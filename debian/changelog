@@ -1,3 +1,9 @@
+nftables (0alpha1) unstable; urgency=low
+
+  * Prepare for Debian upload.
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon,  9 Sep 2013 14:00:00 +0100
+
 nftables (0.01-alpha1) unstable; urgency=low
 
   * initial alpha version

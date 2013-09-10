@@ -1,0 +1,72 @@
+--- pkg-nftables.orig/files/nftables/bridge-filter
++++ pkg-nftables/files/nftables/bridge-filter
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table bridge filter {
+ 	chain input		{ hook NF_INET_LOCAL_IN		-200; }
+--- pkg-nftables.orig/files/nftables/ipv4-filter
++++ pkg-nftables/files/nftables/ipv4-filter
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table filter {
+ 	chain input		{ hook NF_INET_LOCAL_IN		0; }
+--- pkg-nftables.orig/files/nftables/ipv4-mangle
++++ pkg-nftables/files/nftables/ipv4-mangle
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table mangle {
+ 	chain prerouting	{ hook NF_INET_PRE_ROUTING	-150; }
+--- pkg-nftables.orig/files/nftables/ipv4-security
++++ pkg-nftables/files/nftables/ipv4-security
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table security {
+ 	chain input		{ hook NF_INET_LOCAL_IN		50; }
+--- pkg-nftables.orig/files/nftables/ipv6-filter
++++ pkg-nftables/files/nftables/ipv6-filter
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table ip6 filter {
+ 	chain input		{ hook NF_INET_LOCAL_IN		0; }
+--- pkg-nftables.orig/files/nftables/ipv6-raw
++++ pkg-nftables/files/nftables/ipv6-raw
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table ip6 raw {
+ 	chain prerouting	{ hook NF_INET_PRE_ROUTING	-2147483647; }
+--- pkg-nftables.orig/files/nftables/ipv6-security
++++ pkg-nftables/files/nftables/ipv6-security
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table ip6 security {
+ 	chain input		{ hook NF_INET_LOCAL_IN		50; }
+--- pkg-nftables.orig/files/nftables/ipv4-raw
++++ pkg-nftables/files/nftables/ipv4-raw
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table raw {
+ 	chain prerouting	{ hook NF_INET_PRE_ROUTING	-300; }
+--- pkg-nftables.orig/files/nftables/ipv6-mangle
++++ pkg-nftables/files/nftables/ipv6-mangle
+@@ -1,4 +1,4 @@
+-#! nft -f
++#!/sbin/nft -f
+ 
+ table ip6 mangle {
+ 	chain prerouting	{ hook NF_INET_PRE_ROUTING	-150; }

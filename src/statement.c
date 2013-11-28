@@ -122,7 +122,7 @@ static void log_stmt_print(const struct stmt *stmt)
 	if (stmt->log.snaplen)
 		printf(" snaplen %u", stmt->log.snaplen);
 	if (stmt->log.qthreshold)
-		printf(" threshold %u", stmt->log.qthreshold);
+		printf(" queue-threshold %u", stmt->log.qthreshold);
 }
 
 static void log_stmt_destroy(struct stmt *stmt)
@@ -142,10 +142,23 @@ struct stmt *log_stmt_alloc(const struct location *loc)
 	return stmt_alloc(loc, &log_stmt_ops);
 }
 
+static const char *get_unit(uint64_t u)
+{
+	switch (u) {
+	case 1: return "second";
+	case 60: return "minute";
+	case 60 * 60: return "hour";
+	case 60 * 60 * 24: return "day";
+	case 60 * 60 * 24 * 7: return "week";
+	}
+
+	return "error";
+}
+
 static void limit_stmt_print(const struct stmt *stmt)
 {
-	printf("limit rate %" PRIu64 " depth %" PRIu64,
-	       stmt->limit.rate, stmt->limit.depth);
+	printf("limit rate %" PRIu64 "/%s",
+	       stmt->limit.rate, get_unit(stmt->limit.unit));
 }
 
 static const struct stmt_ops limit_stmt_ops = {

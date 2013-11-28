@@ -21,6 +21,7 @@
 #include <gmputil.h>
 #include <utils.h>
 #include <erec.h>
+#include <sys/socket.h>
 
 struct netlink_parse_ctx {
 	struct list_head	*msgs;
@@ -80,9 +81,13 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 	struct stmt *stmt;
 	struct expr *expr;
 
-	if (nft_rule_expr_is_set(nle, NFT_EXPR_IMM_VERDICT))
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_IMM_VERDICT)) {
 		nld.verdict = nft_rule_expr_get_u32(nle, NFT_EXPR_IMM_VERDICT); 
-	else if (nft_rule_expr_is_set(nle, NFT_EXPR_IMM_DATA)) {
+		if  (nft_rule_expr_is_set(nle, NFT_EXPR_IMM_CHAIN)) {
+			nld.chain = nft_rule_expr_get(nle, NFT_EXPR_IMM_CHAIN,
+						      &nld.len);
+		}
+	} else if (nft_rule_expr_is_set(nle, NFT_EXPR_IMM_DATA)) {
 		nld.value = nft_rule_expr_get(nle, NFT_EXPR_IMM_DATA, &nld.len);
 	}
 
@@ -384,8 +389,8 @@ static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
 	struct stmt *stmt;
 
 	stmt = limit_stmt_alloc(loc);
-	stmt->limit.rate  = nft_rule_expr_get_u32(nle, NFT_EXPR_LIMIT_RATE);
-	stmt->limit.depth  = nft_rule_expr_get_u32(nle, NFT_EXPR_LIMIT_DEPTH);
+	stmt->limit.rate  = nft_rule_expr_get_u64(nle, NFT_EXPR_LIMIT_RATE);
+	stmt->limit.unit  = nft_rule_expr_get_u64(nle, NFT_EXPR_LIMIT_UNIT);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -406,9 +411,12 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	struct stmt *stmt;
 	struct expr *addr, *proto;
 	enum nft_registers reg1, reg2;
+	int family;
 
 	stmt = nat_stmt_alloc(loc);
 	stmt->nat.type = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_TYPE);
+
+	family = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_FAMILY);
 
 	reg1 = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_REG_ADDR_MIN);
 	if (reg1) {
@@ -418,7 +426,11 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 					     "NAT statement has no address "
 					     "expression");
 
-		expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
+		if (family == AF_INET)
+			expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
+		else
+			expr_set_type(addr, &ip6addr_type,
+				      BYTEORDER_BIG_ENDIAN);
 		stmt->nat.addr = addr;
 	}
 
@@ -430,7 +442,11 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 					     "NAT statement has no address "
 					     "expression");
 
-		expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
+		if (family == AF_INET)
+			expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
+		else
+			expr_set_type(addr, &ip6addr_type,
+				      BYTEORDER_BIG_ENDIAN);
 		if (stmt->nat.addr != NULL)
 			addr = range_expr_alloc(loc, stmt->nat.addr, addr);
 		stmt->nat.addr = addr;

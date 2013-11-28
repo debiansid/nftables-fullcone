@@ -1,2 +1,0 @@
-shlibs:Depends=libc6 (>= 2.3), libgmp10, libmnl0, libnftables1, libreadline6 (>= 6.0)
-misc:Depends=

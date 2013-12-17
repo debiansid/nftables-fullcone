@@ -1,0 +1,5 @@
+nftables (0.0.0~20131217-1) experimental; urgency=low
+
+  * Closes #522176.
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Thu, 17 Dec 2013 12:39:00 +0100

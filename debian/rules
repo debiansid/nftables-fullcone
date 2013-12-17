@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+configure_opts	:= --prefix=/ --datarootdir=/usr --mandir=/usr/share/man
+
+#override_dh_auto_clean:
+#	make clean
+
+override_dh_auto_test:
+	:
+
+override_dh_auto_configure:
+	./configure $(configure_opts) --
+
+%:
+	dh $@ --with autoreconf

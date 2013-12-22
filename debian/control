@@ -12,7 +12,7 @@ Package: nftables
 Architecture: any
 Section: net
 Depends: ${shlibs:Depends}
-Description: Program to control packet filtering rules by Netfilter project.
+Description: Program to control packet filtering rules by Netfilter project
  These are the user-space administration tools for the Linux
  kernel's netfilter and nftables. netfilter and nftables provide
  a framework for stateful and stateless packet filtering, network

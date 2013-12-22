@@ -7,9 +7,6 @@
 
 configure_opts	:= --prefix=/ --datarootdir=/usr --mandir=/usr/share/man
 
-override_dh_auto_clean:
-	make clean
-
 override_dh_auto_test:
 	:
 

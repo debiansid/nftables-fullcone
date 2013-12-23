@@ -10,7 +10,6 @@ Vcs-Browser: https://github.com/aborrero/pkg-nftables
 
 Package: nftables
 Architecture: any
-Section: net
 Depends: ${shlibs:Depends}
 Description: Program to control packet filtering rules by Netfilter project
  These are the user-space administration tools for the Linux

@@ -356,7 +356,7 @@ const char *expr_op_symbols[] = {
 	[OP_XOR]	= "^",
 	[OP_LSHIFT]	= "<<",
 	[OP_RSHIFT]	= ">>",
-	[OP_EQ]		= NULL,
+	[OP_EQ]		= "==",
 	[OP_NEQ]	= "!=",
 	[OP_LT]		= "<",
 	[OP_GT]		= ">",
@@ -407,7 +407,9 @@ struct expr *unary_expr_alloc(const struct location *loc,
 static void binop_expr_print(const struct expr *expr)
 {
 	expr_print(expr->left);
-	if (expr_op_symbols[expr->op] != NULL)
+	if (expr_op_symbols[expr->op] &&
+	    (expr->op != OP_EQ ||
+	     expr->left->ops->type == EXPR_BINOP))
 		printf(" %s ", expr_op_symbols[expr->op]);
 	else
 		printf(" ");
@@ -642,7 +644,7 @@ struct expr *set_expr_alloc(const struct location *loc)
 static void mapping_expr_print(const struct expr *expr)
 {
 	expr_print(expr->left);
-	printf(" => ");
+	printf(" : ");
 	expr_print(expr->right);
 }
 
@@ -689,7 +691,11 @@ struct expr *mapping_expr_alloc(const struct location *loc,
 static void map_expr_print(const struct expr *expr)
 {
 	expr_print(expr->map);
-	printf(" map ");
+	if (expr->mappings->ops->type == EXPR_SET_REF &&
+	    expr->mappings->set->datatype->type == TYPE_VERDICT)
+		printf(" vmap ");
+	else
+		printf(" map ");
 	expr_print(expr->mappings);
 }
 

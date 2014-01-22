@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <netinet/ip.h>
+#include <netinet/if_ether.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
@@ -149,7 +150,6 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token ASTERISK			"*"
 %token DASH			"-"
 %token AT			"@"
-%token ARROW			"=>"
 %token VMAP			"vmap"
 
 %token INCLUDE			"include"
@@ -182,6 +182,10 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token RETURN			"return"
 %token QUEUE			"queue"
 
+%token CONSTANT			"constant"
+%token INTERVAL			"interval"
+%token ELEMENTS			"elements"
+
 %token <val> NUM		"number"
 %token <string> STRING		"string"
 %token <string> QUOTED_STRING
@@ -193,7 +197,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token BRIDGE			"bridge"
 
-%token ETH			"eth"
+%token ETHER			"ether"
 %token SADDR			"saddr"
 %token DADDR			"daddr"
 %token TYPE			"type"
@@ -291,7 +295,6 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token SKGID			"skgid"
 %token NFTRACE			"nftrace"
 %token RTCLASSID		"rtclassid"
-%token SECMARK			"secmark"
 
 %token CT			"ct"
 %token DIRECTION		"direction"
@@ -353,6 +356,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { chain_free($$); }	chain_block_alloc
 %type <rule>			rule
 %destructor { rule_free($$); }	rule
+
+%type <val>			set_flag_list	set_flag
 
 %type <set>			set_block_alloc set_block
 %destructor { set_free($$); }	set_block_alloc
@@ -451,7 +456,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %type <expr>			meta_expr
 %destructor { expr_free($$); }	meta_expr
-%type <val>			meta_key
+%type <val>			meta_key	meta_key_qualified	meta_key_unqualified
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
@@ -738,6 +743,27 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				}
 				$$ = $1;
 			}
+			|	set_block	FLAGS		set_flag_list	stmt_seperator
+			{
+				$1->flags = $3;
+				$$ = $1;
+			}
+			|	set_block	ELEMENTS	'='		set_expr
+			{
+				$1->init = $4;
+				$$ = $1;
+			}
+			;
+
+set_flag_list		:	set_flag_list	COMMA		set_flag
+			{
+				$$ = $1 | $3;
+			}
+			|	set_flag
+			;
+
+set_flag		:	CONSTANT	{ $$ = SET_F_CONSTANT; }
+			|	INTERVAL	{ $$ = SET_F_INTERVAL; }
 			;
 
 map_block_alloc		:	/* empty */
@@ -751,7 +777,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	common_block
 			|	map_block	stmt_seperator
 			|	map_block	TYPE
-						identifier	ARROW	identifier
+						identifier	COLON	identifier
 						stmt_seperator
 			{
 				$1->keytype = datatype_lookup_byname($3);
@@ -768,6 +794,16 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 					YYERROR;
 				}
 
+				$$ = $1;
+			}
+			|	map_block	FLAGS		set_flag_list	stmt_seperator
+			{
+				$1->flags = $3;
+				$$ = $1;
+			}
+			|	map_block	ELEMENTS	'='		set_expr
+			{
+				$1->init = $4;
 				$$ = $1;
 			}
 			;
@@ -1243,11 +1279,11 @@ set_list_member_expr	:	opt_newline	expr	opt_newline
 			{
 				$$ = $2;
 			}
-			|	opt_newline	map_lhs_expr	ARROW	concat_expr	opt_newline
+			|	opt_newline	map_lhs_expr	COLON	concat_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
 			}
-			|	opt_newline	map_lhs_expr	ARROW	verdict_expr	opt_newline
+			|	opt_newline	map_lhs_expr	COLON	verdict_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
 			}
@@ -1313,12 +1349,22 @@ meta_expr		:	META	meta_key
 			{
 				$$ = meta_expr_alloc(&@$, $2);
 			}
+			|	meta_key_unqualified
+			{
+				$$ = meta_expr_alloc(&@$, $1);
+			}
 			;
 
-meta_key		:	LENGTH		{ $$ = NFT_META_LEN; }
+meta_key		:	meta_key_qualified
+			|	meta_key_unqualified
+			;
+
+meta_key_qualified	:	LENGTH		{ $$ = NFT_META_LEN; }
 			|	PROTOCOL	{ $$ = NFT_META_PROTOCOL; }
 			|	PRIORITY	{ $$ = NFT_META_PRIORITY; }
-			|	MARK		{ $$ = NFT_META_MARK; }
+			;
+
+meta_key_unqualified	:	MARK		{ $$ = NFT_META_MARK; }
 			|	IIF		{ $$ = NFT_META_IIF; }
 			|	IIFNAME		{ $$ = NFT_META_IIFNAME; }
 			|	IIFTYPE		{ $$ = NFT_META_IIFTYPE; }
@@ -1329,12 +1375,15 @@ meta_key		:	LENGTH		{ $$ = NFT_META_LEN; }
 			|	SKGID		{ $$ = NFT_META_SKGID; }
 			|	NFTRACE		{ $$ = NFT_META_NFTRACE; }
 			|	RTCLASSID	{ $$ = NFT_META_RTCLASSID; }
-			|	SECMARK		{ $$ = NFT_META_SECMARK; }
 			;
 
 meta_stmt		:	META	meta_key	SET	expr
 			{
 				$$ = meta_stmt_alloc(&@$, $2, $4);
+			}
+			|	meta_key_unqualified	SET	expr
+			{
+				$$ = meta_stmt_alloc(&@$, $1, $3);
 			}
 			;
 
@@ -1348,7 +1397,6 @@ ct_key			:	STATE		{ $$ = NFT_CT_STATE; }
 			|	DIRECTION	{ $$ = NFT_CT_DIRECTION; }
 			|	STATUS		{ $$ = NFT_CT_STATUS; }
 			|	MARK		{ $$ = NFT_CT_MARK; }
-			|	SECMARK		{ $$ = NFT_CT_SECMARK; }
 			|	EXPIRATION	{ $$ = NFT_CT_EXPIRATION; }
 			|	HELPER		{ $$ = NFT_CT_HELPER; }
 			|	L3PROTOCOL	{ $$ = NFT_CT_L3PROTOCOL; }
@@ -1392,7 +1440,7 @@ payload_base_spec	:	LL_HDR		{ $$ = PAYLOAD_BASE_LL_HDR; }
 			|	TRANSPORT_HDR	{ $$ = PAYLOAD_BASE_TRANSPORT_HDR; }
 			;
 
-eth_hdr_expr		:	ETH	eth_hdr_field
+eth_hdr_expr		:	ETHER	eth_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &payload_eth, $2);
 			}
@@ -1407,6 +1455,13 @@ vlan_hdr_expr		:	VLAN	vlan_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &payload_vlan, $2);
 			}
+			|	VLAN
+			{
+				uint16_t data = ETH_P_8021Q;
+				$$ = constant_expr_alloc(&@$, &ethertype_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
 			;
 
 vlan_hdr_field		:	ID		{ $$ = VLANHDR_VID; }
@@ -1418,6 +1473,13 @@ vlan_hdr_field		:	ID		{ $$ = VLANHDR_VID; }
 arp_hdr_expr		:	ARP	arp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &payload_arp, $2);
+			}
+			|	ARP
+			{
+				uint16_t data = ETH_P_ARP;
+				$$ = constant_expr_alloc(&@$, &ethertype_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -1431,6 +1493,13 @@ arp_hdr_field		:	HTYPE		{ $$ = ARPHDR_HRD; }
 ip_hdr_expr		:	IP	ip_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &payload_ip, $2);
+			}
+			|	IP
+			{
+				uint16_t data = ETH_P_IP;
+				$$ = constant_expr_alloc(&@$, &ethertype_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -1472,6 +1541,13 @@ icmp_hdr_field		:	TYPE		{ $$ = ICMPHDR_TYPE; }
 ip6_hdr_expr		:	IP6	ip6_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &payload_ip6, $2);
+			}
+			|	IP6
+			{
+				uint16_t data = ETH_P_IPV6;
+				$$ = constant_expr_alloc(&@$, &ethertype_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 

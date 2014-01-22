@@ -14,10 +14,10 @@
 #include <errno.h>
 #include <libmnl/libmnl.h>
 
-#include <libnftables/table.h>
-#include <libnftables/chain.h>
-#include <libnftables/expr.h>
-#include <libnftables/set.h>
+#include <libnftnl/table.h>
+#include <libnftnl/chain.h>
+#include <libnftnl/expr.h>
+#include <libnftnl/set.h>
 #include <linux/netfilter/nf_tables.h>
 
 #include <nftables.h>
@@ -157,13 +157,22 @@ static struct nft_set_elem *alloc_nft_setelem(const struct expr *expr)
 		nft_set_elem_attr_set(nlse, NFT_SET_ELEM_ATTR_KEY,
 				      &nld.value, nld.len);
 		netlink_gen_data(expr->right, &nld);
-		if (expr->right->ops->type == EXPR_VERDICT) {
+		switch (expr->right->ops->type) {
+		case EXPR_VERDICT:
 			nft_set_elem_attr_set_u32(nlse, NFT_SET_ELEM_ATTR_VERDICT,
 						  expr->right->verdict);
 			if (expr->chain != NULL) {
 				nft_set_elem_attr_set(nlse, NFT_SET_ELEM_ATTR_CHAIN,
 						nld.chain, strlen(nld.chain));
 			}
+			break;
+		case EXPR_VALUE:
+			nft_set_elem_attr_set(nlse, NFT_SET_ELEM_ATTR_DATA,
+					      nld.value, nld.len);
+			break;
+		default:
+			BUG("unexpected set element expression\n");
+			break;
 		}
 	}
 
@@ -369,7 +378,7 @@ void netlink_dump_rule(struct nft_rule *nlr)
 		return;
 
 	nft_rule_snprintf(buf, sizeof(buf), nlr, 0, 0);
-	fprintf(stderr, "%s\n", buf);
+	fprintf(stdout, "%s\n", buf);
 #endif
 }
 
@@ -382,7 +391,7 @@ void netlink_dump_expr(struct nft_rule_expr *nle)
 		return;
 
 	nft_rule_expr_snprintf(buf, sizeof(buf), nle, 0, 0);
-	fprintf(stderr, "%s\n", buf);
+	fprintf(stdout, "%s\n", buf);
 #endif
 }
 
@@ -437,7 +446,7 @@ void netlink_dump_chain(struct nft_chain *nlc)
 		return;
 
 	nft_chain_snprintf(buf, sizeof(buf), nlc, 0, 0);
-	fprintf(stderr, "%s\n", buf);
+	fprintf(stdout, "%s\n", buf);
 #endif
 }
 
@@ -656,7 +665,7 @@ void netlink_dump_table(struct nft_table *nlt)
 		return;
 
 	nft_table_snprintf(buf, sizeof(buf), nlt, 0, 0);
-	fprintf(stderr, "%s\n", buf);
+	fprintf(stdout, "%s\n", buf);
 #endif
 }
 
@@ -754,7 +763,7 @@ void netlink_dump_set(struct nft_set *nls)
 		return;
 
 	nft_set_snprintf(buf, sizeof(buf), nls, 0, 0);
-	fprintf(stderr, "%s\n", buf);
+	fprintf(stdout, "%s\n", buf);
 #endif
 }
 
@@ -994,6 +1003,9 @@ static int list_setelem_cb(struct nft_set_elem *nlse, void *arg)
 					  set->datatype->type == TYPE_VERDICT ?
 					  NFT_REG_VERDICT : NFT_REG_1);
 		data->dtype = set->datatype;
+		data->byteorder = set->datatype->byteorder;
+		if (data->byteorder == BYTEORDER_HOST_ENDIAN)
+			mpz_switch_byteorder(data->value, data->len / BITS_PER_BYTE);
 
 		expr = mapping_expr_alloc(&internal_location, expr, data);
 	}

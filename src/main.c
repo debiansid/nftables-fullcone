@@ -111,7 +111,7 @@ static void show_help(const char *name)
 "  -a/--handle			Output rule handle.\n"
 "  -I/--includepath <directory>	Add <directory> to the paths searched for include files.\n"
 #ifdef DEBUG
-"  --debug <level [,level...]>	Specify debugging level (scanner, parser, eval, netlink, all)\n"
+"  --debug <level [,level...]>	Specify debugging level (scanner, parser, eval, netlink, mnl, segtree, all)\n"
 #endif
 "\n",
 	name);
@@ -139,6 +139,14 @@ static const struct {
 		.level		= DEBUG_NETLINK,
 	},
 	{
+		.name		= "mnl",
+		.level		= DEBUG_MNL,
+	},
+	{
+		.name		= "segtree",
+		.level		= DEBUG_SEGTREE,
+	},
+	{
 		.name		= "all",
 		.level		= ~0,
 	},
@@ -156,9 +164,10 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 	struct cmd *cmd, *next;
 	struct mnl_err *err, *tmp;
 	LIST_HEAD(err_list);
+	uint32_t batch_seqnum;
 	int ret = 0;
 
-	mnl_batch_begin();
+	batch_seqnum = mnl_batch_begin();
 	list_for_each_entry(cmd, &state->cmds, list) {
 		memset(&ctx, 0, sizeof(ctx));
 		ctx.msgs = msgs;
@@ -179,12 +188,15 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 
 	list_for_each_entry_safe(err, tmp, &err_list, head) {
 		list_for_each_entry(cmd, &state->cmds, list) {
-			if (err->seqnum == cmd->seqnum) {
+			if (err->seqnum == cmd->seqnum ||
+			    err->seqnum == batch_seqnum) {
 				netlink_io_error(&ctx, &cmd->location,
-					"Could not process rule in batch: %s",
-					strerror(err->err));
-				mnl_err_list_free(err);
-				break;
+						 "Could not process rule: %s",
+						 strerror(err->err));
+				if (err->seqnum == cmd->seqnum) {
+					mnl_err_list_free(err);
+					break;
+				}
 			}
 		}
 	}

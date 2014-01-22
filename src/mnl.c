@@ -9,11 +9,11 @@
  */
 
 #include <libmnl/libmnl.h>
-#include <libnftables/table.h>
-#include <libnftables/chain.h>
-#include <libnftables/rule.h>
-#include <libnftables/expr.h>
-#include <libnftables/set.h>
+#include <libnftnl/table.h>
+#include <libnftnl/chain.h>
+#include <libnftnl/rule.h>
+#include <libnftnl/expr.h>
+#include <libnftnl/set.h>
 
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
@@ -37,6 +37,11 @@ mnl_talk(struct mnl_socket *nf_sock, const void *data, unsigned int len,
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	uint32_t portid = mnl_socket_get_portid(nf_sock);
 	int ret;
+
+#ifdef DEBUG
+	if (debug_level & DEBUG_MNL)
+		mnl_nlmsg_fprintf(stdout, data, len, sizeof(struct nfgenmsg));
+#endif
 
 	if (mnl_socket_sendto(nf_sock, data, len) < 0)
 		return -1;
@@ -101,7 +106,7 @@ static void mnl_batch_page_add(void)
 	batch = mnl_batch_alloc();
 }
 
-static void mnl_batch_put(int type)
+static uint32_t mnl_batch_put(int type)
 {
 	struct nlmsghdr *nlh;
 	struct nfgenmsg *nfg;
@@ -118,11 +123,13 @@ static void mnl_batch_put(int type)
 
 	if (!mnl_nlmsg_batch_next(batch))
 		mnl_batch_page_add();
+
+	return nlh->nlmsg_seq;
 }
 
-void mnl_batch_begin(void)
+uint32_t mnl_batch_begin(void)
 {
-	mnl_batch_put(NFNL_MSG_BATCH_BEGIN);
+	return mnl_batch_put(NFNL_MSG_BATCH_BEGIN);
 }
 
 void mnl_batch_end(void)
@@ -200,7 +207,7 @@ static ssize_t mnl_nft_socket_sendmsg(const struct mnl_socket *nl)
 		iov[i].iov_len = mnl_nlmsg_batch_size(batch_page->batch);
 		i++;
 #ifdef DEBUG
-		if (debug_level & DEBUG_NETLINK) {
+		if (debug_level & DEBUG_MNL) {
 			mnl_nlmsg_fprintf(stdout,
 					  mnl_nlmsg_batch_head(batch_page->batch),
 					  mnl_nlmsg_batch_size(batch_page->batch),
@@ -387,7 +394,7 @@ int mnl_nft_chain_add(struct mnl_socket *nf_sock, struct nft_chain *nlc,
 
 	nlh = nft_chain_nlmsg_build_hdr(buf, NFT_MSG_NEWCHAIN,
 			nft_chain_attr_get_u32(nlc, NFT_CHAIN_ATTR_FAMILY),
-			NLM_F_ACK|flags, seq);
+			NLM_F_CREATE|NLM_F_ACK|flags, seq);
 	nft_chain_nlmsg_build_payload(nlh, nlc);
 
 	return mnl_talk(nf_sock, nlh, nlh->nlmsg_len, NULL, NULL);

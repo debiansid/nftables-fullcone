@@ -982,7 +982,7 @@ static const struct symbol_table ethertype_tbl = {
 	.symbols	= {
 		SYMBOL("ip",		ETH_P_IP),
 		SYMBOL("arp",		ETH_P_ARP),
-		SYMBOL("ipv6",		ETH_P_IPV6),
+		SYMBOL("ip6",		ETH_P_IPV6),
 		SYMBOL("vlan",		ETH_P_8021Q),
 		SYMBOL_LIST_END
 	},
@@ -993,6 +993,7 @@ static struct error_record *ethertype_parse(const struct expr *sym,
 {
 	struct error_record *erec;
 
+	*res = NULL;
 	erec = sym->dtype->basetype->parse(sym, res);
 	if (erec != NULL)
 		return erec;
@@ -1026,7 +1027,7 @@ const struct datatype ethertype_type = {
 	ETHHDR_TEMPLATE(__name, &etheraddr_type, __member)
 
 const struct payload_desc payload_eth = {
-	.name		= "eth",
+	.name		= "ether",
 	.base		= PAYLOAD_BASE_LL_HDR,
 	.protocol_key	= ETHHDR_TYPE,
 	.protocols	= {

@@ -2,7 +2,7 @@ Source: nftables
 Section: net
 Priority: important
 Maintainer: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
-Build-Depends: debhelper (>= 9), dh-autoreconf, automake, libtool (>=2.2.6), libmnl-dev, flex, bison, libnftables-dev, libgmp-dev, libreadline-dev, docbook2x
+Build-Depends: debhelper (>= 9), dh-autoreconf, automake, libtool (>=2.2.6), libmnl-dev, flex, bison, libnftnl-dev, libgmp-dev, libreadline-dev, docbook2x
 Standards-Version: 3.9.4
 Homepage: http://www.netfilter.org/
 Vcs-Git: git://github.com/aborrero/pkg-nftables.git

@@ -22,7 +22,14 @@ configure:		configure.ac
 
 %.c %.h:		%.y	$(makedeps)
 			@echo -e "  YACC\t\t$<"
-			$(YACC) $(YACCFLAGS) -d -o $@ $<
+			$(YACC) $(YACCFLAGS) --defines=$*.h.tmp -o $@ $<
+			( \
+				echo "#ifndef __$(*F)_H"; \
+				echo "#define __$(*F)_H"; \
+				cat $*.h.tmp; \
+				echo "#endif /* __$(*F)_H */" \
+			) > $*.h
+			$(RM) $*.h.tmp
 
 %.c %.h:		%.l	$(makedeps)
 			@echo -e "  LEX\t\t$<"
@@ -61,7 +68,7 @@ clean_targets		+= $(1)-clean
 $(1)-install:
 			@echo -e "  INSTALL\t$1"
 			$(MKDIR_P) $$(DESTDIR)/$$($(1)-destdir)
-			$(INSTALL) -m 755 -o root -g root \
+			$(INSTALL) -m 755 -p \
 				$(SUBDIR)$(1) \
 				$$(DESTDIR)/$$($(1)-destdir)/$(1)
 install_targets		+= $(1)-install

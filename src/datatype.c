@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <ctype.h> /* isdigit */
 #include <errno.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -230,10 +231,8 @@ static struct error_record *integer_type_parse(const struct expr *sym,
 	if (gmp_sscanf(sym->identifier, "%Zu%n", v, &len) != 1 ||
 	    (int)strlen(sym->identifier) != len) {
 		mpz_clear(v);
-		if (sym->dtype != &integer_type) {
-			return error(&sym->location, "This is not a valid %s",
-				     sym->dtype->desc);
-		}
+		if (sym->dtype != &integer_type)
+			return NULL;
 		return error(&sym->location, "Could not parse %s",
 			     sym->dtype->desc);
 	}
@@ -382,6 +381,7 @@ const struct datatype ipaddr_type = {
 	.basetype	= &integer_type,
 	.print		= ipaddr_type_print,
 	.parse		= ipaddr_type_parse,
+	.flags		= DTYPE_F_PREFIX,
 };
 
 static void ip6addr_type_print(const struct expr *expr)
@@ -439,6 +439,7 @@ const struct datatype ip6addr_type = {
 	.basetype	= &integer_type,
 	.print		= ip6addr_type_print,
 	.parse		= ip6addr_type_parse,
+	.flags		= DTYPE_F_PREFIX,
 };
 
 static void inet_protocol_type_print(const struct expr *expr)
@@ -645,6 +646,7 @@ static struct error_record *mark_type_parse(const struct expr *sym,
 		}
 	}
 
+	*res = NULL;
 	erec = sym->dtype->basetype->parse(sym, res);
 	if (erec != NULL)
 		return erec;
@@ -663,12 +665,12 @@ const struct datatype mark_type = {
 	.basefmt	= "0x%.8Zx",
 	.print		= mark_type_print,
 	.parse		= mark_type_parse,
+	.flags		= DTYPE_F_PREFIX,
 };
 
 static void time_type_print(const struct expr *expr)
 {
 	uint64_t days, hours, minutes, seconds;
-	const char *delim = "";
 
 	seconds = mpz_get_uint64(expr->value);
 
@@ -681,22 +683,123 @@ static void time_type_print(const struct expr *expr)
 	minutes = seconds / 60;
 	seconds %= 60;
 
-	if (days > 0) {
-		printf("%s%" PRIu64 " d", delim, days);
-		delim = " ";
+	printf("\"");
+
+	if (days > 0)
+		printf("%"PRIu64"d", days);
+	if (hours > 0)
+		printf("%"PRIu64"h", hours);
+	if (minutes > 0)
+		printf("%"PRIu64"m", minutes);
+	if (seconds > 0)
+		printf("%"PRIu64"s", seconds);
+
+	printf("\"");
+}
+
+enum {
+	DAY	= (1 << 0),
+	HOUR	= (1 << 1),
+	MIN 	= (1 << 2),
+	SECS	= (1 << 3),
+};
+
+static uint32_t str2int(char *tmp, const char *c, int k)
+{
+	if (k == 0)
+		return 0;
+
+	strncpy(tmp, c-k, k+1);
+	return atoi(tmp);
+}
+
+static struct error_record *time_type_parse(const struct expr *sym,
+					    struct expr **res)
+{
+	int i, len;
+	unsigned int k = 0;
+	char tmp[8];
+	const char *c;
+	uint64_t d = 0, h = 0, m = 0, s = 0;
+	uint32_t mask = 0;
+
+	c = sym->identifier;
+	len = strlen(c);
+	for (i = 0; i < len; i++, c++) {
+		switch (*c) {
+		case 'd':
+			if (mask & DAY) {
+				return error(&sym->location,
+					     "Day has been specified twice");
+			}
+			d = str2int(tmp, c, k);
+			k = 0;
+			mask |= DAY;
+			break;
+		case 'h':
+			if (mask & HOUR) {
+				return error(&sym->location,
+					     "Hour has been specified twice");
+			}
+			h = str2int(tmp, c, k);
+			k = 0;
+			if (h > 23) {
+				return error(&sym->location,
+					     "Hour needs to be 0-23");
+			}
+			mask |= HOUR;
+			break;
+		case 'm':
+			if (mask & MIN) {
+				return error(&sym->location,
+					     "Minute has been specified twice");
+			}
+			m = str2int(tmp, c, k);
+			k = 0;
+			if (m > 59) {
+				return error(&sym->location,
+					     "Minute needs to be 0-59");
+			}
+			mask |= MIN;
+			break;
+		case 's':
+			if (mask & SECS) {
+				return error(&sym->location,
+					     "Second has been specified twice");
+			}
+			s = str2int(tmp, c, k);
+			k = 0;
+			if (s > 59) {
+				return error(&sym->location,
+					     "second needs to be 0-59");
+			}
+			mask |= SECS;
+			break;
+		default:
+			if (!isdigit(*c))
+				return error(&sym->location, "wrong format");
+
+			if (k++ >= array_size(tmp)) {
+				return error(&sym->location,
+					     "value too large");
+			}
+			break;
+		}
 	}
-	if (hours > 0) {
-		printf("%s%" PRIu64 " h", delim, hours);
-		delim = " ";
-	}
-	if (minutes > 0) {
-		printf("%s%" PRIu64 " min", delim, minutes);
-		delim = " ";
-	}
-	if (seconds > 0) {
-		printf("%s%" PRIu64 " s", delim, seconds);
-		delim = " ";
-	}
+
+	/* default to seconds if no unit was specified */
+	if (!mask)
+		s = atoi(sym->identifier);
+	else
+		s = 24*60*60*d+60*60*h+60*m+s;
+
+	if (s > UINT32_MAX)
+		return error(&sym->location, "value too large");
+
+	*res = constant_expr_alloc(&sym->location, &time_type,
+				   BYTEORDER_HOST_ENDIAN,
+				   sizeof(uint32_t) * BITS_PER_BYTE, &s);
+	return NULL;
 }
 
 const struct datatype time_type = {
@@ -707,6 +810,7 @@ const struct datatype time_type = {
 	.size		= 8 * BITS_PER_BYTE,
 	.basetype	= &integer_type,
 	.print		= time_type_print,
+	.parse		= time_type_parse,
 };
 
 static struct error_record *concat_type_parse(const struct expr *sym,

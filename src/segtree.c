@@ -157,6 +157,15 @@ static void __ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 	rb_insert_color(&new->rb_node, &tree->root);
 }
 
+static bool segtree_debug(void)
+{
+#ifdef DEBUG
+	if (debug_level & DEBUG_SEGTREE)
+		return true;
+#endif
+	return false;
+}
+
 /**
  * ei_insert - insert an elementary interval into the tree
  *
@@ -180,7 +189,8 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 	lei = ei_lookup(tree, new->left);
 	rei = ei_lookup(tree, new->right);
 
-	pr_debug("insert: [%Zx %Zx]\n", new->left, new->right);
+	if (segtree_debug())
+		pr_debug("insert: [%Zx %Zx]\n", new->left, new->right);
 
 	if (lei != NULL && rei != NULL && lei == rei) {
 		/*
@@ -189,7 +199,8 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 		 *
 		 * [lei_left, new_left) and (new_right, rei_right]
 		 */
-		pr_debug("split [%Zx %Zx]\n", lei->left, lei->right);
+		if (segtree_debug())
+			pr_debug("split [%Zx %Zx]\n", lei->left, lei->right);
 
 		ei_remove(tree, lei);
 
@@ -208,7 +219,10 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 			 *
 			 * [lei_left, new_left)[new_left, new_right]
 			 */
-			pr_debug("adjust left [%Zx %Zx]\n", lei->left, lei->right);
+			if (segtree_debug()) {
+				pr_debug("adjust left [%Zx %Zx]\n",
+					 lei->left, lei->right);
+			}
 
 			mpz_sub_ui(lei->right, new->left, 1);
 			mpz_sub(lei->size, lei->right, lei->left);
@@ -223,7 +237,10 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 			 *
 			 * [new_left, new_right](new_right, rei_right]
 			 */
-			pr_debug("adjust right [%Zx %Zx]\n", rei->left, rei->right);
+			if (segtree_debug()) {
+				pr_debug("adjust right [%Zx %Zx]\n",
+					 rei->left, rei->right);
+			}
 
 			mpz_add_ui(rei->left, new->right, 1);
 			mpz_sub(rei->size, rei->right, rei->left);
@@ -350,7 +367,7 @@ static void set_to_segtree(struct expr *set, struct seg_tree *tree)
 	for (n = 0; n < set->size; n++) {
 		if (n < set->size - 1 &&
 		    interval_conflict(intervals[n], intervals[n+1]))
-			printf("conflict\n");
+			pr_debug("conflict\n");
 		ei_insert(tree, intervals[n]);
 	}
 
@@ -371,7 +388,8 @@ static void segtree_linearize(struct list_head *list, struct seg_tree *tree)
 	 * Convert the tree of open intervals to half-closed map expressions.
 	 */
 	rb_for_each_entry_safe(ei, node, next, &tree->root, rb_node) {
-		pr_debug("iter: [%Zx %Zx]\n", ei->left, ei->right);
+		if (segtree_debug())
+			pr_debug("iter: [%Zx %Zx]\n", ei->left, ei->right);
 
 		if (prev == NULL) {
 			/*
@@ -454,14 +472,19 @@ void set_to_intervals(struct set *set)
 	segtree_linearize(&list, &tree);
 
 	list_for_each_entry_safe(ei, next, &list, list) {
-		pr_debug("list: [%.*Zx %.*Zx]\n",
-			 2 * tree.keylen / BITS_PER_BYTE, ei->left,
-			 2 * tree.keylen / BITS_PER_BYTE, ei->right);
+		if (segtree_debug()) {
+			pr_debug("list: [%.*Zx %.*Zx]\n",
+				 2 * tree.keylen / BITS_PER_BYTE, ei->left,
+				 2 * tree.keylen / BITS_PER_BYTE, ei->right);
+		}
 		set_insert_interval(set->init, &tree, ei);
 		ei_destroy(ei);
 	}
 
-	expr_print(set->init); printf("\n");
+	if (segtree_debug()) {
+		expr_print(set->init);
+		pr_debug("\n");
+	}
 }
 
 static bool range_is_prefix(const mpz_t range)
@@ -486,10 +509,11 @@ static struct expr *expr_value(struct expr *expr)
 
 void interval_map_decompose(struct expr *set)
 {
-	struct expr *ranges[set->size];
-	struct expr *i, *next, *low = NULL;
+	struct expr *ranges[set->size * 2];
+	struct expr *i, *next, *low = NULL, *end;
 	unsigned int n, size;
 	mpz_t range, p;
+	bool interval;
 
 	mpz_init(range);
 	mpz_init(p);
@@ -497,8 +521,20 @@ void interval_map_decompose(struct expr *set)
 	size = set->size;
 	n = 0;
 
+	interval = false;
 	list_for_each_entry_safe_reverse(i, next, &set->expressions, list) {
 		compound_expr_remove(set, i);
+
+		if (i->flags & EXPR_F_INTERVAL_END)
+			interval = false;
+		else if (interval) {
+			end = expr_clone(expr_value(i));
+			end->flags |= EXPR_F_INTERVAL_END;
+			ranges[n++] = end;
+			size++;
+		} else
+			interval = true;
+
 		ranges[n++] = i;
 	}
 
@@ -529,7 +565,9 @@ void interval_map_decompose(struct expr *set)
 
 		if (!mpz_cmp_ui(range, 0))
 			compound_expr_add(set, low);
-		else if (!range_is_prefix(range) || mpz_cmp_ui(p, 0)) {
+		else if ((!range_is_prefix(range) ||
+			  !(i->dtype->flags & DTYPE_F_PREFIX)) ||
+			 mpz_cmp_ui(p, 0)) {
 			struct expr *tmp;
 
 			tmp = constant_expr_alloc(&low->location, low->dtype,
@@ -544,8 +582,6 @@ void interval_map_decompose(struct expr *set)
 				tmp = mapping_expr_alloc(&tmp->location, tmp, low->right);
 
 			compound_expr_add(set, tmp);
-
-			low = expr_get(tmp->right);
 		} else {
 			struct expr *prefix;
 			unsigned int prefix_len;
@@ -553,13 +589,9 @@ void interval_map_decompose(struct expr *set)
 			prefix_len = expr_value(i)->len - mpz_scan0(range, 0);
 			prefix = prefix_expr_alloc(&low->location, expr_value(low),
 						   prefix_len);
-
-			if (low->ops->type == EXPR_MAPPING) {
+			if (low->ops->type == EXPR_MAPPING)
 				prefix = mapping_expr_alloc(&low->location, prefix,
 							    low->right);
-				/* Update mapping of "low" to the current mapping */
-				low->right = expr_get(i->right);
-			}
 
 			compound_expr_add(set, prefix);
 		}
@@ -569,5 +601,19 @@ void interval_map_decompose(struct expr *set)
 			low = NULL;
 		}
 		expr_free(i);
+	}
+
+	/* Unclosed interval */
+	if (low != NULL) {
+		i = constant_expr_alloc(&low->location, low->dtype,
+					low->byteorder, expr_value(low)->len,
+					NULL);
+		mpz_init_bitmask(i->value, i->len);
+
+		i = range_expr_alloc(&low->location, expr_value(low), i);
+		if (low->ops->type == EXPR_MAPPING)
+			i = mapping_expr_alloc(&i->location, i, low->right);
+
+		compound_expr_add(set, i);
 	}
 }

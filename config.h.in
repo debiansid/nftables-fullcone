@@ -18,8 +18,8 @@
 /* Define to 1 if you have the `mnl' library (-lmnl). */
 #undef HAVE_LIBMNL
 
-/* Define to 1 if you have the `nftables' library (-lnftables). */
-#undef HAVE_LIBNFTABLES
+/* Define to 1 if you have the `nftnl' library (-lnftnl). */
+#undef HAVE_LIBNFTNL
 
 /* Define to 1 if you have the `readline' library (-lreadline). */
 #undef HAVE_LIBREADLINE

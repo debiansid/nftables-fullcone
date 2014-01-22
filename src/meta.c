@@ -61,6 +61,7 @@ static const struct datatype realm_type = {
 	.basetype	= &integer_type,
 	.print		= realm_type_print,
 	.parse		= realm_type_parse,
+	.flags		= DTYPE_F_PREFIX,
 };
 
 static void tchandle_type_print(const struct expr *expr)
@@ -327,13 +328,20 @@ static const struct meta_template meta_templates[] = {
 						1    , BYTEORDER_HOST_ENDIAN),
 	[NFT_META_RTCLASSID]	= META_TEMPLATE("rtclassid", &realm_type,
 						4 * 8, BYTEORDER_HOST_ENDIAN),
-	[NFT_META_SECMARK]	= META_TEMPLATE("secmark",   &integer_type,
-						4 * 8, BYTEORDER_HOST_ENDIAN),
 };
 
 static void meta_expr_print(const struct expr *expr)
 {
-	printf("meta %s", meta_templates[expr->meta.key].token);
+	switch (expr->meta.key) {
+	case NFT_META_LEN:
+	case NFT_META_PROTOCOL:
+	case NFT_META_PRIORITY:
+		printf("meta %s", meta_templates[expr->meta.key].token);
+		break;
+	default:
+		printf("%s", meta_templates[expr->meta.key].token);
+		break;
+	}
 }
 
 static void meta_expr_clone(struct expr *new, const struct expr *expr)

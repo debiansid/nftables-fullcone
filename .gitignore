@@ -1,0 +1,10 @@
+Makefile
+Makefile.defs
+Makefile.rules
+config.h
+config.log
+config.status
+doc/Makefile
+files/Makefile
+src/Makefile
+

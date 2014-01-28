@@ -1,6 +1,6 @@
 Source: nftables
 Section: net
-Priority: important
+Priority: extra
 Maintainer: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
 Build-Depends: automake,
                bison,

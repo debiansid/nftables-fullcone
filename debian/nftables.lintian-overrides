@@ -3,3 +3,7 @@ nftables: no-upstream-changelog
 
 # The nftables doc system can't be changed easily, and this is a minor thing.
 nftables: hyphen-used-as-minus-sign
+
+# False positive. See the auto-generated 'Makefile.defs' file.
+nftables: hardening-no-fortify-functions
+

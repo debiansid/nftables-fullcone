@@ -1,5 +1,5 @@
-nftables (0.100-1) experimental; urgency=low
+nftables (0.099+git20140120-1) unstable; urgency=low
 
   * Initial release (Closes: #522176)
 
- -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Thu, 23 Jan 2014 12:39:00 +0100
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 12 Mar 2014 19:51:35 +0100

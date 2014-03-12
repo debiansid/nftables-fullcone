@@ -1,6 +1,3 @@
-# In this early version, the upstream does not provide a changelog.
-nftables: no-upstream-changelog
-
 # The nftables doc system can't be changed easily, and this is a minor thing.
 nftables: hyphen-used-as-minus-sign
 

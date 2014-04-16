@@ -4,8 +4,8 @@
 AC_PREREQ(2.61)
 
 AC_COPYRIGHT([Copyright (c) 2008 Patrick McHardy <kaber@trash.net>])
-AC_INIT([nftables], [0.099], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["keith-alexander-filter"], [Release name])
+AC_INIT([nftables], [0.2], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Support Edward Snowden"], [Release name])
 
 AC_CONFIG_SRCDIR([src/rule.c])
 AC_CONFIG_HEADER([config.h])
@@ -25,16 +25,28 @@ AC_PROG_MKDIR_P
 AC_PROG_INSTALL
 AC_PROG_SED
 
-AC_CHECK_PROG(CONFIG_MAN, docbook2x-man, y, n)
-if test "$CONFIG_MAN" != "y"
+AC_CHECK_PROG(CONFIG_MAN1, [docbook2x-man], [y], [n])
+if test "$CONFIG_MAN1" == "y"
 then
-	AC_MSG_WARN([docbookx2-man not found, no manpages will be built])
+	CONFIG_MAN=y
+	DB2MAN=docbook2x-man
+else
+	AC_CHECK_PROG(CONFIG_MAN2, [db2x_docbook2man], [y], [n])
+	if test "$CONFIG_MAN2" == "y"
+	then
+		CONFIG_MAN=y
+		DB2MAN=db2x_docbook2man
+	else
+		AC_MSG_WARN([docbookx2-man/db2x_docbook2man not found, no manpages will be built])
+	fi
 fi
+AC_SUBST(CONFIG_MAN)
+AC_SUBST(DB2MAN)
 
-AC_CHECK_PROG(CONFIG_PDF, db2pdf, y, n)
+AC_CHECK_PROG(CONFIG_PDF, dblatex, y, n)
 if test "$CONFIG_PDF" != "y"
 then
-	AC_MSG_WARN([db2pdf not found, no PDF manpages will be built])
+	AC_MSG_WARN([dblatex not found, no PDF manpages will be built])
 fi
 
 AC_PATH_PROG(LEX, [flex])
@@ -88,8 +100,6 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memmove memset strchr strdup strerror strtoull])
 
 AC_CONFIG_FILES([Makefile Makefile.defs Makefile.rules])

@@ -70,6 +70,7 @@ static void update_pos(struct parser_state *state, struct location *loc,
 {
 	loc->indesc			= state->indesc;
 	loc->first_line			= state->indesc->lineno;
+	loc->last_line			= state->indesc->lineno;
 	loc->first_column		= state->indesc->column;
 	loc->last_column		= state->indesc->column + len - 1;
 	state->indesc->column		+= len;
@@ -88,7 +89,6 @@ static void reset_pos(struct parser_state *state, struct location *loc)
 	state->indesc->line_offset	= state->indesc->token_offset;
 	state->indesc->lineno		+= 1;
 	state->indesc->column		= 1;
-	loc->line_offset		= state->indesc->line_offset;
 }
 
 #define YY_USER_ACTION {					\
@@ -245,16 +245,20 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "jump"			{ return JUMP; }
 "goto"			{ return GOTO; }
 "return"		{ return RETURN; }
-"queue"			{ return QUEUE; }
+
+"inet"			{ return INET; }
 
 "add"			{ return ADD; }
+"create"		{ return CREATE; }
 "insert"		{ return INSERT; }
 "delete"		{ return DELETE; }
 "list"			{ return LIST; }
 "flush"			{ return FLUSH; }
 "rename"		{ return RENAME; }
+"export"		{ return EXPORT; }
 
 "position"		{ return POSITION; }
+"comment"		{ return COMMENT; }
 
 "constant"		{ return CONSTANT; }
 "interval"		{ return INTERVAL; }
@@ -269,6 +273,13 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "group"			{ return GROUP; }
 "snaplen"		{ return SNAPLEN; }
 "queue-threshold"	{ return QUEUE_THRESHOLD; }
+
+"queue"			{ return QUEUE;}
+"num"			{ return QUEUENUM;}
+"total"			{ return QUEUETOTAL;}
+"bypass"		{ return QUEUEBYPASS;}
+"fanout"		{ return QUEUECPUFANOUT;}
+"options"		{ return OPTIONS;}
 
 "limit"			{ return LIMIT; }
 "rate"			{ return RATE; }
@@ -378,6 +389,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "mh"			{ return MH; }
 
 "meta"			{ return META; }
+"nfproto"		{ return NFPROTO; }
+"l4proto"		{ return L4PROTO; }
 "mark"			{ return MARK; }
 "iif"			{ return IIF; }
 "iifname"		{ return IIFNAME; }
@@ -399,6 +412,10 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "l3proto"		{ return L3PROTOCOL; }
 "proto-src"		{ return PROTO_SRC; }
 "proto-dst"		{ return PROTO_DST; }
+"label"			{ return LABEL; }
+
+"xml"			{ return XML; }
+"json"			{ return JSON; }
 
 {addrstring}		{
 				yylval->string = xstrdup(yytext);

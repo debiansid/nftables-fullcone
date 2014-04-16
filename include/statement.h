@@ -59,6 +59,25 @@ struct nat_stmt {
 
 extern struct stmt *nat_stmt_alloc(const struct location *loc);
 
+struct queue_stmt {
+	uint16_t		queuenum;
+	uint16_t		queues_total;
+	uint16_t		flags;
+};
+
+extern struct stmt *queue_stmt_alloc(const struct location *loc);
+
+#include <ct.h>
+struct ct_stmt {
+	enum nft_ct_keys		key;
+	const struct ct_template	*tmpl;
+	struct expr			*expr;
+};
+
+extern struct stmt *ct_stmt_alloc(const struct location *loc,
+				  enum nft_ct_keys key,
+				  struct expr *expr);
+
 /**
  * enum stmt_types - statement types
  *
@@ -71,6 +90,8 @@ extern struct stmt *nat_stmt_alloc(const struct location *loc);
  * @STMT_LOG:		log statement
  * @STMT_REJECT:	REJECT statement
  * @STMT_NAT:		NAT statement
+ * @STMT_QUEUE:		QUEUE statement
+ * @STMT_CT:		conntrack statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -82,6 +103,8 @@ enum stmt_types {
 	STMT_LOG,
 	STMT_REJECT,
 	STMT_NAT,
+	STMT_QUEUE,
+	STMT_CT,
 };
 
 /**
@@ -127,6 +150,8 @@ struct stmt {
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;
 		struct nat_stmt		nat;
+		struct queue_stmt	queue;
+		struct ct_stmt		ct;
 	};
 };
 

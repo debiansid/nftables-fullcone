@@ -26,6 +26,7 @@
 #include <erec.h>
 #include <mnl.h>
 
+unsigned int max_errors = 10;
 unsigned int numeric_output;
 unsigned int handle_output;
 #ifdef DEBUG
@@ -111,7 +112,7 @@ static void show_help(const char *name)
 "  -a/--handle			Output rule handle.\n"
 "  -I/--includepath <directory>	Add <directory> to the paths searched for include files.\n"
 #ifdef DEBUG
-"  --debug <level [,level...]>	Specify debugging level (scanner, parser, eval, netlink, mnl, segtree, all)\n"
+"  --debug <level [,level...]>	Specify debugging level (scanner, parser, eval, netlink, mnl, proto-ctx, segtree, all)\n"
 #endif
 "\n",
 	name);
@@ -141,6 +142,10 @@ static const struct {
 	{
 		.name		= "mnl",
 		.level		= DEBUG_MNL,
+	},
+	{
+		.name		= "proto-ctx",
+		.level		= DEBUG_PROTO_CTX,
 	},
 	{
 		.name		= "segtree",
@@ -211,16 +216,10 @@ out:
 
 int nft_run(void *scanner, struct parser_state *state, struct list_head *msgs)
 {
-	struct eval_ctx ctx;
-	int ret = 0;
+	int ret;
 
 	ret = nft_parse(scanner, state);
-	if (ret != 0)
-		return -1;
-
-	memset(&ctx, 0, sizeof(ctx));
-	ctx.msgs = msgs;
-	if (evaluate(&ctx, &state->cmds) < 0)
+	if (ret != 0 || state->nerrs > 0)
 		return -1;
 
 	return nft_netlink(state, msgs);

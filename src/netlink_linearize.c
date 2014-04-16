@@ -193,9 +193,14 @@ static void netlink_gen_cmp(struct netlink_linearize_ctx *ctx,
 	netlink_gen_expr(ctx, expr->left, sreg);
 
 	if (expr->right->ops->type == EXPR_PREFIX) {
-		right = expr->right->prefix;
+		mpz_t mask;
 
-		netlink_gen_data(expr->right, &nld);
+		mpz_init(mask);
+		mpz_prefixmask(mask, expr->right->len, expr->right->prefix_len);
+		netlink_gen_raw_data(mask, expr->right->byteorder,
+				     expr->right->len / BITS_PER_BYTE, &nld);
+		mpz_clear(mask);
+
 		zero.len = nld.len;
 
 		nle = alloc_nft_expr("bitwise");
@@ -205,6 +210,8 @@ static void netlink_gen_cmp(struct netlink_linearize_ctx *ctx,
 		nft_rule_expr_set(nle, NFT_EXPR_BITWISE_MASK, &nld.value, nld.len);
 		nft_rule_expr_set(nle, NFT_EXPR_BITWISE_XOR, &zero.value, zero.len);
 		nft_rule_add_expr(ctx->nlr, nle);
+
+		right = expr->right->prefix;
 	} else {
 		right = expr->right;
 	}
@@ -271,21 +278,20 @@ static void netlink_gen_flagcmp(struct netlink_linearize_ctx *ctx,
 
 	mpz_init_set_ui(zero, 0);
 
-	nle = alloc_nft_expr("bitwise");
 	netlink_gen_raw_data(zero, expr->right->byteorder, len, &nld);
+	netlink_gen_data(expr->right, &nld2);
+
+	nle = alloc_nft_expr("bitwise");
 	nft_rule_expr_set_u32(nle, NFT_EXPR_BITWISE_SREG, sreg);
 	nft_rule_expr_set_u32(nle, NFT_EXPR_BITWISE_DREG, sreg);
 	nft_rule_expr_set_u32(nle, NFT_EXPR_BITWISE_LEN, len);
-	netlink_gen_data(expr->right, &nld2);
 	nft_rule_expr_set(nle, NFT_EXPR_BITWISE_MASK, &nld2.value, nld2.len);
 	nft_rule_expr_set(nle, NFT_EXPR_BITWISE_XOR, &nld.value, nld.len);
 	nft_rule_add_expr(ctx->nlr, nle);
 
 	nle = alloc_nft_expr("cmp");
-	netlink_gen_raw_data(zero, expr->right->byteorder, len, &nld);
 	nft_rule_expr_set_u32(nle, NFT_EXPR_CMP_SREG, sreg);
 	nft_rule_expr_set_u32(nle, NFT_EXPR_CMP_OP, NFT_CMP_NEQ);
-	netlink_gen_data(expr->right, &nld);
 	nft_rule_expr_set(nle, NFT_EXPR_CMP_DATA, nld.value, nld.len);
 	nft_rule_add_expr(ctx->nlr, nle);
 
@@ -518,6 +524,8 @@ static void netlink_gen_meta_stmt(struct netlink_linearize_ctx *ctx,
 	release_register(ctx);
 
 	nle = alloc_nft_expr("meta");
+	nft_rule_expr_set_u32(nle, NFT_EXPR_META_SREG, sreg);
+	nft_rule_expr_set_u32(nle, NFT_EXPR_META_KEY, stmt->meta.key);
 	nft_rule_add_expr(ctx->nlr, nle);
 }
 
@@ -634,6 +642,42 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 	nft_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_queue_stmt(struct netlink_linearize_ctx *ctx,
+				 const struct stmt *stmt)
+{
+	struct nft_rule_expr *nle;
+
+	nle = alloc_nft_expr("queue");
+
+	nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_NUM,
+			      stmt->queue.queuenum);
+	if (stmt->queue.queues_total) {
+		nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_TOTAL,
+				      stmt->queue.queues_total);
+	}
+	if (stmt->queue.flags) {
+		nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_FLAGS,
+				      stmt->queue.flags);
+	}
+	nft_rule_add_expr(ctx->nlr, nle);
+}
+
+static void netlink_gen_ct_stmt(struct netlink_linearize_ctx *ctx,
+				  const struct stmt *stmt)
+{
+	struct nft_rule_expr *nle;
+	enum nft_registers sreg;
+
+	sreg = get_register(ctx);
+	netlink_gen_expr(ctx, stmt->ct.expr, sreg);
+	release_register(ctx);
+
+	nle = alloc_nft_expr("ct");
+	nft_rule_expr_set_u32(nle, NFT_EXPR_CT_SREG, sreg);
+	nft_rule_expr_set_u32(nle, NFT_EXPR_CT_KEY, stmt->ct.key);
+	nft_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 			     const struct stmt *stmt)
 {
@@ -654,6 +698,10 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_reject_stmt(ctx, stmt);
 	case STMT_NAT:
 		return netlink_gen_nat_stmt(ctx, stmt);
+	case STMT_QUEUE:
+		return netlink_gen_queue_stmt(ctx, stmt);
+	case STMT_CT:
+		return netlink_gen_ct_stmt(ctx, stmt);
 	default:
 		BUG("unknown statement type %s\n", stmt->ops->name);
 	}

@@ -13,12 +13,15 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <libmnl/libmnl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <libnftnl/table.h>
 #include <libnftnl/chain.h>
 #include <libnftnl/expr.h>
 #include <libnftnl/set.h>
 #include <linux/netfilter/nf_tables.h>
+#include <linux/netfilter.h>
 
 #include <nftables.h>
 #include <netlink.h>
@@ -29,6 +32,15 @@
 #include <erec.h>
 
 static struct mnl_socket *nf_sock;
+
+const struct input_descriptor indesc_netlink = {
+	.name	= "netlink",
+	.type	= INDESC_NETLINK,
+};
+
+const struct location netlink_location = {
+	.indesc	= &indesc_netlink,
+};
 
 static void __init netlink_open_sock(void)
 {
@@ -52,7 +64,7 @@ int netlink_io_error(struct netlink_ctx *ctx, const struct location *loc,
 	va_list ap;
 
 	if (loc == NULL)
-		loc = &internal_location;
+		loc = &netlink_location;
 
 	va_start(ap, fmt);
 	erec = erec_vcreate(EREC_ERROR, loc, fmt, ap);
@@ -108,6 +120,10 @@ struct nft_rule *alloc_nft_rule(const struct handle *h)
 		nft_rule_attr_set_u64(nlr, NFT_RULE_ATTR_HANDLE, h->handle);
 	if (h->position)
 		nft_rule_attr_set_u64(nlr, NFT_RULE_ATTR_POSITION, h->position);
+	if (h->comment) {
+		nft_rule_attr_set_data(nlr, NFT_RULE_ATTR_USERDATA,
+				       h->comment, strlen(h->comment) + 1);
+	}
 	return nlr;
 }
 
@@ -214,7 +230,7 @@ static void netlink_gen_concat_data(const struct expr *expr,
 		}
 
 		memcpy(nld->value, data, len / BITS_PER_BYTE);
-		nld->len = len;
+		nld->len = len / BITS_PER_BYTE;
 	}
 }
 
@@ -240,31 +256,6 @@ static void netlink_gen_verdict(const struct expr *expr,
 	}
 }
 
-static void netlink_gen_prefix(const struct expr *expr,
-			       struct nft_data_linearize *data)
-{
-	uint32_t idx;
-	int32_t i, cidr;
-	uint32_t mask;
-
-	assert(expr->ops->type == EXPR_PREFIX);
-
-	data->len = div_round_up(expr->prefix->len, BITS_PER_BYTE);
-	cidr = expr->prefix_len;
-
-	for (i = 0; (uint32_t)i / BITS_PER_BYTE < data->len; i += 32) {
-		if (cidr - i >= 32)
-			mask = 0xffffffff;
-		else if (cidr - i > 0)
-			mask = (1 << (cidr - i)) - 1;
-		else
-			mask = 0;
-
-		idx = i / 32;
-		data->value[idx] = mask;
-	}
-}
-
 void netlink_gen_data(const struct expr *expr, struct nft_data_linearize *data)
 {
 	switch (expr->ops->type) {
@@ -274,8 +265,6 @@ void netlink_gen_data(const struct expr *expr, struct nft_data_linearize *data)
 		return netlink_gen_concat_data(expr, data);
 	case EXPR_VERDICT:
 		return netlink_gen_verdict(expr, data);
-	case EXPR_PREFIX:
-		return netlink_gen_prefix(expr, data);
 	default:
 		BUG("invalid data expression type %s\n", expr->ops->name);
 	}
@@ -451,7 +440,8 @@ void netlink_dump_chain(struct nft_chain *nlc)
 }
 
 int netlink_add_chain(struct netlink_ctx *ctx, const struct handle *h,
-		      const struct location *loc, const struct chain *chain)
+		      const struct location *loc, const struct chain *chain,
+		      bool excl)
 {
 	struct nft_chain *nlc;
 	int err;
@@ -466,7 +456,7 @@ int netlink_add_chain(struct netlink_ctx *ctx, const struct handle *h,
 				       chain->type);
 	}
 	netlink_dump_chain(nlc);
-	err = mnl_nft_chain_add(nf_sock, nlc, NLM_F_EXCL);
+	err = mnl_nft_chain_add(nf_sock, nlc, excl ? NLM_F_EXCL : 0);
 	nft_chain_free(nlc);
 
 	if (err < 0)
@@ -528,7 +518,7 @@ static int list_chain_cb(struct nft_chain *nlc, void *arg)
 	chain->handle.family =
 		nft_chain_attr_get_u32(nlc, NFT_CHAIN_ATTR_FAMILY);
 	chain->handle.table  =
-		xstrdup(nft_chain_attr_get_str(nlc, NFT_CHAIN_ATTR_NAME));
+		xstrdup(nft_chain_attr_get_str(nlc, NFT_CHAIN_ATTR_TABLE));
 	chain->handle.handle =
 		nft_chain_attr_get_u64(nlc, NFT_CHAIN_ATTR_HANDLE);
 
@@ -625,13 +615,14 @@ int netlink_flush_chain(struct netlink_ctx *ctx, const struct handle *h,
 }
 
 int netlink_add_table(struct netlink_ctx *ctx, const struct handle *h,
-		      const struct location *loc, const struct table *table)
+		      const struct location *loc, const struct table *table,
+		      bool excl)
 {
 	struct nft_table *nlt;
 	int err;
 
 	nlt = alloc_nft_table(h);
-	err = mnl_nft_table_add(nf_sock, nlt, NLM_F_EXCL);
+	err = mnl_nft_table_add(nf_sock, nlt, excl ? NLM_F_EXCL : 0);
 	nft_table_free(nlt);
 
 	if (err < 0)
@@ -689,7 +680,6 @@ int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
 			const struct location *loc)
 {
 	struct nft_table_list *table_cache;
-	struct nft_table *nlt;
 
 	table_cache = mnl_nft_table_dump(nf_sock, h->family);
 	if (table_cache == NULL)
@@ -697,9 +687,7 @@ int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
 					"Could not receive tables from kernel: %s",
 					strerror(errno));
 
-	nlt = alloc_nft_table(h);
 	nft_table_list_foreach(table_cache, list_table_cb, ctx);
-	nft_table_free(nlt);
 	nft_table_list_free(table_cache);
 	return 0;
 }
@@ -789,7 +777,7 @@ int netlink_add_set(struct netlink_ctx *ctx, const struct handle *h,
 
 	err = mnl_nft_set_add(nf_sock, nls, NLM_F_EXCL | NLM_F_ECHO);
 	if (err < 0)
-		netlink_io_error(ctx, NULL, "Could not add set: %s",
+		netlink_io_error(ctx, &set->location, "Could not add set: %s",
 				 strerror(errno));
 
 	set->handle.set =
@@ -843,7 +831,7 @@ static int list_set_cb(struct nft_set *nls, void *arg)
 	} else
 		datatype = NULL;
 
-	set = set_alloc(&internal_location);
+	set = set_alloc(&netlink_location);
 	set->handle.family = nft_set_attr_get_u32(nls, NFT_SET_ATTR_FAMILY);
 	set->handle.table  =
 		xstrdup(nft_set_attr_get_str(nls, NFT_SET_ATTR_TABLE));
@@ -894,7 +882,7 @@ int netlink_get_set(struct netlink_ctx *ctx, const struct handle *h,
 					"Could not receive set from kernel: %s",
 					strerror(errno));
 
-	set = set_alloc(&internal_location);
+	set = set_alloc(&netlink_location);
 	set->handle.family = nft_set_attr_get_u32(nls, NFT_SET_ATTR_FAMILY);
 	set->handle.table  =
 		xstrdup(nft_set_attr_get_str(nls, NFT_SET_ATTR_TABLE));
@@ -979,7 +967,7 @@ static int list_setelem_cb(struct nft_set_elem *nlse, void *arg)
 	if (nft_set_elem_attr_is_set(nlse, NFT_SET_ELEM_ATTR_FLAGS))
 		flags = nft_set_elem_attr_get_u32(nlse, NFT_SET_ELEM_ATTR_FLAGS);
 
-	expr = netlink_alloc_value(&internal_location, &nld);
+	expr = netlink_alloc_value(&netlink_location, &nld);
 	expr->dtype	= set->keytype;
 	expr->byteorder	= set->keytype->byteorder;
 	if (expr->byteorder == BYTEORDER_HOST_ENDIAN)
@@ -999,7 +987,7 @@ static int list_setelem_cb(struct nft_set_elem *nlse, void *arg)
 		} else
 			goto out;
 
-		data = netlink_alloc_data(&internal_location, &nld,
+		data = netlink_alloc_data(&netlink_location, &nld,
 					  set->datatype->type == TYPE_VERDICT ?
 					  NFT_REG_VERDICT : NFT_REG_1);
 		data->dtype = set->datatype;
@@ -1007,7 +995,7 @@ static int list_setelem_cb(struct nft_set_elem *nlse, void *arg)
 		if (data->byteorder == BYTEORDER_HOST_ENDIAN)
 			mpz_switch_byteorder(data->value, data->len / BITS_PER_BYTE);
 
-		expr = mapping_expr_alloc(&internal_location, expr, data);
+		expr = mapping_expr_alloc(&netlink_location, expr, data);
 	}
 out:
 	compound_expr_add(set->init, expr);
@@ -1047,4 +1035,18 @@ out:
 int netlink_batch_send(struct list_head *err_list)
 {
 	return mnl_batch_talk(nf_sock, err_list);
+}
+
+struct nft_ruleset *netlink_dump_ruleset(struct netlink_ctx *ctx,
+					 const struct handle *h,
+					 const struct location *loc)
+{
+	struct nft_ruleset *rs;
+
+	rs = mnl_nft_ruleset_dump(nf_sock, h->family);
+	if (rs == NULL)
+		netlink_io_error(ctx, loc, "Could not receive ruleset: %s",
+				 strerror(errno));
+
+	return rs;
 }

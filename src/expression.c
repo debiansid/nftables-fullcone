@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 
 #include <expression.h>
 #include <datatype.h>
@@ -73,6 +74,17 @@ void expr_print(const struct expr *expr)
 	expr->ops->print(expr);
 }
 
+bool expr_cmp(const struct expr *e1, const struct expr *e2)
+{
+	assert(e1->flags & EXPR_F_SINGLETON);
+	assert(e2->flags & EXPR_F_SINGLETON);
+
+	if (e1->ops->type != e2->ops->type)
+		return false;
+
+	return e1->ops->cmp(e1, e2);
+}
+
 void expr_describe(const struct expr *expr)
 {
 	const struct datatype *dtype = expr->dtype;
@@ -126,7 +138,7 @@ const struct datatype *expr_basetype(const struct expr *expr)
 	return type;
 }
 
-int __fmtstring(4, 5) expr_binary_error(struct eval_ctx *ctx,
+int __fmtstring(4, 5) expr_binary_error(struct list_head *msgs,
 					const struct expr *e1, const struct expr *e2,
 					const char *fmt, ...)
 {
@@ -138,13 +150,26 @@ int __fmtstring(4, 5) expr_binary_error(struct eval_ctx *ctx,
 	if (e2 != NULL)
 		erec_add_location(erec, &e2->location);
 	va_end(ap);
-	erec_queue(erec, ctx->msgs);
+	erec_queue(erec, msgs);
 	return -1;
 }
 
 static void verdict_expr_print(const struct expr *expr)
 {
 	datatype_print(expr);
+}
+
+static bool verdict_expr_cmp(const struct expr *e1, const struct expr *e2)
+{
+	if (e1->verdict != e2->verdict)
+		return false;
+
+	if ((e1->verdict == NFT_JUMP ||
+	     e1->verdict == NFT_GOTO) &&
+	    strcmp(e1->chain, e2->chain))
+		return false;
+
+	return true;
 }
 
 static void verdict_expr_clone(struct expr *new, const struct expr *expr)
@@ -163,6 +188,7 @@ static const struct expr_ops verdict_expr_ops = {
 	.type		= EXPR_VERDICT,
 	.name		= "verdict",
 	.print		= verdict_expr_print,
+	.cmp		= verdict_expr_cmp,
 	.clone		= verdict_expr_clone,
 	.destroy	= verdict_expr_destroy,
 };
@@ -225,6 +251,12 @@ static void constant_expr_print(const struct expr *expr)
 	datatype_print(expr);
 }
 
+static bool constant_expr_cmp(const struct expr *e1, const struct expr *e2)
+{
+	return expr_basetype(e1) == expr_basetype(e2) &&
+	       !mpz_cmp(e1->value, e2->value);
+}
+
 static void constant_expr_clone(struct expr *new, const struct expr *expr)
 {
 	mpz_init_set(new->value, expr->value);
@@ -239,6 +271,7 @@ static const struct expr_ops constant_expr_ops = {
 	.type		= EXPR_VALUE,
 	.name		= "value",
 	.print		= constant_expr_print,
+	.cmp		= constant_expr_cmp,
 	.clone		= constant_expr_clone,
 	.destroy	= constant_expr_destroy,
 };
@@ -300,6 +333,59 @@ struct expr *constant_expr_splice(struct expr *expr, unsigned int len)
 
 	expr->len -= len;
 	return slice;
+}
+
+/*
+ * Allocate a constant expression with a single bit set at position n.
+ */
+struct expr *flag_expr_alloc(const struct location *loc,
+			     const struct datatype *dtype,
+			     enum byteorder byteorder,
+			     unsigned int len, unsigned long n)
+{
+	struct expr *expr;
+
+	assert(n < len);
+
+	expr = constant_expr_alloc(loc, dtype, byteorder, len, NULL);
+	mpz_set_ui(expr->value, 1);
+	mpz_lshift_ui(expr->value, n);
+
+	return expr;
+}
+
+/*
+ * Convert an expression of basetype TYPE_BITMASK into a series of inclusive
+ * OR binop expressions of the individual flag values.
+ */
+struct expr *bitmask_expr_to_binops(struct expr *expr)
+{
+	struct expr *binop, *flag;
+	unsigned long n;
+
+	assert(expr->ops->type == EXPR_VALUE);
+	assert(expr->dtype->basetype->type == TYPE_BITMASK);
+
+	n = mpz_popcount(expr->value);
+	if (n == 0 || n == 1)
+		return expr;
+
+	binop = NULL;
+	n = 0;
+	while ((n = mpz_scan1(expr->value, n)) != ULONG_MAX) {
+		flag = flag_expr_alloc(&expr->location, expr->dtype,
+				       expr->byteorder, expr->len, n);
+		if (binop != NULL)
+			binop = binop_expr_alloc(&expr->location,
+						 OP_OR, binop, flag);
+		else
+			binop = flag;
+
+		n++;
+	}
+
+	expr_free(expr);
+	return binop;
 }
 
 static void prefix_expr_print(const struct expr *expr)
@@ -404,16 +490,50 @@ struct expr *unary_expr_alloc(const struct location *loc,
 	return expr;
 }
 
+static uint8_t expr_binop_precedence[OP_MAX + 1] = {
+	[OP_LSHIFT]	= 1,
+	[OP_RSHIFT]	= 1,
+	[OP_AND]	= 2,
+	[OP_XOR]	= 3,
+	[OP_OR]		= 4,
+};
+
+static void binop_arg_print(const struct expr *op, const struct expr *arg)
+{
+	bool prec = false;
+
+	if (arg->ops->type == EXPR_BINOP &&
+	    expr_binop_precedence[op->op] != 0 &&
+	    expr_binop_precedence[op->op] < expr_binop_precedence[arg->op])
+		prec = 1;
+
+	if (prec)
+		printf("(");
+	expr_print(arg);
+	if (prec)
+		printf(")");
+}
+
+static bool must_print_eq_op(const struct expr *expr)
+{
+	if (expr->right->dtype->basetype != NULL &&
+	    expr->right->dtype->basetype->type == TYPE_BITMASK)
+		return true;
+
+	return expr->left->ops->type == EXPR_BINOP;
+}
+
 static void binop_expr_print(const struct expr *expr)
 {
-	expr_print(expr->left);
+	binop_arg_print(expr, expr->left);
+
 	if (expr_op_symbols[expr->op] &&
-	    (expr->op != OP_EQ ||
-	     expr->left->ops->type == EXPR_BINOP))
+	    (expr->op != OP_EQ || must_print_eq_op(expr)))
 		printf(" %s ", expr_op_symbols[expr->op]);
 	else
 		printf(" ");
-	expr_print(expr->right);
+
+	binop_arg_print(expr, expr->right);
 }
 
 static void binop_expr_clone(struct expr *new, const struct expr *expr)
@@ -441,8 +561,8 @@ struct expr *binop_expr_alloc(const struct location *loc, enum ops op,
 {
 	struct expr *expr;
 
-	expr = expr_alloc(loc, &binop_expr_ops, &invalid_type,
-			  BYTEORDER_INVALID, 0);
+	expr = expr_alloc(loc, &binop_expr_ops, left->dtype,
+			  left->byteorder, 0);
 	expr->left  = left;
 	expr->op    = op;
 	expr->right = right;

@@ -329,13 +329,15 @@ static bool interval_conflict(const struct elementary_interval *e1,
 {
 	if (mpz_cmp(e1->left, e2->left) <= 0 &&
 	    mpz_cmp(e1->right, e2->left) >= 0 &&
-	    mpz_cmp(e1->size, e2->size) == 0)
+	    mpz_cmp(e1->size, e2->size) == 0 &&
+	    !expr_cmp(e1->expr->right, e2->expr->right))
 		return true;
 	else
 		return false;
 }
 
-static void set_to_segtree(struct expr *set, struct seg_tree *tree)
+static int set_to_segtree(struct list_head *msgs, struct expr *set,
+			  struct seg_tree *tree)
 {
 	struct elementary_interval *intervals[set->size];
 	struct elementary_interval *ei;
@@ -365,14 +367,19 @@ static void set_to_segtree(struct expr *set, struct seg_tree *tree)
 	 * Insert elements into tree
 	 */
 	for (n = 0; n < set->size; n++) {
-		if (n < set->size - 1 &&
+		if (set->set_flags & SET_F_MAP &&
+		    n < set->size - 1 &&
 		    interval_conflict(intervals[n], intervals[n+1]))
-			pr_debug("conflict\n");
+			return expr_binary_error(msgs,
+					intervals[n]->expr,
+					intervals[n+1]->expr,
+					"conflicting intervals specified");
 		ei_insert(tree, intervals[n]);
 	}
 
 	mpz_clear(high);
 	mpz_clear(low);
+	return 0;
 }
 
 static void segtree_linearize(struct list_head *list, struct seg_tree *tree)
@@ -461,14 +468,15 @@ static void set_insert_interval(struct expr *set, struct seg_tree *tree,
 	compound_expr_add(set, expr);
 }
 
-void set_to_intervals(struct set *set)
+int set_to_intervals(struct list_head *errs, struct set *set)
 {
 	struct elementary_interval *ei, *next;
 	struct seg_tree tree;
 	LIST_HEAD(list);
 
 	seg_tree_init(&tree, set);
-	set_to_segtree(set->init, &tree);
+	if (set_to_segtree(errs, set->init, &tree) < 0)
+		return -1;
 	segtree_linearize(&list, &tree);
 
 	list_for_each_entry_safe(ei, next, &list, list) {
@@ -485,6 +493,7 @@ void set_to_intervals(struct set *set)
 		expr_print(set->init);
 		pr_debug("\n");
 	}
+	return 0;
 }
 
 static bool range_is_prefix(const mpz_t range)
@@ -507,23 +516,39 @@ static struct expr *expr_value(struct expr *expr)
 		return expr;
 }
 
+static int expr_value_cmp(const void *p1, const void *p2)
+{
+	struct expr *e1 = *(void * const *)p1;
+	struct expr *e2 = *(void * const *)p2;
+
+	return mpz_cmp(expr_value(e1)->value, expr_value(e2)->value);
+}
+
 void interval_map_decompose(struct expr *set)
 {
-	struct expr *ranges[set->size * 2];
+	struct expr *elements[set->size], *ranges[set->size * 2];
 	struct expr *i, *next, *low = NULL, *end;
-	unsigned int n, size;
+	unsigned int n, m, size;
 	mpz_t range, p;
 	bool interval;
 
 	mpz_init(range);
 	mpz_init(p);
 
-	size = set->size;
+	/* Sort elements */
 	n = 0;
-
-	interval = false;
-	list_for_each_entry_safe_reverse(i, next, &set->expressions, list) {
+	list_for_each_entry_safe(i, next, &set->expressions, list) {
 		compound_expr_remove(set, i);
+		elements[n++] = i;
+	}
+	qsort(elements, n, sizeof(elements[0]), expr_value_cmp);
+	size = n;
+
+	/* Transform points (single values) into half-closed intervals */
+	n = 0;
+	interval = false;
+	for (m = 0; m < size; m++) {
+		i = elements[m];
 
 		if (i->flags & EXPR_F_INTERVAL_END)
 			interval = false;
@@ -531,12 +556,12 @@ void interval_map_decompose(struct expr *set)
 			end = expr_clone(expr_value(i));
 			end->flags |= EXPR_F_INTERVAL_END;
 			ranges[n++] = end;
-			size++;
 		} else
 			interval = true;
 
 		ranges[n++] = i;
 	}
+	size = n;
 
 	for (n = 0; n < size; n++) {
 		i = ranges[n];

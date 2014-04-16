@@ -17,12 +17,14 @@ enum debug_level {
 	DEBUG_PARSER		= 0x2,
 	DEBUG_EVALUATION	= 0x4,
 	DEBUG_NETLINK		= 0x8,
-	DEBUG_SEGTREE		= 0x10,
-	DEBUG_MNL		= 0x20,
+	DEBUG_MNL		= 0x10,
+	DEBUG_PROTO_CTX		= 0x20,
+	DEBUG_SEGTREE		= 0x40,
 };
 
 #define INCLUDE_PATHS_MAX	16
 
+extern unsigned int max_errors;
 extern unsigned int numeric_output;
 extern unsigned int handle_output;
 extern unsigned int debug_level;

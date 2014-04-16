@@ -80,7 +80,9 @@ enum ops {
 	OP_FLAGCMP,
 	/* Set lookup */
 	OP_LOOKUP,
+	__OP_MAX
 };
+#define OP_MAX		(__OP_MAX - 1)
 
 extern const char *expr_op_symbols[];
 
@@ -118,7 +120,10 @@ static inline void expr_set_context(struct expr_ctx *ctx,
  * @destroy:	destructor, must release inner expressions
  * @set_type:	function to promote type and byteorder of inner types
  * @print:	function to print the expression
+ * @cmp:	function to compare two expressions of the same types
+ * @pctx_update:update protocol context
  */
+struct proto_ctx;
 struct expr_ops {
 	enum expr_types		type;
 	const char		*name;
@@ -128,6 +133,10 @@ struct expr_ops {
 					    const struct datatype *dtype,
 					    enum byteorder byteorder);
 	void			(*print)(const struct expr *expr);
+	bool			(*cmp)(const struct expr *e1,
+				       const struct expr *e2);
+	void			(*pctx_update)(struct proto_ctx *ctx,
+					       const struct expr *expr);
 };
 
 /**
@@ -135,12 +144,14 @@ struct expr_ops {
  *
  * @EXPR_F_CONSTANT:		constant expression
  * @EXPR_F_SINGLETON:		singleton (implies primary and constant)
+ * @EXPR_F_PROTOCOL:		expressions describes upper layer protocol
  * @EXPR_F_INTERVAL_END:	set member ends an open interval
  */
 enum expr_flags {
 	EXPR_F_CONSTANT		= 0x1,
 	EXPR_F_SINGLETON	= 0x2,
-	EXPR_F_INTERVAL_END	= 0x4,
+	EXPR_F_PROTOCOL		= 0x4,
+	EXPR_F_INTERVAL_END	= 0x8,
 };
 
 #include <payload.h>
@@ -223,20 +234,20 @@ struct expr {
 
 		struct {
 			/* EXPR_PAYLOAD */
-			const struct payload_desc	*desc;
-			const struct payload_template	*tmpl;
-			enum payload_bases		base;
+			const struct proto_desc		*desc;
+			const struct proto_hdr_template	*tmpl;
+			enum proto_bases		base;
 			unsigned int			offset;
-			unsigned int			flags;
 		} payload;
 		struct {
 			/* EXPR_EXTHDR */
 			const struct exthdr_desc	*desc;
-			const struct payload_template	*tmpl;
+			const struct proto_hdr_template	*tmpl;
 		} exthdr;
 		struct {
 			/* EXPR_META */
 			enum nft_meta_keys	key;
+			enum proto_bases	base;
 		} meta;
 		struct {
 			/* EXPR_CT */
@@ -253,6 +264,7 @@ extern struct expr *expr_clone(const struct expr *expr);
 extern struct expr *expr_get(struct expr *expr);
 extern void expr_free(struct expr *expr);
 extern void expr_print(const struct expr *expr);
+extern bool expr_cmp(const struct expr *e1, const struct expr *e2);
 extern void expr_describe(const struct expr *expr);
 
 extern const struct datatype *expr_basetype(const struct expr *expr);
@@ -260,12 +272,12 @@ extern void expr_set_type(struct expr *expr, const struct datatype *dtype,
 			  enum byteorder byteorder);
 
 struct eval_ctx;
-extern int expr_binary_error(struct eval_ctx *ctx,
+extern int expr_binary_error(struct list_head *msgs,
 			     const struct expr *e1, const struct expr *e2,
 			     const char *fmt, ...) __gmp_fmtstring(4, 5);
 
-#define expr_error(ctx, expr, fmt, args...) \
-	expr_binary_error(ctx, expr, NULL, fmt, ## args)
+#define expr_error(msgs, expr, fmt, args...) \
+	expr_binary_error(msgs, expr, NULL, fmt, ## args)
 
 static inline bool expr_is_constant(const struct expr *expr)
 {
@@ -308,6 +320,12 @@ extern struct expr *constant_expr_join(const struct expr *e1,
 				       const struct expr *e2);
 extern struct expr *constant_expr_splice(struct expr *expr, unsigned int len);
 
+extern struct expr *flag_expr_alloc(const struct location *loc,
+				    const struct datatype *dtype,
+				    enum byteorder byteorder,
+				    unsigned int len, unsigned long n);
+extern struct expr *bitmask_expr_to_binops(struct expr *expr);
+
 extern struct expr *prefix_expr_alloc(const struct location *loc,
 				      struct expr *expr,
 				      unsigned int prefix_len);
@@ -323,7 +341,7 @@ extern struct expr *concat_expr_alloc(const struct location *loc);
 extern struct expr *list_expr_alloc(const struct location *loc);
 
 extern struct expr *set_expr_alloc(const struct location *loc);
-extern void set_to_intervals(struct set *set);
+extern int set_to_intervals(struct list_head *msgs, struct set *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,
 				       struct expr *from, struct expr *to);

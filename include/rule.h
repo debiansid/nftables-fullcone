@@ -14,6 +14,7 @@
  * @set:	set name (sets only)
  * @handle:	rule handle (rules only)
  * @position:	rule position (rules only)
+ * @comment:	human-readable comment (rules only)
  */
 struct handle {
 	uint32_t		family;
@@ -22,6 +23,7 @@ struct handle {
 	const char		*set;
 	uint64_t		handle;
 	uint64_t		position;
+	const char		*comment;
 };
 
 extern void handle_merge(struct handle *dst, const struct handle *src);
@@ -198,21 +200,25 @@ extern void set_print(const struct set *set);
  * enum cmd_ops - command operations
  *
  * @CMD_INVALID:	invalid
- * @CMD_ADD:		add object
+ * @CMD_ADD:		add object (non-exclusive)
+ * @CMD_CREATE:		create object (exclusive)
  * @CMD_INSERT:		insert object
  * @CMD_DELETE:		delete object
  * @CMD_LIST:		list container
  * @CMD_FLUSH:		flush container
  * @CMD_RENAME:		rename object
+ * @CMD_EXPORT:		export the ruleset in a given format
  */
 enum cmd_ops {
 	CMD_INVALID,
 	CMD_ADD,
+	CMD_CREATE,
 	CMD_INSERT,
 	CMD_DELETE,
 	CMD_LIST,
 	CMD_FLUSH,
 	CMD_RENAME,
+	CMD_EXPORT,
 };
 
 /**
@@ -225,6 +231,7 @@ enum cmd_ops {
  * @CMD_OBJ_RULE:	rule
  * @CMD_OBJ_CHAIN:	chain
  * @CMD_OBJ_TABLE:	table
+ * @CMD_OBJ_RULESET:	ruleset
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
@@ -234,6 +241,7 @@ enum cmd_obj {
 	CMD_OBJ_RULE,
 	CMD_OBJ_CHAIN,
 	CMD_OBJ_TABLE,
+	CMD_OBJ_RULESET,
 };
 
 /**
@@ -247,6 +255,7 @@ enum cmd_obj {
  * @seqnum:	sequence number to match netlink errors
  * @union:	object
  * @arg:	argument data
+ * @format:	info about the export/import format
  */
 struct cmd {
 	struct list_head	list;
@@ -264,6 +273,7 @@ struct cmd {
 		struct table	*table;
 	};
 	const void		*arg;
+	uint32_t		format;
 };
 
 extern struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
@@ -292,10 +302,10 @@ struct eval_ctx {
 	struct set		*set;
 	struct stmt		*stmt;
 	struct expr_ctx		ectx;
-	struct payload_ctx	pctx;
+	struct proto_ctx	pctx;
 };
 
-extern int evaluate(struct eval_ctx *ctx, struct list_head *commands);
+extern int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd);
 
 extern struct error_record *rule_postprocess(struct rule *rule);
 

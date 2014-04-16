@@ -18,7 +18,10 @@
 #include <statement.h>
 #include <rule.h>
 #include <utils.h>
+#include <netlink.h>
 
+#include <libnftnl/common.h>
+#include <libnftnl/ruleset.h>
 #include <netinet/ip.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_arp.h>
@@ -28,6 +31,7 @@ void handle_free(struct handle *h)
 	xfree(h->table);
 	xfree(h->chain);
 	xfree(h->set);
+	xfree(h->comment);
 }
 
 void handle_merge(struct handle *dst, const struct handle *src)
@@ -44,6 +48,8 @@ void handle_merge(struct handle *dst, const struct handle *src)
 		dst->handle = src->handle;
 	if (dst->position == 0)
 		dst->position = src->position;
+	if (dst->comment == NULL && src->comment != NULL)
+		dst->comment = xstrdup(src->comment);
 }
 
 struct set *set_alloc(const struct location *loc)
@@ -151,7 +157,6 @@ void rule_print(const struct rule *rule)
 	}
 	if (handle_output > 0)
 		printf(" # handle %" PRIu64, rule->handle.handle);
-	printf("\n");
 }
 
 struct scope *scope_init(struct scope *scope, const struct scope *parent)
@@ -283,6 +288,8 @@ static const char *family2str(unsigned int family)
 			return "ip";
 		case NFPROTO_IPV6:
 			return "ip6";
+		case NFPROTO_INET:
+			return "inet";
 		case NFPROTO_ARP:
 			return "arp";
 		case NFPROTO_BRIDGE:
@@ -299,6 +306,7 @@ static const char *hooknum2str(unsigned int family, unsigned int hooknum)
 	case NFPROTO_IPV4:
 	case NFPROTO_BRIDGE:
 	case NFPROTO_IPV6:
+	case NFPROTO_INET:
 		switch (hooknum) {
 		case NF_INET_PRE_ROUTING:
 			return "prerouting";
@@ -345,6 +353,10 @@ static void chain_print(const struct chain *chain)
 	list_for_each_entry(rule, &chain->rules, list) {
 		printf("\t\t");
 		rule_print(rule);
+		if (rule->handle.comment)
+			printf(" comment \"%s\"\n", rule->handle.comment);
+		else
+			printf("\n");
 	}
 	printf("\t}\n");
 }
@@ -420,6 +432,7 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 	struct cmd *cmd;
 
 	cmd = xzalloc(sizeof(*cmd));
+	init_list_head(&cmd->list);
 	cmd->op       = op;
 	cmd->obj      = obj;
 	cmd->handle   = *h;
@@ -459,9 +472,10 @@ void cmd_free(struct cmd *cmd)
 #include <netlink.h>
 
 static int do_add_chain(struct netlink_ctx *ctx, const struct handle *h,
-			const struct location *loc, struct chain *chain)
+			const struct location *loc, struct chain *chain,
+			bool excl)
 {
-	if (netlink_add_chain(ctx, h, loc, chain) < 0)
+	if (netlink_add_chain(ctx, h, loc, chain, excl) < 0)
 		return -1;
 	if (chain != NULL) {
 		if (netlink_add_rule_list(ctx, h, &chain->rules) < 0)
@@ -484,8 +498,9 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 	if (netlink_add_set(ctx, h, set) < 0)
 		return -1;
 	if (set->init != NULL) {
-		if (set->flags & SET_F_INTERVAL)
-			set_to_intervals(set);
+		if (set->flags & SET_F_INTERVAL &&
+		    set_to_intervals(ctx->msgs, set) < 0)
+			return -1;
 		if (do_add_setelems(ctx, &set->handle, set->init) < 0)
 			return -1;
 	}
@@ -493,12 +508,13 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 }
 
 static int do_add_table(struct netlink_ctx *ctx, const struct handle *h,
-			const struct location *loc, struct table *table)
+			const struct location *loc, struct table *table,
+			bool excl)
 {
 	struct chain *chain;
 	struct set *set;
 
-	if (netlink_add_table(ctx, h, loc, table) < 0)
+	if (netlink_add_table(ctx, h, loc, table, excl) < 0)
 		return -1;
 	if (table != NULL) {
 		list_for_each_entry(set, &table->sets, list) {
@@ -508,22 +524,22 @@ static int do_add_table(struct netlink_ctx *ctx, const struct handle *h,
 		}
 		list_for_each_entry(chain, &table->chains, list) {
 			if (do_add_chain(ctx, &chain->handle, &chain->location,
-					 chain) < 0)
+					 chain, excl) < 0)
 				return -1;
 		}
 	}
 	return 0;
 }
 
-static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd)
+static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd, bool excl)
 {
 	switch (cmd->obj) {
 	case CMD_OBJ_TABLE:
 		return do_add_table(ctx, &cmd->handle, &cmd->location,
-				    cmd->table);
+				    cmd->table, excl);
 	case CMD_OBJ_CHAIN:
 		return do_add_chain(ctx, &cmd->handle, &cmd->location,
-				    cmd->chain);
+				    cmd->chain, excl);
 	case CMD_OBJ_RULE:
 		return netlink_add_rule_batch(ctx, &cmd->handle,
 					      cmd->rule, NLM_F_APPEND);
@@ -584,6 +600,21 @@ static int do_list_sets(struct netlink_ctx *ctx, const struct location *loc,
 	return 0;
 }
 
+static int do_command_export(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	struct nft_ruleset *rs = netlink_dump_ruleset(ctx, &cmd->handle,
+						      &cmd->location);
+
+	if (rs == NULL)
+		return -1;
+
+	nft_ruleset_fprintf(stdout, rs, cmd->format, 0);
+	fprintf(stdout, "\n");
+
+	nft_ruleset_free(rs);
+	return 0;
+}
+
 static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table = NULL;
@@ -637,9 +668,13 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SETS:
 		if (netlink_list_sets(ctx, &cmd->handle, &cmd->location) < 0)
 			return -1;
-		list_for_each_entry_safe(set, nset, &ctx->list, list)
-			list_move_tail(&set->list, &table->sets);
-		break;
+		list_for_each_entry(set, &ctx->list, list){
+			if (netlink_get_setelems(ctx, &set->handle,
+						 &cmd->location, set) < 0)
+				return -1;
+			set_print(set);
+		}
+		return 0;
 	case CMD_OBJ_SET:
 		if (netlink_get_set(ctx, &cmd->handle, &cmd->location) < 0)
 			return -1;
@@ -723,7 +758,9 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->op) {
 	case CMD_ADD:
-		return do_command_add(ctx, cmd);
+		return do_command_add(ctx, cmd, false);
+	case CMD_CREATE:
+		return do_command_add(ctx, cmd, true);
 	case CMD_INSERT:
 		return do_command_insert(ctx, cmd);
 	case CMD_DELETE:
@@ -734,6 +771,8 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_command_flush(ctx, cmd);
 	case CMD_RENAME:
 		return do_command_rename(ctx, cmd);
+	case CMD_EXPORT:
+		return do_command_export(ctx, cmd);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}

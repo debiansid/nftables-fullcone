@@ -75,11 +75,11 @@ static void tchandle_type_print(const struct expr *expr)
 		printf("none\n");
 	default:
 		if (TC_H_MAJ(handle) == 0)
-			printf(":%04x\n", TC_H_MIN(handle));
+			printf(":%04x", TC_H_MIN(handle));
 		else if (TC_H_MIN(handle) == 0)
-			printf("%04x:\n", TC_H_MAJ(handle) >> 16);
+			printf("%04x:", TC_H_MAJ(handle) >> 16);
 		else {
-			printf("%04x:%04x\n",
+			printf("%04x:%04x",
 			       TC_H_MAJ(handle) >> 16, TC_H_MIN(handle));
 		}
 		break;
@@ -160,8 +160,8 @@ static struct error_record *ifindex_type_parse(const struct expr *sym,
 
 static const struct datatype ifindex_type = {
 	.type		= TYPE_IFINDEX,
-	.name		= "ifindex",
-	.desc		= "interface index",
+	.name		= "iface_index",
+	.desc		= "network interface index",
 	.byteorder	= BYTEORDER_HOST_ENDIAN,
 	.size		= 4 * BITS_PER_BYTE,
 	.basetype	= &integer_type,
@@ -185,8 +185,8 @@ static const struct symbol_table arphrd_tbl = {
 
 const struct datatype arphrd_type = {
 	.type		= TYPE_ARPHRD,
-	.name		= "arphrd",
-	.desc		= "hardware type",
+	.name		= "iface_type",
+	.desc		= "network interface type",
 	.byteorder	= BYTEORDER_HOST_ENDIAN,
 	.size		= 2 * BITS_PER_BYTE,
 	.basetype	= &integer_type,
@@ -302,6 +302,10 @@ static const struct meta_template meta_templates[] = {
 						4 * 8, BYTEORDER_HOST_ENDIAN),
 	[NFT_META_PROTOCOL]	= META_TEMPLATE("protocol",  &ethertype_type,
 						2 * 8, BYTEORDER_BIG_ENDIAN),
+	[NFT_META_NFPROTO]	= META_TEMPLATE("nfproto",   &nfproto_type,
+						1 * 8, BYTEORDER_HOST_ENDIAN),
+	[NFT_META_L4PROTO]	= META_TEMPLATE("l4proto",   &inet_protocol_type,
+						1 * 8, BYTEORDER_HOST_ENDIAN),
 	[NFT_META_PRIORITY]	= META_TEMPLATE("priority",  &tchandle_type,
 						4 * 8, BYTEORDER_HOST_ENDIAN),
 	[NFT_META_MARK]		= META_TEMPLATE("mark",      &mark_type,
@@ -334,6 +338,8 @@ static void meta_expr_print(const struct expr *expr)
 {
 	switch (expr->meta.key) {
 	case NFT_META_LEN:
+	case NFT_META_NFPROTO:
+	case NFT_META_L4PROTO:
 	case NFT_META_PROTOCOL:
 	case NFT_META_PRIORITY:
 		printf("meta %s", meta_templates[expr->meta.key].token);
@@ -344,16 +350,71 @@ static void meta_expr_print(const struct expr *expr)
 	}
 }
 
+static bool meta_expr_cmp(const struct expr *e1, const struct expr *e2)
+{
+	return e1->meta.key == e2->meta.key;
+}
+
 static void meta_expr_clone(struct expr *new, const struct expr *expr)
 {
 	new->meta.key = expr->meta.key;
+}
+
+/**
+ * meta_expr_pctx_update - update protocol context based on meta match
+ *
+ * @ctx:	protocol context
+ * @expr:	relational meta expression
+ *
+ * Update LL protocol context based on IIFTYPE meta match in non-LL hooks.
+ */
+static void meta_expr_pctx_update(struct proto_ctx *ctx,
+				  const struct expr *expr)
+{
+	const struct hook_proto_desc *h = &hook_proto_desc[ctx->family];
+	const struct expr *left = expr->left, *right = expr->right;
+	const struct proto_desc *desc;
+
+	assert(expr->op == OP_EQ);
+
+	switch (left->meta.key) {
+	case NFT_META_IIFTYPE:
+		if (h->base < PROTO_BASE_NETWORK_HDR)
+			return;
+
+		desc = proto_dev_desc(mpz_get_uint16(right->value));
+		if (desc == NULL)
+			desc = &proto_unknown;
+
+		proto_ctx_update(ctx, PROTO_BASE_LL_HDR, &expr->location, desc);
+		break;
+	case NFT_META_NFPROTO:
+		desc = proto_find_upper(h->desc, mpz_get_uint8(right->value));
+		if (desc == NULL)
+			desc = &proto_unknown;
+
+		proto_ctx_update(ctx, PROTO_BASE_NETWORK_HDR, &expr->location, desc);
+		break;
+	case NFT_META_L4PROTO:
+		desc = proto_find_upper(&proto_inet_service,
+					mpz_get_uint8(right->value));
+		if (desc == NULL)
+			desc = &proto_unknown;
+
+		proto_ctx_update(ctx, PROTO_BASE_TRANSPORT_HDR, &expr->location, desc);
+		break;
+	default:
+		break;
+	}
 }
 
 static const struct expr_ops meta_expr_ops = {
 	.type		= EXPR_META,
 	.name		= "meta",
 	.print		= meta_expr_print,
+	.cmp		= meta_expr_cmp,
 	.clone		= meta_expr_clone,
+	.pctx_update	= meta_expr_pctx_update,
 };
 
 struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
@@ -364,6 +425,23 @@ struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
 	expr = expr_alloc(loc, &meta_expr_ops, tmpl->dtype,
 			  tmpl->byteorder, tmpl->len);
 	expr->meta.key = key;
+
+	switch (key) {
+	case NFT_META_IIFTYPE:
+		expr->flags |= EXPR_F_PROTOCOL;
+		break;
+	case NFT_META_NFPROTO:
+		expr->flags |= EXPR_F_PROTOCOL;
+		expr->meta.base = PROTO_BASE_LL_HDR;
+		break;
+	case NFT_META_L4PROTO:
+		expr->flags |= EXPR_F_PROTOCOL;
+		expr->meta.base = PROTO_BASE_NETWORK_HDR;
+		break;
+	default:
+		break;
+	}
+
 	return expr;
 }
 

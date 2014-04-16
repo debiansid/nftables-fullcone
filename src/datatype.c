@@ -27,6 +27,7 @@
 static const struct datatype *datatypes[TYPE_MAX + 1] = {
 	[TYPE_INVALID]		= &invalid_type,
 	[TYPE_VERDICT]		= &verdict_type,
+	[TYPE_NFPROTO]		= &nfproto_type,
 	[TYPE_BITMASK]		= &bitmask_type,
 	[TYPE_INTEGER]		= &integer_type,
 	[TYPE_STRING]		= &string_type,
@@ -123,7 +124,7 @@ struct error_record *symbolic_constant_parse(const struct expr *sym,
 
 	*res = constant_expr_alloc(&sym->location, dtype,
 				   dtype->byteorder, dtype->size,
-				   &s->value);
+				   constant_data_ptr(s->value, dtype->size));
 	return NULL;
 }
 
@@ -203,6 +204,23 @@ const struct datatype verdict_type = {
 	.name		= "verdict",
 	.desc		= "netfilter verdict",
 	.print		= verdict_type_print,
+};
+
+static const struct symbol_table nfproto_tbl = {
+	.symbols	= {
+		SYMBOL("ipv4",		NFPROTO_IPV4),
+		SYMBOL("ipv6",		NFPROTO_IPV6),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype nfproto_type = {
+	.type		= TYPE_NFPROTO,
+	.name		= "nf_proto",
+	.desc		= "netfilter protocol",
+	.size		= 1 * BITS_PER_BYTE,
+	.basetype	= &integer_type,
+	.sym_tbl	= &nfproto_tbl,
 };
 
 const struct datatype bitmask_type = {
@@ -320,7 +338,7 @@ static struct error_record *lladdr_type_parse(const struct expr *sym,
 
 const struct datatype lladdr_type = {
 	.type		= TYPE_LLADDR,
-	.name		= "lladdr",
+	.name		= "ll_addr",
 	.desc		= "link layer address",
 	.byteorder	= BYTEORDER_HOST_ENDIAN,
 	.basetype	= &integer_type,
@@ -374,7 +392,7 @@ static struct error_record *ipaddr_type_parse(const struct expr *sym,
 
 const struct datatype ipaddr_type = {
 	.type		= TYPE_IPADDR,
-	.name		= "ipv4_address",
+	.name		= "ipv4_addr",
 	.desc		= "IPv4 address",
 	.byteorder	= BYTEORDER_BIG_ENDIAN,
 	.size		= 4 * BITS_PER_BYTE,
@@ -432,7 +450,7 @@ static struct error_record *ip6addr_type_parse(const struct expr *sym,
 
 const struct datatype ip6addr_type = {
 	.type		= TYPE_IP6ADDR,
-	.name		= "ipv6_address",
+	.name		= "ipv6_addr",
 	.desc		= "IPv6 address",
 	.byteorder	= BYTEORDER_BIG_ENDIAN,
 	.size		= 16 * BITS_PER_BYTE,
@@ -487,7 +505,7 @@ static struct error_record *inet_protocol_type_parse(const struct expr *sym,
 
 const struct datatype inet_protocol_type = {
 	.type		= TYPE_INET_PROTOCOL,
-	.name		= "inet_protocol",
+	.name		= "inet_proto",
 	.desc		= "Internet protocol",
 	.size		= BITS_PER_BYTE,
 	.basetype	= &integer_type,
@@ -585,7 +603,7 @@ struct symbol_table *rt_symbol_table_init(const char *filename)
 		    sscanf(p, "%u %511s #", &val, namebuf) != 2) {
 			fprintf(stderr, "iproute database '%s' corrupted\n",
 				filename);
-			goto out;
+			break;
 		}
 
 		/* One element is reserved for list terminator */

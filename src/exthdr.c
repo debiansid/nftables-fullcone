@@ -27,6 +27,12 @@ static void exthdr_expr_print(const struct expr *expr)
 	printf("%s %s", expr->exthdr.desc->name, expr->exthdr.tmpl->token);
 }
 
+static bool exthdr_expr_cmp(const struct expr *e1, const struct expr *e2)
+{
+	return e1->exthdr.desc == e2->exthdr.desc &&
+	       e1->exthdr.tmpl == e2->exthdr.tmpl;
+}
+
 static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
 {
 	new->exthdr.desc = expr->exthdr.desc;
@@ -37,17 +43,18 @@ static const struct expr_ops exthdr_expr_ops = {
 	.type		= EXPR_EXTHDR,
 	.name		= "exthdr",
 	.print		= exthdr_expr_print,
+	.cmp		= exthdr_expr_cmp,
 	.clone		= exthdr_expr_clone,
 };
 
-static const struct payload_template exthdr_unknown_template =
-	PAYLOAD_TEMPLATE("unknown", &invalid_type, 0, 0);
+static const struct proto_hdr_template exthdr_unknown_template =
+	PROTO_HDR_TEMPLATE("unknown", &invalid_type, 0, 0);
 
 struct expr *exthdr_expr_alloc(const struct location *loc,
 			       const struct exthdr_desc *desc,
 			       uint8_t type)
 {
-	const struct payload_template *tmpl;
+	const struct proto_hdr_template *tmpl;
 	struct expr *expr;
 
 	if (desc != NULL)
@@ -73,7 +80,7 @@ static const struct exthdr_desc *exthdr_protocols[IPPROTO_MAX] = {
 void exthdr_init_raw(struct expr *expr, uint8_t type,
 		     unsigned int offset, unsigned int len)
 {
-	const struct payload_template *tmpl;
+	const struct proto_hdr_template *tmpl;
 	unsigned int i;
 
 	assert(expr->ops->type == EXPR_EXTHDR);
@@ -94,9 +101,9 @@ void exthdr_init_raw(struct expr *expr, uint8_t type,
 }
 
 #define HDR_TEMPLATE(__name, __dtype, __type, __member)			\
-	PAYLOAD_TEMPLATE(__name, __dtype,				\
-			 offsetof(__type, __member) * 8,		\
-			 field_sizeof(__type, __member) * 8)
+	PROTO_HDR_TEMPLATE(__name, __dtype,				\
+			   offsetof(__type, __member) * 8,		\
+			   field_sizeof(__type, __member) * 8)
 
 /*
  * Hop-by-hop options
@@ -171,12 +178,12 @@ const struct exthdr_desc exthdr_frag = {
 	.templates	= {
 		[FRAGHDR_NEXTHDR]	= FRAG_FIELD("nexthdr", ip6f_nxt, &inet_protocol_type),
 		[FRAGHDR_RESERVED]	= FRAG_FIELD("reserved", ip6f_reserved, &integer_type),
-		[FRAGHDR_FRAG_OFF]	= PAYLOAD_TEMPLATE("frag-off", &integer_type,
-							   16, 13),
-		[FRAGHDR_RESERVED2]	= PAYLOAD_TEMPLATE("reserved2", &integer_type,
-							   29, 2),
-		[FRAGHDR_MFRAGS]	= PAYLOAD_TEMPLATE("more-fragments", &integer_type,
-							   31, 1),
+		[FRAGHDR_FRAG_OFF]	= PROTO_HDR_TEMPLATE("frag-off", &integer_type,
+							  16, 13),
+		[FRAGHDR_RESERVED2]	= PROTO_HDR_TEMPLATE("reserved2", &integer_type,
+							  29, 2),
+		[FRAGHDR_MFRAGS]	= PROTO_HDR_TEMPLATE("more-fragments", &integer_type,
+							  31, 1),
 		[FRAGHDR_ID]		= FRAG_FIELD("id", ip6f_ident, &integer_type),
 	},
 };

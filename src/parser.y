@@ -18,6 +18,7 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
+#include <libnftnl/common.h>
 
 #include <rule.h>
 #include <statement.h>
@@ -36,6 +37,7 @@ void parser_init(struct parser_state *state, struct list_head *msgs)
 	init_list_head(&state->top_scope.symbols);
 	state->msgs = msgs;
 	state->scopes[0] = scope_init(&state->top_scope, NULL);
+	state->ectx.msgs = msgs;
 }
 
 static void yyerror(struct location *loc, void *scanner,
@@ -51,12 +53,14 @@ static struct scope *current_scope(const struct parser_state *state)
 
 static void open_scope(struct parser_state *state, struct scope *scope)
 {
+	assert(state->scope < array_size(state->scopes) - 1);
 	scope_init(scope, current_scope(state));
 	state->scopes[++state->scope] = scope;
 }
 
 static void close_scope(struct parser_state *state)
 {
+	assert(state->scope > 0);
 	state->scope--;
 }
 
@@ -166,13 +170,17 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token MAP			"map"
 %token HANDLE			"handle"
 
+%token INET			"inet"
+
 %token ADD			"add"
+%token CREATE			"create"
 %token INSERT			"insert"
 %token DELETE			"delete"
 %token LIST			"list"
 %token FLUSH			"flush"
 %token RENAME			"rename"
 %token DESCRIBE			"describe"
+%token EXPORT			"export"
 
 %token ACCEPT			"accept"
 %token DROP			"drop"
@@ -180,7 +188,6 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token JUMP			"jump"
 %token GOTO			"goto"
 %token RETURN			"return"
-%token QUEUE			"queue"
 
 %token CONSTANT			"constant"
 %token INTERVAL			"interval"
@@ -284,6 +291,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token MH			"mh"
 
 %token META			"meta"
+%token NFPROTO			"nfproto"
+%token L4PROTO			"l4proto"
 %token MARK			"mark"
 %token IIF			"iif"
 %token IIFNAME			"iifname"
@@ -305,6 +314,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token L3PROTOCOL		"l3proto"
 %token PROTO_SRC		"proto-src"
 %token PROTO_DST		"proto-dst"
+%token LABEL			"label"
 
 %token COUNTER			"counter"
 %token PACKETS			"packets"
@@ -333,16 +343,27 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token SNAT			"snat"
 %token DNAT			"dnat"
 
-%token POSITION			"position"
+%token QUEUE			"queue"
+%token QUEUENUM			"num"
+%token QUEUETOTAL		"total"
+%token QUEUEBYPASS		"bypass"
+%token QUEUECPUFANOUT		"fanout"
+%token OPTIONS			"options"
 
-%type <string>			identifier string
-%destructor { xfree($$); }	identifier string
+%token POSITION			"position"
+%token COMMENT			"comment"
+
+%token XML			"xml"
+%token JSON			"json"
+
+%type <string>			identifier string comment_spec
+%destructor { xfree($$); }	identifier string comment_spec
 
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd
+%type <cmd>			base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd
 
 %type <handle>			table_spec tables_spec chain_spec chain_identifier ruleid_spec
 %destructor { handle_free(&$$); } table_spec tables_spec chain_spec chain_identifier ruleid_spec
@@ -351,9 +372,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <val>			handle_spec family_spec position_spec
 
 %type <table>			table_block_alloc table_block
-%destructor { table_free($$); }	table_block_alloc
+%destructor { close_scope(state); table_free($$); }	table_block_alloc
 %type <chain>			chain_block_alloc chain_block
-%destructor { chain_free($$); }	chain_block_alloc
+%destructor { close_scope(state); chain_free($$); }	chain_block_alloc
 %type <rule>			rule
 %destructor { rule_free($$); }	rule
 
@@ -371,6 +392,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { stmt_free($$); }	stmt match_stmt verdict_stmt
 %type <stmt>			counter_stmt counter_stmt_alloc
 %destructor { stmt_free($$); }	counter_stmt counter_stmt_alloc
+%type <stmt>			ct_stmt
+%destructor { stmt_free($$); }	ct_stmt
 %type <stmt>			meta_stmt
 %destructor { stmt_free($$); }	meta_stmt
 %type <stmt>			log_stmt log_stmt_alloc
@@ -382,6 +405,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { stmt_free($$); }	reject_stmt
 %type <stmt>			nat_stmt nat_stmt_alloc
 %destructor { stmt_free($$); }	nat_stmt nat_stmt_alloc
+%type <stmt>			queue_stmt queue_stmt_alloc
+%destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
+%type <val>			queue_flags queue_flag
 
 %type <expr>			symbol_expr verdict_expr integer_expr
 %destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr
@@ -404,8 +430,11 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <expr>			map_expr
 %destructor { expr_free($$); }	map_expr
 
-%type <expr>			verdict_map_expr
-%destructor { expr_free($$); }	verdict_map_expr
+%type <expr>			verdict_map_stmt
+%destructor { expr_free($$); }	verdict_map_stmt
+
+%type <expr>			verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
+%destructor { expr_free($$); }	verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
 
 %type <expr>			set_expr set_list_expr set_list_member_expr
 %destructor { expr_free($$); }	set_expr set_list_expr set_list_member_expr
@@ -462,14 +491,24 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { expr_free($$); }	ct_expr
 %type <val>			ct_key
 
+%type <val>			export_format
+
 %%
 
 input			:	/* empty */
 			|	input		line
 			{
 				if ($2 != NULL) {
+					LIST_HEAD(list);
+
 					$2->location = @2;
-					list_add_tail(&$2->list, &state->cmds);
+
+					list_add_tail(&$2->list, &list);
+					if (cmd_evaluate(&state->ectx, $2) < 0) {
+						if (++state->nerrs == max_errors)
+							YYABORT;
+					} else
+						list_splice_tail(&list, &state->cmds);
 				}
 			}
 			;
@@ -492,8 +531,22 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_seperator
 			}
 			|	DEFINE		identifier	'='	initializer_expr	stmt_seperator
 			{
-				symbol_bind(current_scope(state), $2, $4);
+				struct scope *scope = current_scope(state);
+
+				if (symbol_lookup(scope, $2) != NULL) {
+					erec_queue(error(&@2, "redfinition of symbol '%s'", $2),
+						   state->msgs);
+					YYERROR;
+				}
+
+				symbol_bind(scope, $2, $4);
 				xfree($2);
+			}
+			|	error		stmt_seperator
+			{
+				if (++state->nerrs == max_errors)
+					YYABORT;
+				yyerrok;
 			}
 			;
 
@@ -512,23 +565,32 @@ line			:	common_block			{ $$ = NULL; }
 				 * work.
 				 */
 				if ($1 != NULL) {
+					LIST_HEAD(list);
+
 					$1->location = @1;
-					list_add_tail(&$1->list, &state->cmds);
+
+					list_add_tail(&$1->list, &list);
+					if (cmd_evaluate(&state->ectx, $1) < 0) {
+						if (++state->nerrs == max_errors)
+							YYABORT;
+					} else
+						list_splice_tail(&list, &state->cmds);
 				}
 				$$ = NULL;
 
 				YYACCEPT;
 			}
-			|	base_cmd	error		{ $$ = $1; }
 			;
 
 base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 	  		|	ADD		add_cmd		{ $$ = $2; }
+			|	CREATE		create_cmd	{ $$ = $2; }
 			|	INSERT		insert_cmd	{ $$ = $2; }
 			|	DELETE		delete_cmd	{ $$ = $2; }
 			|	LIST		list_cmd	{ $$ = $2; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
 			|	RENAME		rename_cmd	{ $$ = $2; }
+			|	EXPORT		export_cmd	{ $$ = $2; }
 			|	DESCRIBE	primary_expr
 			{
 				expr_describe($2);
@@ -588,6 +650,31 @@ add_cmd			:	TABLE		table_spec
 			}
 			;
 
+create_cmd		:	TABLE		table_spec
+			{
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_TABLE, &$2, &@$, NULL);
+			}
+			|	TABLE		table_spec	table_block_alloc
+						'{'	table_block	'}'
+			{
+				handle_merge(&$3->handle, &$2);
+				close_scope(state);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_TABLE, &$2, &@$, $5);
+			}
+			|	CHAIN		chain_spec
+			{
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_CHAIN, &$2, &@$, NULL);
+			}
+			|	CHAIN		chain_spec	chain_block_alloc
+						'{'	chain_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				close_scope(state);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_CHAIN, &$2, &@$, $5);
+			}
+			;
+
 insert_cmd		:	RULE		ruleid_spec	rule
 			{
 				$$ = cmd_alloc(CMD_INSERT, CMD_OBJ_RULE, &$2, &@$, $3);
@@ -632,7 +719,7 @@ list_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_CHAIN, &$2, &@$, NULL);
 			}
-			|	SETS		table_spec
+			|	SETS		tables_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_SETS, &$2, &@$, NULL);
 			}
@@ -660,6 +747,14 @@ rename_cmd		:	CHAIN		chain_spec	identifier
 			{
 				$$ = cmd_alloc(CMD_RENAME, CMD_OBJ_CHAIN, &$2, &@$, NULL);
 				$$->arg = $3;
+			}
+			;
+
+export_cmd		:	export_format
+			{
+				struct handle h = { .family = NFPROTO_UNSPEC };
+				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_RULESET, &h, &@$, NULL);
+				$$->format = $1;
 			}
 			;
 
@@ -854,6 +949,7 @@ string			:	STRING
 family_spec		:	/* empty */	{ $$ = NFPROTO_IPV4; }
 			|	IP		{ $$ = NFPROTO_IPV4; }
 			|	IP6		{ $$ = NFPROTO_IPV6; }
+			|	INET		{ $$ = NFPROTO_INET; }
 			|	ARP		{ $$ = NFPROTO_ARP; }
 			|	BRIDGE		{ $$ = NFPROTO_BRIDGE; }
 			;
@@ -930,11 +1026,22 @@ ruleid_spec		:	chain_spec	handle_spec	position_spec
 			}
 			;
 
-rule			:	stmt_list
+comment_spec		:	/* empty */
+			{
+				$$ = NULL;
+			}
+			|	COMMENT		string
+			{
+				$$ = $2;
+			}
+			;
+
+rule			:	stmt_list	comment_spec
 			{
 				struct stmt *i;
 
 				$$ = rule_alloc(&@$, NULL);
+				$$->handle.comment = $2;
 				list_for_each_entry(i, $1, list)
 					$$->num_stmts++;
 				list_splice_tail($1, &$$->stmts);
@@ -963,17 +1070,52 @@ stmt			:	verdict_stmt
 			|	limit_stmt
 			|	reject_stmt
 			|	nat_stmt
+			|	queue_stmt
+			|	ct_stmt
 			;
 
 verdict_stmt		:	verdict_expr
 			{
 				$$ = verdict_stmt_alloc(&@$, $1);
 			}
-			|	verdict_map_expr
+			|	verdict_map_stmt
 			{
 				$$ = verdict_stmt_alloc(&@$, $1);
 			}
 			;
+
+verdict_map_stmt	:	concat_expr	VMAP	verdict_map_expr
+			{
+				$$ = map_expr_alloc(&@$, $1, $3);
+			}
+			;
+
+verdict_map_expr	:	'{'	verdict_map_list_expr	'}'
+			{
+				$2->location = @$;
+				$$ = $2;
+			}
+			;
+
+verdict_map_list_expr	:	verdict_map_list_member_expr
+			{
+				$$ = set_expr_alloc(&@$);
+				compound_expr_add($$, $1);
+			}
+			|	verdict_map_list_expr	COMMA	verdict_map_list_member_expr
+			{
+				compound_expr_add($1, $3);
+				$$ = $1;
+			}
+			|	verdict_map_list_expr	COMMA	opt_newline
+			;
+
+verdict_map_list_member_expr:	opt_newline	map_lhs_expr	COLON	verdict_expr	opt_newline
+			{
+				$$ = mapping_expr_alloc(&@$, $2, $4);
+			}
+			;
+
 
 counter_stmt		:	counter_stmt_alloc
 			|	counter_stmt_alloc	counter_args
@@ -1087,6 +1229,57 @@ nat_stmt_args		:	expr
 			}
 			;
 
+queue_stmt		:	queue_stmt_alloc
+			|	queue_stmt_alloc		queue_args
+			;
+
+queue_stmt_alloc		:	QUEUE
+			{
+				$$ = queue_stmt_alloc(&@$);
+			}
+			;
+
+queue_args		:	queue_arg
+			{
+				$<stmt>$	= $<stmt>0;
+			}
+			|	queue_args	queue_arg
+			;
+
+queue_arg		:	QUEUENUM		NUM
+			{
+				$<stmt>0->queue.queuenum	 = $2;
+			}
+			|	QUEUETOTAL		NUM
+			{
+				$<stmt>0->queue.queues_total	 = $2;
+			}
+			|	OPTIONS		queue_flags
+			{
+				$<stmt>0->queue.flags		 = $2;
+			}
+			;
+
+queue_flags		:	queue_flag
+			{
+				$$ = $1;
+			}
+			|	queue_flags	COMMA	queue_flag
+			{
+				$$ |= $1 | $3;
+			}
+			;
+
+queue_flag		:	QUEUEBYPASS
+			{
+				$$ = NFT_QUEUE_FLAG_BYPASS;
+			}
+			|	QUEUECPUFANOUT
+			{
+				$$ = NFT_QUEUE_FLAG_CPU_FANOUT;
+			}
+			;
+
 match_stmt		:	relational_expr
 			{
 				$$ = expr_stmt_alloc(&@$, $1);
@@ -1102,9 +1295,16 @@ symbol_expr		:	string
 			}
 			|	'$'	identifier
 			{
+				struct scope *scope = current_scope(state);
+
+				if (symbol_lookup(scope, $2) == NULL) {
+					erec_queue(error(&@2, "unknown identifier '%s'", $2),
+						   state->msgs);
+					YYERROR;
+				}
+
 				$$ = symbol_expr_alloc(&@$, SYMBOL_DEFINE,
-						       current_scope(state),
-						       $2);
+						       scope, $2);
 				xfree($2);
 			}
 			|	AT	identifier
@@ -1243,12 +1443,6 @@ map_expr		:	concat_expr	MAP	expr
 			}
 			;
 
-verdict_map_expr	:	concat_expr	VMAP	expr
-			{
-				$$ = map_expr_alloc(&@$, $1, $3);
-			}
-			;
-
 expr			:	concat_expr
 			|	set_expr
 			|       map_expr
@@ -1280,10 +1474,6 @@ set_list_member_expr	:	opt_newline	expr	opt_newline
 				$$ = $2;
 			}
 			|	opt_newline	map_lhs_expr	COLON	concat_expr	opt_newline
-			{
-				$$ = mapping_expr_alloc(&@$, $2, $4);
-			}
-			|	opt_newline	map_lhs_expr	COLON	verdict_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
 			}
@@ -1323,10 +1513,6 @@ verdict_expr		:	ACCEPT
 			{
 				$$ = verdict_expr_alloc(&@$, NF_DROP, NULL);
 			}
-			|	QUEUE
-			{
-				$$ = verdict_expr_alloc(&@$, NF_QUEUE, NULL);
-			}
 			|	CONTINUE
 			{
 				$$ = verdict_expr_alloc(&@$, NFT_CONTINUE, NULL);
@@ -1360,6 +1546,8 @@ meta_key		:	meta_key_qualified
 			;
 
 meta_key_qualified	:	LENGTH		{ $$ = NFT_META_LEN; }
+			|	NFPROTO		{ $$ = NFT_META_NFPROTO; }
+			|	L4PROTO		{ $$ = NFT_META_L4PROTO; }
 			|	PROTOCOL	{ $$ = NFT_META_PROTOCOL; }
 			|	PRIORITY	{ $$ = NFT_META_PRIORITY; }
 			;
@@ -1405,6 +1593,13 @@ ct_key			:	STATE		{ $$ = NFT_CT_STATE; }
 			|	PROTOCOL	{ $$ = NFT_CT_PROTOCOL; }
 			|	PROTO_SRC	{ $$ = NFT_CT_PROTO_SRC; }
 			|	PROTO_DST	{ $$ = NFT_CT_PROTO_DST; }
+			|	LABEL		{ $$ = NFT_CT_LABEL; }
+			;
+
+ct_stmt			:	CT	ct_key		SET	expr
+			{
+				$$ = ct_stmt_alloc(&@$, $2, $4);
+			}
 			;
 
 payload_expr		:	payload_raw_expr
@@ -1435,14 +1630,21 @@ payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
 			}
 			;
 
-payload_base_spec	:	LL_HDR		{ $$ = PAYLOAD_BASE_LL_HDR; }
-			|	NETWORK_HDR	{ $$ = PAYLOAD_BASE_NETWORK_HDR; }
-			|	TRANSPORT_HDR	{ $$ = PAYLOAD_BASE_TRANSPORT_HDR; }
+payload_base_spec	:	LL_HDR		{ $$ = PROTO_BASE_LL_HDR; }
+			|	NETWORK_HDR	{ $$ = PROTO_BASE_NETWORK_HDR; }
+			|	TRANSPORT_HDR	{ $$ = PROTO_BASE_TRANSPORT_HDR; }
 			;
 
 eth_hdr_expr		:	ETHER	eth_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_eth, $2);
+				$$ = payload_expr_alloc(&@$, &proto_eth, $2);
+			}
+			|	ETHER
+			{
+				uint16_t data = ARPHRD_ETHER;
+				$$ = constant_expr_alloc(&@$, &arphrd_type,
+							 BYTEORDER_BIG_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -1453,14 +1655,13 @@ eth_hdr_field		:	SADDR		{ $$ = ETHHDR_SADDR; }
 
 vlan_hdr_expr		:	VLAN	vlan_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_vlan, $2);
+				$$ = payload_expr_alloc(&@$, &proto_vlan, $2);
 			}
 			|	VLAN
 			{
-				uint16_t data = ETH_P_8021Q;
-				$$ = constant_expr_alloc(&@$, &ethertype_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "vlan");
 			}
 			;
 
@@ -1472,14 +1673,13 @@ vlan_hdr_field		:	ID		{ $$ = VLANHDR_VID; }
 
 arp_hdr_expr		:	ARP	arp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_arp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_arp, $2);
 			}
 			|	ARP
 			{
-				uint16_t data = ETH_P_ARP;
-				$$ = constant_expr_alloc(&@$, &ethertype_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "arp");
 			}
 			;
 
@@ -1492,14 +1692,13 @@ arp_hdr_field		:	HTYPE		{ $$ = ARPHDR_HRD; }
 
 ip_hdr_expr		:	IP	ip_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_ip, $2);
+				$$ = payload_expr_alloc(&@$, &proto_ip, $2);
 			}
 			|	IP
 			{
-				uint16_t data = ETH_P_IP;
-				$$ = constant_expr_alloc(&@$, &ethertype_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ip");
 			}
 			;
 
@@ -1518,7 +1717,7 @@ ip_hdr_field		:	VERSION		{ $$ = IPHDR_VERSION; }
 
 icmp_hdr_expr		:	ICMP	icmp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_icmp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_icmp, $2);
 			}
 			|	ICMP
 			{
@@ -1540,14 +1739,13 @@ icmp_hdr_field		:	TYPE		{ $$ = ICMPHDR_TYPE; }
 
 ip6_hdr_expr		:	IP6	ip6_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_ip6, $2);
+				$$ = payload_expr_alloc(&@$, &proto_ip6, $2);
 			}
 			|	IP6
 			{
-				uint16_t data = ETH_P_IPV6;
-				$$ = constant_expr_alloc(&@$, &ethertype_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ip6");
 			}
 			;
 
@@ -1562,7 +1760,7 @@ ip6_hdr_field		:	VERSION		{ $$ = IP6HDR_VERSION; }
 			;
 icmp6_hdr_expr		:	ICMP6	icmp6_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_icmp6, $2);
+				$$ = payload_expr_alloc(&@$, &proto_icmp6, $2);
 			}
 			|	ICMP6
 			{
@@ -1585,7 +1783,7 @@ icmp6_hdr_field		:	TYPE		{ $$ = ICMP6HDR_TYPE; }
 
 auth_hdr_expr		:	AH	auth_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_ah, $2);
+				$$ = payload_expr_alloc(&@$, &proto_ah, $2);
 			}
 			|	AH
 			{
@@ -1605,7 +1803,7 @@ auth_hdr_field		:	NEXTHDR		{ $$ = AHHDR_NEXTHDR; }
 
 esp_hdr_expr		:	ESP	esp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_esp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_esp, $2);
 			}
 			|	ESP
 			{
@@ -1622,7 +1820,7 @@ esp_hdr_field		:	SPI		{ $$ = ESPHDR_SPI; }
 
 comp_hdr_expr		:	COMP	comp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_comp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_comp, $2);
 			}
 			|	COMP
 			{
@@ -1640,7 +1838,7 @@ comp_hdr_field		:	NEXTHDR		{ $$ = COMPHDR_NEXTHDR; }
 
 udp_hdr_expr		:	UDP	udp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_udp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_udp, $2);
 			}
 			|	UDP
 			{
@@ -1659,7 +1857,7 @@ udp_hdr_field		:	SPORT		{ $$ = UDPHDR_SPORT; }
 
 udplite_hdr_expr	:	UDPLITE	udplite_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_udplite, $2);
+				$$ = payload_expr_alloc(&@$, &proto_udplite, $2);
 			}
 			|	UDPLITE
 			{
@@ -1678,7 +1876,7 @@ udplite_hdr_field	:	SPORT		{ $$ = UDPHDR_SPORT; }
 
 tcp_hdr_expr		:	TCP	tcp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_tcp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_tcp, $2);
 			}
 			|	TCP
 			{
@@ -1703,7 +1901,7 @@ tcp_hdr_field		:	SPORT		{ $$ = TCPHDR_SPORT; }
 
 dccp_hdr_expr		:	DCCP	dccp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_dccp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_dccp, $2);
 			}
 			|	DCCP
 			{
@@ -1721,7 +1919,7 @@ dccp_hdr_field		:	SPORT		{ $$ = DCCPHDR_SPORT; }
 
 sctp_hdr_expr		:	SCTP	sctp_hdr_field
 			{
-				$$ = payload_expr_alloc(&@$, &payload_sctp, $2);
+				$$ = payload_expr_alloc(&@$, &proto_sctp, $2);
 			}
 			|	SCTP
 			{
@@ -1827,4 +2025,7 @@ mh_hdr_field		:	NEXTHDR		{ $$ = MHHDR_NEXTHDR; }
 			|	CHECKSUM	{ $$ = MHHDR_CHECKSUM; }
 			;
 
+export_format		: 	XML 		{ $$ = NFT_OUTPUT_XML; }
+			|	JSON		{ $$ = NFT_OUTPUT_JSON; }
+			;
 %%

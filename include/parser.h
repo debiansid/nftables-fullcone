@@ -19,12 +19,14 @@ struct parser_state {
 	unsigned int			indesc_idx;
 
 	struct list_head		*msgs;
+	unsigned int			nerrs;
 
 	struct scope			top_scope;
 	struct scope			*scopes[SCOPE_NEST_MAX];
 	unsigned int			scope;
 
 	struct list_head		cmds;
+	struct eval_ctx			ectx;
 };
 
 extern void parser_init(struct parser_state *state, struct list_head *msgs);

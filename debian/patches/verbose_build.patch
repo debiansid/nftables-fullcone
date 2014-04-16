@@ -1,0 +1,13 @@
+Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+Description: print verbose output
+--- a/Makefile.rules.in
++++ b/Makefile.rules.in
+@@ -12,7 +12,7 @@
+ 			sh configure
+ 
+ %.o:			%.c	$(makedeps)
+-			@echo -e "  CC\t\t$<"
++			@echo $(CC) $(CFLAGS) -c -o $@ $<
+ 			$(CC) $(CFLAGS) -c -o $@ $<
+ 
+ .%.d:			%.c	$(makedeps)

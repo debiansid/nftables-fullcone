@@ -1,3 +1,9 @@
+nftables (0.2-1) UNRELEASED; urgency=low
+
+  * none
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 16 Apr 2014 14:36:44 +0100
+
 nftables (0.099+git20140120-1) unstable; urgency=low
 
   * Initial release (Closes: #522176)

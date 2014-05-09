@@ -1,0 +1,7 @@
+autom4te.cache/*
+Makefile*
+config.*
+doc/Makefile
+files/Makefile
+src/Makefile
+

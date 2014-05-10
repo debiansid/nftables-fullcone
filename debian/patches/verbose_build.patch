@@ -1,5 +1,10 @@
 Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
-Description: print verbose output
+Description: print verbose output.
+ .
+ Upstream is expected to rework the build system, so no need to forward
+ this patch.
+Forwarded: not-needed
+Last-Update: 2014-05-10
 --- a/Makefile.rules.in
 +++ b/Makefile.rules.in
 @@ -12,7 +12,7 @@

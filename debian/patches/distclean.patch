@@ -1,5 +1,10 @@
 Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
-Description: Implement the missing distclean option
+Description: Implement the missing distclean option.
+ .
+ Upstream is expected to rework the build system, so no need to forward
+ this patch.
+Forwarded: not-needed
+Last-Update: 2014-05-10
 --- pkg-nftables.orig/Makefile.rules.in	2013-12-22 15:25:02.296809032 +0100
 +++ pkg-nftables/Makefile.rules.in	2013-12-22 15:26:12.545157359 +0100
 @@ -81,6 +81,7 @@

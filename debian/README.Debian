@@ -1,6 +1,6 @@
 The following message was published the 20th Jan 2014 in the Netfilter
 devel mailing list <netfilter-devel@vger.kernel.org> when the nftables
-release happened, authored by Patric McHardy <kaber@trash.net>.
+release happened, authored by Patrick McHardy <kaber@trash.net>.
 
 Please, read it carefully as it contains valuable information about the new
 nftables framework.

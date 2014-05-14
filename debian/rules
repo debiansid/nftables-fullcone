@@ -7,9 +7,6 @@
 
 configure_opts	:= --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man
 
-override_dh_auto_test:
-	:
-
 override_dh_auto_configure:
 	./configure $(configure_opts) --
 

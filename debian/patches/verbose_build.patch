@@ -1,18 +1,14 @@
 Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
 Description: print verbose output.
  .
- Upstream is expected to rework the build system, so no need to forward
- this patch.
+ This is a Debian specific patch, no need to forward upstream.
 Forwarded: not-needed
-Last-Update: 2014-05-10
+Last-Update: 2014-05-15
 --- a/Makefile.rules.in
 +++ b/Makefile.rules.in
-@@ -12,7 +12,7 @@
- 			sh configure
- 
- %.o:			%.c	$(makedeps)
--			@echo -e "  CC\t\t$<"
-+			@echo $(CC) $(CFLAGS) -c -o $@ $<
- 			$(CC) $(CFLAGS) -c -o $@ $<
- 
- .%.d:			%.c	$(makedeps)
+@@ -93,4 +93,4 @@
+ .PHONY: $(SUBDIRS)
+ $(SUBDIRS):
+ 			@echo -e "  SUBDIR\t$@/"
+-			@$(MAKE) -s -f Makefile.rules $(MAKECMDGOALS) SUBDIR="$@/" SUBDIRS=""
++			@$(MAKE) -f Makefile.rules $(MAKECMDGOALS) SUBDIR="$@/" SUBDIRS=""

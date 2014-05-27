@@ -1,3 +1,12 @@
+nftables (0.2-2) UNRELEASED; urgency=medium
+
+  * [6aa52bf] d/README.Debian: fix Patrick McHardy name
+  * [ca0e8ba] d/nftables.links: fix broken links file
+  * [7492a48] d/rules: delete override for dh_auto_test
+  * [1aca9dd] d/patches: improve verbose_build.patch
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 27 May 2014 11:14:48 +0200
+
 nftables (0.2-1) unstable; urgency=low
 
   * Initial release (Closes: #522176)

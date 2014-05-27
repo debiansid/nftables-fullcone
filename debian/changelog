@@ -1,4 +1,4 @@
-nftables (0.2-2) UNRELEASED; urgency=medium
+nftables (0.2-2) unstable; urgency=low
 
   * [6aa52bf] d/README.Debian: fix Patrick McHardy name
   * [ca0e8ba] d/nftables.links: fix broken links file

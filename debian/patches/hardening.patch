@@ -1,0 +1,23 @@
+Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+Description: include CPPFLAGS to harden the build
+.
+This is a Debian specific patch, no need to forward upstream.
+Forwarded: not-needed
+Last-Updated: 2014-06-03
+--- pkg-nftables.orig/Makefile.rules.in	2014-05-14 19:01:42.095684381 +0200
++++ pkg-nftables/Makefile.rules.in	2014-06-03 10:47:49.271878591 +0200
+@@ -13,12 +13,12 @@
+ 
+ %.o:			%.c	$(makedeps)
+ 			@echo -e "  CC\t\t$<"
+-			$(CC) $(CFLAGS) -c -o $@ $<
++			$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+ 
+ .%.d:			%.c	$(makedeps)
+ 			@echo -e "  DEP\t\t$<"
+ 			$(RM) $@
+-			$(CC) -M $(CFLAGS) $< | sed 's,$(*F)\.o[ :]*,$*.o $@ : ,g' > $@
++			$(CC) -M $(CFLAGS) $(CPPFLAGS) $< | sed 's,$(*F)\.o[ :]*,$*.o $@ : ,g' > $@
+ 
+ %.c %.h:		%.y	$(makedeps)
+ 			@echo -e "  YACC\t\t$<"

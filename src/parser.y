@@ -92,6 +92,21 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 #define YYLLOC_DEFAULT(Current, Rhs, N)	location_update(&Current, Rhs, N)
 
+enum {
+	NFT_EVENT_NEW	= 0,
+	NFT_EVENT_DEL,
+};
+
+static int monitor_lookup_event(const char *event)
+{
+	if (strcmp(event, "new") == 0)
+		return NFT_EVENT_NEW;
+	else if (strcmp(event, "destroy") == 0)
+		return NFT_EVENT_DEL;
+
+	return -1;
+}
+
 %}
 
 /* Declaration section */
@@ -163,7 +178,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token TABLE			"table"
 %token TABLES			"tables"
 %token CHAIN			"chain"
+%token CHAINS			"chains"
 %token RULE			"rule"
+%token RULES			"rules"
 %token SETS			"sets"
 %token SET			"set"
 %token ELEMENT			"element"
@@ -181,6 +198,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token RENAME			"rename"
 %token DESCRIBE			"describe"
 %token EXPORT			"export"
+%token MONITOR			"monitor"
 
 %token ACCEPT			"accept"
 %token DROP			"drop"
@@ -304,6 +322,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token SKGID			"skgid"
 %token NFTRACE			"nftrace"
 %token RTCLASSID		"rtclassid"
+%token IBRIPORT			"ibriport"
+%token OBRIPORT			"obriport"
 
 %token CT			"ct"
 %token DIRECTION		"direction"
@@ -345,10 +365,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token QUEUE			"queue"
 %token QUEUENUM			"num"
-%token QUEUETOTAL		"total"
 %token QUEUEBYPASS		"bypass"
 %token QUEUECPUFANOUT		"fanout"
-%token OPTIONS			"options"
 
 %token POSITION			"position"
 %token COMMENT			"comment"
@@ -362,8 +380,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd
+%type <cmd>			base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd
 
 %type <handle>			table_spec tables_spec chain_spec chain_identifier ruleid_spec
 %destructor { handle_free(&$$); } table_spec tables_spec chain_spec chain_identifier ruleid_spec
@@ -405,7 +423,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { stmt_free($$); }	reject_stmt
 %type <stmt>			nat_stmt nat_stmt_alloc
 %destructor { stmt_free($$); }	nat_stmt nat_stmt_alloc
-%type <stmt>			queue_stmt queue_stmt_alloc
+%type <stmt>			queue_stmt queue_stmt_alloc queue_range
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
 %type <val>			queue_flags queue_flag
 
@@ -491,7 +509,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { expr_free($$); }	ct_expr
 %type <val>			ct_key
 
-%type <val>			export_format
+%type <val>			export_format	output_format	monitor_flags
 
 %%
 
@@ -591,6 +609,7 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
 			|	RENAME		rename_cmd	{ $$ = $2; }
 			|	EXPORT		export_cmd	{ $$ = $2; }
+			|	MONITOR		monitor_cmd	{ $$ = $2; }
 			|	DESCRIBE	primary_expr
 			{
 				expr_describe($2);
@@ -756,6 +775,190 @@ export_cmd		:	export_format
 				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_RULESET, &h, &@$, NULL);
 				$$->format = $1;
 			}
+			;
+
+monitor_cmd		:	monitor_flags	output_format
+			{
+				struct handle h = { .family = NFPROTO_UNSPEC };
+				$$ = cmd_alloc(CMD_MONITOR, CMD_OBJ_RULESET, &h, &@$, NULL);
+				$$->monitor_flags = $1;
+				$$->format = $2;
+			}
+			;
+
+monitor_flags		:	/* empty */
+			{
+				$$ = (1 << NFT_MSG_NEWRULE)	|
+				     (1 << NFT_MSG_DELRULE)	|
+				     (1 << NFT_MSG_NEWSET)	|
+				     (1 << NFT_MSG_DELSET)	|
+				     (1 << NFT_MSG_NEWSETELEM)	|
+				     (1 << NFT_MSG_DELSETELEM)	|
+				     (1 << NFT_MSG_NEWCHAIN)	|
+				     (1 << NFT_MSG_DELCHAIN)	|
+				     (1 << NFT_MSG_NEWTABLE)	|
+				     (1 << NFT_MSG_DELTABLE);
+			}
+			|	STRING
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWTABLE)	|
+					     (1 << NFT_MSG_NEWCHAIN)	|
+					     (1 << NFT_MSG_NEWRULE)	|
+					     (1 << NFT_MSG_NEWSET)	|
+					     (1 << NFT_MSG_NEWSETELEM);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELTABLE)	|
+					     (1 << NFT_MSG_DELCHAIN)	|
+					     (1 << NFT_MSG_DELRULE)	|
+					     (1 << NFT_MSG_DELSET)	|
+					     (1 << NFT_MSG_DELSETELEM);
+					break;
+				}
+			}
+			|	TABLES
+			{
+				$$ = (1 << NFT_MSG_NEWTABLE) |
+				     (1 << NFT_MSG_DELTABLE);
+			}
+			|	STRING 	TABLES
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWTABLE);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELTABLE);
+					break;
+				}
+			}
+			|	CHAINS
+			{
+				$$ = (1 << NFT_MSG_NEWCHAIN) |
+				     (1 << NFT_MSG_DELCHAIN);
+			}
+			|	STRING	CHAINS
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWCHAIN);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELCHAIN);
+					break;
+				}
+			}
+			|	SETS
+			{
+				$$ = (1 << NFT_MSG_NEWSET) |
+				     (1 << NFT_MSG_DELSET);
+			}
+			|	STRING	SETS
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWSET);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELSET);
+					break;
+				}
+			}
+			|	RULES
+			{
+				$$ = (1 << NFT_MSG_NEWRULE) |
+				     (1 << NFT_MSG_DELRULE);
+			}
+			|	STRING 	RULES
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWRULE);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELRULE);
+					break;
+				}
+			}
+			|	ELEMENTS
+			{
+				$$ = (1 << NFT_MSG_NEWSETELEM) |
+				     (1 << NFT_MSG_DELSETELEM);
+			}
+			|	STRING	ELEMENTS
+			{
+				int event;
+
+				event = monitor_lookup_event($1);
+				if (event < 0) {
+					erec_queue(error(&@1, "unknown event type %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+
+				switch (event) {
+				case NFT_EVENT_NEW:
+					$$ = (1 << NFT_MSG_NEWSETELEM);
+					break;
+				case NFT_EVENT_DEL:
+					$$ = (1 << NFT_MSG_DELSETELEM);
+					break;
+				}
+			}
+			;
+
+output_format		:	/* empty */
+			{
+				$$ = NFT_OUTPUT_DEFAULT;
+			}
+			|	export_format
 			;
 
 table_block_alloc	:	/* empty */
@@ -1233,30 +1436,46 @@ queue_stmt		:	queue_stmt_alloc
 			|	queue_stmt_alloc		queue_args
 			;
 
-queue_stmt_alloc		:	QUEUE
+queue_stmt_alloc	:	QUEUE
 			{
 				$$ = queue_stmt_alloc(&@$);
 			}
 			;
 
-queue_args		:	queue_arg
+queue_args		:	QUEUENUM	queue_range	queue_flags
 			{
-				$<stmt>$	= $<stmt>0;
+				$<stmt>0->queue.from = $2->queue.from;
+				$<stmt>0->queue.to = $2->queue.to;
+				$<stmt>0->queue.flags = $3;
 			}
-			|	queue_args	queue_arg
+			|	QUEUENUM	queue_range
+			{
+				$<stmt>0->queue.from = $2->queue.from;
+				$<stmt>0->queue.to = $2->queue.to;
+			}
+			|	queue_flags
+			{
+				$<stmt>0->queue.flags = $1;
+			}
 			;
 
-queue_arg		:	QUEUENUM		NUM
+queue_range		:	NUM
 			{
-				$<stmt>0->queue.queuenum	 = $2;
+				$<stmt>0->queue.from = $1;
+				$<stmt>0->queue.to = $1;
+				$$ = $<stmt>0;
 			}
-			|	QUEUETOTAL		NUM
+			|	NUM	DASH	NUM
 			{
-				$<stmt>0->queue.queues_total	 = $2;
-			}
-			|	OPTIONS		queue_flags
-			{
-				$<stmt>0->queue.flags		 = $2;
+				if ($3 < $1) {
+					erec_queue(error(&@1,
+							 "invalid range %d-%d",
+							 $1, $3), state->msgs);
+					YYERROR;
+				}
+				$<stmt>0->queue.from = $1;
+				$<stmt>0->queue.to = $3;
+				$$ = $<stmt>0;
 			}
 			;
 
@@ -1264,9 +1483,9 @@ queue_flags		:	queue_flag
 			{
 				$$ = $1;
 			}
-			|	queue_flags	COMMA	queue_flag
+			|	queue_flags	queue_flag
 			{
-				$$ |= $1 | $3;
+				$$ |= $1 | $2;
 			}
 			;
 
@@ -1563,6 +1782,8 @@ meta_key_unqualified	:	MARK		{ $$ = NFT_META_MARK; }
 			|	SKGID		{ $$ = NFT_META_SKGID; }
 			|	NFTRACE		{ $$ = NFT_META_NFTRACE; }
 			|	RTCLASSID	{ $$ = NFT_META_RTCLASSID; }
+			|	IBRIPORT	{ $$ = NFT_META_BRI_IIFNAME; }
+			|       OBRIPORT	{ $$ = NFT_META_BRI_OIFNAME; }
 			;
 
 meta_stmt		:	META	meta_key	SET	expr
@@ -1641,10 +1862,9 @@ eth_hdr_expr		:	ETHER	eth_hdr_field
 			}
 			|	ETHER
 			{
-				uint16_t data = ARPHRD_ETHER;
-				$$ = constant_expr_alloc(&@$, &arphrd_type,
-							 BYTEORDER_BIG_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ether");
 			}
 			;
 

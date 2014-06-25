@@ -77,6 +77,22 @@ void set_free(struct set *set)
 	xfree(set);
 }
 
+struct set *set_clone(const struct set *set)
+{
+	struct set *newset = set_alloc(&set->location);
+
+	newset->list = set->list;
+	handle_merge(&newset->handle, &set->handle);
+	newset->flags = set->flags;
+	newset->keytype = set->keytype;
+	newset->keylen = set->keylen;
+	newset->datatype = set->datatype;
+	newset->datalen = set->datalen;
+	newset->init = expr_clone(set->init);
+
+	return newset;
+}
+
 void set_add_hash(struct set *set, struct table *table)
 {
 	list_add_tail(&set->list, &table->sets);
@@ -93,21 +109,53 @@ struct set *set_lookup(const struct table *table, const char *name)
 	return NULL;
 }
 
-void set_print(const struct set *set)
+struct set *set_lookup_global(uint32_t family, const char *table,
+			      const char *name)
+{
+	struct handle h;
+	struct table *t;
+
+	h.family = family;
+	h.table = table;
+
+	t = table_lookup(&h);
+	if (t == NULL)
+		return NULL;
+
+	return set_lookup(t, name);
+}
+
+struct print_fmt_options {
+	const char	*tab;
+	const char	*nl;
+	const char	*table;
+	const char	*family;
+	const char	*stmt_separator;
+};
+
+static void do_set_print(const struct set *set, struct print_fmt_options *opts)
 {
 	const char *delim = "";
 	const char *type;
 
 	type = set->flags & SET_F_MAP ? "map" : "set";
-	printf("\t%s %s {\n", type, set->handle.set);
+	printf("%s%s", opts->tab, type);
 
-	printf("\t\ttype %s", set->keytype->name);
+	if (opts->family != NULL)
+		printf(" %s", opts->family);
+
+	if (opts->table != NULL)
+		printf(" %s", opts->table);
+
+	printf(" %s { %s", set->handle.set, opts->nl);
+
+	printf("%s%stype %s", opts->tab, opts->tab, set->keytype->name);
 	if (set->flags & SET_F_MAP)
 		printf(" : %s", set->datatype->name);
-	printf("\n");
+	printf("%s", opts->stmt_separator);
 
 	if (set->flags & (SET_F_CONSTANT | SET_F_INTERVAL)) {
-		printf("\t\tflags ");
+		printf("%s%sflags ", opts->tab, opts->tab);
 		if (set->flags & SET_F_CONSTANT) {
 			printf("%sconstant", delim);
 			delim = ",";
@@ -116,15 +164,39 @@ void set_print(const struct set *set)
 			printf("%sinterval", delim);
 			delim = ",";
 		}
-		printf("\n");
+		printf("%s", opts->nl);
 	}
 
 	if (set->init != NULL && set->init->size > 0) {
-		printf("\t\telements = ");
+		printf("%s%selements = ", opts->tab, opts->tab);
 		expr_print(set->init);
-		printf("\n");
+		printf("%s", opts->nl);
 	}
-	printf("\t}\n");
+	printf("%s}%s", opts->tab, opts->nl);
+}
+
+void set_print(const struct set *s)
+{
+	struct print_fmt_options opts = {
+		.tab		= "\t",
+		.nl		= "\n",
+		.stmt_separator	= "\n",
+	};
+
+	do_set_print(s, &opts);
+}
+
+void set_print_plain(const struct set *s)
+{
+	struct print_fmt_options opts = {
+		.tab		= "",
+		.nl		= "",
+		.table		= s->handle.table,
+		.family		= family2str(s->handle.family),
+		.stmt_separator	= ";",
+	};
+
+	do_set_print(s, &opts);
 }
 
 struct rule *rule_alloc(const struct location *loc, const struct handle *h)
@@ -281,7 +353,7 @@ struct chain *chain_lookup(const struct table *table, const struct handle *h)
 	return NULL;
 }
 
-static const char *family2str(unsigned int family)
+const char *family2str(unsigned int family)
 {
 	switch (family) {
 		case NFPROTO_IPV4:
@@ -346,7 +418,7 @@ static void chain_print(const struct chain *chain)
 
 	printf("\tchain %s {\n", chain->handle.chain);
 	if (chain->flags & CHAIN_F_BASECHAIN) {
-		printf("\t\t type %s hook %s priority %u;\n", chain->type,
+		printf("\t\t type %s hook %s priority %d;\n", chain->type,
 		       hooknum2str(chain->handle.family, chain->hooknum),
 		       chain->priority);
 	}
@@ -359,6 +431,20 @@ static void chain_print(const struct chain *chain)
 			printf("\n");
 	}
 	printf("\t}\n");
+}
+
+void chain_print_plain(const struct chain *chain)
+{
+	printf("chain %s %s %s", family2str(chain->handle.family),
+	       chain->handle.table, chain->handle.chain);
+
+	if (chain->flags & CHAIN_F_BASECHAIN) {
+		printf(" { type %s hook %s priority %d; }", chain->type,
+		       hooknum2str(chain->handle.family, chain->hooknum),
+		       chain->priority);
+	}
+
+	printf("\n");
 }
 
 struct table *table_alloc(void)
@@ -754,6 +840,61 @@ static int do_command_rename(struct netlink_ctx *ctx, struct cmd *cmd)
 	return 0;
 }
 
+static int do_command_monitor(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	struct table *t, *nt;
+	struct set *s, *ns;
+	struct netlink_ctx set_ctx;
+	LIST_HEAD(msgs);
+	struct handle set_handle;
+	struct netlink_mon_handler monhandler;
+
+	/* cache only needed if monitoring:
+	 *  - new rules in default format
+	 *  - new elements
+	 */
+	if (((cmd->monitor_flags & (1 << NFT_MSG_NEWRULE)) &&
+	    (cmd->format == NFT_OUTPUT_DEFAULT)) ||
+	    (cmd->monitor_flags & (1 << NFT_MSG_NEWSETELEM)))
+		monhandler.cache_needed = true;
+	else
+		monhandler.cache_needed = false;
+
+	if (monhandler.cache_needed) {
+		memset(&set_ctx, 0, sizeof(set_ctx));
+		init_list_head(&msgs);
+		set_ctx.msgs = &msgs;
+
+		if (netlink_list_tables(ctx, &cmd->handle, &cmd->location) < 0)
+			return -1;
+
+		list_for_each_entry_safe(t, nt, &ctx->list, list) {
+			set_handle.family = t->handle.family;
+			set_handle.table = t->handle.table;
+
+			init_list_head(&set_ctx.list);
+
+			if (netlink_list_sets(&set_ctx, &set_handle,
+					      &cmd->location) < 0)
+				return -1;
+
+			list_for_each_entry_safe(s, ns, &set_ctx.list, list) {
+				s->init = set_expr_alloc(&cmd->location);
+				set_add_hash(s, t);
+			}
+
+			table_add_hash(t);
+		}
+	}
+
+	monhandler.monitor_flags = cmd->monitor_flags;
+	monhandler.format = cmd->format;
+	monhandler.ctx = ctx;
+	monhandler.loc = &cmd->location;
+
+	return netlink_monitor(&monhandler);
+}
+
 int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->op) {
@@ -773,6 +914,8 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_command_rename(ctx, cmd);
 	case CMD_EXPORT:
 		return do_command_export(ctx, cmd);
+	case CMD_MONITOR:
+		return do_command_monitor(ctx, cmd);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}

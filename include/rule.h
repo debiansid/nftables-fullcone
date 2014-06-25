@@ -14,6 +14,7 @@
  * @set:	set name (sets only)
  * @handle:	rule handle (rules only)
  * @position:	rule position (rules only)
+ * @set_id:	set ID (sets only)
  * @comment:	human-readable comment (rules only)
  */
 struct handle {
@@ -23,6 +24,7 @@ struct handle {
 	const char		*set;
 	uint64_t		handle;
 	uint64_t		position;
+	uint32_t		set_id;
 	const char		*comment;
 };
 
@@ -113,7 +115,7 @@ struct chain {
 	uint32_t		flags;
 	const char		*hookstr;
 	unsigned int		hooknum;
-	unsigned int		priority;
+	int			priority;
 	const char		*type;
 	struct scope		scope;
 	struct list_head	rules;
@@ -126,6 +128,9 @@ extern void chain_free(struct chain *chain);
 extern void chain_add_hash(struct chain *chain, struct table *table);
 extern struct chain *chain_lookup(const struct table *table,
 				  const struct handle *h);
+
+extern const char *family2str(unsigned int family);
+extern void chain_print_plain(const struct chain *chain);
 
 /**
  * struct rule - nftables rule
@@ -192,9 +197,13 @@ struct set {
 extern struct set *set_alloc(const struct location *loc);
 extern struct set *set_get(struct set *set);
 extern void set_free(struct set *set);
+extern struct set *set_clone(const struct set *set);
 extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
+extern struct set *set_lookup_global(uint32_t family, const char *table,
+				     const char *name);
 extern void set_print(const struct set *set);
+extern void set_print_plain(const struct set *s);
 
 /**
  * enum cmd_ops - command operations
@@ -208,6 +217,7 @@ extern void set_print(const struct set *set);
  * @CMD_FLUSH:		flush container
  * @CMD_RENAME:		rename object
  * @CMD_EXPORT:		export the ruleset in a given format
+ * @CMD_MONITOR:	event listener
  */
 enum cmd_ops {
 	CMD_INVALID,
@@ -219,6 +229,7 @@ enum cmd_ops {
 	CMD_FLUSH,
 	CMD_RENAME,
 	CMD_EXPORT,
+	CMD_MONITOR,
 };
 
 /**
@@ -274,6 +285,7 @@ struct cmd {
 	};
 	const void		*arg;
 	uint32_t		format;
+	uint32_t		monitor_flags;
 };
 
 extern struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,

@@ -232,7 +232,9 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "table"			{ return TABLE; }
 "tables"		{ return TABLES; }
 "chain"			{ return CHAIN; }
+"chains"		{ return CHAINS; }
 "rule"			{ return RULE; }
+"rules"			{ return RULES; }
 "sets"			{ return SETS; }
 "set"			{ return SET; }
 "element"		{ return ELEMENT; }
@@ -256,6 +258,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "flush"			{ return FLUSH; }
 "rename"		{ return RENAME; }
 "export"		{ return EXPORT; }
+"monitor"		{ return MONITOR; }
 
 "position"		{ return POSITION; }
 "comment"		{ return COMMENT; }
@@ -276,10 +279,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "queue"			{ return QUEUE;}
 "num"			{ return QUEUENUM;}
-"total"			{ return QUEUETOTAL;}
 "bypass"		{ return QUEUEBYPASS;}
 "fanout"		{ return QUEUECPUFANOUT;}
-"options"		{ return OPTIONS;}
 
 "limit"			{ return LIMIT; }
 "rate"			{ return RATE; }
@@ -358,6 +359,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "cpi"			{ return CPI; }
 
 "udp"			{ return UDP; }
+"udplite"		{ return UDPLITE; }
 "sport"			{ return SPORT; }
 "dport"			{ return DPORT; }
 
@@ -402,6 +404,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "skgid"			{ return SKGID; }
 "nftrace"		{ return NFTRACE; }
 "rtclassid"		{ return RTCLASSID; }
+"ibriport"		{ return IBRIPORT; }
+"obriport"		{ return OBRIPORT; }
 
 "ct"			{ return CT; }
 "direction"		{ return DIRECTION; }

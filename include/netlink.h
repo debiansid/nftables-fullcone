@@ -30,6 +30,7 @@ struct netlink_ctx {
 	struct set		*set;
 	const void		*data;
 	uint32_t		seqnum;
+	bool			batch_supported;
 };
 
 extern struct nft_table *alloc_nft_table(const struct handle *h);
@@ -136,10 +137,23 @@ extern void netlink_dump_expr(struct nft_rule_expr *nle);
 extern void netlink_dump_set(struct nft_set *nls);
 
 extern int netlink_batch_send(struct list_head *err_list);
+extern void netlink_abi_error(void) __noreturn;
 extern int netlink_io_error(struct netlink_ctx *ctx,
 			    const struct location *loc, const char *fmt, ...);
+extern void netlink_open_error(void) __noreturn;
 
 extern struct nft_ruleset *netlink_dump_ruleset(struct netlink_ctx *ctx,
 						const struct handle *h,
 						const struct location *loc);
+struct netlink_mon_handler {
+	uint32_t		monitor_flags;
+	uint32_t		format;
+	struct netlink_ctx	*ctx;
+	const struct location	*loc;
+	bool			cache_needed;
+};
+
+extern int netlink_monitor(struct netlink_mon_handler *monhandler);
+bool netlink_batch_supported(void);
+
 #endif /* NFTABLES_NETLINK_H */

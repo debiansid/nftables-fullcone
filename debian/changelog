@@ -1,3 +1,11 @@
+nftables (0.3-1) unstable; urgency=medium
+
+  * [3a4f54a] d/patches: patch to harden the build
+  * [b6c82d5] Imported Upstream version 0.3
+  * [98e5eb7] d/control: depends on libnftnl >= 1.0.2
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 25 Jun 2014 19:02:59 +0200
+
 nftables (0.2-2) unstable; urgency=low
 
   * [6aa52bf] d/README.Debian: fix Patrick McHardy name

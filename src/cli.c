@@ -12,6 +12,7 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -27,6 +28,7 @@
 #include <parser.h>
 #include <erec.h>
 #include <utils.h>
+#include <cli.h>
 
 #define CMDLINE_HISTFILE	".nft.history"
 

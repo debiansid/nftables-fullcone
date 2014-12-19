@@ -28,11 +28,21 @@ extern struct stmt *meta_stmt_alloc(const struct location *loc,
 				    enum nft_meta_keys key,
 				    struct expr *expr);
 
+enum {
+	STMT_LOG_PREFIX		= (1 << 0),
+	STMT_LOG_SNAPLEN	= (1 << 1),
+	STMT_LOG_GROUP		= (1 << 2),
+	STMT_LOG_QTHRESHOLD	= (1 << 3),
+	STMT_LOG_LEVEL		= (1 << 4),
+};
+
 struct log_stmt {
 	const char		*prefix;
 	unsigned int		snaplen;
 	uint16_t		group;
 	uint16_t		qthreshold;
+	uint32_t		level;
+	uint32_t		flags;
 };
 
 extern struct stmt *log_stmt_alloc(const struct location *loc);
@@ -46,7 +56,10 @@ struct limit_stmt {
 extern struct stmt *limit_stmt_alloc(const struct location *loc);
 
 struct reject_stmt {
+	struct expr		*expr;
 	enum nft_reject_types	type;
+	int8_t			icmp_code;
+	unsigned int		family;
 };
 
 extern struct stmt *reject_stmt_alloc(const struct location *loc);
@@ -55,13 +68,26 @@ struct nat_stmt {
 	enum nft_nat_types	type;
 	struct expr		*addr;
 	struct expr		*proto;
+	uint32_t		flags;
 };
 
 extern struct stmt *nat_stmt_alloc(const struct location *loc);
 
+struct masq_stmt {
+	uint32_t		flags;
+};
+
+extern struct stmt *masq_stmt_alloc(const struct location *loc);
+
+struct redir_stmt {
+	struct expr		*proto;
+	uint32_t		flags;
+};
+
+extern struct stmt *redir_stmt_alloc(const struct location *loc);
+
 struct queue_stmt {
-	uint16_t		from;
-	uint16_t		to;
+	struct expr		*queue;
 	uint16_t		flags;
 };
 
@@ -90,6 +116,8 @@ extern struct stmt *ct_stmt_alloc(const struct location *loc,
  * @STMT_LOG:		log statement
  * @STMT_REJECT:	REJECT statement
  * @STMT_NAT:		NAT statement
+ * @STMT_MASQ:		masquerade statement
+ * @STMT_REDIR:		redirect statement
  * @STMT_QUEUE:		QUEUE statement
  * @STMT_CT:		conntrack statement
  */
@@ -103,6 +131,8 @@ enum stmt_types {
 	STMT_LOG,
 	STMT_REJECT,
 	STMT_NAT,
+	STMT_MASQ,
+	STMT_REDIR,
 	STMT_QUEUE,
 	STMT_CT,
 };
@@ -150,6 +180,8 @@ struct stmt {
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;
 		struct nat_stmt		nat;
+		struct masq_stmt	masq;
+		struct redir_stmt	redir;
 		struct queue_stmt	queue;
 		struct ct_stmt		ct;
 	};
@@ -157,6 +189,7 @@ struct stmt {
 
 extern struct stmt *stmt_alloc(const struct location *loc,
 			       const struct stmt_ops *ops);
+int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt);
 extern void stmt_free(struct stmt *stmt);
 extern void stmt_list_free(struct list_head *list);
 extern void stmt_print(const struct stmt *stmt);

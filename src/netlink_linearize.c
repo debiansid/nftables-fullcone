@@ -442,7 +442,7 @@ static enum nft_byteorder_ops netlink_gen_unary_op(enum ops op)
 	case OP_HTON:
 		return NFT_BYTEORDER_HTON;
 	case OP_NTOH:
-		return NFT_BYTEORDER_HTON;
+		return NFT_BYTEORDER_NTOH;
 	default:
 		BUG("invalid unary operation %u\n", op);
 	}
@@ -576,17 +576,20 @@ static void netlink_gen_log_stmt(struct netlink_linearize_ctx *ctx,
 		nft_rule_expr_set_str(nle, NFT_EXPR_LOG_PREFIX,
 				      stmt->log.prefix);
 	}
-	if (stmt->log.group) {
+	if (stmt->log.flags & STMT_LOG_GROUP) {
 		nft_rule_expr_set_u16(nle, NFT_EXPR_LOG_GROUP,
 				      stmt->log.group);
-	}
-	if (stmt->log.snaplen) {
-		nft_rule_expr_set_u32(nle, NFT_EXPR_LOG_SNAPLEN,
-				      stmt->log.snaplen);
-	}
-	if (stmt->log.qthreshold) {
-		nft_rule_expr_set_u16(nle, NFT_EXPR_LOG_QTHRESHOLD,
-				      stmt->log.qthreshold);
+		if (stmt->log.flags & STMT_LOG_SNAPLEN)
+			nft_rule_expr_set_u32(nle, NFT_EXPR_LOG_SNAPLEN,
+					      stmt->log.snaplen);
+		if (stmt->log.flags & STMT_LOG_QTHRESHOLD)
+			nft_rule_expr_set_u16(nle, NFT_EXPR_LOG_QTHRESHOLD,
+					      stmt->log.qthreshold);
+	} else {
+		if (stmt->log.flags & STMT_LOG_LEVEL) {
+			nft_rule_expr_set_u32(nle, NFT_EXPR_LOG_LEVEL,
+					      stmt->log.level);
+		}
 	}
 	nft_rule_add_expr(ctx->nlr, nle);
 }
@@ -609,7 +612,10 @@ static void netlink_gen_reject_stmt(struct netlink_linearize_ctx *ctx,
 
 	nle = alloc_nft_expr("reject");
 	nft_rule_expr_set_u32(nle, NFT_EXPR_REJECT_TYPE, stmt->reject.type);
-	nft_rule_expr_set_u8(nle, NFT_EXPR_REJECT_CODE, 0);
+	if (stmt->reject.icmp_code != -1)
+		nft_rule_expr_set_u8(nle, NFT_EXPR_REJECT_CODE,
+				     stmt->reject.icmp_code);
+
 	nft_rule_add_expr(ctx->nlr, nle);
 }
 
@@ -627,6 +633,9 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 
 	family = nft_rule_attr_get_u32(ctx->nlr, NFT_RULE_ATTR_FAMILY);
 	nft_rule_expr_set_u32(nle, NFT_EXPR_NAT_FAMILY, family);
+
+	if (stmt->nat.flags != 0)
+		nft_rule_expr_set_u32(nle, NFT_EXPR_NAT_FLAGS, stmt->nat.flags);
 
 	if (stmt->nat.addr) {
 		amin_reg = get_register(ctx);
@@ -679,26 +688,92 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 	nft_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_masq_stmt(struct netlink_linearize_ctx *ctx,
+				  const struct stmt *stmt)
+{
+	struct nft_rule_expr *nle;
+
+	nle = alloc_nft_expr("masq");
+	if (stmt->masq.flags != 0)
+		nft_rule_expr_set_u32(nle, NFT_EXPR_MASQ_FLAGS,
+				      stmt->masq.flags);
+
+	nft_rule_add_expr(ctx->nlr, nle);
+}
+
+static void netlink_gen_redir_stmt(struct netlink_linearize_ctx *ctx,
+				   const struct stmt *stmt)
+{
+	struct nft_rule_expr *nle;
+	enum nft_registers pmin_reg, pmax_reg;
+	int registers = 0;
+
+	nle = alloc_nft_expr("redir");
+
+	if (stmt->redir.flags != 0)
+		nft_rule_expr_set_u32(nle, NFT_EXPR_REDIR_FLAGS,
+				      stmt->redir.flags);
+
+	if (stmt->redir.proto) {
+		pmin_reg = get_register(ctx);
+		registers++;
+
+		if (stmt->redir.proto->ops->type == EXPR_RANGE) {
+			pmax_reg = get_register(ctx);
+			registers++;
+
+			netlink_gen_expr(ctx, stmt->redir.proto->left,
+					 pmin_reg);
+			netlink_gen_expr(ctx, stmt->redir.proto->right,
+					 pmax_reg);
+			nft_rule_expr_set_u32(nle,
+					      NFT_EXPR_REDIR_REG_PROTO_MIN,
+					      pmin_reg);
+			nft_rule_expr_set_u32(nle,
+					      NFT_EXPR_REDIR_REG_PROTO_MAX,
+					      pmax_reg);
+		} else {
+			netlink_gen_expr(ctx, stmt->redir.proto, pmin_reg);
+			nft_rule_expr_set_u32(nle,
+					      NFT_EXPR_REDIR_REG_PROTO_MIN,
+					      pmin_reg);
+		}
+	}
+
+	while (registers > 0) {
+		release_register(ctx);
+		registers--;
+	}
+
+	nft_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_queue_stmt(struct netlink_linearize_ctx *ctx,
 				 const struct stmt *stmt)
 {
 	struct nft_rule_expr *nle;
 	uint16_t total_queues;
+	mpz_t low, high;
+
+	mpz_init2(low, 16);
+	mpz_init2(high, 16);
+	if (stmt->queue.queue != NULL) {
+		range_expr_value_low(low, stmt->queue.queue);
+		range_expr_value_high(high, stmt->queue.queue);
+	}
+	total_queues = mpz_get_uint16(high) - mpz_get_uint16(low) + 1;
 
 	nle = alloc_nft_expr("queue");
-
-	nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_NUM,
-			      stmt->queue.from);
-
-	total_queues = stmt->queue.to - stmt->queue.from;
-	nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_TOTAL,
-			      total_queues + 1);
-
+	nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_NUM, mpz_get_uint16(low));
+	nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_TOTAL, total_queues);
 	if (stmt->queue.flags) {
 		nft_rule_expr_set_u16(nle, NFT_EXPR_QUEUE_FLAGS,
 				      stmt->queue.flags);
 	}
 	nft_rule_add_expr(ctx->nlr, nle);
+
+	mpz_clear(low);
+	mpz_clear(high);
 }
 
 static void netlink_gen_ct_stmt(struct netlink_linearize_ctx *ctx,
@@ -737,6 +812,10 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_reject_stmt(ctx, stmt);
 	case STMT_NAT:
 		return netlink_gen_nat_stmt(ctx, stmt);
+	case STMT_MASQ:
+		return netlink_gen_masq_stmt(ctx, stmt);
+	case STMT_REDIR:
+		return netlink_gen_redir_stmt(ctx, stmt);
 	case STMT_QUEUE:
 		return netlink_gen_queue_stmt(ctx, stmt);
 	case STMT_CT:
@@ -746,8 +825,8 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 	}
 }
 
-int netlink_linearize_rule(struct netlink_ctx *ctx, struct nft_rule *nlr,
-			   const struct rule *rule)
+void netlink_linearize_rule(struct netlink_ctx *ctx, struct nft_rule *nlr,
+			    const struct rule *rule)
 {
 	struct netlink_linearize_ctx lctx;
 	const struct stmt *stmt;
@@ -760,5 +839,4 @@ int netlink_linearize_rule(struct netlink_ctx *ctx, struct nft_rule *nlr,
 		netlink_gen_stmt(&lctx, stmt);
 
 	netlink_dump_rule(nlr);
-	return 0;
 }

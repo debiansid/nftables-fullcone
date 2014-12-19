@@ -26,14 +26,10 @@ enum debug_level {
 
 extern unsigned int max_errors;
 extern unsigned int numeric_output;
+extern unsigned int ip2name_output;
 extern unsigned int handle_output;
 extern unsigned int debug_level;
 extern const char *include_paths[INCLUDE_PATHS_MAX];
-
-struct parser_state;
-extern int cli_init(struct parser_state *state);
-extern void cli_exit(void);
-extern void cli_display(const char *fmt, va_list ap) __fmtstring(1, 0);
 
 enum nftables_exit_codes {
 	NFT_EXIT_SUCCESS	= 0,
@@ -107,6 +103,8 @@ struct input_descriptor {
 	off_t				token_offset;
 	off_t				line_offset;
 };
+
+struct parser_state;
 
 int nft_run(void *scanner, struct parser_state *state, struct list_head *msgs);
 

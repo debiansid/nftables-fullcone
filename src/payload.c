@@ -21,6 +21,7 @@
 
 #include <rule.h>
 #include <expression.h>
+#include <statement.h>
 #include <payload.h>
 #include <gmputil.h>
 #include <utils.h>
@@ -69,13 +70,20 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 {
 	const struct expr *left = expr->left, *right = expr->right;
 	const struct proto_desc *base, *desc;
+	unsigned int proto = 0;
 
 	if (!(left->flags & EXPR_F_PROTOCOL))
 		return;
 
 	assert(expr->op == OP_EQ);
+
+	/* Export the data in the correct byte order */
+	assert(right->len / BITS_PER_BYTE <= sizeof(proto));
+	mpz_export_data(constant_data_ptr(proto, right->len), right->value,
+			right->byteorder, right->len / BITS_PER_BYTE);
+
 	base = ctx->protocol[left->payload.base].desc;
-	desc = proto_find_upper(base, mpz_get_uint32(right->value));
+	desc = proto_find_upper(base, proto);
 
 	proto_ctx_update(ctx, left->payload.base + 1, &expr->location, desc);
 }
@@ -106,10 +114,11 @@ struct expr *payload_expr_alloc(const struct location *loc,
 	} else {
 		tmpl = &proto_unknown_template;
 		base = PROTO_BASE_INVALID;
+		desc = &proto_unknown;
 	}
 
 	expr = expr_alloc(loc, &payload_expr_ops, tmpl->dtype,
-			  tmpl->dtype->byteorder, tmpl->len);
+			  tmpl->byteorder, tmpl->len);
 	expr->flags |= flags;
 
 	expr->payload.desc   = desc;
@@ -152,12 +161,13 @@ void payload_init_raw(struct expr *expr, enum proto_bases base,
  *   in the input path though.
  */
 int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
-			   struct expr **res)
+			   struct stmt **res)
 {
 	const struct hook_proto_desc *h = &hook_proto_desc[ctx->pctx.family];
 	const struct proto_desc *desc;
 	const struct proto_hdr_template *tmpl;
 	struct expr *dep, *left, *right;
+	struct stmt *stmt;
 	int protocol;
 	uint16_t type;
 
@@ -178,16 +188,42 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 					    2 * BITS_PER_BYTE, &type);
 
 		dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
-		*res = dep;
+		stmt = expr_stmt_alloc(&dep->location, dep);
+		if (stmt_evaluate(ctx, stmt) < 0) {
+			return expr_error(ctx->msgs, expr,
+					  "dependency statement is invalid");
+		}
+		*res = stmt;
 		return 0;
 	}
 
 	desc = ctx->pctx.protocol[expr->payload.base - 1].desc;
-	/* Special case for mixed IPv4/IPv6 tables: use meta L4 proto */
-	if (desc == NULL &&
-	    ctx->pctx.family == NFPROTO_INET &&
-	    expr->payload.base == PROTO_BASE_TRANSPORT_HDR)
-		desc = &proto_inet_service;
+	/* Special case for mixed IPv4/IPv6 and bridge tables */
+	if (desc == NULL) {
+		switch (ctx->pctx.family) {
+		case NFPROTO_INET:
+			switch (expr->payload.base) {
+			case PROTO_BASE_TRANSPORT_HDR:
+				desc = &proto_inet_service;
+				break;
+			case PROTO_BASE_LL_HDR:
+				desc = &proto_inet;
+				break;
+			default:
+				break;
+			}
+			break;
+		case NFPROTO_BRIDGE:
+			switch (expr->payload.base) {
+			case PROTO_BASE_LL_HDR:
+				desc = &proto_eth;
+				break;
+			default:
+				break;
+			}
+			break;
+		}
+	}
 
 	if (desc == NULL)
 		return expr_error(ctx->msgs, expr,
@@ -208,13 +244,17 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 		left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
 
 	right = constant_expr_alloc(&expr->location, tmpl->dtype,
-				    BYTEORDER_HOST_ENDIAN,
-				    tmpl->len,
+				    tmpl->dtype->byteorder, tmpl->len,
 				    constant_data_ptr(protocol, tmpl->len));
 
 	dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
+	stmt = expr_stmt_alloc(&dep->location, dep);
+	if (stmt_evaluate(ctx, stmt) < 0) {
+		return expr_error(ctx->msgs, expr,
+					  "dependency statement is invalid");
+	}
 	left->ops->pctx_update(&ctx->pctx, dep);
-	*res = dep;
+	*res = stmt;
 	return 0;
 }
 

@@ -24,6 +24,9 @@
 #include <gmputil.h>
 #include <erec.h>
 
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+
 static const struct datatype *datatypes[TYPE_MAX + 1] = {
 	[TYPE_INVALID]		= &invalid_type,
 	[TYPE_VERDICT]		= &verdict_type,
@@ -41,6 +44,9 @@ static const struct datatype *datatypes[TYPE_MAX + 1] = {
 	[TYPE_TIME]		= &time_type,
 	[TYPE_MARK]		= &mark_type,
 	[TYPE_ARPHRD]		= &arphrd_type,
+	[TYPE_ICMP_CODE]	= &icmp_code_type,
+	[TYPE_ICMPV6_CODE]	= &icmpv6_code_type,
+	[TYPE_ICMPX_CODE]	= &icmpx_code_type,
 };
 
 void datatype_register(const struct datatype *dtype)
@@ -81,7 +87,8 @@ void datatype_print(const struct expr *expr)
 			return symbolic_constant_print(dtype->sym_tbl, expr);
 	} while ((dtype = dtype->basetype));
 
-	BUG("datatype has no print method or symbol table\n");
+	BUG("datatype %s has no print method or symbol table\n",
+	    expr->dtype->name);
 }
 
 struct error_record *symbol_parse(const struct expr *sym,
@@ -112,19 +119,35 @@ struct error_record *symbolic_constant_parse(const struct expr *sym,
 {
 	const struct symbolic_constant *s;
 	const struct datatype *dtype;
+	struct error_record *erec;
 
 	for (s = tbl->symbols; s->identifier != NULL; s++) {
 		if (!strcmp(sym->identifier, s->identifier))
 			break;
 	}
 
-	dtype = sym->dtype;
-	if (s->identifier == NULL)
-		return error(&sym->location, "Could not parse %s", dtype->desc);
+	if (s->identifier != NULL)
+		goto out;
 
-	*res = constant_expr_alloc(&sym->location, dtype,
-				   dtype->byteorder, dtype->size,
-				   constant_data_ptr(s->value, dtype->size));
+	dtype = sym->dtype;
+	*res = NULL;
+	do {
+		if (dtype->basetype->parse) {
+			erec = dtype->basetype->parse(sym, res);
+			if (erec != NULL)
+				return erec;
+			if (*res)
+				return NULL;
+			goto out;
+		}
+	} while ((dtype = dtype->basetype));
+
+	return error(&sym->location, "Could not parse %s", sym->dtype->desc);
+out:
+	*res = constant_expr_alloc(&sym->location, sym->dtype,
+				   sym->dtype->byteorder, sym->dtype->size,
+				   constant_data_ptr(s->value,
+				   sym->dtype->size));
 	return NULL;
 }
 
@@ -132,9 +155,15 @@ void symbolic_constant_print(const struct symbol_table *tbl,
 			     const struct expr *expr)
 {
 	const struct symbolic_constant *s;
+	uint64_t val = 0;
+
+	/* Export the data in the correct byteorder for comparison */
+	assert(expr->len / BITS_PER_BYTE <= sizeof(val));
+	mpz_export_data(constant_data_ptr(val, expr->len), expr->value,
+			expr->byteorder, expr->len / BITS_PER_BYTE);
 
 	for (s = tbl->symbols; s->identifier != NULL; s++) {
-		if (!mpz_cmp_ui(expr->value, s->value))
+		if (val == s->value)
 			break;
 	}
 
@@ -170,15 +199,6 @@ const struct datatype invalid_type = {
 static void verdict_type_print(const struct expr *expr)
 {
 	switch (expr->verdict) {
-	case NF_ACCEPT:
-		printf("accept");
-		break;
-	case NF_DROP:
-		printf("drop");
-		break;
-	case NF_QUEUE:
-		printf("queue");
-		break;
 	case NFT_CONTINUE:
 		printf("continue");
 		break;
@@ -195,7 +215,19 @@ static void verdict_type_print(const struct expr *expr)
 		printf("return");
 		break;
 	default:
-		BUG("invalid verdict value %u\n", expr->verdict);
+		switch (expr->verdict & NF_VERDICT_MASK) {
+		case NF_ACCEPT:
+			printf("accept");
+			break;
+		case NF_DROP:
+			printf("drop");
+			break;
+		case NF_QUEUE:
+			printf("queue");
+			break;
+		default:
+			BUG("invalid verdict value %u\n", expr->verdict);
+		}
 	}
 }
 
@@ -249,8 +281,6 @@ static struct error_record *integer_type_parse(const struct expr *sym,
 	if (gmp_sscanf(sym->identifier, "%Zu%n", v, &len) != 1 ||
 	    (int)strlen(sym->identifier) != len) {
 		mpz_clear(v);
-		if (sym->dtype != &integer_type)
-			return NULL;
 		return error(&sym->location, "Could not parse %s",
 			     sym->dtype->desc);
 	}
@@ -294,6 +324,7 @@ const struct datatype string_type = {
 	.type		= TYPE_STRING,
 	.name		= "string",
 	.desc		= "string",
+	.byteorder	= BYTEORDER_HOST_ENDIAN,
 	.print		= string_type_print,
 	.parse		= string_type_parse,
 };
@@ -355,7 +386,7 @@ static void ipaddr_type_print(const struct expr *expr)
 	sin.sin_addr.s_addr = mpz_get_be32(expr->value);
 	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			  sizeof(buf), NULL, 0,
-			  numeric_output ? NI_NUMERICHOST : 0);
+			  ip2name_output ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
@@ -413,7 +444,7 @@ static void ip6addr_type_print(const struct expr *expr)
 
 	err = getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			  sizeof(buf), NULL, 0,
-			  numeric_output ? NI_NUMERICHOST : 0);
+			  ip2name_output ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
@@ -651,25 +682,6 @@ static void mark_type_print(const struct expr *expr)
 static struct error_record *mark_type_parse(const struct expr *sym,
 					    struct expr **res)
 {
-	struct error_record *erec;
-	const struct symbolic_constant *s;
-
-	for (s = mark_tbl->symbols; s->identifier != NULL; s++) {
-		if (!strcmp(sym->identifier, s->identifier)) {
-			*res = constant_expr_alloc(&sym->location, sym->dtype,
-						   sym->dtype->byteorder,
-						   sym->dtype->size,
-						   &s->value);
-			return NULL;
-		}
-	}
-
-	*res = NULL;
-	erec = sym->dtype->basetype->parse(sym, res);
-	if (erec != NULL)
-		return erec;
-	if (*res)
-		return NULL;
 	return symbolic_constant_parse(sym, mark_tbl, res);
 }
 
@@ -684,6 +696,69 @@ const struct datatype mark_type = {
 	.print		= mark_type_print,
 	.parse		= mark_type_parse,
 	.flags		= DTYPE_F_PREFIX,
+};
+
+static const struct symbol_table icmp_code_tbl = {
+	.symbols	= {
+		SYMBOL("net-unreachable",	ICMP_NET_UNREACH),
+		SYMBOL("host-unreachable",	ICMP_HOST_UNREACH),
+		SYMBOL("prot-unreachable",	ICMP_PROT_UNREACH),
+		SYMBOL("port-unreachable",	ICMP_PORT_UNREACH),
+		SYMBOL("net-prohibited",	ICMP_NET_ANO),
+		SYMBOL("host-prohibited",	ICMP_HOST_ANO),
+		SYMBOL("admin-prohibited",	ICMP_PKT_FILTERED),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype icmp_code_type = {
+	.type		= TYPE_ICMP_CODE,
+	.name		= "icmp_code",
+	.desc		= "icmp code",
+	.size		= BITS_PER_BYTE,
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.basetype	= &integer_type,
+	.sym_tbl	= &icmp_code_tbl,
+};
+
+static const struct symbol_table icmpv6_code_tbl = {
+	.symbols	= {
+		SYMBOL("no-route",		ICMP6_DST_UNREACH_NOROUTE),
+		SYMBOL("admin-prohibited",	ICMP6_DST_UNREACH_ADMIN),
+		SYMBOL("addr-unreachable",	ICMP6_DST_UNREACH_ADDR),
+		SYMBOL("port-unreachable",	ICMP6_DST_UNREACH_NOPORT),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype icmpv6_code_type = {
+	.type		= TYPE_ICMPV6_CODE,
+	.name		= "icmpv6_code",
+	.desc		= "icmpv6 code",
+	.size		= BITS_PER_BYTE,
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.basetype	= &integer_type,
+	.sym_tbl	= &icmpv6_code_tbl,
+};
+
+static const struct symbol_table icmpx_code_tbl = {
+	.symbols	= {
+		SYMBOL("port-unreachable",	NFT_REJECT_ICMPX_PORT_UNREACH),
+		SYMBOL("admin-prohibited",	NFT_REJECT_ICMPX_ADMIN_PROHIBITED),
+		SYMBOL("no-route",		NFT_REJECT_ICMPX_NO_ROUTE),
+		SYMBOL("host-unreachable",	NFT_REJECT_ICMPX_HOST_UNREACH),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype icmpx_code_type = {
+	.type		= TYPE_ICMPX_CODE,
+	.name		= "icmpx_code",
+	.desc		= "icmpx code",
+	.size		= BITS_PER_BYTE,
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.basetype	= &integer_type,
+	.sym_tbl	= &icmpx_code_tbl,
 };
 
 static void time_type_print(const struct expr *expr)
@@ -877,6 +952,8 @@ const struct datatype *concat_type_alloc(const struct expr *expr)
 
 void concat_type_destroy(const struct datatype *dtype)
 {
-	if (dtype->flags & DTYPE_F_ALLOC)
+	if (dtype->flags & DTYPE_F_ALLOC) {
+		xfree(dtype->desc);
 		xfree(dtype);
+	}
 }

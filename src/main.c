@@ -25,9 +25,11 @@
 #include <netlink.h>
 #include <erec.h>
 #include <mnl.h>
+#include <cli.h>
 
 unsigned int max_errors = 10;
 unsigned int numeric_output;
+unsigned int ip2name_output;
 unsigned int handle_output;
 #ifdef DEBUG
 unsigned int debug_level;
@@ -43,12 +45,13 @@ enum opt_vals {
 	OPT_INTERACTIVE		= 'i',
 	OPT_INCLUDEPATH		= 'I',
 	OPT_NUMERIC		= 'n',
+	OPT_IP2NAME		= 'N',
 	OPT_DEBUG		= 'd',
 	OPT_HANDLE_OUTPUT	= 'a',
 	OPT_INVALID		= '?',
 };
 
-#define OPTSTRING	"hvf:iI:vna"
+#define OPTSTRING	"hvf:iI:vnNa"
 
 static const struct option options[] = {
 	{
@@ -71,6 +74,10 @@ static const struct option options[] = {
 	{
 		.name		= "numeric",
 		.val		= OPT_NUMERIC,
+	},
+	{
+		.name		= "reversedns",
+		.val		= OPT_IP2NAME,
 	},
 	{
 		.name		= "includepath",
@@ -105,10 +112,11 @@ static void show_help(const char *name)
 "  -f/--file <filename>		Read input from <filename>\n"
 "  -i/--interactive		Read input from interactive CLI\n"
 "\n"
-"  -n/--numeric			When specified once, show network addresses numerically.\n"
-"  				When specified twice, also show Internet services,\n"
+"  -n/--numeric			When specified once, show network addresses numerically (default behaviour).\n"
+"  				When specified twice, show Internet services,\n"
 "				user IDs and group IDs numerically.\n"
 "				When specified thrice, also show protocols numerically.\n"
+"  -N				Translate IP addresses to names.\n"
 "  -a/--handle			Output rule handle.\n"
 "  -I/--includepath <directory>	Add <directory> to the paths searched for include files.\n"
 #ifdef DEBUG
@@ -166,12 +174,15 @@ static const struct input_descriptor indesc_cmdline = {
 static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 {
 	struct netlink_ctx ctx;
-	struct cmd *cmd, *next;
+	struct cmd *cmd;
 	struct mnl_err *err, *tmp;
 	LIST_HEAD(err_list);
 	uint32_t batch_seqnum;
 	bool batch_supported = netlink_batch_supported();
 	int ret = 0;
+
+	netlink_genid_get();
+	mnl_batch_init();
 
 	batch_seqnum = mnl_batch_begin();
 	list_for_each_entry(cmd, &state->cmds, list) {
@@ -182,16 +193,14 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 		init_list_head(&ctx.list);
 		ret = do_command(&ctx, cmd);
 		if (ret < 0)
-			return ret;
+			goto out;
 	}
 	mnl_batch_end();
 
-	if (mnl_batch_ready())
-		ret = netlink_batch_send(&err_list);
-	else {
-		mnl_batch_reset();
+	if (!mnl_batch_ready())
 		goto out;
-	}
+
+	ret = netlink_batch_send(&err_list);
 
 	list_for_each_entry_safe(err, tmp, &err_list, head) {
 		list_for_each_entry(cmd, &state->cmds, list) {
@@ -200,6 +209,8 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 				netlink_io_error(&ctx, &cmd->location,
 						 "Could not process rule: %s",
 						 strerror(err->err));
+				ret = -1;
+				errno = err->err;
 				if (err->seqnum == cmd->seqnum) {
 					mnl_err_list_free(err);
 					break;
@@ -208,23 +219,31 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 		}
 	}
 out:
+	mnl_batch_reset();
+	return ret;
+}
+
+int nft_run(void *scanner, struct parser_state *state, struct list_head *msgs)
+{
+	struct cmd *cmd, *next;
+	int ret;
+
+	ret = nft_parse(scanner, state);
+	if (ret != 0 || state->nerrs > 0)
+		return -1;
+retry:
+	ret = nft_netlink(state, msgs);
+	if (ret < 0 && errno == EINTR) {
+		netlink_restart();
+		goto retry;
+	}
+
 	list_for_each_entry_safe(cmd, next, &state->cmds, list) {
 		list_del(&cmd->list);
 		cmd_free(cmd);
 	}
 
 	return ret;
-}
-
-int nft_run(void *scanner, struct parser_state *state, struct list_head *msgs)
-{
-	int ret;
-
-	ret = nft_parse(scanner, state);
-	if (ret != 0 || state->nerrs > 0)
-		return -1;
-
-	return nft_netlink(state, msgs);
 }
 
 int main(int argc, char * const *argv)
@@ -267,6 +286,9 @@ int main(int argc, char * const *argv)
 			break;
 		case OPT_NUMERIC:
 			numeric_output++;
+			break;
+		case OPT_IP2NAME:
+			ip2name_output++;
 			break;
 #ifdef DEBUG
 		case OPT_DEBUG:
@@ -324,7 +346,11 @@ int main(int argc, char * const *argv)
 		if (scanner_read_file(scanner, filename, &internal_location) < 0)
 			goto out;
 	} else if (interactive) {
-		cli_init(&state);
+		if (cli_init(&state) < 0) {
+			fprintf(stderr, "%s: interactive CLI not supported in this build\n",
+				argv[0]);
+			exit(NFT_EXIT_FAILURE);
+		}
 		return 0;
 	} else {
 		fprintf(stderr, "%s: no command specified\n", argv[0]);

@@ -14,10 +14,18 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
+#include <syslog.h>
 
+#include <arpa/inet.h>
+#include <linux/netfilter.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
 #include <statement.h>
 #include <utils.h>
 #include <list.h>
+
+#include <netinet/in.h>
+#include <linux/netfilter/nf_nat.h>
 
 struct stmt *stmt_alloc(const struct location *loc,
 			const struct stmt_ops *ops)
@@ -112,17 +120,39 @@ struct stmt *counter_stmt_alloc(const struct location *loc)
 	return stmt_alloc(loc, &counter_stmt_ops);
 }
 
+static const char *syslog_level[LOG_DEBUG + 1] = {
+	[LOG_EMERG]	= "emerg",
+	[LOG_ALERT]	= "alert",
+	[LOG_CRIT]	= "crit",
+	[LOG_ERR]       = "err",
+	[LOG_WARNING]	= "warn",
+	[LOG_NOTICE]	= "notice",
+	[LOG_INFO]	= "info",
+	[LOG_DEBUG]	= "debug",
+};
+
+static const char *log_level(uint32_t level)
+{
+	if (level > LOG_DEBUG)
+		return "unknown";
+
+	return syslog_level[level];
+}
+
 static void log_stmt_print(const struct stmt *stmt)
 {
 	printf("log");
-	if (stmt->log.prefix != NULL)
+	if (stmt->log.flags & STMT_LOG_PREFIX)
 		printf(" prefix \"%s\"", stmt->log.prefix);
-	if (stmt->log.group)
+	if (stmt->log.flags & STMT_LOG_GROUP)
 		printf(" group %u", stmt->log.group);
-	if (stmt->log.snaplen)
+	if (stmt->log.flags & STMT_LOG_SNAPLEN)
 		printf(" snaplen %u", stmt->log.snaplen);
-	if (stmt->log.qthreshold)
+	if (stmt->log.flags & STMT_LOG_QTHRESHOLD)
 		printf(" queue-threshold %u", stmt->log.qthreshold);
+	if ((stmt->log.flags & STMT_LOG_LEVEL) &&
+	    stmt->log.level != LOG_WARNING)
+		printf(" level %s", log_level(stmt->log.level));
 }
 
 static void log_stmt_destroy(struct stmt *stmt)
@@ -174,14 +204,19 @@ struct stmt *limit_stmt_alloc(const struct location *loc)
 
 static void queue_stmt_print(const struct stmt *stmt)
 {
-	printf("queue num %u",
-		stmt->queue.from);
-	if (stmt->queue.to && stmt->queue.to != stmt->queue.from)
-		printf("-%u", stmt->queue.to);
-	if (stmt->queue.flags & NFT_QUEUE_FLAG_BYPASS)
-		printf(" bypass");
+	const char *delim = " ";
+
+	printf("queue");
+	if (stmt->queue.queue != NULL) {
+		printf(" num ");
+		expr_print(stmt->queue.queue);
+	}
+	if (stmt->queue.flags & NFT_QUEUE_FLAG_BYPASS) {
+		printf("%sbypass", delim);
+		delim = ",";
+	}
 	if (stmt->queue.flags & NFT_QUEUE_FLAG_CPU_FANOUT)
-		printf(" fanout");
+		printf("%sfanout", delim);
 
 }
 
@@ -199,6 +234,33 @@ struct stmt *queue_stmt_alloc(const struct location *loc)
 static void reject_stmt_print(const struct stmt *stmt)
 {
 	printf("reject");
+	switch (stmt->reject.type) {
+	case NFT_REJECT_TCP_RST:
+		printf(" with tcp reset");
+		break;
+	case NFT_REJECT_ICMPX_UNREACH:
+		if (stmt->reject.icmp_code == NFT_REJECT_ICMPX_PORT_UNREACH)
+			break;
+		printf(" with icmpx type ");
+		expr_print(stmt->reject.expr);
+		break;
+	case NFT_REJECT_ICMP_UNREACH:
+		switch (stmt->reject.family) {
+		case NFPROTO_IPV4:
+			if (stmt->reject.icmp_code == ICMP_PORT_UNREACH)
+				break;
+			printf(" with icmp type ");
+			expr_print(stmt->reject.expr);
+			break;
+		case NFPROTO_IPV6:
+			if (stmt->reject.icmp_code == ICMP6_DST_UNREACH_NOPORT)
+				break;
+			printf(" with icmpv6 type ");
+			expr_print(stmt->reject.expr);
+			break;
+		}
+		break;
+	}
 }
 
 static const struct stmt_ops reject_stmt_ops = {
@@ -210,6 +272,27 @@ static const struct stmt_ops reject_stmt_ops = {
 struct stmt *reject_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &reject_stmt_ops);
+}
+
+static void print_nf_nat_flags(uint32_t flags)
+{
+	const char *delim = " ";
+
+	if (flags == 0)
+		return;
+
+	if (flags & NF_NAT_RANGE_PROTO_RANDOM) {
+		printf("%srandom", delim);
+		delim = ",";
+	}
+
+	if (flags & NF_NAT_RANGE_PROTO_RANDOM_FULLY) {
+		printf("%sfully-random", delim);
+		delim = ",";
+	}
+
+	if (flags & NF_NAT_RANGE_PERSISTENT)
+		printf("%spersistent", delim);
 }
 
 static void nat_stmt_print(const struct stmt *stmt)
@@ -226,6 +309,8 @@ static void nat_stmt_print(const struct stmt *stmt)
 		printf(":");
 		expr_print(stmt->nat.proto);
 	}
+
+	print_nf_nat_flags(stmt->nat.flags);
 }
 
 static void nat_stmt_destroy(struct stmt *stmt)
@@ -244,4 +329,51 @@ static const struct stmt_ops nat_stmt_ops = {
 struct stmt *nat_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &nat_stmt_ops);
+}
+
+static void masq_stmt_print(const struct stmt *stmt)
+{
+	printf("masquerade");
+
+	print_nf_nat_flags(stmt->masq.flags);
+}
+
+static const struct stmt_ops masq_stmt_ops = {
+	.type		= STMT_MASQ,
+	.name		= "masq",
+	.print		= masq_stmt_print,
+};
+
+struct stmt *masq_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &masq_stmt_ops);
+}
+
+static void redir_stmt_print(const struct stmt *stmt)
+{
+	printf("redirect");
+
+	if (stmt->redir.proto) {
+		printf(" to ");
+		expr_print(stmt->redir.proto);
+	}
+
+	print_nf_nat_flags(stmt->redir.flags);
+}
+
+static void redir_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->redir.proto);
+}
+
+static const struct stmt_ops redir_stmt_ops = {
+	.type		= STMT_REDIR,
+	.name		= "redir",
+	.print		= redir_stmt_print,
+	.destroy	= redir_stmt_destroy,
+};
+
+struct stmt *redir_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &redir_stmt_ops);
 }

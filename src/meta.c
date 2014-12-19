@@ -20,6 +20,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <linux/pkt_sched.h>
+#include <linux/if_packet.h>
 
 #include <nftables.h>
 #include <expression.h>
@@ -297,6 +298,65 @@ static const struct datatype gid_type = {
 	.parse		= gid_type_parse,
 };
 
+static const struct symbol_table pkttype_type_tbl = {
+	.symbols	= {
+		SYMBOL("unicast", PACKET_HOST),
+		SYMBOL("broadcast", PACKET_BROADCAST),
+		SYMBOL("multicast", PACKET_MULTICAST),
+		SYMBOL_LIST_END,
+	},
+};
+
+static void pkttype_type_print(const struct expr *expr)
+{
+	return symbolic_constant_print(&pkttype_type_tbl, expr);
+}
+
+static const struct datatype pkttype_type = {
+	.type		= TYPE_PKTTYPE,
+	.name		= "pkt_type",
+	.desc		= "packet type",
+	.byteorder	= BYTEORDER_HOST_ENDIAN,
+	.size		= BITS_PER_BYTE,
+	.basetype	= &integer_type,
+	.print		= pkttype_type_print,
+	.sym_tbl	= &pkttype_type_tbl,
+};
+
+static struct symbol_table *devgroup_tbl;
+static void __init devgroup_table_init(void)
+{
+	devgroup_tbl = rt_symbol_table_init("/etc/iproute2/group");
+}
+
+static void __exit devgroup_table_exit(void)
+{
+	rt_symbol_table_free(devgroup_tbl);
+}
+
+static void devgroup_type_print(const struct expr *expr)
+{
+	return symbolic_constant_print(devgroup_tbl, expr);
+}
+
+static struct error_record *devgroup_type_parse(const struct expr *sym,
+						struct expr **res)
+{
+	return symbolic_constant_parse(sym, devgroup_tbl, res);
+}
+
+static const struct datatype devgroup_type = {
+	.type		= TYPE_DEVGROUP,
+	.name		= "devgroup",
+	.desc		= "devgroup name",
+	.byteorder	= BYTEORDER_HOST_ENDIAN,
+	.size		= 4 * BITS_PER_BYTE,
+	.basetype	= &integer_type,
+	.print		= devgroup_type_print,
+	.parse		= devgroup_type_parse,
+	.flags		= DTYPE_F_PREFIX,
+};
+
 static const struct meta_template meta_templates[] = {
 	[NFT_META_LEN]		= META_TEMPLATE("length",    &integer_type,
 						4 * 8, BYTEORDER_HOST_ENDIAN),
@@ -338,6 +398,21 @@ static const struct meta_template meta_templates[] = {
 	[NFT_META_BRI_OIFNAME]	= META_TEMPLATE("obriport",  &string_type,
 						IFNAMSIZ * BITS_PER_BYTE,
 						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_PKTTYPE]	= META_TEMPLATE("pkttype",   &pkttype_type,
+						BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_CPU]		= META_TEMPLATE("cpu",	     &integer_type,
+						4 * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_IIFGROUP]	= META_TEMPLATE("iifgroup",  &devgroup_type,
+						4 * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_OIFGROUP]	= META_TEMPLATE("oifgroup",  &devgroup_type,
+						4 * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_CGROUP]	= META_TEMPLATE("cgroup",    &integer_type,
+						4 * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
 };
 
 static void meta_expr_print(const struct expr *expr)
@@ -364,6 +439,7 @@ static bool meta_expr_cmp(const struct expr *e1, const struct expr *e2)
 static void meta_expr_clone(struct expr *new, const struct expr *expr)
 {
 	new->meta.key = expr->meta.key;
+	new->meta.base = expr->meta.base;
 }
 
 /**
@@ -482,4 +558,5 @@ static void __init meta_init(void)
 	datatype_register(&tchandle_type);
 	datatype_register(&uid_type);
 	datatype_register(&gid_type);
+	datatype_register(&devgroup_type);
 }

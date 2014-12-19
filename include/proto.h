@@ -2,6 +2,7 @@
 #define NFTABLES_PROTO_H
 
 #include <nftables.h>
+#include <datatype.h>
 #include <linux/netfilter/nf_tables.h>
 
 /**
@@ -38,13 +39,15 @@ struct proto_hdr_template {
 	const struct datatype		*dtype;
 	uint16_t			offset;
 	uint16_t			len;
+	enum byteorder			byteorder;
 	enum nft_meta_keys		meta_key;
 };
 
-#define PROTO_HDR_TEMPLATE(__token, __dtype,  __offset, __len)		\
+#define PROTO_HDR_TEMPLATE(__token, __dtype,  __byteorder, __offset, __len)\
 	{								\
 		.token		= (__token),				\
 		.dtype		= (__dtype),				\
+		.byteorder	= (__byteorder),			\
 		.offset		= (__offset),				\
 		.len		= (__len),				\
 	}
@@ -249,6 +252,7 @@ enum udp_hdr_fields {
 
 enum tcp_hdr_fields {
 	TCPHDR_INVALID,
+	TCPHDR_UNSPEC = TCPHDR_INVALID,
 	TCPHDR_SPORT,
 	TCPHDR_DPORT,
 	TCPHDR_SEQ,

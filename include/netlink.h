@@ -65,9 +65,9 @@ extern struct expr *netlink_alloc_data(const struct location *loc,
 				       const struct nft_data_delinearize *nld,
 				       enum nft_registers dreg);
 
-extern int netlink_linearize_rule(struct netlink_ctx *ctx,
-				  struct nft_rule *nlr,
-				  const struct rule *rule);
+extern void netlink_linearize_rule(struct netlink_ctx *ctx,
+				   struct nft_rule *nlr,
+				   const struct rule *rule);
 extern struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 					     const struct nft_rule *r);
 
@@ -137,10 +137,19 @@ extern void netlink_dump_expr(struct nft_rule_expr *nle);
 extern void netlink_dump_set(struct nft_set *nls);
 
 extern int netlink_batch_send(struct list_head *err_list);
-extern void netlink_abi_error(void) __noreturn;
+
+extern void netlink_genid_get(void);
+extern void netlink_restart(void);
+#define netlink_abi_error()	\
+	__netlink_abi_error(__FILE__, __LINE__, strerror(errno));
+extern void __noreturn __netlink_abi_error(const char *file, int line, const char *reason);
 extern int netlink_io_error(struct netlink_ctx *ctx,
 			    const struct location *loc, const char *fmt, ...);
 extern void netlink_open_error(void) __noreturn;
+
+extern int netlink_flush_ruleset(struct netlink_ctx *ctx,
+				 const struct handle *h,
+				 const struct location *loc);
 
 extern struct nft_ruleset *netlink_dump_ruleset(struct netlink_ctx *ctx,
 						const struct handle *h,

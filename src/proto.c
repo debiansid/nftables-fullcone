@@ -38,7 +38,7 @@ const char *proto_base_tokens[] = {
 };
 
 const struct proto_hdr_template proto_unknown_template =
-	PROTO_HDR_TEMPLATE("unknown", &invalid_type, 0, 0);
+	PROTO_HDR_TEMPLATE("unknown", &invalid_type, BYTEORDER_INVALID, 0, 0);
 
 const struct proto_desc proto_unknown = {
 	.name		= "unknown",
@@ -186,13 +186,15 @@ void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 
 #define HDR_TEMPLATE(__name, __dtype, __type, __member)			\
 	PROTO_HDR_TEMPLATE(__name, __dtype,				\
+			   BYTEORDER_BIG_ENDIAN,			\
 			   offsetof(__type, __member) * 8,		\
 			   field_sizeof(__type, __member) * 8)
 
 #define HDR_FIELD(__name, __struct, __member)				\
 	HDR_TEMPLATE(__name, &integer_type, __struct, __member)
 #define HDR_BITFIELD(__name, __dtype,  __offset, __len)			\
-	PROTO_HDR_TEMPLATE(__name, __dtype, __offset, __len)
+	PROTO_HDR_TEMPLATE(__name, __dtype, BYTEORDER_BIG_ENDIAN,	\
+			   __offset, __len)
 #define HDR_TYPE(__name, __dtype, __struct, __member)			\
 	HDR_TEMPLATE(__name, __dtype, __struct, __member)
 
@@ -712,10 +714,10 @@ const struct proto_desc proto_vlan = {
 	.base		= PROTO_BASE_LL_HDR,
 	.protocol_key	= VLANHDR_TYPE,
 	.protocols	= {
-		PROTO_LINK(ETH_P_IP,		&proto_ip),
-		PROTO_LINK(ETH_P_ARP,		&proto_arp),
-		PROTO_LINK(ETH_P_IPV6,		&proto_ip6),
-		PROTO_LINK(ETH_P_8021Q,		&proto_vlan),
+		PROTO_LINK(__constant_htons(ETH_P_IP),		&proto_ip),
+		PROTO_LINK(__constant_htons(ETH_P_ARP),		&proto_arp),
+		PROTO_LINK(__constant_htons(ETH_P_IPV6),	&proto_ip6),
+		PROTO_LINK(__constant_htons(ETH_P_8021Q),	&proto_vlan),
 
 	},
 	.templates	= {
@@ -741,26 +743,13 @@ const struct datatype etheraddr_type = {
 
 static const struct symbol_table ethertype_tbl = {
 	.symbols	= {
-		SYMBOL("ip",		ETH_P_IP),
-		SYMBOL("arp",		ETH_P_ARP),
-		SYMBOL("ip6",		ETH_P_IPV6),
-		SYMBOL("vlan",		ETH_P_8021Q),
+		SYMBOL("ip",		__constant_htons(ETH_P_IP)),
+		SYMBOL("arp",		__constant_htons(ETH_P_ARP)),
+		SYMBOL("ip6",		__constant_htons(ETH_P_IPV6)),
+		SYMBOL("vlan",		__constant_htons(ETH_P_8021Q)),
 		SYMBOL_LIST_END
 	},
 };
-
-static struct error_record *ethertype_parse(const struct expr *sym,
-					    struct expr **res)
-{
-	struct error_record *erec;
-
-	erec = sym->dtype->basetype->parse(sym, res);
-	if (erec != NULL)
-		return erec;
-	if (*res)
-		return NULL;
-	return symbolic_constant_parse(sym, &ethertype_tbl, res);
-}
 
 static void ethertype_print(const struct expr *expr)
 {
@@ -776,7 +765,7 @@ const struct datatype ethertype_type = {
 	.basetype	= &integer_type,
 	.basefmt	= "0x%.4Zx",
 	.print		= ethertype_print,
-	.parse		= ethertype_parse,
+	.sym_tbl	= &ethertype_tbl,
 };
 
 #define ETHHDR_TEMPLATE(__name, __dtype, __member) \
@@ -784,17 +773,20 @@ const struct datatype ethertype_type = {
 #define ETHHDR_TYPE(__name, __member) \
 	ETHHDR_TEMPLATE(__name, &ethertype_type, __member)
 #define ETHHDR_ADDR(__name, __member) \
-	ETHHDR_TEMPLATE(__name, &etheraddr_type, __member)
+	PROTO_HDR_TEMPLATE(__name, &etheraddr_type,		\
+			   BYTEORDER_HOST_ENDIAN,		\
+			   offsetof(struct ether_header, __member) * 8,	\
+			   field_sizeof(struct ether_header, __member) * 8)
 
 const struct proto_desc proto_eth = {
 	.name		= "ether",
 	.base		= PROTO_BASE_LL_HDR,
 	.protocol_key	= ETHHDR_TYPE,
 	.protocols	= {
-		PROTO_LINK(ETH_P_IP,		&proto_ip),
-		PROTO_LINK(ETH_P_ARP,		&proto_arp),
-		PROTO_LINK(ETH_P_IPV6,		&proto_ip6),
-		PROTO_LINK(ETH_P_8021Q,		&proto_vlan),
+		PROTO_LINK(__constant_htons(ETH_P_IP),		&proto_ip),
+		PROTO_LINK(__constant_htons(ETH_P_ARP),		&proto_arp),
+		PROTO_LINK(__constant_htons(ETH_P_IPV6),	&proto_ip6),
+		PROTO_LINK(__constant_htons(ETH_P_8021Q),	&proto_vlan),
 	},
 	.templates	= {
 		[ETHHDR_DADDR]		= ETHHDR_ADDR("daddr", ether_dhost),

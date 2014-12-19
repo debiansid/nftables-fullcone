@@ -17,6 +17,9 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_arp.h>
 #include <linux/netfilter/nf_tables.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+#include <net/ethernet.h>
 
 #include <expression.h>
 #include <statement.h>
@@ -26,7 +29,6 @@
 #include <utils.h>
 
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr);
-static int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt);
 
 static const char *byteorder_names[] = {
 	[BYTEORDER_INVALID]		= "invalid",
@@ -57,6 +59,8 @@ static int __fmtstring(4, 5) __stmt_binary_error(struct eval_ctx *ctx,
 #define stmt_binary_error(ctx, s1, s2, fmt, args...) \
 	__stmt_binary_error(ctx, &(s1)->location, &(s2)->location, fmt, ## args)
 #define chain_error(ctx, s1, fmt, args...) \
+	__stmt_binary_error(ctx, &(s1)->location, NULL, fmt, ## args)
+#define monitor_error(ctx, s1, fmt, args...) \
 	__stmt_binary_error(ctx, &(s1)->location, NULL, fmt, ## args)
 
 static int __fmtstring(3, 4) set_error(struct eval_ctx *ctx,
@@ -234,6 +238,7 @@ static int expr_evaluate_value(struct eval_ctx *ctx, struct expr **expr)
 			mpz_clear(mask);
 			return -1;
 		}
+		(*expr)->byteorder = ctx->ectx.byteorder;
 		(*expr)->len = ctx->ectx.len;
 		mpz_clear(mask);
 		break;
@@ -257,7 +262,8 @@ static int expr_evaluate_value(struct eval_ctx *ctx, struct expr **expr)
  */
 static int expr_evaluate_primary(struct eval_ctx *ctx, struct expr **expr)
 {
-	expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->len);
+	__expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->byteorder,
+			   (*expr)->len);
 	return 0;
 }
 
@@ -271,13 +277,9 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **expr)
 	struct expr *payload = *expr;
 	enum proto_bases base = payload->payload.base;
 	struct stmt *nstmt;
-	struct expr *nexpr;
 
 	if (ctx->pctx.protocol[base].desc == NULL) {
-		if (payload_gen_dependency(ctx, payload, &nexpr) < 0)
-			return -1;
-		nstmt = expr_stmt_alloc(&nexpr->location, nexpr);
-		if (stmt_evaluate(ctx, nstmt) < 0)
+		if (payload_gen_dependency(ctx, payload, &nstmt) < 0)
 			return -1;
 		list_add_tail(&nstmt->list, &ctx->stmt->list);
 	} else if (ctx->pctx.protocol[base].desc != payload->payload.desc)
@@ -703,6 +705,7 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 	struct expr_ctx ectx = ctx->ectx;
 	struct expr *map = *expr, *mappings;
 
+	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &map->map) < 0)
 		return -1;
 	if (expr_is_constant(map->map))
@@ -1130,10 +1133,360 @@ static int stmt_evaluate_meta(struct eval_ctx *ctx, struct stmt *stmt)
 	return 0;
 }
 
-static int stmt_evaluate_reject(struct eval_ctx *ctx, struct stmt *stmt)
+static int reject_payload_gen_dependency_tcp(struct eval_ctx *ctx,
+					     struct stmt *stmt,
+					     struct expr **payload)
 {
+	const struct proto_desc *desc;
+
+	desc = ctx->pctx.protocol[PROTO_BASE_TRANSPORT_HDR].desc;
+	if (desc != NULL)
+		return 0;
+	*payload = payload_expr_alloc(&stmt->location, &proto_tcp,
+				      TCPHDR_UNSPEC);
+	return 1;
+}
+
+static int reject_payload_gen_dependency_family(struct eval_ctx *ctx,
+						struct stmt *stmt,
+						struct expr **payload)
+{
+	const struct proto_desc *base;
+
+	base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+	if (base != NULL)
+		return 0;
+
+	if (stmt->reject.icmp_code < 0)
+		return stmt_error(ctx, stmt, "missing icmp error type");
+
+	/* Generate a network dependency */
+	switch (stmt->reject.family) {
+	case NFPROTO_IPV4:
+		*payload = payload_expr_alloc(&stmt->location, &proto_ip,
+					     IPHDR_PROTOCOL);
+		break;
+	case NFPROTO_IPV6:
+		*payload = payload_expr_alloc(&stmt->location, &proto_ip6,
+					     IP6HDR_NEXTHDR);
+		break;
+	default:
+		BUG("unknown reject family");
+	}
+	return 1;
+}
+
+static int stmt_reject_gen_dependency(struct eval_ctx *ctx, struct stmt *stmt,
+				      struct expr *expr)
+{
+	struct expr *payload = NULL;
+	struct stmt *nstmt;
+	int ret;
+
+	switch (stmt->reject.type) {
+	case NFT_REJECT_TCP_RST:
+		ret = reject_payload_gen_dependency_tcp(ctx, stmt, &payload);
+		break;
+	case NFT_REJECT_ICMP_UNREACH:
+		ret = reject_payload_gen_dependency_family(ctx, stmt, &payload);
+		break;
+	default:
+		BUG("cannot generate reject dependency for type %d",
+		    stmt->reject.type);
+	}
+	if (ret <= 0)
+		return ret;
+
+	if (payload_gen_dependency(ctx, payload, &nstmt) < 0)
+		return -1;
+
+	list_add(&nstmt->list, &ctx->cmd->rule->stmts);
+	return 0;
+}
+
+static int stmt_evaluate_reject_inet_family(struct eval_ctx *ctx,
+					    struct stmt *stmt,
+					    const struct proto_desc *desc)
+{
+	const struct proto_desc *base;
+	int protocol;
+
+	switch (stmt->reject.type) {
+	case NFT_REJECT_TCP_RST:
+		break;
+	case NFT_REJECT_ICMPX_UNREACH:
+		return stmt_binary_error(ctx, stmt->reject.expr,
+				    &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				    "conflicting network protocol specified");
+	case NFT_REJECT_ICMP_UNREACH:
+		base = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case NFPROTO_IPV4:
+			if (stmt->reject.family == NFPROTO_IPV4)
+				break;
+			return stmt_binary_error(ctx, stmt->reject.expr,
+				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				  "conflicting protocols specified: ip vs ip6");
+		case NFPROTO_IPV6:
+			if (stmt->reject.family == NFPROTO_IPV6)
+				break;
+			return stmt_binary_error(ctx, stmt->reject.expr,
+				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				  "conflicting protocols specified: ip vs ip6");
+		default:
+			BUG("unsupported family");
+		}
+		break;
+	}
+
+	return 0;
+}
+
+static int stmt_evaluate_reject_inet(struct eval_ctx *ctx, struct stmt *stmt,
+				     struct expr *expr)
+{
+	const struct proto_desc *desc;
+
+	desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+	if (desc != NULL &&
+	    stmt_evaluate_reject_inet_family(ctx, stmt, desc) < 0)
+		return -1;
+	if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH)
+		return 0;
+	if (stmt_reject_gen_dependency(ctx, stmt, expr) < 0)
+		return -1;
+	return 0;
+}
+
+static int stmt_evaluate_reject_bridge_family(struct eval_ctx *ctx,
+					      struct stmt *stmt,
+					      const struct proto_desc *desc)
+{
+	const struct proto_desc *base;
+	int protocol;
+
+	switch (stmt->reject.type) {
+	case NFT_REJECT_ICMPX_UNREACH:
+		return stmt_binary_error(ctx, stmt->reject.expr,
+				    &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				    "conflicting network protocol specified");
+	case NFT_REJECT_TCP_RST:
+		base = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case __constant_htons(ETH_P_IP):
+		case __constant_htons(ETH_P_IPV6):
+			break;
+		default:
+			return stmt_binary_error(ctx, stmt,
+				    &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				    "cannot reject this ether type");
+		}
+		break;
+	case NFT_REJECT_ICMP_UNREACH:
+		base = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case __constant_htons(ETH_P_IP):
+			if (NFPROTO_IPV4 == stmt->reject.family)
+				break;
+			return stmt_binary_error(ctx, stmt->reject.expr,
+				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				  "conflicting protocols specified: ip vs ip6");
+		case __constant_htons(ETH_P_IPV6):
+			if (NFPROTO_IPV6 == stmt->reject.family)
+				break;
+			return stmt_binary_error(ctx, stmt->reject.expr,
+				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				  "conflicting protocols specified: ip vs ip6");
+		default:
+			return stmt_binary_error(ctx, stmt,
+				    &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
+				    "cannot reject this ether type");
+		}
+		break;
+	}
+
+	return 0;
+}
+
+static int stmt_evaluate_reject_bridge(struct eval_ctx *ctx, struct stmt *stmt,
+				       struct expr *expr)
+{
+	const struct proto_desc *desc;
+
+	desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+	if (desc != NULL &&
+	    stmt_evaluate_reject_bridge_family(ctx, stmt, desc) < 0)
+		return -1;
+	if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH)
+		return 0;
+	if (stmt_reject_gen_dependency(ctx, stmt, expr) < 0)
+		return -1;
+	return 0;
+}
+
+static int stmt_evaluate_reject_family(struct eval_ctx *ctx, struct stmt *stmt,
+				       struct expr *expr)
+{
+	switch (ctx->pctx.family) {
+	case NFPROTO_ARP:
+		return stmt_error(ctx, stmt, "cannot use reject with arp");
+	case NFPROTO_IPV4:
+	case NFPROTO_IPV6:
+		switch (stmt->reject.type) {
+		case NFT_REJECT_TCP_RST:
+			if (stmt_reject_gen_dependency(ctx, stmt, expr) < 0)
+				return -1;
+			break;
+		case NFT_REJECT_ICMPX_UNREACH:
+			return stmt_binary_error(ctx, stmt->reject.expr, stmt,
+				   "abstracted ICMP unreachable not supported");
+		case NFT_REJECT_ICMP_UNREACH:
+			if (stmt->reject.family == ctx->pctx.family)
+				break;
+			return stmt_binary_error(ctx, stmt->reject.expr, stmt,
+				  "conflicting protocols specified: ip vs ip6");
+		}
+		break;
+	case NFPROTO_BRIDGE:
+		if (stmt_evaluate_reject_bridge(ctx, stmt, expr) < 0)
+			return -1;
+		break;
+	case NFPROTO_INET:
+		if (stmt_evaluate_reject_inet(ctx, stmt, expr) < 0)
+			return -1;
+		break;
+	}
+
 	stmt->flags |= STMT_F_TERMINAL;
 	return 0;
+}
+
+static int stmt_evaluate_reject_default(struct eval_ctx *ctx,
+					  struct stmt *stmt)
+{
+	int protocol;
+	const struct proto_desc *desc, *base;
+
+	switch (ctx->pctx.family) {
+	case NFPROTO_IPV4:
+	case NFPROTO_IPV6:
+		stmt->reject.type = NFT_REJECT_ICMP_UNREACH;
+		stmt->reject.family = ctx->pctx.family;
+		if (ctx->pctx.family == NFPROTO_IPV4)
+			stmt->reject.icmp_code = ICMP_PORT_UNREACH;
+		else
+			stmt->reject.icmp_code = ICMP6_DST_UNREACH_NOPORT;
+		break;
+	case NFPROTO_INET:
+		desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+		if (desc == NULL) {
+			stmt->reject.type = NFT_REJECT_ICMPX_UNREACH;
+			stmt->reject.icmp_code = NFT_REJECT_ICMPX_PORT_UNREACH;
+			break;
+		}
+		stmt->reject.type = NFT_REJECT_ICMP_UNREACH;
+		base = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case NFPROTO_IPV4:
+			stmt->reject.family = NFPROTO_IPV4;
+			stmt->reject.icmp_code = ICMP_PORT_UNREACH;
+			break;
+		case NFPROTO_IPV6:
+			stmt->reject.family = NFPROTO_IPV6;
+			stmt->reject.icmp_code = ICMP6_DST_UNREACH_NOPORT;
+			break;
+		}
+		break;
+	case NFPROTO_BRIDGE:
+		desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+		if (desc == NULL) {
+			stmt->reject.type = NFT_REJECT_ICMPX_UNREACH;
+			stmt->reject.icmp_code = NFT_REJECT_ICMPX_PORT_UNREACH;
+			break;
+		}
+		stmt->reject.type = NFT_REJECT_ICMP_UNREACH;
+		base = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case __constant_htons(ETH_P_IP):
+			stmt->reject.family = NFPROTO_IPV4;
+			stmt->reject.icmp_code = ICMP_PORT_UNREACH;
+			break;
+		case __constant_htons(ETH_P_IPV6):
+			stmt->reject.family = NFPROTO_IPV6;
+			stmt->reject.icmp_code = ICMP6_DST_UNREACH_NOPORT;
+			break;
+		}
+		break;
+	}
+	return 0;
+}
+
+static int stmt_evaluate_reject_icmp(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct error_record *erec;
+	struct expr *code;
+
+	erec = symbol_parse(stmt->reject.expr, &code);
+	if (erec != NULL) {
+		erec_queue(erec, ctx->msgs);
+		return -1;
+	}
+	stmt->reject.icmp_code = mpz_get_uint8(code->value);
+	return 0;
+}
+
+static int stmt_evaluate_reset(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	int protonum;
+	const struct proto_desc *desc, *base;
+	struct proto_ctx *pctx = &ctx->pctx;
+
+	desc = pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc;
+	if (desc == NULL)
+		return 0;
+
+	base = pctx->protocol[PROTO_BASE_NETWORK_HDR].desc;
+	if (base == NULL &&
+	    (ctx->pctx.family == NFPROTO_INET ||
+	     ctx->pctx.family == NFPROTO_BRIDGE))
+		base = &proto_inet_service;
+
+	protonum = proto_find_num(base, desc);
+	switch (protonum) {
+	case IPPROTO_TCP:
+		break;
+	default:
+		if (stmt->reject.type == NFT_REJECT_TCP_RST) {
+			return stmt_binary_error(ctx, stmt,
+				 &ctx->pctx.protocol[PROTO_BASE_TRANSPORT_HDR],
+				 "you cannot use tcp reset with this protocol");
+		}
+		break;
+	}
+	return 0;
+}
+
+static int stmt_evaluate_reject(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct expr *expr = ctx->cmd->expr;
+
+	if (stmt->reject.icmp_code < 0) {
+		if (stmt_evaluate_reject_default(ctx, stmt) < 0)
+			return -1;
+	} else if (stmt->reject.expr != NULL) {
+		if (stmt_evaluate_reject_icmp(ctx, stmt) < 0)
+			return -1;
+	} else {
+		if (stmt_evaluate_reset(ctx, stmt) < 0)
+			return -1;
+	}
+
+	return stmt_evaluate_reject_family(ctx, stmt, expr);
 }
 
 static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
@@ -1170,6 +1523,69 @@ static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
 	return 0;
 }
 
+static int stmt_evaluate_masq(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct proto_ctx *pctx = &ctx->pctx;
+
+	if (!pctx)
+		goto out;
+
+	switch (pctx->family) {
+	case AF_INET:
+		expr_set_context(&ctx->ectx, &ipaddr_type,
+				4 * BITS_PER_BYTE);
+		break;
+	case AF_INET6:
+		expr_set_context(&ctx->ectx, &ip6addr_type,
+				 16 * BITS_PER_BYTE);
+		break;
+	default:
+		return stmt_error(ctx, stmt, "ip and ip6 support only");
+	}
+
+out:
+	stmt->flags |= STMT_F_TERMINAL;
+	return 0;
+}
+
+static int stmt_evaluate_redir(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	int err;
+	struct proto_ctx *pctx = &ctx->pctx;
+
+	if (!pctx)
+		goto out;
+
+	switch (pctx->family) {
+	case AF_INET:
+		expr_set_context(&ctx->ectx, &ipaddr_type,
+				4 * BITS_PER_BYTE);
+		break;
+	case AF_INET6:
+		expr_set_context(&ctx->ectx, &ip6addr_type,
+				 16 * BITS_PER_BYTE);
+		break;
+	default:
+		return stmt_error(ctx, stmt, "ip and ip6 support only");
+	}
+
+	if (stmt->redir.proto != NULL) {
+		if (pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc == NULL)
+			return stmt_binary_error(ctx, stmt->redir.proto, stmt,
+						 "missing transport protocol match");
+
+		expr_set_context(&ctx->ectx, &inet_service_type,
+				 2 * BITS_PER_BYTE);
+		err = expr_evaluate(ctx, &stmt->redir.proto);
+		if (err < 0)
+			return err;
+	}
+
+out:
+	stmt->flags |= STMT_F_TERMINAL;
+	return 0;
+}
+
 static int stmt_evaluate_ct(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	expr_set_context(&ctx->ectx, stmt->ct.tmpl->dtype,
@@ -1179,7 +1595,32 @@ static int stmt_evaluate_ct(struct eval_ctx *ctx, struct stmt *stmt)
 	return 0;
 }
 
-static int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
+static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	if (stmt->queue.queue != NULL) {
+		expr_set_context(&ctx->ectx, &integer_type, 16);
+		if (expr_evaluate(ctx, &stmt->queue.queue) < 0)
+			return -1;
+		if (!expr_is_constant(stmt->queue.queue))
+			return expr_error(ctx->msgs, stmt->queue.queue,
+					  "queue number is not constant");
+	}
+	return 0;
+}
+
+static int stmt_evaluate_log(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	if (stmt->log.flags & STMT_LOG_LEVEL &&
+	    (stmt->log.flags & STMT_LOG_GROUP	||
+	     stmt->log.flags & STMT_LOG_SNAPLEN	||
+	     stmt->log.flags & STMT_LOG_QTHRESHOLD)) {
+		return stmt_error(ctx, stmt,
+				  "level and group are mutually exclusive");
+	}
+	return 0;
+}
+
+int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 {
 #ifdef DEBUG
 	if (debug_level & DEBUG_EVALUATION) {
@@ -1192,7 +1633,6 @@ static int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 	switch (stmt->ops->type) {
 	case STMT_COUNTER:
 	case STMT_LIMIT:
-	case STMT_LOG:
 		return 0;
 	case STMT_EXPRESSION:
 		return stmt_evaluate_expr(ctx, stmt);
@@ -1200,12 +1640,18 @@ static int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_verdict(ctx, stmt);
 	case STMT_META:
 		return stmt_evaluate_meta(ctx, stmt);
+	case STMT_LOG:
+		return stmt_evaluate_log(ctx, stmt);
 	case STMT_REJECT:
 		return stmt_evaluate_reject(ctx, stmt);
 	case STMT_NAT:
 		return stmt_evaluate_nat(ctx, stmt);
+	case STMT_MASQ:
+		return stmt_evaluate_masq(ctx, stmt);
+	case STMT_REDIR:
+		return stmt_evaluate_redir(ctx, stmt);
 	case STMT_QUEUE:
-		return 0;
+		return stmt_evaluate_queue(ctx, stmt);
 	case STMT_CT:
 		return stmt_evaluate_ct(ctx, stmt);
 	default:
@@ -1406,6 +1852,72 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 	}
 }
 
+enum {
+	CMD_MONITOR_EVENT_ANY,
+	CMD_MONITOR_EVENT_NEW,
+	CMD_MONITOR_EVENT_DEL,
+	CMD_MONITOR_EVENT_MAX
+};
+
+static uint32_t monitor_flags[CMD_MONITOR_EVENT_MAX][CMD_MONITOR_OBJ_MAX] = {
+	[CMD_MONITOR_EVENT_ANY] = {
+		[CMD_MONITOR_OBJ_ANY]		= 0xffffffff,
+		[CMD_MONITOR_OBJ_TABLES]	= (1 << NFT_MSG_NEWTABLE) |
+						  (1 << NFT_MSG_DELTABLE),
+		[CMD_MONITOR_OBJ_CHAINS]	= (1 << NFT_MSG_NEWCHAIN) |
+						  (1 << NFT_MSG_DELCHAIN),
+		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_NEWRULE) |
+						  (1 << NFT_MSG_DELRULE),
+		[CMD_MONITOR_OBJ_SETS]		= (1 << NFT_MSG_NEWSET) |
+						  (1 << NFT_MSG_DELSET),
+		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_NEWSETELEM) |
+						  (1 << NFT_MSG_DELSETELEM),
+	},
+	[CMD_MONITOR_EVENT_NEW] = {
+		[CMD_MONITOR_OBJ_ANY]		= (1 << NFT_MSG_NEWTABLE) |
+						  (1 << NFT_MSG_NEWCHAIN) |
+						  (1 << NFT_MSG_NEWRULE)  |
+						  (1 << NFT_MSG_NEWSET)   |
+						  (1 << NFT_MSG_NEWSETELEM),
+		[CMD_MONITOR_OBJ_TABLES]	= (1 << NFT_MSG_NEWTABLE),
+		[CMD_MONITOR_OBJ_CHAINS]	= (1 << NFT_MSG_NEWCHAIN),
+		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_NEWRULE),
+		[CMD_MONITOR_OBJ_SETS]		= (1 << NFT_MSG_NEWSET),
+		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_NEWSETELEM),
+	},
+	[CMD_MONITOR_EVENT_DEL] = {
+		[CMD_MONITOR_OBJ_ANY]		= (1 << NFT_MSG_DELTABLE) |
+						  (1 << NFT_MSG_DELCHAIN) |
+						  (1 << NFT_MSG_DELRULE)  |
+						  (1 << NFT_MSG_DELSET)   |
+						  (1 << NFT_MSG_DELSETELEM),
+		[CMD_MONITOR_OBJ_TABLES]	= (1 << NFT_MSG_DELTABLE),
+		[CMD_MONITOR_OBJ_CHAINS]	= (1 << NFT_MSG_DELCHAIN),
+		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_DELRULE),
+		[CMD_MONITOR_OBJ_SETS]		= (1 << NFT_MSG_DELSET),
+		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_DELSETELEM),
+	},
+};
+
+static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	uint32_t event;
+
+	if (cmd->monitor->event == NULL)
+		event = CMD_MONITOR_EVENT_ANY;
+	else if (strcmp(cmd->monitor->event, "new") == 0)
+		event = CMD_MONITOR_EVENT_NEW;
+	else if (strcmp(cmd->monitor->event, "destroy") == 0)
+		event = CMD_MONITOR_EVENT_DEL;
+	else {
+		return monitor_error(ctx, cmd->monitor, "invalid event %s",
+				     cmd->monitor->event);
+	}
+
+	cmd->monitor->flags = monitor_flags[event][cmd->monitor->type];
+	return 0;
+}
+
 int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 {
 #ifdef DEBUG
@@ -1428,8 +1940,10 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_FLUSH:
 	case CMD_RENAME:
 	case CMD_EXPORT:
-	case CMD_MONITOR:
+	case CMD_DESCRIBE:
 		return 0;
+	case CMD_MONITOR:
+		return cmd_evaluate_monitor(ctx, cmd);
 	default:
 		BUG("invalid command operation %u\n", cmd->op);
 	};

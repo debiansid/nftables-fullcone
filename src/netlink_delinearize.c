@@ -14,6 +14,9 @@
 #include <string.h>
 #include <limits.h>
 #include <linux/netfilter/nf_tables.h>
+#include <arpa/inet.h>
+#include <linux/netfilter.h>
+#include <net/ethernet.h>
 #include <netlink.h>
 #include <rule.h>
 #include <statement.h>
@@ -54,6 +57,9 @@ static void netlink_set_register(struct netlink_parse_ctx *ctx,
 		return;
 	}
 
+	if (ctx->registers[reg] != NULL)
+		expr_free(ctx->registers[reg]);
+
 	ctx->registers[reg] = expr;
 }
 
@@ -69,7 +75,15 @@ static struct expr *netlink_get_register(struct netlink_parse_ctx *ctx,
 	}
 
 	expr = ctx->registers[reg];
-	return expr;
+	return expr_clone(expr);
+}
+
+static void netlink_release_registers(struct netlink_parse_ctx *ctx)
+{
+	int i;
+
+	for (i = 0; i <= NFT_REG_MAX; i++)
+		expr_free(ctx->registers[i]);
 }
 
 static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
@@ -428,12 +442,30 @@ static void netlink_parse_log(struct netlink_parse_ctx *ctx,
 
 	stmt = log_stmt_alloc(loc);
 	prefix = nft_rule_expr_get_str(nle, NFT_EXPR_LOG_PREFIX);
-	if (prefix != NULL)
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_LOG_PREFIX)) {
 		stmt->log.prefix = xstrdup(prefix);
-	stmt->log.group = nft_rule_expr_get_u16(nle, NFT_EXPR_LOG_GROUP);
-	stmt->log.snaplen = nft_rule_expr_get_u32(nle, NFT_EXPR_LOG_SNAPLEN);
-	stmt->log.qthreshold =
-		nft_rule_expr_get_u16(nle, NFT_EXPR_LOG_QTHRESHOLD);
+		stmt->log.flags |= STMT_LOG_PREFIX;
+	}
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_LOG_GROUP)) {
+		stmt->log.group =
+			nft_rule_expr_get_u16(nle, NFT_EXPR_LOG_GROUP);
+		stmt->log.flags |= STMT_LOG_GROUP;
+	}
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_LOG_SNAPLEN)) {
+		stmt->log.snaplen =
+			nft_rule_expr_get_u32(nle, NFT_EXPR_LOG_SNAPLEN);
+		stmt->log.flags |= STMT_LOG_SNAPLEN;
+	}
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_LOG_QTHRESHOLD)) {
+		stmt->log.qthreshold =
+			nft_rule_expr_get_u16(nle, NFT_EXPR_LOG_QTHRESHOLD);
+		stmt->log.flags |= STMT_LOG_QTHRESHOLD;
+	}
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_LOG_LEVEL)) {
+		stmt->log.level =
+			nft_rule_expr_get_u32(nle, NFT_EXPR_LOG_LEVEL);
+		stmt->log.flags |= STMT_LOG_LEVEL;
+	}
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -454,8 +486,15 @@ static void netlink_parse_reject(struct netlink_parse_ctx *ctx,
 				 const struct nft_rule_expr *expr)
 {
 	struct stmt *stmt;
+	uint8_t icmp_code;
 
 	stmt = reject_stmt_alloc(loc);
+	stmt->reject.type = nft_rule_expr_get_u32(expr, NFT_EXPR_REJECT_TYPE);
+	icmp_code = nft_rule_expr_get_u8(expr, NFT_EXPR_REJECT_CODE);
+	stmt->reject.icmp_code = icmp_code;
+	stmt->reject.expr = constant_expr_alloc(loc, &integer_type,
+						BYTEORDER_HOST_ENDIAN, 8,
+						&icmp_code);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -472,6 +511,10 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	stmt->nat.type = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_TYPE);
 
 	family = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_FAMILY);
+
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_NAT_FLAGS))
+		stmt->nat.flags = nft_rule_expr_get_u32(nle,
+							NFT_EXPR_NAT_FLAGS);
 
 	reg1 = nft_rule_expr_get_u32(nle, NFT_EXPR_NAT_REG_ADDR_MIN);
 	if (reg1) {
@@ -536,19 +579,89 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
+static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
+			       const struct location *loc,
+			       const struct nft_rule_expr *nle)
+{
+	struct stmt *stmt;
+
+	stmt = masq_stmt_alloc(loc);
+
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_MASQ_FLAGS))
+		stmt->masq.flags = nft_rule_expr_get_u32(nle,
+							 NFT_EXPR_MASQ_FLAGS);
+
+	list_add_tail(&stmt->list, &ctx->rule->stmts);
+}
+
+static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
+				const struct location *loc,
+				const struct nft_rule_expr *nle)
+{
+	struct stmt *stmt;
+	struct expr *proto;
+	enum nft_registers reg1, reg2;
+	uint32_t flags;
+
+	stmt = redir_stmt_alloc(loc);
+
+	if (nft_rule_expr_is_set(nle, NFT_EXPR_REDIR_FLAGS)) {
+		flags = nft_rule_expr_get_u32(nle, NFT_EXPR_REDIR_FLAGS);
+		stmt->redir.flags = flags;
+	}
+
+	reg1 = nft_rule_expr_get_u32(nle, NFT_EXPR_REDIR_REG_PROTO_MIN);
+	if (reg1) {
+		proto = netlink_get_register(ctx, loc, reg1);
+		if (proto == NULL)
+			return netlink_error(ctx, loc,
+					     "redirect statement has no proto "
+					     "expression");
+
+		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
+		stmt->redir.proto = proto;
+	}
+
+	reg2 = nft_rule_expr_get_u32(nle, NFT_EXPR_REDIR_REG_PROTO_MAX);
+	if (reg2 && reg2 != reg1) {
+		proto = netlink_get_register(ctx, loc, reg2);
+		if (proto == NULL)
+			return netlink_error(ctx, loc,
+					     "redirect statement has no proto "
+					     "expression");
+
+		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
+		if (stmt->redir.proto != NULL)
+			proto = range_expr_alloc(loc, stmt->redir.proto,
+						 proto);
+		stmt->redir.proto = proto;
+	}
+
+	list_add_tail(&stmt->list, &ctx->rule->stmts);
+}
+
 static void netlink_parse_queue(struct netlink_parse_ctx *ctx,
 			      const struct location *loc,
 			      const struct nft_rule_expr *nle)
 {
+	struct expr *expr, *high;
 	struct stmt *stmt;
-	uint16_t range_to;
+	uint16_t num, total;
+
+	num   = nft_rule_expr_get_u16(nle, NFT_EXPR_QUEUE_NUM);
+	total = nft_rule_expr_get_u16(nle, NFT_EXPR_QUEUE_TOTAL);
+
+	expr = constant_expr_alloc(loc, &integer_type,
+				   BYTEORDER_HOST_ENDIAN, 16, &num);
+	if (total > 1) {
+		total += num - 1;
+		high = constant_expr_alloc(loc, &integer_type,
+					   BYTEORDER_HOST_ENDIAN, 16, &total);
+		expr = range_expr_alloc(loc, expr, high);
+	}
 
 	stmt = queue_stmt_alloc(loc);
-	stmt->queue.from = nft_rule_expr_get_u16(nle, NFT_EXPR_QUEUE_NUM);
-	range_to = nft_rule_expr_get_u16(nle, NFT_EXPR_QUEUE_TOTAL);
-	range_to += stmt->queue.from - 1;
-	stmt->queue.to = range_to;
-
+	stmt->queue.queue = expr;
 	stmt->queue.flags = nft_rule_expr_get_u16(nle, NFT_EXPR_QUEUE_FLAGS);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
@@ -573,6 +686,8 @@ static const struct {
 	{ .name = "limit",	.parse = netlink_parse_limit },
 	{ .name = "reject",	.parse = netlink_parse_reject },
 	{ .name = "nat",	.parse = netlink_parse_nat },
+	{ .name = "masq",	.parse = netlink_parse_masq },
+	{ .name = "redir",	.parse = netlink_parse_redir },
 	{ .name = "queue",	.parse = netlink_parse_queue },
 };
 
@@ -625,6 +740,29 @@ static void payload_dependency_store(struct rule_pp_ctx *ctx,
 {
 	ctx->pbase = base;
 	ctx->pdep  = stmt;
+}
+
+static void integer_type_postprocess(struct expr *expr)
+{
+	struct expr *i;
+
+	switch (expr->ops->type) {
+	case EXPR_VALUE:
+		if (expr->byteorder == BYTEORDER_HOST_ENDIAN) {
+			uint32_t len = div_round_up(expr->len, BITS_PER_BYTE);
+
+			mpz_switch_byteorder(expr->value, len);
+		}
+		break;
+	case EXPR_SET_REF:
+		list_for_each_entry(i, &expr->set->init->expressions, list) {
+			expr_set_type(i, expr->dtype, expr->byteorder);
+			integer_type_postprocess(i);
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 static void payload_match_postprocess(struct rule_pp_ctx *ctx,
@@ -689,6 +827,12 @@ static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 		if (ctx->pbase == PROTO_BASE_INVALID &&
 		    left->flags & EXPR_F_PROTOCOL)
 			payload_dependency_store(ctx, stmt, left->meta.base);
+		break;
+	case OP_LOOKUP:
+		expr_set_type(expr->right, expr->left->dtype,
+			      expr->left->byteorder);
+		if (expr->right->dtype == &integer_type)
+			integer_type_postprocess(expr->right);
 		break;
 	default:
 		break;
@@ -872,6 +1016,64 @@ static void expr_postprocess(struct rule_pp_ctx *ctx,
 	}
 }
 
+static void stmt_reject_postprocess(struct rule_pp_ctx rctx, struct stmt *stmt)
+{
+	const struct proto_desc *desc, *base;
+	int protocol;
+
+	switch (rctx.pctx.family) {
+	case NFPROTO_IPV4:
+		stmt->reject.family = rctx.pctx.family;
+		stmt->reject.expr->dtype = &icmp_code_type;
+		break;
+	case NFPROTO_IPV6:
+		stmt->reject.family = rctx.pctx.family;
+		stmt->reject.expr->dtype = &icmpv6_code_type;
+		break;
+	case NFPROTO_INET:
+		if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH) {
+			stmt->reject.expr->dtype = &icmpx_code_type;
+			break;
+		}
+		base = rctx.pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		desc = rctx.pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case NFPROTO_IPV4:
+			stmt->reject.expr->dtype = &icmp_code_type;
+			break;
+		case NFPROTO_IPV6:
+			stmt->reject.expr->dtype = &icmpv6_code_type;
+			break;
+		}
+		stmt->reject.family = protocol;
+		break;
+	case NFPROTO_BRIDGE:
+		if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH) {
+			stmt->reject.expr->dtype = &icmpx_code_type;
+			break;
+		}
+		base = rctx.pctx.protocol[PROTO_BASE_LL_HDR].desc;
+		desc = rctx.pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+		protocol = proto_find_num(base, desc);
+		switch (protocol) {
+		case __constant_htons(ETH_P_IP):
+			stmt->reject.family = NFPROTO_IPV4;
+			stmt->reject.expr->dtype = &icmp_code_type;
+			break;
+		case __constant_htons(ETH_P_IPV6):
+			stmt->reject.family = NFPROTO_IPV6;
+			stmt->reject.expr->dtype = &icmpv6_code_type;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *rule)
 {
 	struct rule_pp_ctx rctx;
@@ -898,6 +1100,14 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 				expr_postprocess(&rctx, stmt, &stmt->nat.addr);
 			if (stmt->nat.proto != NULL)
 				expr_postprocess(&rctx, stmt, &stmt->nat.proto);
+			break;
+		case STMT_REDIR:
+			if (stmt->redir.proto != NULL)
+				expr_postprocess(&rctx, stmt,
+						 &stmt->redir.proto);
+			break;
+		case STMT_REJECT:
+			stmt_reject_postprocess(rctx, stmt);
 			break;
 		default:
 			break;
@@ -939,5 +1149,6 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 	nft_rule_expr_foreach((struct nft_rule *)nlr, netlink_parse_expr, pctx);
 
 	rule_parse_postprocess(pctx, pctx->rule);
+	netlink_release_registers(pctx);
 	return pctx->rule;
 }

@@ -96,19 +96,31 @@ enum symbol_types {
  * struct expr_ctx - type context for symbol parsing during evaluation
  *
  * @dtype:	expected datatype
+ * @byteorder:	expected byteorder
  * @len:	expected len
  */
 struct expr_ctx {
 	const struct datatype	*dtype;
+	enum byteorder		byteorder;
 	unsigned int		len;
 };
+
+static inline void __expr_set_context(struct expr_ctx *ctx,
+				      const struct datatype *dtype,
+				      enum byteorder byteorder,
+				      unsigned int len)
+{
+	ctx->dtype	= dtype;
+	ctx->byteorder	= byteorder;
+	ctx->len	= len;
+}
 
 static inline void expr_set_context(struct expr_ctx *ctx,
 				    const struct datatype *dtype,
 				    unsigned int len)
 {
-	ctx->dtype = dtype;
-	ctx->len   = len;
+	__expr_set_context(ctx, dtype,
+			   dtype ? dtype->byteorder : BYTEORDER_INVALID, len);
 }
 
 /**
@@ -350,5 +362,9 @@ extern struct expr *map_expr_alloc(const struct location *loc,
 
 extern struct expr *set_ref_expr_alloc(const struct location *loc,
 				       struct set *set);
+
+
+extern void range_expr_value_low(mpz_t rop, const struct expr *expr);
+extern void range_expr_value_high(mpz_t rop, const struct expr *expr);
 
 #endif /* NFTABLES_EXPRESSION_H */

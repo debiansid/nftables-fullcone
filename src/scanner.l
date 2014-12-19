@@ -20,7 +20,7 @@
 #include <erec.h>
 #include <rule.h>
 #include <parser.h>
-#include "parser.h"
+#include "parser_bison.h"
 
 #define YY_NO_INPUT
 
@@ -47,7 +47,8 @@
 		clearerr(yyin);							\
 	}									\
 	if (result > 1) {							\
-		while (result > 1 && buf[result - 1] != '\n')			\
+		while (result > 1 && 						\
+		       (buf[result - 1] != '\n' &&  buf[result - 1] != ' '))	\
 			result--, n++;						\
 		result--, n++;							\
 		fseek(yyin, -n, SEEK_CUR);					\
@@ -169,6 +170,7 @@ ip6addr		({v680}|{v67}|{v66}|{v65}|{v64}|{v63}|{v62}|{v61}|{v60})
 addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 %option prefix="nft_"
+%option outfile="lex.yy.c"
 %option reentrant
 %option noyywrap
 %option nounput
@@ -240,6 +242,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "element"		{ return ELEMENT; }
 "map"			{ return MAP; }
 "handle"		{ return HANDLE; }
+"ruleset"		{ return RULESET; }
 
 "accept"		{ return ACCEPT; }
 "drop"			{ return DROP; }
@@ -247,6 +250,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "jump"			{ return JUMP; }
 "goto"			{ return GOTO; }
 "return"		{ return RETURN; }
+"to"			{ return TO; }
 
 "inet"			{ return INET; }
 
@@ -267,6 +271,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "interval"		{ return INTERVAL; }
 "elements"		{ return ELEMENTS; }
 
+"policy"		{ return POLICY; }
+"size"			{ return SIZE; }
+"performance"		{ return PERFORMANCE; }
+"memory"		{ return MEMORY; }
+
 "counter"		{ return COUNTER; }
 "packets"		{ return PACKETS; }
 "bytes"			{ return BYTES; }
@@ -276,11 +285,20 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "group"			{ return GROUP; }
 "snaplen"		{ return SNAPLEN; }
 "queue-threshold"	{ return QUEUE_THRESHOLD; }
+"level"			{ return LEVEL; }
+"emerg"			{ return LEVEL_EMERG; }
+"alert"			{ return LEVEL_ALERT; }
+"crit"			{ return LEVEL_CRIT; }
+"err"			{ return LEVEL_ERR; }
+"warn"			{ return LEVEL_WARN; }
+"notice"		{ return LEVEL_NOTICE; }
+"info"			{ return LEVEL_INFO; }
+"debug"			{ return LEVEL_DEBUG; }
 
 "queue"			{ return QUEUE;}
 "num"			{ return QUEUENUM;}
-"bypass"		{ return QUEUEBYPASS;}
-"fanout"		{ return QUEUECPUFANOUT;}
+"bypass"		{ return BYPASS;}
+"fanout"		{ return FANOUT;}
 
 "limit"			{ return LIMIT; }
 "rate"			{ return RATE; }
@@ -295,9 +313,17 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "week"			{ return WEEK; }
 
 "reject"		{ return _REJECT; }
+"with"			{ return WITH; }
+"reset"			{ return RESET; }
+"icmpx"			{ return ICMPX; }
 
 "snat"			{ return SNAT; }
 "dnat"			{ return DNAT; }
+"masquerade"		{ return MASQUERADE; }
+"redirect"		{ return REDIRECT; }
+"random"		{ return RANDOM; }
+"fully-random"		{ return FULLY_RANDOM; }
+"persistent"		{ return PERSISTENT; }
 
 "ll"			{ return LL_HDR; }
 "nh"			{ return NETWORK_HDR; }
@@ -406,6 +432,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "rtclassid"		{ return RTCLASSID; }
 "ibriport"		{ return IBRIPORT; }
 "obriport"		{ return OBRIPORT; }
+"pkttype"		{ return PKTTYPE; }
+"cpu"			{ return CPU; }
+"iifgroup"		{ return IIFGROUP; }
+"oifgroup"		{ return OIFGROUP; }
+"cgroup"		{ return CGROUP; }
 
 "ct"			{ return CT; }
 "direction"		{ return DIRECTION; }
@@ -429,16 +460,20 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 {decstring}		{
 				errno = 0;
 				yylval->val = strtoull(yytext, NULL, 0);
-				if (errno != 0)
-					BUG();
+				if (errno != 0) {
+					yylval->string = xstrdup(yytext);
+					return ERROR;
+				}
 				return NUM;
 			}
 
 {hexstring}		{
 				errno = 0;
 				yylval->val = strtoull(yytext, NULL, 0);
-				if (errno != 0)
-					BUG();
+				if (errno != 0) {
+					yylval->string = xstrdup(yytext);
+					return ERROR;
+				}
 				return NUM;
 			}
 

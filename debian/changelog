@@ -1,3 +1,15 @@
+nftables (0.4-1) experimental; urgency=medium
+
+  * [b187410] d/control: bump standars to 3.9.6
+  * [2021272] Imported Upstream version 0.4 (Closes: #773401)
+  * [8b73e74] d/patches/: drop all v0.3 patches
+  * [bff758e] d/control: depends on libnftnl >= 1.0.3
+  * [0e2023b] d/copyright: put more general statement first
+  * [b382dff] d/rules: fix perms of files under /etc/nftables
+  * [96252e6] d/rules: disable silent rules
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 22 Dec 2014 10:33:33 +0100
+
 nftables (0.3-1) unstable; urgency=medium
 
   * [3a4f54a] d/patches: patch to harden the build

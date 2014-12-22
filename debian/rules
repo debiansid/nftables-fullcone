@@ -5,7 +5,7 @@
 
 # DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-configure_opts	:= --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man
+configure_opts	:= --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man --disable-silent-rules
 
 override_dh_auto_configure:
 	./configure $(configure_opts) --

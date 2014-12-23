@@ -1,4 +1,4 @@
-nftables (0.4-1) experimental; urgency=medium
+nftables (0.4-1) unstable; urgency=medium
 
   * [b187410] d/control: bump standars to 3.9.6
   * [2021272] Imported Upstream version 0.4 (Closes: #773401)

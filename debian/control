@@ -31,3 +31,5 @@ Description: Program to control packet filtering rules by Netfilter project
  Netfilter and nftables are used in applications such as Internet
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
+ .
+ A linux kernel >= 3.13 is required. However, >= 3.18 is recommended.

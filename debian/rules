@@ -15,7 +15,11 @@ override_dh_auto_configure:
 
 override_dh_auto_install:
 	dh_auto_install
-	chmod a+x debian/nftables/etc/nftables/*
+	chmod a+x debian/tmp/etc/nftables/*
+
+override_dh_install:
+	dh_install
+	chmod a+x debian/nftables-service/etc/nftables.conf
 
 PKD   = $(abspath $(dir $(MAKEFILE_LIST)))
 PKG   = $(word 2,$(shell dpkg-parsechangelog -l$(PKD)/changelog | grep ^Source))

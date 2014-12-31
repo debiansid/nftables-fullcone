@@ -37,7 +37,9 @@ Description: Program to control packet filtering rules by Netfilter project
 
 Package: nftables-service
 Architecture: linux-any
-Depends: ${misc:Depends}, nftables
+Depends: ${misc:Depends}, nftables (>= 0.4)
 Description: nftables firewall systemd service
  This package provides a basic and simple firewall integrated as a systemd
  service.
+ .
+ For this service to run in an atomic way, linux kernel >= 3.18 is required.

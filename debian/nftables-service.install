@@ -1,2 +1,1 @@
-debian/nft-service/nftables.conf	etc
-debian/nft-service/nftables.service	lib/systemd/system
+debian/nftables.conf		etc

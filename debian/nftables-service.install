@@ -1,1 +1,2 @@
 debian/nftables.conf		etc
+debian/nftables.service		lib/systemd/system

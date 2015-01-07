@@ -22,10 +22,10 @@ override_dh_install:
 	chmod a+x debian/nftables-service/etc/nftables.conf
 
 override_dh_systemd_enable:
-	dh_systemd_enable --package=nftables-service --name nftables debian/nftables-service.nftables.service
+	dh_systemd_enable --package=nftables-service --name=nftables debian/nftables.service
 
 override_dh_systemd_start:
-	dh_systemd_start --package=nftables-service debian/nftables-service.nftables.service
+	dh_systemd_start --package=nftables-service debian/nftables.service
 
 PKD   = $(abspath $(dir $(MAKEFILE_LIST)))
 PKG   = $(word 2,$(shell dpkg-parsechangelog -l$(PKD)/changelog | grep ^Source))

@@ -34,7 +34,7 @@ Description: Program to control packet filtering rules by Netfilter project
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
  .
- A linux kernel >= 3.13 is required. However, >= 3.18 is recommended.
+ A Linux kernel >= 3.13 is required. However, >= 3.18 is recommended.
 
 Package: nftables-service
 Architecture: linux-any
@@ -43,4 +43,4 @@ Description: nftables firewall systemd service
  This package provides a basic and simple firewall integrated as a systemd
  service.
  .
- For this service to run in an atomic way, linux kernel >= 3.18 is required.
+ For this service to run in an atomic way, Linux kernel >= 3.18 is required.

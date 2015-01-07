@@ -1,12 +1,14 @@
 nftables (0.4-2) unstable; urgency=medium
 
-  * [0c9a349] d/control: include notice about recommended and required
-    kernel versions
+  * [0c9a349] d/control: include notice about recommended and required kernel
+    versions
   * [006a223] d/: add nftables-service binary package
-  * [0b1abab] d/control: require nftables >= 0.4 for nftables-service
-  * [aac4be4] d/nft-service/nftables.conf: pure inet family firewall
+  * [2237bad] d/nftables.examples: only ship upstream examples, not in
+    /etc/nftables
+  * [2ed9b77] d/nftables-service.docs: include README.Debian in the binary
+    package
 
- -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 05 Jan 2015 13:44:23 +0100
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 07 Jan 2015 11:51:27 +0100
 
 nftables (0.4-1) unstable; urgency=medium
 

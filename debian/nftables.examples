@@ -1,1 +1,1 @@
-debian/basic.nft
+debian/tmp/etc/nftables/*

@@ -4,9 +4,9 @@ Priority: extra
 Maintainer: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
 Build-Depends: automake,
                bison,
-               debhelper (>= 9),
+               debhelper (>= 9.20141022),
                dh-autoreconf,
-               dh-systemd (>= 1.22),
+               dh-systemd,
                docbook2x,
                flex,
                libgmp-dev,
@@ -35,12 +35,3 @@ Description: Program to control packet filtering rules by Netfilter project
  advanced routing and traffic control.
  .
  A Linux kernel >= 3.13 is required. However, >= 3.18 is recommended.
-
-Package: nftables-service
-Architecture: linux-any
-Depends: nftables (>= 0.4), ${misc:Depends}
-Description: nftables firewall systemd service
- This package provides a basic and simple firewall integrated as a systemd
- service.
- .
- For this service to run in an atomic way, Linux kernel >= 3.18 is required.

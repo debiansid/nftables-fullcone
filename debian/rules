@@ -11,7 +11,7 @@ override_dh_auto_configure:
 	./configure $(configure_opts) --
 
 %:
-	dh $@ --with autoreconf --with systemd
+	dh $@ --with autoreconf,systemd
 
 override_dh_fixperms:
 	dh_fixperms

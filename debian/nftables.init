@@ -64,7 +64,7 @@ do_status()
 	# Return
 	#   0 if no rules
 	#   1 if rules
-	if [ "$($BIN list ruleset 2>/dev/null | wc -l)" == "0" ] ; then
+	if [ "$($BIN list ruleset 2>/dev/null | wc -l)" = "0" ] ; then
 		return 0
 	fi
 

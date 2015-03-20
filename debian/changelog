@@ -1,3 +1,13 @@
+nftables (0.4-3) unstable; urgency=medium
+
+  * [d42d50f] d/nftables.init: doesn't require networking to stop
+  * [ceee9cb] d/nftables.service: the service is of Type=oneshot
+  * [8415993] d/nftables.init: fix bashism in status operation.
+    Thanks to Manolo Diaz for the bug report (Closes: #775875)
+  * [a0e197a] d/tests: add basic autopkgtest support
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 20 Mar 2015 21:27:46 +0100
+
 nftables (0.4-2) unstable; urgency=medium
 
   * Both a /etc/init.d/nftables and a nftables.service files are distributed

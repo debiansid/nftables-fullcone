@@ -1,0 +1,2 @@
+Test-Command: nft -h
+Depends: @

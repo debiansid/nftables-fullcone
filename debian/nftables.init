@@ -103,7 +103,7 @@ case "$1" in
 	exit $ret
 	;;
   status)
-	if do_status ; then
+	if ! do_status ; then
 		[ "$VERBOSE" != no ] && log_daemon_msg "Status of ${DESC}: rules loaded" "$NAME"
 		[ "$VERBOSE" != no ] && log_end_msg 0
 		exit 0

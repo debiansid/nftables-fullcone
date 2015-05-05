@@ -1,3 +1,11 @@
+nftables (0.4-4) unstable; urgency=medium
+
+  * [c8b825e] /etc/init.d/nftables: fix inverted logic in status op.
+    Thanks to Manolo Diaz for the fast report (Closes: #783608)
+  * [2105ccb] source: make the build reproducible
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 05 May 2015 12:15:33 +0200
+
 nftables (0.4-3) unstable; urgency=medium
 
   * [d42d50f] d/nftables.init: doesn't require networking to stop

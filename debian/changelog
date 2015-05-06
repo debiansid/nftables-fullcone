@@ -1,6 +1,5 @@
 nftables (0.4-5) unstable; urgency=medium
 
-  [ Arturo Borrero Gonzalez ]
   * [231244a] sysvinit: don't start the service by default
 
  -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 06 May 2015 11:56:10 +0200

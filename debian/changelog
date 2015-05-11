@@ -1,3 +1,9 @@
+nftables (0.4-5~bpo8+1) jessie-backports; urgency=medium
+
+  * Rebuild for jessie-backports.
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 11 May 2015 12:56:23 +0200
+
 nftables (0.4-5) unstable; urgency=medium
 
   * [231244a] sysvinit: don't start the service by default

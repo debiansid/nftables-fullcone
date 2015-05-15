@@ -1,3 +1,10 @@
+nftables (0.4-6) unstable; urgency=medium
+
+  * [4f9fbf0] d/tests/control: add restriction to run test as root
+  * [be594d3] nftables.conf: improve icmpv6 support
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 15 May 2015 12:53:09 +0200
+
 nftables (0.4-5) unstable; urgency=medium
 
   * [231244a] sysvinit: don't start the service by default

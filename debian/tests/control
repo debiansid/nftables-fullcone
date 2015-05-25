@@ -1,2 +1,3 @@
 Test-Command: nft -h
 Depends: @
+Restrictions: needs-root

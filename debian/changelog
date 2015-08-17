@@ -1,3 +1,13 @@
+nftables (0.4-7) unstable; urgency=medium
+
+  [ Vincent Blut ]
+  * [0fc181f] d/copyright: fix missing doc/nft.xml license (Closes: #795096)
+
+  [ Arturo Borrero Gonzalez ]
+  * [ae662e4] d/rules: drop get-orig-source code
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 17 Aug 2015 11:20:15 +0200
+
 nftables (0.4-6) unstable; urgency=medium
 
   * [4f9fbf0] d/tests/control: add restriction to run test as root

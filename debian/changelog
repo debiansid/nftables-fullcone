@@ -1,3 +1,13 @@
+nftables (0.5-1) unstable; urgency=medium
+
+  * [007a8d0] Imported Upstream version 0.5
+  * [9a90c87] d/control: nftables 0.5 requires libnftnl >= 1.0.5
+  * [17fdcc1] d/control: update nftables description: linux 4.2 recommended
+  * [a473529] d/copyright: update file to include latest changes in v0.5
+  * [4a9deac] d/copyright: drop copyright for debian/*
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 18 Sep 2015 11:44:21 +0200
+
 nftables (0.4-7) unstable; urgency=medium
 
   [ Vincent Blut ]

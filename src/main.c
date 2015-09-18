@@ -25,6 +25,7 @@
 #include <netlink.h>
 #include <erec.h>
 #include <mnl.h>
+#include <iface.h>
 #include <cli.h>
 
 unsigned int max_errors = 10;
@@ -181,7 +182,6 @@ static int nft_netlink(struct parser_state *state, struct list_head *msgs)
 	bool batch_supported = netlink_batch_supported();
 	int ret = 0;
 
-	netlink_genid_get();
 	mnl_batch_init();
 
 	batch_seqnum = mnl_batch_begin();
@@ -229,15 +229,12 @@ int nft_run(void *scanner, struct parser_state *state, struct list_head *msgs)
 	int ret;
 
 	ret = nft_parse(scanner, state);
-	if (ret != 0 || state->nerrs > 0)
-		return -1;
-retry:
-	ret = nft_netlink(state, msgs);
-	if (ret < 0 && errno == EINTR) {
-		netlink_restart();
-		goto retry;
+	if (ret != 0 || state->nerrs > 0) {
+		ret = -1;
+		goto err1;
 	}
-
+	ret = nft_netlink(state, msgs);
+err1:
 	list_for_each_entry_safe(cmd, next, &state->cmds, list) {
 		list_del(&cmd->list);
 		cmd_free(cmd);
@@ -361,8 +358,10 @@ int main(int argc, char * const *argv)
 		rc = NFT_EXIT_FAILURE;
 out:
 	scanner_destroy(scanner);
-	erec_print_list(stdout, &msgs);
-
+	erec_print_list(stderr, &msgs);
 	xfree(buf);
+	cache_release();
+	iface_cache_release();
+
 	return rc;
 }

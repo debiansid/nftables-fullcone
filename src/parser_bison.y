@@ -132,6 +132,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 	struct stmt		*stmt;
 	struct expr		*expr;
 	struct set		*set;
+	const struct datatype	*datatype;
 }
 
 %token TOKEN_EOF 0		"end of file"
@@ -164,6 +165,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token DEFINE			"define"
 
 %token HOOK			"hook"
+%token DEVICE			"device"
 %token TABLE			"table"
 %token TABLES			"tables"
 %token CHAIN			"chain"
@@ -178,8 +180,10 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token RULESET			"ruleset"
 
 %token INET			"inet"
+%token NETDEV			"netdev"
 
 %token ADD			"add"
+%token UPDATE			"update"
 %token CREATE			"create"
 %token INSERT			"insert"
 %token DELETE			"delete"
@@ -200,6 +204,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token CONSTANT			"constant"
 %token INTERVAL			"interval"
+%token TIMEOUT			"timeout"
+%token GC_INTERVAL		"gc-interval"
 %token ELEMENTS			"elements"
 
 %token POLICY			"policy"
@@ -210,8 +216,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token <val> NUM		"number"
 %token <string> STRING		"string"
 %token <string> QUOTED_STRING
-%token <string> ERROR		"error"
-%destructor { xfree($$); }	STRING QUOTED_STRING ERROR
+%destructor { xfree($$); }	STRING QUOTED_STRING
 
 %token LL_HDR			"ll"
 %token NETWORK_HDR		"nh"
@@ -237,7 +242,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token OPERATION		"operation"
 
 %token IP			"ip"
-%token VERSION			"version"
+%token HDRVERSION		"version"
 %token HDRLENGTH		"hdrlength"
 %token TOS			"tos"
 %token LENGTH			"length"
@@ -393,8 +398,13 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token XML			"xml"
 %token JSON			"json"
 
-%type <string>			identifier string comment_spec
-%destructor { xfree($$); }	identifier string comment_spec
+%type <string>			identifier type_identifier string comment_spec
+%destructor { xfree($$); }	identifier type_identifier string comment_spec
+
+%type <val>			time_spec
+
+%type <val>			type_identifier_list
+%type <datatype>		data_type
 
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
@@ -406,7 +416,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { handle_free(&$$); } table_spec tables_spec chain_spec chain_identifier ruleid_spec ruleset_spec
 %type <handle>			set_spec set_identifier
 %destructor { handle_free(&$$); } set_spec set_identifier
-%type <val>			handle_spec family_spec family_spec_explicit position_spec
+%type <val>			handle_spec family_spec family_spec_explicit position_spec chain_policy
 
 %type <table>			table_block_alloc table_block
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
@@ -449,6 +459,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			queue_stmt queue_stmt_alloc
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
 %type <val>			queue_stmt_flags queue_stmt_flag
+%type <stmt>			set_stmt
+%destructor { stmt_free($$); }	set_stmt
+%type <val>			set_stmt_op
 
 %type <expr>			symbol_expr verdict_expr integer_expr
 %destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr
@@ -465,10 +478,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { expr_free($$); }	prefix_expr range_expr wildcard_expr
 %type <expr>			list_expr
 %destructor { expr_free($$); }	list_expr
-%type <expr>			concat_expr map_lhs_expr
-%destructor { expr_free($$); }	concat_expr map_lhs_expr
-%type <expr>			error_expr
-%destructor { expr_free($$); }	error_expr
+%type <expr>			concat_expr
+%destructor { expr_free($$); }	concat_expr
 
 %type <expr>			map_expr
 %destructor { expr_free($$); }	map_expr
@@ -481,6 +492,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %type <expr>			set_expr set_list_expr set_list_member_expr
 %destructor { expr_free($$); }	set_expr set_list_expr set_list_member_expr
+%type <expr>			set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
+%destructor { expr_free($$); }	set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
 
 %type <expr>			expr initializer_expr
 %destructor { expr_free($$); }	expr initializer_expr
@@ -829,12 +842,12 @@ monitor_object		:	/* empty */	{ $$ = CMD_MONITOR_OBJ_ANY; }
 			|	ELEMENTS	{ $$ = CMD_MONITOR_OBJ_ELEMS; }
 			;
 
-monitor_format		:	/* empty */	{ $$ = NFT_OUTPUT_DEFAULT; }
+monitor_format		:	/* empty */	{ $$ = NFTNL_OUTPUT_DEFAULT; }
 			|	export_format
 			;
 
-export_format		: 	XML 		{ $$ = NFT_OUTPUT_XML; }
-			|	JSON		{ $$ = NFT_OUTPUT_JSON; }
+export_format		: 	XML 		{ $$ = NFTNL_OUTPUT_XML; }
+			|	JSON		{ $$ = NFTNL_OUTPUT_JSON; }
 			;
 
 describe_cmd		:	primary_expr
@@ -852,9 +865,22 @@ table_block_alloc	:	/* empty */
 			}
 			;
 
+table_options		:	FLAGS		STRING
+			{
+				if (strcmp($2, "dormant") == 0) {
+					$<table>0->flags = TABLE_F_DORMANT;
+				} else {
+					erec_queue(error(&@2, "unknown table option %s", $2),
+						   state->msgs);
+					YYERROR;
+				}
+			}
+			;
+
 table_block		:	/* empty */	{ $$ = $<table>-1; }
 			|	table_block	common_block
 			|	table_block	stmt_seperator
+			|	table_block	table_options	stmt_seperator
 			|	table_block	CHAIN		chain_identifier
 					chain_block_alloc	'{' 	chain_block	'}'
 					stmt_seperator
@@ -899,6 +925,7 @@ chain_block		:	/* empty */	{ $$ = $<chain>-1; }
 			|	chain_block	common_block
 	     		|	chain_block	stmt_seperator
 			|	chain_block	hook_spec	stmt_seperator
+			|	chain_block	policy_spec	stmt_seperator
 			|	chain_block	rule		stmt_seperator
 			{
 				list_add_tail(&$2->list, &$1->rules);
@@ -915,19 +942,24 @@ set_block_alloc		:	/* empty */
 set_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	set_block	common_block
 			|	set_block	stmt_seperator
-			|	set_block	TYPE		identifier	stmt_seperator
+			|	set_block	TYPE		data_type	stmt_seperator
 			{
-				$1->keytype = datatype_lookup_byname($3);
-				if ($1->keytype == NULL) {
-					erec_queue(error(&@3, "unknown datatype %s", $3),
-						   state->msgs);
-					YYERROR;
-				}
+				$1->keytype = $3;
 				$$ = $1;
 			}
 			|	set_block	FLAGS		set_flag_list	stmt_seperator
 			{
 				$1->flags = $3;
+				$$ = $1;
+			}
+			|	set_block	TIMEOUT		time_spec	stmt_seperator
+			{
+				$1->timeout = $3 * 1000;
+				$$ = $1;
+			}
+			|	set_block	GC_INTERVAL	time_spec	stmt_seperator
+			{
+				$1->gc_int = $3 * 1000;
 				$$ = $1;
 			}
 			|	set_block	ELEMENTS	'='		set_expr
@@ -947,6 +979,7 @@ set_flag_list		:	set_flag_list	COMMA		set_flag
 
 set_flag		:	CONSTANT	{ $$ = SET_F_CONSTANT; }
 			|	INTERVAL	{ $$ = SET_F_INTERVAL; }
+			|	TIMEOUT		{ $$ = SET_F_TIMEOUT; }
 			;
 
 map_block_alloc		:	/* empty */
@@ -960,23 +993,11 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	common_block
 			|	map_block	stmt_seperator
 			|	map_block	TYPE
-						identifier	COLON	identifier
+						data_type	COLON	data_type
 						stmt_seperator
 			{
-				$1->keytype = datatype_lookup_byname($3);
-				if ($1->keytype == NULL) {
-					erec_queue(error(&@3, "unknown datatype %s", $3),
-						   state->msgs);
-					YYERROR;
-				}
-
-				$1->datatype = datatype_lookup_byname($5);
-				if ($1->datatype == NULL) {
-					erec_queue(error(&@5, "unknown datatype %s", $5),
-						   state->msgs);
-					YYERROR;
-				}
-
+				$1->keytype  = $3;
+				$1->datatype = $5;
 				$$ = $1;
 			}
 			|	map_block	FLAGS		set_flag_list	stmt_seperator
@@ -1004,6 +1025,41 @@ set_mechanism		:	POLICY		set_policy_spec
 
 set_policy_spec		:	PERFORMANCE	{ $$ = NFT_SET_POL_PERFORMANCE; }
 			|	MEMORY		{ $$ = NFT_SET_POL_MEMORY; }
+			;
+
+data_type		:	type_identifier_list
+			{
+				if ($1 & ~TYPE_MASK)
+					$$ = concat_type_alloc($1);
+				else
+					$$ = datatype_lookup($1);
+			}
+			;
+
+type_identifier_list	:	type_identifier
+			{
+				const struct datatype *dtype = datatype_lookup_byname($1);
+				if (dtype == NULL) {
+					erec_queue(error(&@1, "unknown datatype %s", $1),
+						   state->msgs);
+					YYERROR;
+				}
+				$$ = dtype->type;
+			}
+			|	type_identifier_list	DOT	type_identifier
+			{
+				const struct datatype *dtype = datatype_lookup_byname($3);
+				if (dtype == NULL) {
+					erec_queue(error(&@3, "unknown datatype %s", $3),
+						   state->msgs);
+					YYERROR;
+				}
+				$$ = concat_subtype_add($$, dtype->type);
+			}
+			;
+
+type_identifier		:	STRING	{ $$ = $1; }
+			|	MARK	{ $$ = xstrdup("mark"); }
 			;
 
 hook_spec		:	TYPE		STRING		HOOK		STRING		PRIORITY	NUM
@@ -1040,6 +1096,52 @@ hook_spec		:	TYPE		STRING		HOOK		STRING		PRIORITY	NUM
 				$<chain>0->priority	= -$7;
 				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
 			}
+			|	TYPE		STRING		HOOK		STRING		DEVICE	STRING	PRIORITY	NUM
+			{
+				$<chain>0->type		= chain_type_name_lookup($2);
+				if ($<chain>0->type == NULL) {
+					erec_queue(error(&@2, "unknown chain type %s", $2),
+						   state->msgs);
+					YYERROR;
+				}
+				$<chain>0->hookstr	= chain_hookname_lookup($4);
+				if ($<chain>0->hookstr == NULL) {
+					erec_queue(error(&@4, "unknown chain hook %s", $4),
+						   state->msgs);
+					YYERROR;
+				}
+				$<chain>0->dev		= $6;
+				$<chain>0->priority	= $8;
+				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
+			}
+			|	TYPE		STRING		HOOK		STRING		DEVICE	STRING	PRIORITY	DASH	NUM
+			{
+				$<chain>0->type		= chain_type_name_lookup($2);
+				if ($<chain>0->type == NULL) {
+					erec_queue(error(&@2, "unknown type name %s", $2),
+						   state->msgs);
+					YYERROR;
+				}
+				$<chain>0->hookstr	= chain_hookname_lookup($4);
+				$<chain>0->dev		= $6;
+				$<chain>0->priority	= -$9;
+				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
+			}
+			;
+
+policy_spec		:	POLICY		chain_policy
+			{
+				if ($<chain>0->policy != -1) {
+					erec_queue(error(&@$, "you cannot set chain policy twice"),
+						   state->msgs);
+					YYERROR;
+				}
+				$<chain>0->policy	= $2;
+			}
+			;
+
+chain_policy		:	ACCEPT		{ $$ = NF_ACCEPT; }
+			|	DROP		{ $$ = NF_DROP;   }
 			;
 
 identifier		:	STRING
@@ -1047,6 +1149,20 @@ identifier		:	STRING
 
 string			:	STRING
 			|	QUOTED_STRING
+			;
+
+time_spec		:	STRING
+			{
+				struct error_record *erec;
+				uint64_t res;
+
+				erec = time_parse(&@1, $1, &res);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+				$$ = res;
+			}
 			;
 
 family_spec		:	/* empty */		{ $$ = NFPROTO_IPV4; }
@@ -1058,6 +1174,7 @@ family_spec_explicit	:	IP		{ $$ = NFPROTO_IPV4; }
 			|	INET		{ $$ = NFPROTO_INET; }
 			|	ARP		{ $$ = NFPROTO_ARP; }
 			|	BRIDGE		{ $$ = NFPROTO_BRIDGE; }
+			|	NETDEV		{ $$ = NFPROTO_NETDEV; }
 			;
 
 table_spec		:	family_spec	identifier
@@ -1192,6 +1309,7 @@ stmt			:	verdict_stmt
 			|	ct_stmt
 			|	masq_stmt
 			|	redir_stmt
+			|	set_stmt
 			;
 
 verdict_stmt		:	verdict_expr
@@ -1237,12 +1355,11 @@ verdict_map_list_expr	:	verdict_map_list_member_expr
 			|	verdict_map_list_expr	COMMA	opt_newline
 			;
 
-verdict_map_list_member_expr:	opt_newline	map_lhs_expr	COLON	verdict_expr	opt_newline
+verdict_map_list_member_expr:	opt_newline	set_elem_expr	COLON	verdict_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
 			}
 			;
-
 
 counter_stmt		:	counter_stmt_alloc
 			|	counter_stmt_alloc	counter_args
@@ -1505,6 +1622,19 @@ queue_stmt_flag		:	BYPASS	{ $$ = NFT_QUEUE_FLAG_BYPASS; }
 			|	FANOUT	{ $$ = NFT_QUEUE_FLAG_CPU_FANOUT; }
 			;
 
+set_stmt		:	SET	set_stmt_op	set_elem_expr	symbol_expr
+			{
+				$$ = set_stmt_alloc(&@$);
+				$$->set.op  = $2;
+				$$->set.key = $3;
+				$$->set.set = $4;
+			}
+			;
+
+set_stmt_op		:	ADD	{ $$ = NFT_DYNSET_OP_ADD; }
+			|	UPDATE	{ $$ = NFT_DYNSET_OP_UPDATE; }
+			;
+
 match_stmt		:	relational_expr
 			{
 				$$ = expr_stmt_alloc(&@$, $1);
@@ -1658,10 +1788,6 @@ multiton_expr		:	prefix_expr
 			|	wildcard_expr
 			;
 
-map_lhs_expr		:	multiton_expr
-			|	concat_expr
-			;
-
 map_expr		:	concat_expr	MAP	expr
 			{
 				$$ = map_expr_alloc(&@$, $1, $3);
@@ -1669,19 +1795,9 @@ map_expr		:	concat_expr	MAP	expr
 			;
 
 expr			:	concat_expr
+			|	multiton_expr
 			|	set_expr
 			|       map_expr
-			|	multiton_expr
-			|	error_expr
-			;
-
-error_expr		:	ERROR
-			{
-				$$ = NULL;
-				erec_queue(error(&@1, "bad value '%s'", $1),
-					   state->msgs);
-				YYERROR;
-			}
 			;
 
 set_expr		:	'{'	set_list_expr		'}'
@@ -1704,18 +1820,53 @@ set_list_expr		:	set_list_member_expr
 			|	set_list_expr		COMMA	opt_newline
 			;
 
-set_list_member_expr	:	opt_newline	expr	opt_newline
+set_list_member_expr	:	opt_newline	set_expr	opt_newline
 			{
 				$$ = $2;
 			}
-			|	opt_newline	map_lhs_expr	COLON	concat_expr	opt_newline
+			|	opt_newline	set_elem_expr	opt_newline
+			{
+				$$ = $2;
+			}
+			|	opt_newline	set_elem_expr	COLON	set_rhs_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
 			}
-			|	opt_newline	map_lhs_expr	COLON	verdict_expr	opt_newline
+			;
+
+set_elem_expr		:	set_elem_expr_alloc
+			|	set_elem_expr_alloc		set_elem_options
+			;
+
+set_elem_expr_alloc	:	set_lhs_expr
 			{
-				$$ = mapping_expr_alloc(&@$, $2, $4);
+				$$ = set_elem_expr_alloc(&@1, $1);
 			}
+			;
+
+set_elem_options	:	set_elem_option
+			{
+				$<expr>$	= $<expr>0;
+			}
+			|	set_elem_options	set_elem_option
+			;
+
+set_elem_option		:	TIMEOUT			time_spec
+			{
+				$<expr>0->timeout = $2 * 1000;
+			}
+			|	COMMENT			string
+			{
+				$<expr>0->comment = $2;
+			}
+			;
+
+set_lhs_expr		:	concat_expr
+			|	multiton_expr
+			;
+
+set_rhs_expr		:	concat_expr
+			|	verdict_expr
 			;
 
 initializer_expr	:	expr
@@ -1947,7 +2098,7 @@ ip_hdr_expr		:	IP	ip_hdr_field
 			}
 			;
 
-ip_hdr_field		:	VERSION		{ $$ = IPHDR_VERSION; }
+ip_hdr_field		:	HDRVERSION	{ $$ = IPHDR_VERSION; }
 			|	HDRLENGTH	{ $$ = IPHDR_HDRLENGTH; }
 			|	TOS		{ $$ = IPHDR_TOS; }
 			|	LENGTH		{ $$ = IPHDR_LENGTH; }
@@ -1994,7 +2145,7 @@ ip6_hdr_expr		:	IP6	ip6_hdr_field
 			}
 			;
 
-ip6_hdr_field		:	VERSION		{ $$ = IP6HDR_VERSION; }
+ip6_hdr_field		:	HDRVERSION	{ $$ = IP6HDR_VERSION; }
 			|	PRIORITY	{ $$ = IP6HDR_PRIORITY; }
 			|	FLOWLABEL	{ $$ = IP6HDR_FLOWLABEL; }
 			|	LENGTH		{ $$ = IP6HDR_LENGTH; }

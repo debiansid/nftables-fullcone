@@ -6,10 +6,6 @@ Files: *
 Copyright: 2008 Patrick McHardy <kaber@trash.net>
 License: GPL-2
 
-Files: debian/*
-Copyright: 2014 Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
-License: GPL-2
-
 Files: src/netlink.c
 Copyright: 2008-2012 Patrick McHardy <kaber@trash.net>
 	   2013 Pablo Neira Ayuso <pablo@netfilter.org>

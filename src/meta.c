@@ -30,6 +30,7 @@
 #include <gmputil.h>
 #include <utils.h>
 #include <erec.h>
+#include <iface.h>
 
 static struct symbol_table *realm_tbl;
 static void __init realm_table_init(void)
@@ -138,7 +139,7 @@ static void ifindex_type_print(const struct expr *expr)
 	int ifindex;
 
 	ifindex = mpz_get_uint32(expr->value);
-	if (if_indextoname(ifindex, name))
+	if (nft_if_indextoname(ifindex, name))
 		printf("%s", name);
 	else
 		printf("%d", ifindex);
@@ -149,7 +150,7 @@ static struct error_record *ifindex_type_parse(const struct expr *sym,
 {
 	int ifindex;
 
-	ifindex = if_nametoindex(sym->identifier);
+	ifindex = nft_if_nametoindex(sym->identifier);
 	if (ifindex == 0)
 		return error(&sym->location, "Interface does not exist");
 
@@ -415,20 +416,26 @@ static const struct meta_template meta_templates[] = {
 						BYTEORDER_HOST_ENDIAN),
 };
 
-static void meta_expr_print(const struct expr *expr)
+static bool meta_key_is_qualified(enum nft_meta_keys key)
 {
-	switch (expr->meta.key) {
+	switch (key) {
 	case NFT_META_LEN:
 	case NFT_META_NFPROTO:
 	case NFT_META_L4PROTO:
 	case NFT_META_PROTOCOL:
 	case NFT_META_PRIORITY:
-		printf("meta %s", meta_templates[expr->meta.key].token);
-		break;
+		return true;
 	default:
-		printf("%s", meta_templates[expr->meta.key].token);
-		break;
+		return false;
 	}
+}
+
+static void meta_expr_print(const struct expr *expr)
+{
+	if (meta_key_is_qualified(expr->meta.key))
+		printf("meta %s", meta_templates[expr->meta.key].token);
+	else
+		printf("%s", meta_templates[expr->meta.key].token);
 }
 
 static bool meta_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -529,7 +536,11 @@ struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
 
 static void meta_stmt_print(const struct stmt *stmt)
 {
-	printf("meta %s set ", meta_templates[stmt->meta.key].token);
+	if (meta_key_is_qualified(stmt->meta.key))
+		printf("meta %s set ", meta_templates[stmt->meta.key].token);
+	else
+		printf("%s set ", meta_templates[stmt->meta.key].token);
+
 	expr_print(stmt->meta.expr);
 }
 
@@ -559,4 +570,5 @@ static void __init meta_init(void)
 	datatype_register(&uid_type);
 	datatype_register(&gid_type);
 	datatype_register(&devgroup_type);
+	datatype_register(&pkttype_type);
 }

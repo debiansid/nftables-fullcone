@@ -85,6 +85,7 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	base = ctx->protocol[left->payload.base].desc;
 	desc = proto_find_upper(base, proto);
 
+	assert(left->payload.base + 1 <= PROTO_BASE_MAX);
 	proto_ctx_update(ctx, left->payload.base + 1, &expr->location, desc);
 }
 
@@ -203,20 +204,24 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 		switch (ctx->pctx.family) {
 		case NFPROTO_INET:
 			switch (expr->payload.base) {
-			case PROTO_BASE_TRANSPORT_HDR:
-				desc = &proto_inet_service;
-				break;
 			case PROTO_BASE_LL_HDR:
 				desc = &proto_inet;
+				break;
+			case PROTO_BASE_TRANSPORT_HDR:
+				desc = &proto_inet_service;
 				break;
 			default:
 				break;
 			}
 			break;
 		case NFPROTO_BRIDGE:
+		case NFPROTO_NETDEV:
 			switch (expr->payload.base) {
 			case PROTO_BASE_LL_HDR:
 				desc = &proto_eth;
+				break;
+			case PROTO_BASE_TRANSPORT_HDR:
+				desc = &proto_inet_service;
 				break;
 			default:
 				break;

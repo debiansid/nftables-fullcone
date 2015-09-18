@@ -63,6 +63,10 @@ extern void symbol_bind(struct scope *scope, const char *identifier,
 extern struct symbol *symbol_lookup(const struct scope *scope,
 				    const char *identifier);
 
+enum table_flags {
+	TABLE_F_DORMANT		= (1 << 0),
+};
+
 /**
  * struct table - nftables table
  *
@@ -71,6 +75,8 @@ extern struct symbol *symbol_lookup(const struct scope *scope,
  * @location:	location the table was defined at
  * @chains:	chains contained in the table
  * @sets:	sets contained in the table
+ * @flags:	table flags
+ * @refcnt:	table reference counter
  */
 struct table {
 	struct list_head	list;
@@ -79,9 +85,12 @@ struct table {
 	struct scope		scope;
 	struct list_head	chains;
 	struct list_head	sets;
+	enum table_flags 	flags;
+	unsigned int		refcnt;
 };
 
 extern struct table *table_alloc(void);
+extern struct table *table_get(struct table *table);
 extern void table_free(struct table *table);
 extern void table_add_hash(struct table *table);
 extern struct table *table_lookup(const struct handle *h);
@@ -101,22 +110,28 @@ enum chain_flags {
  * @list:	list node in table list
  * @handle:	chain handle
  * @location:	location the chain was defined at
+ * @refcnt:	reference counter
  * @flags:	chain flags
  * @hookstr:	unified and human readable hook name (base chains)
  * @hooknum:	hook number (base chains)
  * @priority:	hook priority (base chains)
+ * @policy:	default chain policy (base chains)
  * @type:	chain type
+ * @dev:	device (if any)
  * @rules:	rules contained in the chain
  */
 struct chain {
 	struct list_head	list;
 	struct handle		handle;
 	struct location		location;
+	unsigned int		refcnt;
 	uint32_t		flags;
 	const char		*hookstr;
 	unsigned int		hooknum;
 	int			priority;
+	int			policy;
 	const char		*type;
+	const char		*dev;
 	struct scope		scope;
 	struct list_head	rules;
 };
@@ -124,12 +139,14 @@ struct chain {
 extern const char *chain_type_name_lookup(const char *name);
 extern const char *chain_hookname_lookup(const char *name);
 extern struct chain *chain_alloc(const char *name);
+extern struct chain *chain_get(struct chain *chain);
 extern void chain_free(struct chain *chain);
 extern void chain_add_hash(struct chain *chain, struct table *table);
 extern struct chain *chain_lookup(const struct table *table,
 				  const struct handle *h);
 
 extern const char *family2str(unsigned int family);
+extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
 extern void chain_print_plain(const struct chain *chain);
 
 /**
@@ -165,6 +182,7 @@ enum set_flags {
 	SET_F_CONSTANT		= 0x2,
 	SET_F_INTERVAL		= 0x4,
 	SET_F_MAP		= 0x8,
+	SET_F_TIMEOUT		= 0x10,
 };
 
 /**
@@ -175,6 +193,8 @@ enum set_flags {
  * @location:	location the set was defined/declared at
  * @refcnt:	reference count
  * @flags:	bitmask of set flags
+ * @gc_int:	garbage collection interval
+ * @timeout:	default timeout value
  * @keytype:	key data type
  * @keylen:	key length
  * @datatype:	mapping data type
@@ -189,6 +209,8 @@ struct set {
 	struct location		location;
 	unsigned int		refcnt;
 	uint32_t		flags;
+	uint32_t		gc_int;
+	uint64_t		timeout;
 	const struct datatype	*keytype;
 	unsigned int		keylen;
 	const struct datatype	*datatype;
@@ -203,7 +225,6 @@ struct set {
 extern struct set *set_alloc(const struct location *loc);
 extern struct set *set_get(struct set *set);
 extern void set_free(struct set *set);
-extern struct set *set_clone(const struct set *set);
 extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
@@ -344,6 +365,7 @@ extern void cmd_free(struct cmd *cmd);
  * @msgs:	message queue
  * @cmd:	current command
  * @table:	current table
+ * @rule:	current rule
  * @set:	current set
  * @stmt:	current statement
  * @ectx:	expression context
@@ -353,6 +375,7 @@ struct eval_ctx {
 	struct list_head	*msgs;
 	struct cmd		*cmd;
 	struct table		*table;
+	struct rule		*rule;
 	struct set		*set;
 	struct stmt		*stmt;
 	struct expr_ctx		ectx;
@@ -365,5 +388,8 @@ extern struct error_record *rule_postprocess(struct rule *rule);
 
 struct netlink_ctx;
 extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
+
+extern int cache_update(enum cmd_ops cmd, struct list_head *msgs);
+extern void cache_release(void);
 
 #endif /* NFTABLES_RULE_H */

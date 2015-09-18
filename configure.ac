@@ -4,7 +4,7 @@
 AC_PREREQ(2.61)
 
 AC_COPYRIGHT([Copyright (c) 2008 Patrick McHardy <kaber@trash.net>])
-AC_INIT([nftables], [0.4], [netfilter-devel@vger.kernel.org])
+AC_INIT([nftables], [0.5], [netfilter-devel@vger.kernel.org])
 AC_DEFINE([RELEASE_NAME], ["Support Edward Snowden"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
@@ -23,8 +23,8 @@ AC_DEFINE([_GNU_SOURCE], [], [Enable various GNU extensions])
 AC_DEFINE([_STDC_FORMAT_MACROS], [], [printf-style format macros])
 
 AC_ARG_ENABLE([debug],
-	      AS_HELP_STRING([--enable-debug], [Enable debugging]),
-	      [with_debug=no],
+	      AS_HELP_STRING([--enable-debug], [Disable debugging]),
+	      AS_IF([test "x$enable_debug" = "xno"], [with_debug=no], [with_debug=yes]),
 	      [with_debug=yes])
 AC_SUBST(with_debug)
 AM_CONDITIONAL([BUILD_DEBUG], [test "x$with_debug" != xno])
@@ -71,10 +71,15 @@ AM_CONDITIONAL([BUILD_PDF], [test "$DBLATEX" == "found"])
 
 # Checks for libraries.
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.2])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.5])
 
-AC_CHECK_LIB([gmp], [__gmpz_init], ,
-	     AC_MSG_ERROR([No suitable version of libgmp found]))
+AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
+            [Use builtin mini-gmp (for embedded builds)])], [],
+            [with_mini_gmp=no])
+AS_IF([test "x$with_mini_gmp" != xyes], [
+AC_CHECK_LIB([gmp],[__gmpz_init], , AC_MSG_ERROR([No suitable version of libgmp found]))
+])
+AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" == xyes])
 
 AC_ARG_WITH([cli], [AS_HELP_STRING([--without-cli],
             [disable interactive CLI (libreadline support)])],
@@ -130,4 +135,5 @@ AC_OUTPUT
 echo "
 nft configuration:
   cli support:			${with_cli}
-  enable debugging:		${with_debug}"
+  enable debugging:		${with_debug}
+  use mini-gmp:			${with_mini_gmp}"

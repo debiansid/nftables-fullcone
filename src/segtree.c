@@ -190,7 +190,7 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 	rei = ei_lookup(tree, new->right);
 
 	if (segtree_debug())
-		pr_debug("insert: [%Zx %Zx]\n", new->left, new->right);
+		pr_gmp_debug("insert: [%Zx %Zx]\n", new->left, new->right);
 
 	if (lei != NULL && rei != NULL && lei == rei) {
 		/*
@@ -200,7 +200,7 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 		 * [lei_left, new_left) and (new_right, rei_right]
 		 */
 		if (segtree_debug())
-			pr_debug("split [%Zx %Zx]\n", lei->left, lei->right);
+			pr_gmp_debug("split [%Zx %Zx]\n", lei->left, lei->right);
 
 		ei_remove(tree, lei);
 
@@ -220,8 +220,8 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 			 * [lei_left, new_left)[new_left, new_right]
 			 */
 			if (segtree_debug()) {
-				pr_debug("adjust left [%Zx %Zx]\n",
-					 lei->left, lei->right);
+				pr_gmp_debug("adjust left [%Zx %Zx]\n",
+					     lei->left, lei->right);
 			}
 
 			mpz_sub_ui(lei->right, new->left, 1);
@@ -238,8 +238,8 @@ static void ei_insert(struct seg_tree *tree, struct elementary_interval *new)
 			 * [new_left, new_right](new_right, rei_right]
 			 */
 			if (segtree_debug()) {
-				pr_debug("adjust right [%Zx %Zx]\n",
-					 rei->left, rei->right);
+				pr_gmp_debug("adjust right [%Zx %Zx]\n",
+					     rei->left, rei->right);
 			}
 
 			mpz_add_ui(rei->left, new->right, 1);
@@ -358,7 +358,7 @@ static void segtree_linearize(struct list_head *list, struct seg_tree *tree)
 	 */
 	rb_for_each_entry_safe(ei, node, next, &tree->root, rb_node) {
 		if (segtree_debug())
-			pr_debug("iter: [%Zx %Zx]\n", ei->left, ei->right);
+			pr_gmp_debug("iter: [%Zx %Zx]\n", ei->left, ei->right);
 
 		if (prev == NULL) {
 			/*
@@ -419,6 +419,7 @@ static void set_insert_interval(struct expr *set, struct seg_tree *tree,
 	expr = constant_expr_alloc(&internal_location, tree->keytype,
 				   tree->byteorder, tree->keylen, NULL);
 	mpz_set(expr->value, ei->left);
+	expr = set_elem_expr_alloc(&internal_location, expr);
 
 	if (ei->expr != NULL && ei->expr->ops->type == EXPR_MAPPING)
 		expr = mapping_expr_alloc(&ei->expr->location, expr,
@@ -443,9 +444,9 @@ int set_to_intervals(struct list_head *errs, struct set *set)
 
 	list_for_each_entry_safe(ei, next, &list, list) {
 		if (segtree_debug()) {
-			pr_debug("list: [%.*Zx %.*Zx]\n",
-				 2 * tree.keylen / BITS_PER_BYTE, ei->left,
-				 2 * tree.keylen / BITS_PER_BYTE, ei->right);
+			pr_gmp_debug("list: [%.*Zx %.*Zx]\n",
+				     2 * tree.keylen / BITS_PER_BYTE, ei->left,
+				     2 * tree.keylen / BITS_PER_BYTE, ei->right);
 		}
 		set_insert_interval(set->init, &tree, ei);
 		ei_destroy(ei);
@@ -453,7 +454,7 @@ int set_to_intervals(struct list_head *errs, struct set *set)
 
 	if (segtree_debug()) {
 		expr_print(set->init);
-		pr_debug("\n");
+		pr_gmp_debug("\n");
 	}
 	return 0;
 }
@@ -473,9 +474,9 @@ extern void interval_map_decompose(struct expr *set);
 static struct expr *expr_value(struct expr *expr)
 {
 	if (expr->ops->type == EXPR_MAPPING)
-		return expr->left;
+		return expr->left->key;
 	else
-		return expr;
+		return expr->key;
 }
 
 static int expr_value_cmp(const void *p1, const void *p2)
@@ -565,6 +566,7 @@ void interval_map_decompose(struct expr *set)
 			mpz_set(tmp->value, range);
 
 			tmp = range_expr_alloc(&low->location, expr_value(low), tmp);
+			tmp = set_elem_expr_alloc(&low->location, tmp);
 			if (low->ops->type == EXPR_MAPPING)
 				tmp = mapping_expr_alloc(&tmp->location, tmp, low->right);
 
@@ -576,6 +578,7 @@ void interval_map_decompose(struct expr *set)
 			prefix_len = expr_value(i)->len - mpz_scan0(range, 0);
 			prefix = prefix_expr_alloc(&low->location, expr_value(low),
 						   prefix_len);
+			prefix = set_elem_expr_alloc(&low->location, prefix);
 			if (low->ops->type == EXPR_MAPPING)
 				prefix = mapping_expr_alloc(&low->location, prefix,
 							    low->right);
@@ -598,6 +601,7 @@ void interval_map_decompose(struct expr *set)
 		mpz_init_bitmask(i->value, i->len);
 
 		i = range_expr_alloc(&low->location, expr_value(low), i);
+		i = set_elem_expr_alloc(&low->location, i);
 		if (low->ops->type == EXPR_MAPPING)
 			i = mapping_expr_alloc(&i->location, i, low->right);
 

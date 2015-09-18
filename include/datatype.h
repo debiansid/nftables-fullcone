@@ -82,6 +82,9 @@ enum datatypes {
 };
 #define TYPE_MAX		(__TYPE_MAX - 1)
 
+#define TYPE_BITS		6
+#define TYPE_MASK		((1 << TYPE_BITS) - 1)
+
 /**
  * enum byteorder
  *
@@ -115,6 +118,7 @@ enum datatype_flags {
  * @byteorder:	byteorder of type (non-basetypes only)
  * @flags:	flags
  * @size:	type size (fixed sized non-basetypes only)
+ * @subtypes:	number of subtypes (concat type)
  * @name:	type name
  * @desc:	type description
  * @basetype:	basetype for subtypes, determines type compatibilty
@@ -128,6 +132,7 @@ struct datatype {
 	enum byteorder			byteorder;
 	unsigned int			flags;
 	unsigned int			size;
+	unsigned int			subtypes;
 	const char			*name;
 	const char			*desc;
 	const struct datatype		*basetype;
@@ -207,7 +212,27 @@ extern const struct datatype icmpv6_code_type;
 extern const struct datatype icmpx_code_type;
 extern const struct datatype time_type;
 
-extern const struct datatype *concat_type_alloc(const struct expr *expr);
+extern const struct datatype *concat_type_alloc(uint32_t type);
 extern void concat_type_destroy(const struct datatype *dtype);
+
+static inline uint32_t concat_subtype_add(uint32_t type, uint32_t subtype)
+{
+	return type << TYPE_BITS | subtype;
+}
+
+static inline uint32_t concat_subtype_id(uint32_t type, unsigned int n)
+{
+	return (type >> TYPE_BITS * n) & TYPE_MASK;
+}
+
+static inline const struct datatype *
+concat_subtype_lookup(uint32_t type, unsigned int n)
+{
+	return datatype_lookup(concat_subtype_id(type, n));
+}
+
+extern void time_print(uint64_t seconds);
+extern struct error_record *time_parse(const struct location *loc,
+				       const char *c, uint64_t *res);
 
 #endif /* NFTABLES_DATATYPE_H */

@@ -858,6 +858,11 @@ static void set_ref_expr_print(const struct expr *expr)
 		printf("@%s", expr->set->handle.set);
 }
 
+static void set_ref_expr_clone(struct expr *new, const struct expr *expr)
+{
+	new->set = set_get(expr->set);
+}
+
 static void set_ref_expr_destroy(struct expr *expr)
 {
 	set_free(expr->set);
@@ -867,6 +872,7 @@ static const struct expr_ops set_ref_expr_ops = {
 	.type		= EXPR_SET_REF,
 	.name		= "set reference",
 	.print		= set_ref_expr_print,
+	.clone		= set_ref_expr_clone,
 	.destroy	= set_ref_expr_destroy,
 };
 
@@ -877,6 +883,44 @@ struct expr *set_ref_expr_alloc(const struct location *loc, struct set *set)
 	expr = expr_alloc(loc, &set_ref_expr_ops, set->keytype, 0, 0);
 	expr->set = set_get(set);
 	expr->flags |= EXPR_F_CONSTANT;
+	return expr;
+}
+
+static void set_elem_expr_print(const struct expr *expr)
+{
+	expr_print(expr->key);
+	if (expr->timeout) {
+		printf(" timeout ");
+		time_print(expr->timeout / 1000);
+	}
+	if (expr->expiration) {
+		printf(" expires ");
+		time_print(expr->expiration / 1000);
+	}
+	if (expr->comment)
+		printf(" comment \"%s\"", expr->comment);
+}
+
+static void set_elem_expr_destroy(struct expr *expr)
+{
+	xfree(expr->comment);
+	expr_free(expr->key);
+}
+
+static const struct expr_ops set_elem_expr_ops = {
+	.type		= EXPR_SET_ELEM,
+	.name		= "set element",
+	.print		= set_elem_expr_print,
+	.destroy	= set_elem_expr_destroy,
+};
+
+struct expr *set_elem_expr_alloc(const struct location *loc, struct expr *key)
+{
+	struct expr *expr;
+
+	expr = expr_alloc(loc, &set_elem_expr_ops, key->dtype,
+			  key->byteorder, key->len);
+	expr->key = key;
 	return expr;
 }
 
@@ -891,6 +935,8 @@ void range_expr_value_low(mpz_t rop, const struct expr *expr)
 		return range_expr_value_low(rop, expr->left);
 	case EXPR_MAPPING:
 		return range_expr_value_low(rop, expr->left);
+	case EXPR_SET_ELEM:
+		return range_expr_value_low(rop, expr->key);
 	default:
 		BUG("invalid range expression type %s\n", expr->ops->name);
 	}
@@ -913,6 +959,8 @@ void range_expr_value_high(mpz_t rop, const struct expr *expr)
 		return range_expr_value_high(rop, expr->right);
 	case EXPR_MAPPING:
 		return range_expr_value_high(rop, expr->left);
+	case EXPR_SET_ELEM:
+		return range_expr_value_high(rop, expr->key);
 	default:
 		BUG("invalid range expression type %s\n", expr->ops->name);
 	}

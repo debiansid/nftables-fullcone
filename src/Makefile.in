@@ -54,6 +54,7 @@ host_triplet = @host@
 sbin_PROGRAMS = nft$(EXEEXT)
 @BUILD_DEBUG_TRUE@am__append_1 = -g -DDEBUG
 @BUILD_CLI_TRUE@am__append_2 = cli.c
+@BUILD_MINIGMP_TRUE@am__append_3 = mini-gmp.c
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	parser_bison.c parser_bison.h scanner.c
@@ -70,17 +71,19 @@ PROGRAMS = $(sbin_PROGRAMS)
 am__nft_SOURCES_DIST = main.c rule.c statement.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c meta.c ct.c \
 	netlink.c netlink_linearize.c netlink_delinearize.c segtree.c \
-	rbtree.c gmputil.c utils.c erec.c mnl.c scanner.l \
-	parser_bison.y cli.c
+	rbtree.c gmputil.c utils.c erec.c mnl.c iface.c scanner.l \
+	parser_bison.y cli.c mini-gmp.c
 @BUILD_CLI_TRUE@am__objects_1 = cli.$(OBJEXT)
+@BUILD_MINIGMP_TRUE@am__objects_2 = mini-gmp.$(OBJEXT)
 am_nft_OBJECTS = main.$(OBJEXT) rule.$(OBJEXT) statement.$(OBJEXT) \
 	datatype.$(OBJEXT) expression.$(OBJEXT) evaluate.$(OBJEXT) \
 	proto.$(OBJEXT) payload.$(OBJEXT) exthdr.$(OBJEXT) \
 	meta.$(OBJEXT) ct.$(OBJEXT) netlink.$(OBJEXT) \
 	netlink_linearize.$(OBJEXT) netlink_delinearize.$(OBJEXT) \
 	segtree.$(OBJEXT) rbtree.$(OBJEXT) gmputil.$(OBJEXT) \
-	utils.$(OBJEXT) erec.$(OBJEXT) mnl.$(OBJEXT) scanner.$(OBJEXT) \
-	parser_bison.$(OBJEXT) $(am__objects_1)
+	utils.$(OBJEXT) erec.$(OBJEXT) mnl.$(OBJEXT) iface.$(OBJEXT) \
+	scanner.$(OBJEXT) parser_bison.$(OBJEXT) $(am__objects_1) \
+	$(am__objects_2)
 nft_OBJECTS = $(am_nft_OBJECTS)
 am__DEPENDENCIES_1 =
 nft_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -253,8 +256,8 @@ BUILT_SOURCES = parser_bison.h
 nft_SOURCES = main.c rule.c statement.c datatype.c expression.c \
 	evaluate.c proto.c payload.c exthdr.c meta.c ct.c netlink.c \
 	netlink_linearize.c netlink_delinearize.c segtree.c rbtree.c \
-	gmputil.c utils.c erec.c mnl.c scanner.l parser_bison.y \
-	$(am__append_2)
+	gmputil.c utils.c erec.c mnl.c iface.c scanner.l \
+	parser_bison.y $(am__append_2) $(am__append_3)
 nft_LDADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS}
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -352,8 +355,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/expression.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exthdr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/meta.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mini-gmp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mnl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_delinearize.Po@am__quote@
@@ -604,6 +609,8 @@ uninstall-am: uninstall-sbinPROGRAMS
 
 # yacc and lex generate dirty code
 parser_bison.o scanner.o: AM_CFLAGS += -Wno-missing-prototypes -Wno-missing-declarations -Wno-implicit-function-declaration -Wno-nested-externs -Wno-undef -Wno-redundant-decls
+
+@BUILD_MINIGMP_TRUE@mini-gmp.o: AM_CFLAGS += -Wno-sign-compare
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

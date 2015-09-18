@@ -117,6 +117,8 @@ quotedstring	\"[^"]*\"
 comment		#.*$
 slash		\/
 
+timestring	([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?
+
 hex4		([[:xdigit:]]{1,4})
 v680		(({hex4}:){7}{hex4})
 v670		((:)((:{hex4}){7}))
@@ -231,6 +233,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "describe"		{ return DESCRIBE; }
 
 "hook"			{ return HOOK; }
+"device"		{ return DEVICE; }
 "table"			{ return TABLE; }
 "tables"		{ return TABLES; }
 "chain"			{ return CHAIN; }
@@ -253,8 +256,10 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "to"			{ return TO; }
 
 "inet"			{ return INET; }
+"netdev"		{ return NETDEV; }
 
 "add"			{ return ADD; }
+"update"		{ return UPDATE; }
 "create"		{ return CREATE; }
 "insert"		{ return INSERT; }
 "delete"		{ return DELETE; }
@@ -269,6 +274,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "constant"		{ return CONSTANT; }
 "interval"		{ return INTERVAL; }
+"timeout"		{ return TIMEOUT; }
+"gc-interval"		{ return GC_INTERVAL; }
 "elements"		{ return ELEMENTS; }
 
 "policy"		{ return POLICY; }
@@ -349,7 +356,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "operation"		{ return OPERATION; }
 
 "ip"			{ return IP; }
-"version"		{ return VERSION; }
+"version"		{ return HDRVERSION; }
 "hdrlength"		{ return HDRLENGTH; }
 "tos"			{ return TOS; }
 "length"		{ return LENGTH; }
@@ -457,12 +464,17 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 				return STRING;
 			}
 
+{timestring}		{
+				yylval->string = xstrdup(yytext);
+				return STRING;
+			}
+
 {decstring}		{
 				errno = 0;
 				yylval->val = strtoull(yytext, NULL, 0);
 				if (errno != 0) {
 					yylval->string = xstrdup(yytext);
-					return ERROR;
+					return STRING;
 				}
 				return NUM;
 			}
@@ -472,7 +484,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 				yylval->val = strtoull(yytext, NULL, 0);
 				if (errno != 0) {
 					yylval->string = xstrdup(yytext);
-					return ERROR;
+					return STRING;
 				}
 				return NUM;
 			}

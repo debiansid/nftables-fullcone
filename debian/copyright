@@ -24,6 +24,14 @@ Files: src/mnl.c
 Copyright: 2013 Pablo Neira Ayuso <pablo@netfilter.org>
 License: GPL-2
 
+Files: src/iface.c
+Copyright: 2015 Pablo Neira Ayuso <pablo@netfilter.org>
+License: GPL-2
+
+Files: src/mini-gmp.c
+Copyright: 1991-1997, 1999-2014, Free Software Foundation, Inc
+License: GPL-2+
+
 Files: include/linux/netfilter_arp.h
 Copyright: 2002 Rusty Russell - IBM
 License: GPL-2

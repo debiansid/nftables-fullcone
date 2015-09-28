@@ -23,6 +23,7 @@
 #include <expression.h>
 #include <gmputil.h>
 #include <erec.h>
+#include <netlink.h>
 
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
@@ -51,6 +52,7 @@ static const struct datatype *datatypes[TYPE_MAX + 1] = {
 
 void datatype_register(const struct datatype *dtype)
 {
+	BUILD_BUG_ON(TYPE_MAX & ~TYPE_MASK);
 	datatypes[dtype->type] = dtype;
 }
 
@@ -154,13 +156,14 @@ out:
 void symbolic_constant_print(const struct symbol_table *tbl,
 			     const struct expr *expr)
 {
+	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
 	const struct symbolic_constant *s;
 	uint64_t val = 0;
 
 	/* Export the data in the correct byteorder for comparison */
 	assert(expr->len / BITS_PER_BYTE <= sizeof(val));
 	mpz_export_data(constant_data_ptr(val, expr->len), expr->value,
-			expr->byteorder, expr->len / BITS_PER_BYTE);
+			expr->byteorder, len);
 
 	for (s = tbl->symbols; s->identifier != NULL; s++) {
 		if (val == s->value)
@@ -259,15 +262,22 @@ const struct datatype bitmask_type = {
 	.type		= TYPE_BITMASK,
 	.name		= "bitmask",
 	.desc		= "bitmask",
+	.basefmt	= "0x%Zx",
 	.basetype	= &integer_type,
 };
 
 static void integer_type_print(const struct expr *expr)
 {
+	const struct datatype *dtype = expr->dtype;
 	const char *fmt = "%Zu";
 
-	if (expr->dtype->basefmt != NULL)
-		fmt = expr->dtype->basefmt;
+	do {
+		if (dtype->basefmt != NULL) {
+			fmt = dtype->basefmt;
+			break;
+		}
+	} while ((dtype = dtype->basetype));
+
 	gmp_printf(fmt, expr->value);
 }
 
@@ -275,11 +285,9 @@ static struct error_record *integer_type_parse(const struct expr *sym,
 					       struct expr **res)
 {
 	mpz_t v;
-	int len;
 
 	mpz_init(v);
-	if (gmp_sscanf(sym->identifier, "%Zu%n", v, &len) != 1 ||
-	    (int)strlen(sym->identifier) != len) {
+	if (mpz_set_str(v, sym->identifier, 0)) {
 		mpz_clear(v);
 		return error(&sym->location, "Could not parse %s",
 			     sym->dtype->desc);
@@ -761,11 +769,9 @@ const struct datatype icmpx_code_type = {
 	.sym_tbl	= &icmpx_code_tbl,
 };
 
-static void time_type_print(const struct expr *expr)
+void time_print(uint64_t seconds)
 {
-	uint64_t days, hours, minutes, seconds;
-
-	seconds = mpz_get_uint64(expr->value);
+	uint64_t days, hours, minutes;
 
 	days = seconds / 86400;
 	seconds %= 86400;
@@ -776,8 +782,6 @@ static void time_type_print(const struct expr *expr)
 	minutes = seconds / 60;
 	seconds %= 60;
 
-	printf("\"");
-
 	if (days > 0)
 		printf("%"PRIu64"d", days);
 	if (hours > 0)
@@ -786,8 +790,6 @@ static void time_type_print(const struct expr *expr)
 		printf("%"PRIu64"m", minutes);
 	if (seconds > 0)
 		printf("%"PRIu64"s", seconds);
-
-	printf("\"");
 }
 
 enum {
@@ -806,8 +808,8 @@ static uint32_t str2int(char *tmp, const char *c, int k)
 	return atoi(tmp);
 }
 
-static struct error_record *time_type_parse(const struct expr *sym,
-					    struct expr **res)
+struct error_record *time_parse(const struct location *loc, const char *str,
+				uint64_t *res)
 {
 	int i, len;
 	unsigned int k = 0;
@@ -816,75 +818,81 @@ static struct error_record *time_type_parse(const struct expr *sym,
 	uint64_t d = 0, h = 0, m = 0, s = 0;
 	uint32_t mask = 0;
 
-	c = sym->identifier;
+	c = str;
 	len = strlen(c);
 	for (i = 0; i < len; i++, c++) {
 		switch (*c) {
 		case 'd':
-			if (mask & DAY) {
-				return error(&sym->location,
+			if (mask & DAY)
+				return error(loc,
 					     "Day has been specified twice");
-			}
+
 			d = str2int(tmp, c, k);
 			k = 0;
 			mask |= DAY;
 			break;
 		case 'h':
-			if (mask & HOUR) {
-				return error(&sym->location,
+			if (mask & HOUR)
+				return error(loc,
 					     "Hour has been specified twice");
-			}
+
 			h = str2int(tmp, c, k);
 			k = 0;
-			if (h > 23) {
-				return error(&sym->location,
-					     "Hour needs to be 0-23");
-			}
 			mask |= HOUR;
 			break;
 		case 'm':
-			if (mask & MIN) {
-				return error(&sym->location,
+			if (mask & MIN)
+				return error(loc,
 					     "Minute has been specified twice");
-			}
+
 			m = str2int(tmp, c, k);
 			k = 0;
-			if (m > 59) {
-				return error(&sym->location,
-					     "Minute needs to be 0-59");
-			}
 			mask |= MIN;
 			break;
 		case 's':
-			if (mask & SECS) {
-				return error(&sym->location,
+			if (mask & SECS)
+				return error(loc,
 					     "Second has been specified twice");
-			}
+
 			s = str2int(tmp, c, k);
 			k = 0;
-			if (s > 59) {
-				return error(&sym->location,
-					     "second needs to be 0-59");
-			}
 			mask |= SECS;
 			break;
 		default:
 			if (!isdigit(*c))
-				return error(&sym->location, "wrong format");
+				return error(loc, "wrong time format");
 
-			if (k++ >= array_size(tmp)) {
-				return error(&sym->location,
-					     "value too large");
-			}
+			if (k++ >= array_size(tmp))
+				return error(loc, "value too large");
 			break;
 		}
 	}
 
 	/* default to seconds if no unit was specified */
 	if (!mask)
-		s = atoi(sym->identifier);
+		s = atoi(str);
 	else
 		s = 24*60*60*d+60*60*h+60*m+s;
+
+	*res = s;
+	return NULL;
+}
+
+
+static void time_type_print(const struct expr *expr)
+{
+	time_print(mpz_get_uint64(expr->value));
+}
+
+static struct error_record *time_type_parse(const struct expr *sym,
+					    struct expr **res)
+{
+	struct error_record *erec;
+	uint64_t s;
+
+	erec = time_parse(&sym->location, sym->identifier, &s);
+	if (erec != NULL)
+		return erec;
 
 	if (s > UINT32_MAX)
 		return error(&sym->location, "value too large");
@@ -923,27 +931,37 @@ static struct datatype *dtype_alloc(void)
 	return dtype;
 }
 
-const struct datatype *concat_type_alloc(const struct expr *expr)
+const struct datatype *concat_type_alloc(uint32_t type)
 {
+	const struct datatype *i;
 	struct datatype *dtype;
-	struct expr *i;
 	char desc[256] = "concatenation of (";
-	unsigned int type = 0, size = 0;
+	char name[256] = "";
+	unsigned int size = 0, subtypes = 0, n;
 
-	list_for_each_entry(i, &expr->expressions, list) {
-		if (size != 0)
+	n = div_round_up(fls(type), TYPE_BITS);
+	while (n > 0 && concat_subtype_id(type, --n)) {
+		i = concat_subtype_lookup(type, n);
+		if (i == NULL)
+			return NULL;
+
+		if (subtypes != 0) {
 			strncat(desc, ", ", sizeof(desc) - strlen(desc) - 1);
-		strncat(desc, i->dtype->desc, sizeof(desc) - strlen(desc) - 1);
+			strncat(name, " . ", sizeof(name) - strlen(name) - 1);
+		}
+		strncat(desc, i->desc, sizeof(desc) - strlen(desc) - 1);
+		strncat(name, i->name, sizeof(name) - strlen(name) - 1);
 
-		type <<= 8;
-		type  |= i->dtype->type;
-		size++;
+		size += netlink_padded_len(i->size);
+		subtypes++;
 	}
 	strncat(desc, ")", sizeof(desc) - strlen(desc) - 1);
 
 	dtype		= dtype_alloc();
 	dtype->type	= type;
 	dtype->size	= size;
+	dtype->subtypes = subtypes;
+	dtype->name	= xstrdup(name);
 	dtype->desc	= xstrdup(desc);
 	dtype->parse	= concat_type_parse;
 
@@ -953,6 +971,7 @@ const struct datatype *concat_type_alloc(const struct expr *expr)
 void concat_type_destroy(const struct datatype *dtype)
 {
 	if (dtype->flags & DTYPE_F_ALLOC) {
+		xfree(dtype->name);
 		xfree(dtype->desc);
 		xfree(dtype);
 	}

@@ -1,3 +1,23 @@
+nftables (0.5-1) unstable; urgency=medium
+
+  * [007a8d0] Imported Upstream version 0.5
+  * [9a90c87] d/control: nftables 0.5 requires libnftnl >= 1.0.5
+  * [17fdcc1] d/control: update nftables description: linux 4.2 recommended
+  * [a473529] d/copyright: update file to include latest changes in v0.5
+  * [4a9deac] d/copyright: drop copyright for debian/*
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 18 Sep 2015 11:44:21 +0200
+
+nftables (0.4-7) unstable; urgency=medium
+
+  [ Vincent Blut ]
+  * [0fc181f] d/copyright: fix missing doc/nft.xml license (Closes: #795096)
+
+  [ Arturo Borrero Gonzalez ]
+  * [ae662e4] d/rules: drop get-orig-source code
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 17 Aug 2015 11:20:15 +0200
+
 nftables (0.4-6~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.

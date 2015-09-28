@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include <netlink.h>
 #include <gmputil.h>
@@ -44,6 +45,7 @@ static void erec_destroy(struct error_record *erec)
 	xfree(erec);
 }
 
+__attribute__((format(printf, 3, 0)))
 struct error_record *erec_vcreate(enum error_record_types type,
 				  const struct location *loc,
 				  const char *fmt, va_list ap)
@@ -55,10 +57,13 @@ struct error_record *erec_vcreate(enum error_record_types type,
 	erec->num_locations	= 0;
 	erec_add_location(erec, loc);
 
-	gmp_vasprintf(&erec->msg, fmt, ap);
+	if (vasprintf(&erec->msg, fmt, ap) < 0)
+		erec->msg = NULL;
+
 	return erec;
 }
 
+__attribute__((format(printf, 3, 4)))
 struct error_record *erec_create(enum error_record_types type,
 				 const struct location *loc,
 				 const char *fmt, ...)
@@ -78,8 +83,10 @@ void erec_print(FILE *f, const struct error_record *erec)
 	const struct input_descriptor *indesc = loc->indesc, *tmp;
 	const char *line = NULL; /* silence gcc */
 	char buf[1024];
+	char *pbuf = NULL;
 	unsigned int i, end;
 	int l, ret;
+	off_t orig_offset = 0;
 
 	switch (indesc->type) {
 	case INDESC_BUFFER:
@@ -88,11 +95,13 @@ void erec_print(FILE *f, const struct error_record *erec)
 		break;
 	case INDESC_FILE:
 		memset(buf, 0, sizeof(buf));
+		orig_offset = lseek(indesc->fd, 0, SEEK_CUR);
 		lseek(indesc->fd, loc->line_offset, SEEK_SET);
 		ret = read(indesc->fd, buf, sizeof(buf) - 1);
 		if (ret > 0)
 			*strchrnul(buf, '\n') = '\0';
 		line = buf;
+		lseek(indesc->fd, orig_offset, SEEK_SET);
 		break;
 	case INDESC_INTERNAL:
 	case INDESC_NETLINK:
@@ -137,17 +146,22 @@ void erec_print(FILE *f, const struct error_record *erec)
 		if (indesc->type != INDESC_INTERNAL)
 			fprintf(f, "%s\n", line);
 
-		memset(buf, ' ', sizeof(buf));
 		end = 0;
+		for (l = erec->num_locations - 1; l >= 0; l--) {
+			loc = &erec->locations[l];
+			end = max(end, loc->last_column);
+		}
+		pbuf = xmalloc(end + 1);
+		memset(pbuf, ' ', end + 1);
 		for (l = erec->num_locations - 1; l >= 0; l--) {
 			loc = &erec->locations[l];
 			for (i = loc->first_column ? loc->first_column - 1 : 0;
 			     i < loc->last_column; i++)
-				buf[i] = l ? '~' : '^';
-			end = max(end, loc->last_column);
+				pbuf[i] = l ? '~' : '^';
 		}
-		buf[end] = '\0';
-		fprintf(f, "%s", buf);
+		pbuf[end] = '\0';
+		fprintf(f, "%s", pbuf);
+		xfree(pbuf);
 	}
 	fprintf(f, "\n");
 }

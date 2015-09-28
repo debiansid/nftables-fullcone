@@ -11,7 +11,7 @@ Build-Depends: automake,
                flex,
                libgmp-dev,
                libmnl-dev,
-               libnftnl-dev (>= 1.0.3),
+               libnftnl-dev (>= 1.0.5),
                libreadline-dev,
                libtool (>=2.2.6)
 Standards-Version: 3.9.6
@@ -34,4 +34,4 @@ Description: Program to control packet filtering rules by Netfilter project
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
  .
- A Linux kernel >= 3.13 is required. However, >= 3.18 is recommended.
+ A Linux kernel >= 3.13 is required. However, >= 4.2 is recommended.

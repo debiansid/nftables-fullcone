@@ -44,11 +44,18 @@ nft_SOURCES =	main.c				\
 		utils.c				\
 		erec.c				\
 		mnl.c				\
+		iface.c				\
 		scanner.l			\
 		parser_bison.y
 
 if BUILD_CLI
 nft_SOURCES +=	cli.c
+endif
+
+if BUILD_MINIGMP
+mini-gmp.o: AM_CFLAGS += -Wno-sign-compare
+
+nft_SOURCES +=	mini-gmp.c
 endif
 
 nft_LDADD	= ${LIBMNL_LIBS} ${LIBNFTNL_LIBS}

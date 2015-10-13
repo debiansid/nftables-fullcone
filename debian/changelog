@@ -1,3 +1,10 @@
+nftables (0.5-2) unstable; urgency=medium
+
+  * [92938c3] d/rules: get rid of useless commented line
+  * [a04a737] d/: add nftables-dbg binary package
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 13 Oct 2015 14:03:25 +0200
+
 nftables (0.5-1) unstable; urgency=medium
 
   * [007a8d0] Imported Upstream version 0.5

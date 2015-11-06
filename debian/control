@@ -11,7 +11,7 @@ Build-Depends: automake,
                flex,
                libgmp-dev,
                libmnl-dev,
-               libnftnl-dev (>= 1.0.5),
+               libnftnl-dev (>= 1.0.5+snapshot20151106),
                libreadline-dev,
                libtool (>=2.2.6)
 Standards-Version: 3.9.6

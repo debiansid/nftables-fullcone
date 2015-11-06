@@ -51,6 +51,8 @@ extern struct stmt *log_stmt_alloc(const struct location *loc);
 struct limit_stmt {
 	uint64_t		rate;
 	uint64_t		unit;
+	enum nft_limit_type	type;
+	uint32_t		burst;
 };
 
 extern struct stmt *limit_stmt_alloc(const struct location *loc);
@@ -103,6 +105,13 @@ struct ct_stmt {
 extern struct stmt *ct_stmt_alloc(const struct location *loc,
 				  enum nft_ct_keys key,
 				  struct expr *expr);
+struct dup_stmt {
+	struct expr		*to;
+	struct expr		*dev;
+};
+
+struct stmt *dup_stmt_alloc(const struct location *loc);
+uint32_t dup_stmt_type(const char *type);
 
 struct set_stmt {
 	struct expr		*set;
@@ -129,6 +138,7 @@ extern struct stmt *set_stmt_alloc(const struct location *loc);
  * @STMT_QUEUE:		QUEUE statement
  * @STMT_CT:		conntrack statement
  * @STMT_SET:		set statement
+ * @STMT_DUP:		dup statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -145,6 +155,7 @@ enum stmt_types {
 	STMT_QUEUE,
 	STMT_CT,
 	STMT_SET,
+	STMT_DUP,
 };
 
 /**
@@ -195,6 +206,7 @@ struct stmt {
 		struct queue_stmt	queue;
 		struct ct_stmt		ct;
 		struct set_stmt		set;
+		struct dup_stmt		dup;
 	};
 };
 

@@ -364,6 +364,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token LIMIT			"limit"
 %token RATE			"rate"
+%token BURST			"burst"
 
 %token NANOSECOND		"nanosecond"
 %token MICROSECOND		"microsecond"
@@ -392,6 +393,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token BYPASS			"bypass"
 %token FANOUT			"fanout"
 
+%token DUP			"dup"
+%token ON			"on"
+
 %token POSITION			"position"
 %token COMMENT			"comment"
 
@@ -412,8 +416,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <cmd>			base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
 %destructor { cmd_free($$); }	base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
 
-%type <handle>			table_spec tables_spec chain_spec chain_identifier ruleid_spec ruleset_spec
-%destructor { handle_free(&$$); } table_spec tables_spec chain_spec chain_identifier ruleid_spec ruleset_spec
+%type <handle>			table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
+%destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
 %type <handle>			set_spec set_identifier
 %destructor { handle_free(&$$); } set_spec set_identifier
 %type <val>			handle_spec family_spec family_spec_explicit position_spec chain_policy
@@ -450,7 +454,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <val>			level_type
 %type <stmt>			limit_stmt
 %destructor { stmt_free($$); }	limit_stmt
-%type <val>			time_unit
+%type <val>			limit_burst time_unit
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
 %type <stmt>			nat_stmt nat_stmt_alloc masq_stmt masq_stmt_alloc redir_stmt redir_stmt_alloc
@@ -459,6 +463,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			queue_stmt queue_stmt_alloc
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
 %type <val>			queue_stmt_flags queue_stmt_flag
+%type <stmt>			dup_stmt
+%destructor { stmt_free($$); }	dup_stmt
 %type <stmt>			set_stmt
 %destructor { stmt_free($$); }	set_stmt
 %type <val>			set_stmt_op
@@ -766,7 +772,7 @@ list_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_TABLE, &$2, &@$, NULL);
 			}
-			|	TABLES		tables_spec
+			|	TABLES		ruleset_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_TABLE, &$2, &@$, NULL);
 			}
@@ -774,7 +780,11 @@ list_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_CHAIN, &$2, &@$, NULL);
 			}
-			|	SETS		tables_spec
+			|	CHAINS		ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_CHAINS, &$2, &@$, NULL);
+			}
+			|	SETS		ruleset_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_SETS, &$2, &@$, NULL);
 			}
@@ -1185,14 +1195,6 @@ table_spec		:	family_spec	identifier
 			}
 			;
 
-tables_spec		:	family_spec
-			{
-				memset(&$$, 0, sizeof($$));
-				$$.family	= $1;
-				$$.table	= NULL;
-			}
-			;
-
 chain_spec		:	table_spec	identifier
 			{
 				$$		= $1;
@@ -1309,6 +1311,7 @@ stmt			:	verdict_stmt
 			|	ct_stmt
 			|	masq_stmt
 			|	redir_stmt
+			|	dup_stmt
 			|	set_stmt
 			;
 
@@ -1441,11 +1444,47 @@ level_type		:	LEVEL_EMERG	{ $$ = LOG_EMERG; }
 			|	LEVEL_DEBUG	{ $$ = LOG_DEBUG; }
 			;
 
-limit_stmt		:	LIMIT	RATE	NUM	SLASH	time_unit
+limit_stmt		:	LIMIT	RATE	NUM	SLASH	time_unit	limit_burst
 	    		{
 				$$ = limit_stmt_alloc(&@$);
 				$$->limit.rate	= $3;
 				$$->limit.unit	= $5;
+				$$->limit.burst	= $6;
+				$$->limit.type	= NFT_LIMIT_PKTS;
+			}
+			|	LIMIT RATE	NUM	STRING	limit_burst
+			{
+				struct error_record *erec;
+				uint64_t rate, unit;
+
+				erec = rate_parse(&@$, $4, &rate, &unit);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = limit_stmt_alloc(&@$);
+				$$->limit.rate	= rate * $3;
+				$$->limit.unit	= unit;
+				$$->limit.burst	= $5;
+				$$->limit.type	= NFT_LIMIT_PKT_BYTES;
+			}
+			;
+
+limit_burst		:	/* empty */			{ $$ = 0; }
+			|	BURST	NUM	PACKETS		{ $$ = $2; }
+			|	BURST	NUM	BYTES		{ $$ = $2; }
+			|	BURST	NUM	STRING
+			{
+				struct error_record *erec;
+				uint64_t rate;
+
+				erec = data_unit_parse(&@$, $3, &rate);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+				$$ = $2 * rate;
 			}
 			;
 
@@ -1569,6 +1608,19 @@ redir_stmt_arg		:	TO	expr
 			{
 				$<stmt>0->redir.proto = $2;
 				$<stmt>0->redir.flags = $3;
+			}
+			;
+
+dup_stmt		:	DUP	TO	expr
+			{
+				$$ = dup_stmt_alloc(&@$);
+				$$->dup.to = $3;
+			}
+			|	DUP	TO	expr 	DEVICE	expr
+			{
+				$$ = dup_stmt_alloc(&@$);
+				$$->dup.to = $3;
+				$$->dup.dev = $5;
 			}
 			;
 

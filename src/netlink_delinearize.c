@@ -583,6 +583,8 @@ static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
 	stmt = limit_stmt_alloc(loc);
 	stmt->limit.rate = nftnl_expr_get_u64(nle, NFTNL_EXPR_LIMIT_RATE);
 	stmt->limit.unit = nftnl_expr_get_u64(nle, NFTNL_EXPR_LIMIT_UNIT);
+	stmt->limit.type = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_TYPE);
+	stmt->limit.burst = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_BURST);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -747,6 +749,52 @@ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
+static void netlink_parse_dup(struct netlink_parse_ctx *ctx,
+			      const struct location *loc,
+			      const struct nftnl_expr *nle)
+{
+	enum nft_registers reg1, reg2;
+	struct expr *addr, *dev;
+	struct stmt *stmt;
+
+	stmt = dup_stmt_alloc(loc);
+
+	reg1 = netlink_parse_register(nle, NFTNL_EXPR_DUP_SREG_ADDR);
+	if (reg1) {
+		addr = netlink_get_register(ctx, loc, reg1);
+		if (addr == NULL)
+			return netlink_error(ctx, loc,
+					     "DUP statement has no destination expression");
+
+		switch (ctx->table->handle.family) {
+		case NFPROTO_IPV4:
+			expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
+			break;
+		case NFPROTO_IPV6:
+			expr_set_type(addr, &ip6addr_type,
+				      BYTEORDER_BIG_ENDIAN);
+			break;
+		}
+		stmt->dup.to = addr;
+	}
+
+	reg2 = netlink_parse_register(nle, NFTNL_EXPR_DUP_SREG_DEV);
+	if (reg2) {
+		dev = netlink_get_register(ctx, loc, reg2);
+		if (dev == NULL)
+			return netlink_error(ctx, loc,
+					     "DUP statement has no output expression");
+
+		expr_set_type(dev, &ifindex_type, BYTEORDER_HOST_ENDIAN);
+		if (stmt->dup.to == NULL)
+			stmt->dup.to = dev;
+		else
+			stmt->dup.dev = dev;
+	}
+
+	list_add_tail(&stmt->list, &ctx->rule->stmts);
+}
+
 static void netlink_parse_queue(struct netlink_parse_ctx *ctx,
 			      const struct location *loc,
 			      const struct nftnl_expr *nle)
@@ -835,6 +883,7 @@ static const struct {
 	{ .name = "nat",	.parse = netlink_parse_nat },
 	{ .name = "masq",	.parse = netlink_parse_masq },
 	{ .name = "redir",	.parse = netlink_parse_redir },
+	{ .name = "dup",	.parse = netlink_parse_dup },
 	{ .name = "queue",	.parse = netlink_parse_queue },
 	{ .name = "dynset",	.parse = netlink_parse_dynset },
 };
@@ -918,14 +967,20 @@ static void integer_type_postprocess(struct expr *expr)
 	}
 }
 
-static void payload_match_expand(struct rule_pp_ctx *ctx, struct expr *expr)
+static void payload_match_expand(struct rule_pp_ctx *ctx,
+				 struct expr *expr,
+				 struct expr *payload,
+				 struct expr *mask)
 {
-	struct expr *left = expr->left, *right = expr->right, *tmp;
+	struct expr *left = payload, *right = expr->right, *tmp;
 	struct list_head list = LIST_HEAD_INIT(list);
 	struct stmt *nstmt;
-	struct expr *nexpr;
+	struct expr *nexpr = NULL;
+	enum proto_bases base = left->payload.base;
+	const struct expr_ops *payload_ops = left->ops;
 
-	payload_expr_expand(&list, left, &ctx->pctx);
+	payload_expr_expand(&list, left, mask, &ctx->pctx);
+
 	list_for_each_entry(left, &list, list) {
 		tmp = constant_expr_splice(right, left->len);
 		expr_set_type(tmp, left->dtype, left->byteorder);
@@ -940,16 +995,37 @@ static void payload_match_expand(struct rule_pp_ctx *ctx, struct expr *expr)
 		nstmt = expr_stmt_alloc(&ctx->stmt->location, nexpr);
 		list_add_tail(&nstmt->list, &ctx->stmt->list);
 
+		assert(left->ops == payload_ops);
+		assert(left->payload.base);
+		assert(base == left->payload.base);
+
 		/* Remember the first payload protocol expression to
 		 * kill it later on if made redundant by a higher layer
 		 * payload expression.
 		 */
 		if (ctx->pbase == PROTO_BASE_INVALID &&
-		    left->flags & EXPR_F_PROTOCOL)
-			payload_dependency_store(ctx, nstmt,
-						 left->payload.base);
-		else
+		    left->flags & EXPR_F_PROTOCOL) {
+			unsigned int proto = mpz_get_be16(tmp->value);
+			const struct proto_desc *desc, *next;
+			bool stacked_header = false;
+
+			desc = ctx->pctx.protocol[base].desc;
+			assert(desc);
+			if (desc) {
+				next = proto_find_upper(desc, proto);
+				stacked_header = next && next->base == base;
+			}
+
+			if (stacked_header) {
+				ctx->pctx.protocol[base].desc = next;
+				ctx->pctx.protocol[base].offset += desc->length;
+				payload_dependency_store(ctx, nstmt, base - 1);
+			} else {
+				payload_dependency_store(ctx, nstmt, base);
+			}
+		} else {
 			payload_dependency_kill(ctx, nexpr->left);
+		}
 	}
 	list_del(&ctx->stmt->list);
 	stmt_free(ctx->stmt);
@@ -957,21 +1033,28 @@ static void payload_match_expand(struct rule_pp_ctx *ctx, struct expr *expr)
 }
 
 static void payload_match_postprocess(struct rule_pp_ctx *ctx,
-				      struct expr *expr)
+				      struct expr *expr,
+				      struct expr *payload,
+				      struct expr *mask)
 {
+	enum proto_bases base = payload->payload.base;
+
+	assert(payload->payload.offset >= ctx->pctx.protocol[base].offset);
+	payload->payload.offset -= ctx->pctx.protocol[base].offset;
+
 	switch (expr->op) {
 	case OP_EQ:
 	case OP_NEQ:
 		if (expr->right->ops->type == EXPR_VALUE) {
-			payload_match_expand(ctx, expr);
+			payload_match_expand(ctx, expr, payload, mask);
 			break;
 		}
 		/* Fall through */
 	default:
-		payload_expr_complete(expr->left, &ctx->pctx);
-		expr_set_type(expr->right, expr->left->dtype,
-			      expr->left->byteorder);
-		payload_dependency_kill(ctx, expr->left);
+		payload_expr_complete(payload, &ctx->pctx);
+		expr_set_type(expr->right, payload->dtype,
+			      payload->byteorder);
+		payload_dependency_kill(ctx, payload);
 		break;
 	}
 }
@@ -1044,11 +1127,12 @@ static struct expr *binop_tree_to_list(struct expr *list, struct expr *expr)
 	return list;
 }
 
-static void relational_binop_postprocess(struct expr *expr)
+static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
 {
 	struct expr *binop = expr->left, *value = expr->right;
 
 	if (binop->op == OP_AND && expr->op == OP_NEQ &&
+	    value->dtype->basetype &&
 	    value->dtype->basetype->type == TYPE_BITMASK &&
 	    !mpz_cmp_ui(value->value, 0)) {
 		/* Flag comparison: data & flags != 0
@@ -1072,6 +1156,61 @@ static void relational_binop_postprocess(struct expr *expr)
 						expr_mask_to_prefix(binop->right));
 		expr_free(value);
 		expr_free(binop);
+	} else if (binop->op == OP_AND &&
+		   binop->left->ops->type == EXPR_PAYLOAD &&
+		   binop->right->ops->type == EXPR_VALUE) {
+		struct expr *payload = expr->left->left;
+		struct expr *mask = expr->left->right;
+
+		/*
+		 * This *might* be a payload match testing header fields that
+		 * have non byte divisible offsets and/or bit lengths.
+		 *
+		 * Thus we need to deal with two different cases.
+		 *
+		 * 1 the simple version:
+		 *        relation
+		 * payload        value|setlookup
+		 *
+		 * expr: relation, left: payload, right: value, e.g.  tcp dport == 22.
+		 *
+		 * 2. The '&' version (this is what we're looking at now).
+		 *            relation
+		 *     binop          value1|setlookup
+		 * payload  value2
+		 *
+		 * expr: relation, left: binop, right: value, e.g.
+		 * ip saddr 10.0.0.0/8
+		 *
+		 * payload_expr_trim will figure out if the mask is needed to match
+		 * templates.
+		 */
+		if (payload_expr_trim(payload, mask, &ctx->pctx)) {
+			/* mask is implicit, binop needs to be removed.
+			 *
+			 * Fix all values of the expression according to the mask
+			 * and then process the payload instruction using the real
+			 * sizes and offsets we're interested in.
+			 *
+			 * Finally, convert the expression to 1) by replacing
+			 * the binop with the binop payload expr.
+			 */
+			if (value->ops->type == EXPR_VALUE) {
+				assert(value->len >= expr->left->right->len);
+				value->len = mask->len;
+			}
+
+			payload->len = mask->len;
+			payload->payload.offset += mpz_scan1(mask->value, 0);
+
+			payload_match_postprocess(ctx, expr, payload, mask);
+
+			assert(expr->left->ops->type == EXPR_BINOP);
+
+			assert(binop->left == payload);
+			expr->left = payload;
+			expr_free(binop);
+		}
 	}
 }
 
@@ -1130,7 +1269,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_RELATIONAL:
 		switch (expr->left->ops->type) {
 		case EXPR_PAYLOAD:
-			payload_match_postprocess(ctx, expr);
+			payload_match_postprocess(ctx, expr, expr->left, NULL);
 			return;
 		default:
 			expr_postprocess(ctx, &expr->left);
@@ -1145,7 +1284,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 			meta_match_postprocess(ctx, expr);
 			break;
 		case EXPR_BINOP:
-			relational_binop_postprocess(expr);
+			relational_binop_postprocess(ctx, expr);
 			break;
 		default:
 			break;
@@ -1367,6 +1506,12 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 			break;
 		case STMT_SET:
 			expr_postprocess(&rctx, &stmt->set.key);
+			break;
+		case STMT_DUP:
+			if (stmt->dup.to != NULL)
+				expr_postprocess(&rctx, &stmt->dup.to);
+			if (stmt->dup.dev != NULL)
+				expr_postprocess(&rctx, &stmt->dup.dev);
 			break;
 		default:
 			break;

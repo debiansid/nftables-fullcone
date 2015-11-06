@@ -309,6 +309,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "limit"			{ return LIMIT; }
 "rate"			{ return RATE; }
+"burst"			{ return BURST; }
 
 "nanosecond"		{ return NANOSECOND; }
 "microsecond"		{ return MICROSECOND; }
@@ -455,6 +456,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "proto-src"		{ return PROTO_SRC; }
 "proto-dst"		{ return PROTO_DST; }
 "label"			{ return LABEL; }
+
+"dup"			{ return DUP; }
 
 "xml"			{ return XML; }
 "json"			{ return JSON; }

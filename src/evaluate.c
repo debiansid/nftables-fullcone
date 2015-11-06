@@ -20,6 +20,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 #include <net/ethernet.h>
+#include <net/if.h>
 
 #include <expression.h>
 #include <statement.h>
@@ -249,6 +250,88 @@ static int expr_evaluate_primary(struct eval_ctx *ctx, struct expr **expr)
 	return 0;
 }
 
+static int
+conflict_resolution_gen_dependency(struct eval_ctx *ctx, int protocol,
+				   const struct expr *expr,
+				   struct stmt **res)
+{
+	enum proto_bases base = expr->payload.base;
+	const struct proto_hdr_template *tmpl;
+	const struct proto_desc *desc = NULL;
+	struct expr *dep, *left, *right;
+	struct stmt *stmt;
+
+	assert(expr->payload.base == PROTO_BASE_LL_HDR);
+
+	desc = ctx->pctx.protocol[base].desc;
+	tmpl = &desc->templates[desc->protocol_key];
+	left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
+
+	right = constant_expr_alloc(&expr->location, tmpl->dtype,
+				    tmpl->dtype->byteorder, tmpl->len,
+				    constant_data_ptr(protocol, tmpl->len));
+
+	dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
+	stmt = expr_stmt_alloc(&dep->location, dep);
+	if (stmt_evaluate(ctx, stmt) < 0)
+		return expr_error(ctx->msgs, expr,
+					  "dependency statement is invalid");
+
+	ctx->pctx.protocol[base].desc = expr->payload.desc;
+	assert(ctx->pctx.protocol[base].offset == 0);
+
+	assert(desc->length);
+	ctx->pctx.protocol[base].offset += desc->length;
+
+	*res = stmt;
+	return 0;
+}
+
+static bool resolve_protocol_conflict(struct eval_ctx *ctx,
+				      struct expr *payload)
+{
+	const struct hook_proto_desc *h = &hook_proto_desc[ctx->pctx.family];
+	enum proto_bases base = payload->payload.base;
+	const struct proto_desc *desc;
+	struct stmt *nstmt = NULL;
+	int link;
+
+	desc = ctx->pctx.protocol[base].desc;
+
+	if (desc == payload->payload.desc) {
+		payload->payload.offset += ctx->pctx.protocol[base].offset;
+		return true;
+	}
+
+	if (payload->payload.base != h->base)
+		return false;
+
+	assert(desc->length);
+	if (base < PROTO_BASE_MAX) {
+		const struct proto_desc *next = ctx->pctx.protocol[base + 1].desc;
+
+		if (payload->payload.desc == next) {
+			ctx->pctx.protocol[base + 1].desc = NULL;
+			ctx->pctx.protocol[base].desc = next;
+			ctx->pctx.protocol[base].offset += desc->length;
+			payload->payload.offset += desc->length;
+			return true;
+		} else if (next) {
+			return false;
+		}
+	}
+
+	link = proto_find_num(desc, payload->payload.desc);
+	if (link < 0 || conflict_resolution_gen_dependency(ctx, link, payload, &nstmt) < 0)
+		return false;
+
+	payload->payload.offset += ctx->pctx.protocol[base].offset;
+	list_add_tail(&nstmt->list, &ctx->stmt->list);
+	ctx->pctx.protocol[base + 1].desc = NULL;
+
+	return true;
+}
+
 /*
  * Payload expression: check whether dependencies are fulfilled, otherwise
  * generate the necessary relational expression and prepend it to the current
@@ -264,7 +347,7 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **expr)
 		if (payload_gen_dependency(ctx, payload, &nstmt) < 0)
 			return -1;
 		list_add_tail(&nstmt->list, &ctx->stmt->list);
-	} else if (ctx->pctx.protocol[base].desc != payload->payload.desc)
+	} else if (!resolve_protocol_conflict(ctx, payload))
 		return expr_error(ctx->msgs, payload,
 				  "conflicting protocols specified: %s vs. %s",
 				  ctx->pctx.protocol[base].desc->name,
@@ -1535,7 +1618,7 @@ static int nat_evaluate_family(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 }
 
-static int nat_evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
+static int evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 			     struct expr **expr)
 {
 	struct proto_ctx *pctx = &ctx->pctx;
@@ -1577,7 +1660,7 @@ static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
 		return err;
 
 	if (stmt->nat.addr != NULL) {
-		err = nat_evaluate_addr(ctx, stmt, &stmt->nat.addr);
+		err = evaluate_addr(ctx, stmt, &stmt->nat.addr);
 		if (err < 0)
 			return err;
 	}
@@ -1618,6 +1701,32 @@ static int stmt_evaluate_redir(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 
 	stmt->flags |= STMT_F_TERMINAL;
+	return 0;
+}
+
+static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	int err;
+
+	switch (ctx->pctx.family) {
+	case NFPROTO_IPV4:
+	case NFPROTO_IPV6:
+		if (stmt->dup.to == NULL)
+			return stmt_error(ctx, stmt,
+					  "missing destination address");
+		err = evaluate_addr(ctx, stmt, &stmt->dup.to);
+		if (err < 0)
+			return err;
+
+		if (stmt->dup.dev != NULL) {
+			err = stmt_evaluate_arg(ctx, stmt, &ifindex_type,
+						sizeof(uint32_t) * BITS_PER_BYTE,
+						&stmt->dup.dev);
+			if (err < 0)
+				return err;
+		}
+		break;
+	}
 	return 0;
 }
 
@@ -1704,6 +1813,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_redir(ctx, stmt);
 	case STMT_QUEUE:
 		return stmt_evaluate_queue(ctx, stmt);
+	case STMT_DUP:
+		return stmt_evaluate_dup(ctx, stmt);
 	case STMT_SET:
 		return stmt_evaluate_set(ctx, stmt);
 	default:
@@ -1980,10 +2091,20 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_TABLE:
 		if (cmd->handle.table == NULL)
 			return 0;
-	case CMD_OBJ_SET:
-		if (table_lookup(&cmd->handle) == NULL)
+
+		table = table_lookup(&cmd->handle);
+		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
+		return 0;
+	case CMD_OBJ_SET:
+		table = table_lookup(&cmd->handle);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		if (set_lookup(table, cmd->handle.set) == NULL)
+			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
+					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_CHAIN:
 		table = table_lookup(&cmd->handle);
@@ -1994,6 +2115,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 			return cmd_error(ctx, "Could not process rule: Chain '%s' does not exist",
 					 cmd->handle.chain);
 		return 0;
+	case CMD_OBJ_CHAINS:
 	case CMD_OBJ_SETS:
 	case CMD_OBJ_RULESET:
 		return 0;

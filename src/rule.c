@@ -254,7 +254,8 @@ static const char *set_policy2str(uint32_t policy)
 	}
 }
 
-static void do_set_print(const struct set *set, struct print_fmt_options *opts)
+static void set_print_declaration(const struct set *set,
+				  struct print_fmt_options *opts)
 {
 	const char *delim = "";
 	const char *type;
@@ -322,6 +323,11 @@ static void do_set_print(const struct set *set, struct print_fmt_options *opts)
 		time_print(set->gc_int / 1000);
 		printf("%s", opts->nl);
 	}
+}
+
+static void do_set_print(const struct set *set, struct print_fmt_options *opts)
+{
+	set_print_declaration(set, opts);
 
 	if (set->init != NULL && set->init->size > 0) {
 		printf("%s%selements = ", opts->tab, opts->tab);
@@ -383,6 +389,10 @@ void rule_print(const struct rule *rule)
 		stmt->ops->print(stmt);
 		printf(" ");
 	}
+
+	if (rule->handle.comment)
+		printf("comment \"%s\" ", rule->handle.comment);
+
 	if (handle_output > 0)
 		printf("# handle %" PRIu64, rule->handle.handle);
 }
@@ -600,10 +610,8 @@ static const char *chain_policy2str(uint32_t policy)
 	return "unknown";
 }
 
-static void chain_print(const struct chain *chain)
+static void chain_print_declaration(const struct chain *chain)
 {
-	struct rule *rule;
-
 	printf("\tchain %s {\n", chain->handle.chain);
 	if (chain->flags & CHAIN_F_BASECHAIN) {
 		if (chain->dev != NULL) {
@@ -619,13 +627,18 @@ static void chain_print(const struct chain *chain)
 			       chain->priority, chain_policy2str(chain->policy));
 		}
 	}
+}
+
+static void chain_print(const struct chain *chain)
+{
+	struct rule *rule;
+
+	chain_print_declaration(chain);
+
 	list_for_each_entry(rule, &chain->rules, list) {
 		printf("\t\t");
 		rule_print(rule);
-		if (rule->handle.comment)
-			printf(" comment \"%s\"\n", rule->handle.comment);
-		else
-			printf("\n");
+		printf("\n");
 	}
 	printf("\t}\n");
 }
@@ -979,12 +992,29 @@ static int do_list_table(struct netlink_ctx *ctx, struct cmd *cmd,
 
 static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 {
+	struct print_fmt_options opts = {
+		.tab		= "\t",
+		.nl		= "\n",
+		.stmt_separator	= "\n",
+	};
 	struct table *table;
 	struct set *set;
 
 	list_for_each_entry(table, &table_list, list) {
-		list_for_each_entry(set, &table->sets, list)
-			set_print(set);
+		if (cmd->handle.family != NFPROTO_UNSPEC &&
+		    cmd->handle.family != table->handle.family)
+			continue;
+
+		printf("table %s %s {\n",
+		       family2str(table->handle.family),
+		       table->handle.table);
+
+		list_for_each_entry(set, &table->sets, list) {
+			set_print_declaration(set, &opts);
+			printf("%s}%s", opts.tab, opts.nl);
+		}
+
+		printf("}\n");
 	}
 	return 0;
 }
@@ -1013,10 +1043,64 @@ static int do_list_tables(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table;
 
-	list_for_each_entry(table, &table_list, list)
+	list_for_each_entry(table, &table_list, list) {
+		if (cmd->handle.family != NFPROTO_UNSPEC &&
+		    cmd->handle.family != table->handle.family)
+			continue;
+
 		printf("table %s %s\n",
 		       family2str(table->handle.family),
 		       table->handle.table);
+	}
+
+	return 0;
+}
+
+static void table_print_declaration(struct table *table)
+{
+	printf("table %s %s {\n",
+		family2str(table->handle.family),
+		table->handle.table);
+}
+
+static int do_list_chain(struct netlink_ctx *ctx, struct cmd *cmd,
+			 struct table *table)
+{
+	struct chain *chain;
+
+	table_print_declaration(table);
+
+	list_for_each_entry(chain, &table->chains, list) {
+		if (chain->handle.family != cmd->handle.family ||
+		    strcmp(cmd->handle.chain, chain->handle.chain) != 0)
+			continue;
+
+		chain_print(chain);
+	}
+
+	printf("}\n");
+
+	return 0;
+}
+
+static int do_list_chains(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	struct table *table;
+	struct chain *chain;
+
+	list_for_each_entry(table, &table_list, list) {
+		if (cmd->handle.family != NFPROTO_UNSPEC &&
+		    cmd->handle.family != table->handle.family)
+			continue;
+
+		table_print_declaration(table);
+
+		list_for_each_entry(chain, &table->chains, list) {
+			chain_print_declaration(chain);
+			printf("\t}\n");
+		}
+		printf("}\n");
+	}
 
 	return 0;
 }
@@ -1030,7 +1114,10 @@ static int do_list_set(struct netlink_ctx *ctx, struct cmd *cmd,
 	if (set == NULL)
 		return -1;
 
+	table_print_declaration(table);
 	set_print(set);
+	printf("}\n");
+
 	return 0;
 }
 
@@ -1047,7 +1134,9 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 			return do_list_tables(ctx, cmd);
 		return do_list_table(ctx, cmd, table);
 	case CMD_OBJ_CHAIN:
-		return do_list_table(ctx, cmd, table);
+		return do_list_chain(ctx, cmd, table);
+	case CMD_OBJ_CHAINS:
+		return do_list_chains(ctx, cmd);
 	case CMD_OBJ_SETS:
 		return do_list_sets(ctx, cmd);
 	case CMD_OBJ_SET:

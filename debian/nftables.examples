@@ -1,1 +1,2 @@
 debian/nftables/etc/nftables/*
+debian/examples/*

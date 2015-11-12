@@ -21,9 +21,6 @@ override_dh_systemd_enable:
 override_dh_systemd_start:
 	dh_systemd_start --no-start
 
-override_dh_installinit:
-	dh_installinit --no-start
-
 # https://wiki.debian.org/DebugPackage
 .PHONY: override_dh_strip
 override_dh_strip:

@@ -28,6 +28,10 @@ override_dh_strip:
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/nftables
+
+	# upstream examples are installed in by the 'install' target to '/etc/nftables'
+	mkdir -p debian/nftables/usr/share/doc/nftables/examples/syntax
+	mv debian/nftables/etc/nftables/* debian/nftables/usr/share/doc/nftables/examples/syntax/
 	rm -rf debian/nftables/etc/nftables
 
 override_dh_installdocs:

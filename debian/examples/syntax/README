@@ -1,0 +1,7 @@
+These are some examples of the nftables syntax.
+
+You may find example configurations for different families and operations (nat,
+filter, mangle).
+
+Also, you may find concrete configurations models, for example a simple
+ruleset for a workstation.

@@ -31,3 +31,14 @@ override_dh_systemd_start:
 
 override_dh_installinit:
 	dh_installinit --no-start
+
+# https://wiki.debian.org/DebugPackage
+.PHONY: override_dh_strip
+override_dh_strip:
+	dh_strip --dbg-package=nftables-dbg
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/nftables
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=nftables

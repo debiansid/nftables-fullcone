@@ -185,10 +185,57 @@ static const char *get_unit(uint64_t u)
 	return "error";
 }
 
+static const char *data_unit[] = {
+	"bytes",
+	"kbytes",
+	"mbytes",
+	NULL
+};
+
+static const char *get_rate(uint64_t byte_rate, uint64_t *rate)
+{
+	uint64_t res, prev, rest;
+	int i;
+
+	res = prev = byte_rate;
+	for (i = 0;; i++) {
+		rest = res % 1024;
+		res /= 1024;
+		if (res <= 1 && rest != 0)
+			break;
+		if (data_unit[i + 1] == NULL)
+			break;
+		prev = res;
+	}
+	*rate = prev;
+	return data_unit[i];
+}
+
 static void limit_stmt_print(const struct stmt *stmt)
 {
-	printf("limit rate %" PRIu64 "/%s",
-	       stmt->limit.rate, get_unit(stmt->limit.unit));
+	const char *data_unit;
+	uint64_t rate;
+
+	switch (stmt->limit.type) {
+	case NFT_LIMIT_PKTS:
+		printf("limit rate %" PRIu64 "/%s",
+		       stmt->limit.rate, get_unit(stmt->limit.unit));
+		if (stmt->limit.burst > 0)
+			printf(" burst %u packets", stmt->limit.burst);
+		break;
+	case NFT_LIMIT_PKT_BYTES:
+		data_unit = get_rate(stmt->limit.rate, &rate);
+
+		printf("limit rate %" PRIu64 " %s/%s",
+		       rate, data_unit, get_unit(stmt->limit.unit));
+		if (stmt->limit.burst > 0) {
+			uint64_t burst;
+
+			data_unit = get_rate(stmt->limit.burst, &burst);
+			printf(" burst %"PRIu64" %s", burst, data_unit);
+		}
+		break;
+	}
 }
 
 static const struct stmt_ops limit_stmt_ops = {
@@ -407,4 +454,36 @@ static const struct stmt_ops set_stmt_ops = {
 struct stmt *set_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &set_stmt_ops);
+}
+
+static void dup_stmt_print(const struct stmt *stmt)
+{
+	printf("dup");
+	if (stmt->dup.to != NULL) {
+		printf(" to ");
+		expr_print(stmt->dup.to);
+
+		if (stmt->dup.dev != NULL) {
+			printf(" device ");
+			expr_print(stmt->dup.dev);
+		}
+	}
+}
+
+static void dup_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->dup.to);
+	expr_free(stmt->dup.dev);
+}
+
+static const struct stmt_ops dup_stmt_ops = {
+	.type		= STMT_DUP,
+	.name		= "dup",
+	.print		= dup_stmt_print,
+	.destroy	= dup_stmt_destroy,
+};
+
+struct stmt *dup_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &dup_stmt_ops);
 }

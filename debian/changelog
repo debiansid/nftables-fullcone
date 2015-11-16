@@ -1,3 +1,17 @@
+nftables (0.5+snapshot20151106-1) unstable; urgency=medium
+
+  * [bd1e71f] Imported Upstream version 0.5+snapshot20151106
+  * [b7e3c39] d/control: bump build-dep on libnftnl
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 06 Nov 2015 13:32:49 +0100
+
+nftables (0.5-2) unstable; urgency=medium
+
+  * [92938c3] d/rules: get rid of useless commented line
+  * [a04a737] d/: add nftables-dbg binary package
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 13 Oct 2015 14:03:25 +0200
+
 nftables (0.5-1~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.

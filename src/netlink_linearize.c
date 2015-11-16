@@ -18,6 +18,10 @@
 #include <netlink.h>
 #include <gmputil.h>
 #include <utils.h>
+#include <netinet/in.h>
+
+#include <linux/netfilter.h>
+
 
 struct netlink_linearize_ctx {
 	struct nftnl_rule	*nlr;
@@ -99,6 +103,44 @@ static void netlink_gen_concat(struct netlink_linearize_ctx *ctx,
 	}
 }
 
+static void netlink_gen_payload_mask(struct netlink_linearize_ctx *ctx,
+				     const struct expr *expr,
+				     enum nft_registers dreg)
+{
+	struct nft_data_linearize nld, zero = {};
+	struct nftnl_expr *nle;
+	unsigned int offset, len, masklen;
+	mpz_t mask;
+
+	offset = expr->payload.offset % BITS_PER_BYTE;
+	masklen = expr->len + offset;
+
+	if (masklen > 128)
+		BUG("expr mask length is %u (len %u, offset %u)\n",
+				masklen, expr->len, offset);
+
+	mpz_init2(mask, masklen);
+	mpz_bitmask(mask, expr->len);
+
+	if (offset)
+		mpz_lshift_ui(mask, offset);
+
+	nle = alloc_nft_expr("bitwise");
+
+	len = div_round_up(expr->len, BITS_PER_BYTE);
+
+	nftnl_expr_set_u32(nle, NFT_EXPR_BITWISE_SREG, dreg);
+	nftnl_expr_set_u32(nle, NFT_EXPR_BITWISE_DREG, dreg);
+	nftnl_expr_set_u32(nle, NFT_EXPR_BITWISE_LEN, len);
+
+	netlink_gen_raw_data(mask, expr->byteorder, len, &nld);
+	nftnl_expr_set(nle, NFT_EXPR_BITWISE_MASK, nld.value, nld.len);
+	nftnl_expr_set(nle, NFT_EXPR_BITWISE_XOR, &zero.value, nld.len);
+
+	mpz_clear(mask);
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_payload(struct netlink_linearize_ctx *ctx,
 				const struct expr *expr,
 				enum nft_registers dreg)
@@ -111,9 +153,13 @@ static void netlink_gen_payload(struct netlink_linearize_ctx *ctx,
 			      expr->payload.base - 1);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_PAYLOAD_OFFSET,
 			      expr->payload.offset / BITS_PER_BYTE);
-	nftnl_expr_set_u32(nle, NFTNL_EXPR_PAYLOAD_LEN,
-			      expr->len / BITS_PER_BYTE);
+	nftnl_expr_set_u32(nle, NFT_EXPR_PAYLOAD_LEN,
+			   div_round_up(expr->len, BITS_PER_BYTE));
+
 	nftnl_rule_add_expr(ctx->nlr, nle);
+
+	if (expr->len % BITS_PER_BYTE)
+		netlink_gen_payload_mask(ctx, expr, dreg);
 }
 
 static void netlink_gen_exthdr(struct netlink_linearize_ctx *ctx,
@@ -235,6 +281,15 @@ static void netlink_gen_range(struct netlink_linearize_ctx *ctx,
 			      const struct expr *expr,
 			      enum nft_registers dreg);
 
+static void payload_shift_value(const struct expr *left, struct expr *right)
+{
+	if (right->ops->type != EXPR_VALUE ||
+	    left->ops->type != EXPR_PAYLOAD)
+		return;
+
+	mpz_lshift_ui(right->value, left->payload.offset % BITS_PER_BYTE);
+}
+
 static void netlink_gen_cmp(struct netlink_linearize_ctx *ctx,
 			    const struct expr *expr,
 			    enum nft_registers dreg)
@@ -283,6 +338,7 @@ static void netlink_gen_cmp(struct netlink_linearize_ctx *ctx,
 	netlink_put_register(nle, NFTNL_EXPR_CMP_SREG, sreg);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_CMP_OP,
 			      netlink_gen_cmp_op(expr->op));
+	payload_shift_value(expr->left, right);
 	netlink_gen_data(right, &nld);
 	nftnl_expr_set(nle, NFTNL_EXPR_CMP_DATA, nld.value, nld.len);
 	release_register(ctx, expr->left);
@@ -656,6 +712,11 @@ static void netlink_gen_limit_stmt(struct netlink_linearize_ctx *ctx,
 	nle = alloc_nft_expr("limit");
 	nftnl_expr_set_u64(nle, NFTNL_EXPR_LIMIT_RATE, stmt->limit.rate);
 	nftnl_expr_set_u64(nle, NFTNL_EXPR_LIMIT_UNIT, stmt->limit.unit);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_LIMIT_TYPE, stmt->limit.type);
+	if (stmt->limit.burst > 0)
+		nftnl_expr_set_u32(nle, NFTNL_EXPR_LIMIT_BURST,
+				   stmt->limit.burst);
+
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
 
@@ -802,6 +863,37 @@ static void netlink_gen_redir_stmt(struct netlink_linearize_ctx *ctx,
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_dup_stmt(struct netlink_linearize_ctx *ctx,
+				 const struct stmt *stmt)
+{
+	struct nftnl_expr *nle;
+	enum nft_registers sreg1, sreg2;
+
+	nle = alloc_nft_expr("dup");
+
+	if (stmt->dup.to != NULL) {
+		if (stmt->dup.to->dtype == &ifindex_type) {
+			sreg1 = get_register(ctx, stmt->dup.to);
+			netlink_gen_expr(ctx, stmt->dup.to, sreg1);
+			netlink_put_register(nle, NFTNL_EXPR_DUP_SREG_DEV, sreg1);
+		} else {
+			sreg1 = get_register(ctx, stmt->dup.to);
+			netlink_gen_expr(ctx, stmt->dup.to, sreg1);
+			netlink_put_register(nle, NFTNL_EXPR_DUP_SREG_ADDR, sreg1);
+		}
+	}
+	if (stmt->dup.dev != NULL) {
+		sreg2 = get_register(ctx, stmt->dup.dev);
+		netlink_gen_expr(ctx, stmt->dup.dev, sreg2);
+		netlink_put_register(nle, NFTNL_EXPR_DUP_SREG_DEV, sreg2);
+		release_register(ctx, stmt->dup.dev);
+	}
+	if (stmt->dup.to != NULL)
+		release_register(ctx, stmt->dup.to);
+
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_queue_stmt(struct netlink_linearize_ctx *ctx,
 				 const struct stmt *stmt)
 {
@@ -892,6 +984,8 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_masq_stmt(ctx, stmt);
 	case STMT_REDIR:
 		return netlink_gen_redir_stmt(ctx, stmt);
+	case STMT_DUP:
+		return netlink_gen_dup_stmt(ctx, stmt);
 	case STMT_QUEUE:
 		return netlink_gen_queue_stmt(ctx, stmt);
 	case STMT_CT:

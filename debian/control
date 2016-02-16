@@ -14,7 +14,7 @@ Build-Depends: automake,
                libnftnl-dev (>= 1.0.5+snapshot20151106),
                libreadline-dev,
                libtool (>=2.2.6)
-Standards-Version: 3.9.6
+Standards-Version: 3.9.7
 Homepage: http://www.netfilter.org/
 Vcs-Git: git://github.com/aborrero/pkg-nftables.git
 Vcs-Browser: https://github.com/aborrero/pkg-nftables

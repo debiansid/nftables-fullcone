@@ -3,7 +3,7 @@ Depends: @
 Restrictions: needs-root
 
 Tests: internaltest-shell
-Depends: @
+Depends: @, kmod
 Restrictions: needs-root, allow-stderr, isolation-container
 
 Tests: internaltest-py

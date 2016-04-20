@@ -1,3 +1,25 @@
+nftables (0.5+snapshot20160419-1) unstable; urgency=medium
+
+  * [88b9c37] d/rules: don't add /etc/nftables/ dir to 'nftables' binary package
+  * [e0472f0] sysvinit: the init script is now just an example
+  * [f89907b] examples: restore upstream examples
+  * [8228918] d/nftables.examples: cleanup leftover line regarding upstream
+  examples
+  * [0655029] nftables.conf: provide a skeleton firewall and use the old one as
+  example (Closes: #804648)
+  * [dc504e4] examples/syntax/README: point to the nftables wiki
+  * [ecd9257] examples/syntax/nat: add new example file
+  * [406baf9] examples/syntax/: add a new example file: overview
+  * [3fa3d3e] d/control: bump standards to 3.9.7
+  * [79a8520] Imported Upstream version 0.5+snapshot20160419
+  * [775f2af] d/control: get rid of XS-Testsuite
+  * [9ac90db] d/control: change Vcs-git from git:// to https://
+  * [b4b8ee7] d/control: bump dependency with libnftnl
+  * [9e6b0eb] d/tests: run internal nftables tests (shell)
+  * [f8e3da1] d/tests: run internal nftables tests (py)
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 20 Apr 2016 12:00:22 +0200
+
 nftables (0.5+snapshot20151106-1) unstable; urgency=medium
 
   * [bd1e71f] Imported Upstream version 0.5+snapshot20151106

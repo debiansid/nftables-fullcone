@@ -5,3 +5,7 @@ Restrictions: needs-root
 Tests: internaltest-shell
 Depends: @
 Restrictions: needs-root, allow-stderr, isolation-container
+
+Tests: internaltest-py
+Depends: @, python
+Restrictions: needs-root, allow-stderr, isolation-container, build-needed

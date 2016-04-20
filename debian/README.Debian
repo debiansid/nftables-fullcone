@@ -23,13 +23,13 @@ Overview
 
 nf_tables is the new firewalling infrastructure in the Linux kernel,
 intended to replace ip_tables, ip6_tables, arp_tables and ebtables
-in the long term. nftables is the corresponsing userspace frontend,
+in the long term. nftables is the corresponding userspace frontend,
 replacing their respective userspace utilities.
 
 nftables features native support for sets and dictionaries of arbitrary
 types, support for many different protocols, meta data types, connection
 tracking, NAT, logging, atomic incremental and full ruleset updates,
-a netlink API with notification support, a format grammar, a compatiblity
+a netlink API with notification support, a format grammar, a compatibility
 layer for iptables/ip6tables and more.
 
 While the internal architecture is fundamentally different from

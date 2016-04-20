@@ -1,3 +1,7 @@
 Test-Command: nft -h
 Depends: @
 Restrictions: needs-root
+
+Tests: internaltest-shell
+Depends: @
+Restrictions: needs-root, allow-stderr, isolation-container

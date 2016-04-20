@@ -94,12 +94,20 @@ static const struct dev_proto_desc dev_proto_desc[] = {
  */
 int proto_dev_type(const struct proto_desc *desc, uint16_t *res)
 {
-	unsigned int i;
+	const struct proto_desc *base;
+	unsigned int i, j;
 
 	for (i = 0; i < array_size(dev_proto_desc); i++) {
-		if (dev_proto_desc[i].desc == desc) {
+		base = dev_proto_desc[i].desc;
+		if (base == desc) {
 			*res = dev_proto_desc[i].type;
 			return 0;
+		}
+		for (j = 0; j < array_size(base->protocols); j++) {
+			if (base->protocols[j].desc == desc) {
+				*res = dev_proto_desc[i].type;
+				return 0;
+			}
 		}
 	}
 	return -1;
@@ -123,7 +131,7 @@ const struct proto_desc *proto_dev_desc(uint16_t type)
 
 const struct hook_proto_desc hook_proto_desc[] = {
 	[NFPROTO_BRIDGE]	= HOOK_PROTO_DESC(PROTO_BASE_LL_HDR,	  &proto_eth),
-	[NFPROTO_NETDEV]	= HOOK_PROTO_DESC(PROTO_BASE_LL_HDR,	  &proto_eth),
+	[NFPROTO_NETDEV]	= HOOK_PROTO_DESC(PROTO_BASE_LL_HDR,	  &proto_netdev),
 	[NFPROTO_INET]		= HOOK_PROTO_DESC(PROTO_BASE_LL_HDR,	  &proto_inet),
 	[NFPROTO_IPV4]		= HOOK_PROTO_DESC(PROTO_BASE_NETWORK_HDR, &proto_ip),
 	[NFPROTO_IPV6]		= HOOK_PROTO_DESC(PROTO_BASE_NETWORK_HDR, &proto_ip6),
@@ -291,6 +299,8 @@ static const struct symbol_table icmp_type_tbl = {
 		SYMBOL("source-quench",			ICMP_SOURCE_QUENCH),
 		SYMBOL("redirect",			ICMP_REDIRECT),
 		SYMBOL("echo-request",			ICMP_ECHO),
+		SYMBOL("router-advertisement",		ICMP_ROUTERADVERT),
+		SYMBOL("router-solicitation",		ICMP_ROUTERSOLICIT),
 		SYMBOL("time-exceeded",			ICMP_TIME_EXCEEDED),
 		SYMBOL("parameter-problem",		ICMP_PARAMETERPROB),
 		SYMBOL("timestamp-request",		ICMP_TIMESTAMP),
@@ -303,7 +313,7 @@ static const struct symbol_table icmp_type_tbl = {
 	},
 };
 
-static const struct datatype icmp_type_type = {
+const struct datatype icmp_type_type = {
 	.type		= TYPE_ICMP_TYPE,
 	.name		= "icmp_type",
 	.desc		= "ICMP type",
@@ -321,6 +331,7 @@ static const struct datatype icmp_type_type = {
 const struct proto_desc proto_icmp = {
 	.name		= "icmp",
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= ICMPHDR_CHECKSUM,
 	.templates	= {
 		[ICMPHDR_TYPE]		= ICMPHDR_TYPE("type", &icmp_type_type, type),
 		[ICMPHDR_CODE]		= ICMPHDR_FIELD("code", code),
@@ -343,6 +354,7 @@ const struct proto_desc proto_icmp = {
 const struct proto_desc proto_udp = {
 	.name		= "udp",
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= UDPHDR_CHECKSUM,
 	.templates	= {
 		[UDPHDR_SPORT]		= INET_SERVICE("sport", struct udphdr, source),
 		[UDPHDR_DPORT]		= INET_SERVICE("dport", struct udphdr, dest),
@@ -398,15 +410,16 @@ static const struct datatype tcp_flag_type = {
 const struct proto_desc proto_tcp = {
 	.name		= "tcp",
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= TCPHDR_CHECKSUM,
 	.templates	= {
 		[TCPHDR_SPORT]		= INET_SERVICE("sport", struct tcphdr, source),
 		[TCPHDR_DPORT]		= INET_SERVICE("dport", struct tcphdr, dest),
 		[TCPHDR_SEQ]		= TCPHDR_FIELD("sequence", seq),
 		[TCPHDR_ACKSEQ]		= TCPHDR_FIELD("ackseq", ack_seq),
 		[TCPHDR_DOFF]		= HDR_BITFIELD("doff", &integer_type,
-						       (12 * BITS_PER_BYTE) + 4, 4),
+						       (12 * BITS_PER_BYTE), 4),
 		[TCPHDR_RESERVED]	= HDR_BITFIELD("reserved", &integer_type,
-						       (12 * BITS_PER_BYTE) + 0, 4),
+						       (12 * BITS_PER_BYTE) + 4, 4),
 		[TCPHDR_FLAGS]		= HDR_BITFIELD("flags", &tcp_flag_type,
 						       13 * BITS_PER_BYTE,
 						       BITS_PER_BYTE),
@@ -456,7 +469,8 @@ const struct proto_desc proto_dccp = {
 	.templates	= {
 		[DCCPHDR_SPORT]		= INET_SERVICE("sport", struct dccp_hdr, dccph_sport),
 		[DCCPHDR_DPORT]		= INET_SERVICE("dport", struct dccp_hdr, dccph_dport),
-		[DCCPHDR_TYPE]		= HDR_BITFIELD("type", &dccp_pkttype_type, 67, 4),
+		[DCCPHDR_TYPE]		= HDR_BITFIELD("type", &dccp_pkttype_type,
+						       (8 * BITS_PER_BYTE) + 3, 4),
 	},
 };
 
@@ -491,6 +505,7 @@ const struct proto_desc proto_sctp = {
 const struct proto_desc proto_ip = {
 	.name		= "ip",
 	.base		= PROTO_BASE_NETWORK_HDR,
+	.checksum_key	= IPHDR_CHECKSUM,
 	.protocol_key	= IPHDR_PROTOCOL,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
@@ -504,8 +519,8 @@ const struct proto_desc proto_ip = {
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
 	},
 	.templates	= {
-		[IPHDR_VERSION]		= HDR_BITFIELD("version", &integer_type, 4, 4),
-		[IPHDR_HDRLENGTH]	= HDR_BITFIELD("hdrlength", &integer_type, 0, 4),
+		[IPHDR_VERSION]		= HDR_BITFIELD("version", &integer_type, 0, 4),
+		[IPHDR_HDRLENGTH]	= HDR_BITFIELD("hdrlength", &integer_type, 4, 4),
 		[IPHDR_TOS]		= IPHDR_FIELD("tos",		tos),
 		[IPHDR_LENGTH]		= IPHDR_FIELD("length",		tot_len),
 		[IPHDR_ID]		= IPHDR_FIELD("id",		id),
@@ -529,7 +544,7 @@ static const struct symbol_table icmp6_type_tbl = {
 		SYMBOL("destination-unreachable",	ICMP6_DST_UNREACH),
 		SYMBOL("packet-too-big",		ICMP6_PACKET_TOO_BIG),
 		SYMBOL("time-exceeded",			ICMP6_TIME_EXCEEDED),
-		SYMBOL("param-problem",			ICMP6_PARAM_PROB),
+		SYMBOL("parameter-problem",		ICMP6_PARAM_PROB),
 		SYMBOL("echo-request",			ICMP6_ECHO_REQUEST),
 		SYMBOL("echo-reply",			ICMP6_ECHO_REPLY),
 		SYMBOL("mld-listener-query",		MLD_LISTENER_QUERY),
@@ -563,6 +578,7 @@ static const struct datatype icmp6_type_type = {
 const struct proto_desc proto_icmp6 = {
 	.name		= "icmpv6",
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= ICMP6HDR_CHECKSUM,
 	.templates	= {
 		[ICMP6HDR_TYPE]		= ICMP6HDR_TYPE("type", &icmp6_type_type, icmp6_type),
 		[ICMP6HDR_CODE]		= ICMP6HDR_FIELD("code", icmp6_code),
@@ -663,13 +679,13 @@ const struct proto_desc proto_inet_service = {
 
 static const struct symbol_table arpop_tbl = {
 	.symbols	= {
-		SYMBOL("request",	ARPOP_REQUEST),
-		SYMBOL("reply",		ARPOP_REPLY),
-		SYMBOL("rrequest",	ARPOP_RREQUEST),
-		SYMBOL("rreply",	ARPOP_RREPLY),
-		SYMBOL("inrequest",	ARPOP_InREQUEST),
-		SYMBOL("inreply",	ARPOP_InREPLY),
-		SYMBOL("nak",		ARPOP_NAK),
+		SYMBOL("request",	__constant_htons(ARPOP_REQUEST)),
+		SYMBOL("reply",		__constant_htons(ARPOP_REPLY)),
+		SYMBOL("rrequest",	__constant_htons(ARPOP_RREQUEST)),
+		SYMBOL("rreply",	__constant_htons(ARPOP_RREPLY)),
+		SYMBOL("inrequest",	__constant_htons(ARPOP_InREQUEST)),
+		SYMBOL("inreply",	__constant_htons(ARPOP_InREPLY)),
+		SYMBOL("nak",		__constant_htons(ARPOP_NAK)),
 		SYMBOL_LIST_END
 	},
 };
@@ -725,9 +741,9 @@ const struct proto_desc proto_vlan = {
 
 	},
 	.templates	= {
-		[VLANHDR_VID]		= VLANHDR_BITFIELD("id", 0, 12),
-		[VLANHDR_CFI]		= VLANHDR_BITFIELD("cfi", 12, 1),
-		[VLANHDR_PCP]		= VLANHDR_BITFIELD("pcp", 13, 3),
+		[VLANHDR_PCP]		= VLANHDR_BITFIELD("pcp", 0, 3),
+		[VLANHDR_CFI]		= VLANHDR_BITFIELD("cfi", 3, 1),
+		[VLANHDR_VID]		= VLANHDR_BITFIELD("id", 4, 12),
 		[VLANHDR_TYPE]		= VLANHDR_TYPE("type", &ethertype_type, vlan_type),
 	},
 };
@@ -797,6 +813,23 @@ const struct proto_desc proto_eth = {
 		[ETHHDR_DADDR]		= ETHHDR_ADDR("daddr", ether_dhost),
 		[ETHHDR_SADDR]		= ETHHDR_ADDR("saddr", ether_shost),
 		[ETHHDR_TYPE]		= ETHHDR_TYPE("type", ether_type),
+	},
+};
+
+/*
+ * Dummy protocol for netdev tables.
+ */
+const struct proto_desc proto_netdev = {
+	.name		= "netdev",
+	.base		= PROTO_BASE_LL_HDR,
+	.protocols	= {
+		PROTO_LINK(__constant_htons(ETH_P_IP),		&proto_ip),
+		PROTO_LINK(__constant_htons(ETH_P_ARP),		&proto_arp),
+		PROTO_LINK(__constant_htons(ETH_P_IPV6),	&proto_ip6),
+		PROTO_LINK(__constant_htons(ETH_P_8021Q),	&proto_vlan),
+	},
+	.templates	= {
+		[0]	= PROTO_META_TEMPLATE("protocol", &ethertype_type, NFT_META_PROTOCOL, 16),
 	},
 };
 

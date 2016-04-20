@@ -213,21 +213,24 @@ static const char *get_rate(uint64_t byte_rate, uint64_t *rate)
 
 static void limit_stmt_print(const struct stmt *stmt)
 {
+	bool inv = stmt->limit.flags & NFT_LIMIT_F_INV;
 	const char *data_unit;
 	uint64_t rate;
 
 	switch (stmt->limit.type) {
 	case NFT_LIMIT_PKTS:
-		printf("limit rate %" PRIu64 "/%s",
-		       stmt->limit.rate, get_unit(stmt->limit.unit));
+		printf("limit rate %s%" PRIu64 "/%s",
+		       inv ? "over " : "", stmt->limit.rate,
+		       get_unit(stmt->limit.unit));
 		if (stmt->limit.burst > 0)
 			printf(" burst %u packets", stmt->limit.burst);
 		break;
 	case NFT_LIMIT_PKT_BYTES:
 		data_unit = get_rate(stmt->limit.rate, &rate);
 
-		printf("limit rate %" PRIu64 " %s/%s",
-		       rate, data_unit, get_unit(stmt->limit.unit));
+		printf("limit rate %s%" PRIu64 " %s/%s",
+		       inv ? "over " : "", rate, data_unit,
+		       get_unit(stmt->limit.unit));
 		if (stmt->limit.burst > 0) {
 			uint64_t burst;
 
@@ -382,13 +385,24 @@ static void masq_stmt_print(const struct stmt *stmt)
 {
 	printf("masquerade");
 
+	if (stmt->masq.proto) {
+		printf(" to :");
+		expr_print(stmt->masq.proto);
+	}
+
 	print_nf_nat_flags(stmt->masq.flags);
+}
+
+static void masq_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->masq.proto);
 }
 
 static const struct stmt_ops masq_stmt_ops = {
 	.type		= STMT_MASQ,
 	.name		= "masq",
 	.print		= masq_stmt_print,
+	.destroy	= masq_stmt_destroy,
 };
 
 struct stmt *masq_stmt_alloc(const struct location *loc)
@@ -486,4 +500,27 @@ static const struct stmt_ops dup_stmt_ops = {
 struct stmt *dup_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &dup_stmt_ops);
+}
+
+static void fwd_stmt_print(const struct stmt *stmt)
+{
+	printf("fwd to ");
+	expr_print(stmt->fwd.to);
+}
+
+static void fwd_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->fwd.to);
+}
+
+static const struct stmt_ops fwd_stmt_ops = {
+	.type		= STMT_FWD,
+	.name		= "fwd",
+	.print		= fwd_stmt_print,
+	.destroy	= fwd_stmt_destroy,
+};
+
+struct stmt *fwd_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &fwd_stmt_ops);
 }

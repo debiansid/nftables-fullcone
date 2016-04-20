@@ -34,19 +34,19 @@ vi:ts=4 sw=4
 		<cmdsynopsis>
 			<command>nft</command>
 			<arg choice="opt">
-				<option>-n/--numeric</option>
+				<option>-n | --numeric</option>
 			</arg>
 			<arg choice="opt">
-				<option>-I/--includepath</option>
+				<option>[-I | --includepath]</option>
 				<replaceable>directory</replaceable>
 			</arg>
 			<group>
 				<arg choice="opt">
-					<option>-f/--file</option>
+					<option>[-f | --file]</option>
 					<replaceable>filename</replaceable>
 				</arg>
 				<arg choice="opt">
-					<option>-i/--interactive</option>
+					<option>[-i | --interactive]</option>
 				</arg>
 				<arg choice="opt" rep="repeat">
 					<replaceable>cmd</replaceable>
@@ -56,10 +56,10 @@ vi:ts=4 sw=4
 		<cmdsynopsis>
 			<command>nft</command>
 			<arg choice="opt">
-				<option>-h/--help</option>
+				<option>-h | --help</option>
 			</arg>
 			<arg choice="opt">
-				<option>-v/--version</option>
+				<option>-v | --version</option>
 			</arg>
 		</cmdsynopsis>
 	</refsynopsisdiv>
@@ -80,7 +80,7 @@ vi:ts=4 sw=4
 
 		<variablelist>
 			<varlistentry>
-				<term><option>-h/--help</option></term>
+				<term><option>-h, --help</option></term>
 				<listitem>
 					<para>
 						Show help message and all options.
@@ -88,7 +88,7 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-v/--version</option></term>
+				<term><option>-v, --version</option></term>
 				<listitem>
 					<para>
 						Show version.
@@ -96,7 +96,7 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-n/--numeric</option></term>
+				<term><option>-n, --numeric</option></term>
 				<listitem>
 					<para>
 						Numeric output: Addresses and other information
@@ -117,7 +117,7 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-a/--handle</option></term>
+				<term><option>-a, --handle</option></term>
 				<listitem>
 					<para>
 						Show rule handles in output.
@@ -125,15 +125,15 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-I/--includepath <replaceable>directory</replaceable></option></term>
+				<term><option>-I, --includepath <replaceable>directory</replaceable></option></term>
 				<listitem>
 					<para>
-						Add the directory <replaceable>directory</replaceable> to the list of directories to by searched for included files.
+						Add the directory <replaceable>directory</replaceable> to the list of directories to be searched for included files.
 					</para>
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-f/--file <replaceable>filename</replaceable></option></term>
+				<term><option>-f, --file <replaceable>filename</replaceable></option></term>
 				<listitem>
 					<para>
 						Read input from <replaceable>filename</replaceable>.
@@ -141,7 +141,7 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-i/--interactive</option></term>
+				<term><option>-i, --interactive</option></term>
 				<listitem>
 					<para>
 						Read input from an interactive readline CLI.
@@ -156,8 +156,8 @@ vi:ts=4 sw=4
 		<refsect2>
 			<title>Lexical conventions</title>
 			<para>
-				Input is parsed line-wise. When the last character of a line just before
-				the newline character is a non-quoted backslash (<literal>\</literal>),
+				Input is parsed line-wise. When the last character of a line, just before
+				the newline character, is a non-quoted backslash (<literal>\</literal>),
 				the next line is treated as a continuation. Multiple commands on the
 				same line can be separated using a semicolon (<literal>;</literal>).
 			</para>
@@ -982,6 +982,13 @@ filter output ip6 daddr ::1
 						<arg>skgid</arg>
 						<arg>nftrace</arg>
 						<arg>rtclassid</arg>
+						<arg>ibriport</arg>
+						<arg>obriport</arg>
+						<arg>pkttype</arg>
+						<arg>cpu</arg>
+						<arg>iifgroup</arg>
+						<arg>oifgroup</arg>
+						<arg>cgroup</arg>
 					</group>
 				</cmdsynopsis>
 			</para>
@@ -1074,6 +1081,41 @@ filter output ip6 daddr ::1
 								<entry>Routing realm</entry>
 								<entry>realm</entry>
 							</row>
+							<row>
+								<entry>ibriport</entry>
+								<entry>Input bridge interface name</entry>
+								<entry>string</entry>
+							</row>
+							<row>
+								<entry>obriport</entry>
+								<entry>Output bridge interface name</entry>
+								<entry>string</entry>
+							</row>
+							<row>
+								<entry>pkttype</entry>
+								<entry>packet type</entry>
+								<entry>pkt_type</entry>
+							</row>
+							<row>
+								<entry>cpu</entry>
+								<entry>cpu number processing the packet</entry>
+								<entry>integer (32 bits)</entry>
+							</row>
+							<row>
+								<entry>iifgroup</entry>
+								<entry>incoming device group</entry>
+								<entry>devgroup_type</entry>
+							</row>
+							<row>
+								<entry>oifgroup</entry>
+								<entry>outgoing device group</entry>
+								<entry>devgroup_type</entry>
+							</row>
+							<row>
+								<entry>cgroup</entry>
+								<entry>control group id</entry>
+								<entry>integer (32 bits)</entry>
+							</row>
 						</tbody>
 					</tgroup>
 				</table>
@@ -1129,6 +1171,20 @@ filter output ip6 daddr ::1
 								<entry>
 									Routing Realm (32 bit number). Can be specified numerically
 									or as symbolic name defined in /etc/iproute2/rt_realms.
+								</entry>
+							</row>
+							<row>
+								<entry>devgroup_type</entry>
+								<entry>
+									Device group (32 bit number). Can be specified numerically
+									or as symbolic name defined in /etc/iproute2/group.
+								</entry>
+							</row>
+							<row>
+								<entry>pkt_type</entry>
+								<entry>
+									Packet type: Unicast (addressed to local host),
+									Broadcast (to all), Multicast (to group).
 								</entry>
 							</row>
 						</tbody>
@@ -1875,6 +1931,13 @@ filter output oif eth0
 				Conntrack expressions refer to meta data of the connection tracking entry associated with a packet.
 			</para>
 			<para>
+				There are three types of conntrack expressions. Some conntrack expressions require the flow
+				direction before the conntrack key, others must be used directly because they are
+				direction agnostic.  The <command>packets<command> and </command>bytes</command> keywords can be used
+				with or without a direction.  If the direction is omitted, the sum of the original and the reply
+				direction is returned.
+			</para>
+			<para>
 				<cmdsynopsis>
 					<command>ct</command>
 					<group choice="req">
@@ -1884,12 +1947,23 @@ filter output oif eth0
 						<arg>mark</arg>
 						<arg>expiration</arg>
 						<arg>helper</arg>
-						<arg>l3proto</arg>
-						<arg>saddr</arg>
-						<arg>daddr</arg>
-						<arg>protocol</arg>
-						<arg>proto-src</arg>
-						<arg>proto-dst</arg>
+						<arg>label</arg>
+						<arg>bytes</arg>
+						<arg>packets</arg>
+					</group>
+					<group choice="req">
+						<arg>original</arg>
+						<arg>reply</arg>
+						<group choice="req">
+							<arg>l3proto</arg>
+							<arg>protocol</arg>
+							<arg>saddr</arg>
+							<arg>daddr</arg>
+							<arg>proto-src</arg>
+							<arg>proto-dst</arg>
+							<arg>bytes</arg>
+							<arg>packets</arg>
+						</group>
 					</group>
 				</cmdsynopsis>
 			</para>
@@ -1939,9 +2013,14 @@ filter output oif eth0
 								<entry>string</entry>
 							</row>
 							<row>
+								<entry>label</entry>
+								<entry>Connection tracking label</entry>
+								<entry>ct_label</entry>
+							</row>
+							<row>
 								<entry>l3proto</entry>
 								<entry>Layer 3 protocol of the connection</entry>
-								<entry>nf_proto FIXME</entry>
+								<entry>nf_proto</entry>
 							</row>
 							<row>
 								<entry>saddr</entry>
@@ -1961,12 +2040,22 @@ filter output oif eth0
 							<row>
 								<entry>proto-src</entry>
 								<entry>Layer 4 protocol source for the given direction</entry>
-								<entry>FIXME</entry>
+								<entry>integer (16 bit)</entry>
 							</row>
 							<row>
 								<entry>proto-dst</entry>
 								<entry>Layer 4 protocol destination for the given direction</entry>
-								<entry>FIXME</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>packets</entry>
+								<entry>packet count seen in the given direction or sum of original and reply</entry>
+								<entry>integer (64 bit)</entry>
+							</row>
+							<row>
+								<entry>bytes</entry>
+								<entry>bytecount seen, see description for <command>packets</command> keyword</entry>
+								<entry>integer (64 bit)</entry>
 							</row>
 						</tbody>
 					</tgroup>

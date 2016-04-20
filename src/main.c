@@ -107,19 +107,19 @@ static void show_help(const char *name)
 "Usage: %s [ options ] [ cmds... ]\n"
 "\n"
 "Options:\n"
-"  -h/--help			Show this help\n"
-"  -v/--version			Show version information\n"
+"  -h, --help			Show this help\n"
+"  -v, --version			Show version information\n"
 "\n"
-"  -f/--file <filename>		Read input from <filename>\n"
-"  -i/--interactive		Read input from interactive CLI\n"
+"  -f, --file <filename>		Read input from <filename>\n"
+"  -i, --interactive		Read input from interactive CLI\n"
 "\n"
-"  -n/--numeric			When specified once, show network addresses numerically (default behaviour).\n"
+"  -n, --numeric			When specified once, show network addresses numerically (default behaviour).\n"
 "  				When specified twice, show Internet services,\n"
 "				user IDs and group IDs numerically.\n"
 "				When specified thrice, also show protocols numerically.\n"
 "  -N				Translate IP addresses to names.\n"
-"  -a/--handle			Output rule handle.\n"
-"  -I/--includepath <directory>	Add <directory> to the paths searched for include files.\n"
+"  -a, --handle			Output rule handle.\n"
+"  -I, --includepath <directory>	Add <directory> to the paths searched for include files.\n"
 #ifdef DEBUG
 "  --debug <level [,level...]>	Specify debugging level (scanner, parser, eval, netlink, mnl, proto-ctx, segtree, all)\n"
 #endif
@@ -338,6 +338,10 @@ int main(int argc, char * const *argv)
 		scanner = scanner_init(&state);
 		scanner_push_buffer(scanner, &indesc_cmdline, buf);
 	} else if (filename != NULL) {
+		rc = cache_update(CMD_INVALID, &msgs);
+		if (rc < 0)
+			return rc;
+
 		parser_init(&state, &msgs);
 		scanner = scanner_init(&state);
 		if (scanner_read_file(scanner, filename, &internal_location) < 0)

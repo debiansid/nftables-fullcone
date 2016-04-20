@@ -133,6 +133,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 	struct expr		*expr;
 	struct set		*set;
 	const struct datatype	*datatype;
+	struct handle_spec	handle_spec;
+	struct position_spec	position_spec;
 }
 
 %token TOKEN_EOF 0		"end of file"
@@ -184,6 +186,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token ADD			"add"
 %token UPDATE			"update"
+%token REPLACE			"replace"
 %token CREATE			"create"
 %token INSERT			"insert"
 %token DELETE			"delete"
@@ -216,7 +219,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token <val> NUM		"number"
 %token <string> STRING		"string"
 %token <string> QUOTED_STRING
-%destructor { xfree($$); }	STRING QUOTED_STRING
+%token <string> ASTERISK_STRING
+%destructor { xfree($$); }	STRING QUOTED_STRING ASTERISK_STRING
 
 %token LL_HDR			"ll"
 %token NETWORK_HDR		"nh"
@@ -365,6 +369,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token LIMIT			"limit"
 %token RATE			"rate"
 %token BURST			"burst"
+%token OVER			"over"
+%token UNTIL			"until"
 
 %token NANOSECOND		"nanosecond"
 %token MICROSECOND		"microsecond"
@@ -376,7 +382,6 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token WEEK			"week"
 
 %token _REJECT			"reject"
-%token RESET			"reset"
 %token WITH			"with"
 %token ICMPX			"icmpx"
 
@@ -394,7 +399,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token FANOUT			"fanout"
 
 %token DUP			"dup"
-%token ON			"on"
+%token FWD			"fwd"
 
 %token POSITION			"position"
 %token COMMENT			"comment"
@@ -413,14 +418,20 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
+%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
 
 %type <handle>			table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
 %destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
 %type <handle>			set_spec set_identifier
 %destructor { handle_free(&$$); } set_spec set_identifier
-%type <val>			handle_spec family_spec family_spec_explicit position_spec chain_policy
+%type <val>			family_spec family_spec_explicit chain_policy prio_spec
+
+%type <handle_spec>		handle_spec
+%type <position_spec>		position_spec
+
+%type <string>			dev_spec
+%destructor { xfree($$); }	dev_spec
 
 %type <table>			table_block_alloc table_block
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
@@ -445,6 +456,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { stmt_free($$); }	stmt match_stmt verdict_stmt
 %type <stmt>			counter_stmt counter_stmt_alloc
 %destructor { stmt_free($$); }	counter_stmt counter_stmt_alloc
+%type <stmt>			payload_stmt
+%destructor { stmt_free($$); }	payload_stmt
 %type <stmt>			ct_stmt
 %destructor { stmt_free($$); }	ct_stmt
 %type <stmt>			meta_stmt
@@ -454,7 +467,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <val>			level_type
 %type <stmt>			limit_stmt
 %destructor { stmt_free($$); }	limit_stmt
-%type <val>			limit_burst time_unit
+%type <val>			limit_burst limit_mode time_unit
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
 %type <stmt>			nat_stmt nat_stmt_alloc masq_stmt masq_stmt_alloc redir_stmt redir_stmt_alloc
@@ -465,6 +478,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <val>			queue_stmt_flags queue_stmt_flag
 %type <stmt>			dup_stmt
 %destructor { stmt_free($$); }	dup_stmt
+%type <stmt>			fwd_stmt
+%destructor { stmt_free($$); }	fwd_stmt
 %type <stmt>			set_stmt
 %destructor { stmt_free($$); }	set_stmt
 %type <val>			set_stmt_op
@@ -478,12 +493,14 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <expr>			basic_expr
 %destructor { expr_free($$); }	basic_expr
 
-%type <expr>			multiton_expr
-%destructor { expr_free($$); }	multiton_expr
-%type <expr>			prefix_expr range_expr wildcard_expr
-%destructor { expr_free($$); }	prefix_expr range_expr wildcard_expr
-%type <expr>			list_expr
-%destructor { expr_free($$); }	list_expr
+%type <expr>			multiton_rhs_expr
+%destructor { expr_free($$); }	multiton_rhs_expr
+%type <expr>			prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
+%destructor { expr_free($$); }	prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
+
+%type <expr>			stmt_expr concat_stmt_expr map_stmt_expr
+%destructor { expr_free($$); }	stmt_expr concat_stmt_expr map_stmt_expr
+
 %type <expr>			concat_expr
 %destructor { expr_free($$); }	concat_expr
 
@@ -503,6 +520,14 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %type <expr>			expr initializer_expr
 %destructor { expr_free($$); }	expr initializer_expr
+
+%type <expr>			rhs_expr concat_rhs_expr basic_rhs_expr
+%destructor { expr_free($$); }	rhs_expr concat_rhs_expr basic_rhs_expr
+%type <expr>			primary_rhs_expr list_rhs_expr shift_rhs_expr
+%destructor { expr_free($$); }	primary_rhs_expr list_rhs_expr shift_rhs_expr
+%type <expr>			and_rhs_expr exclusive_or_rhs_expr inclusive_or_rhs_expr
+%destructor { expr_free($$); }	and_rhs_expr exclusive_or_rhs_expr inclusive_or_rhs_expr
+
 
 %type <expr>			relational_expr
 %destructor { expr_free($$); }	relational_expr
@@ -551,7 +576,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
-%type <val>			ct_key
+%type <val>			ct_key		ct_key_dir	ct_key_counters
 
 %type <val>			export_format
 %type <string>			monitor_event
@@ -649,6 +674,7 @@ line			:	common_block			{ $$ = NULL; }
 
 base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 	  		|	ADD		add_cmd		{ $$ = $2; }
+			|	REPLACE		replace_cmd	{ $$ = $2; }
 			|	CREATE		create_cmd	{ $$ = $2; }
 			|	INSERT		insert_cmd	{ $$ = $2; }
 			|	DELETE		delete_cmd	{ $$ = $2; }
@@ -708,6 +734,12 @@ add_cmd			:	TABLE		table_spec
 			|	ELEMENT		set_spec	set_expr
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SETELEM, &$2, &@$, $3);
+			}
+			;
+
+replace_cmd		:	RULE		ruleid_spec	rule
+			{
+				$$ = cmd_alloc(CMD_REPLACE, CMD_OBJ_RULE, &$2, &@$, $3);
 			}
 			;
 
@@ -1072,71 +1104,36 @@ type_identifier		:	STRING	{ $$ = $1; }
 			|	MARK	{ $$ = xstrdup("mark"); }
 			;
 
-hook_spec		:	TYPE		STRING		HOOK		STRING		PRIORITY	NUM
+hook_spec		:	TYPE		STRING		HOOK		STRING		dev_spec	PRIORITY	prio_spec
 			{
-				$<chain>0->type		= chain_type_name_lookup($2);
+				$<chain>0->type		= xstrdup(chain_type_name_lookup($2));
 				if ($<chain>0->type == NULL) {
 					erec_queue(error(&@2, "unknown chain type %s", $2),
 						   state->msgs);
 					YYERROR;
 				}
+				xfree($2);
+
 				$<chain>0->hookstr	= chain_hookname_lookup($4);
 				if ($<chain>0->hookstr == NULL) {
 					erec_queue(error(&@4, "unknown chain hook %s", $4),
 						   state->msgs);
 					YYERROR;
 				}
-				$<chain>0->priority	= $6;
+				xfree($4);
+
+				$<chain>0->dev		= $5;
+				$<chain>0->priority	= $7;
 				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
 			}
-			|	TYPE		STRING		HOOK		STRING		PRIORITY	DASH	NUM
-			{
-				$<chain>0->type		= chain_type_name_lookup($2);
-				if ($<chain>0->type == NULL) {
-					erec_queue(error(&@2, "unknown type name %s", $2),
-						   state->msgs);
-					YYERROR;
-				}
-				$<chain>0->hookstr	= chain_hookname_lookup($4);
-				if ($<chain>0->hookstr == NULL) {
-					erec_queue(error(&@4, "unknown hook name %s", $4),
-						   state->msgs);
-					YYERROR;
-				}
-				$<chain>0->priority	= -$7;
-				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
-			}
-			|	TYPE		STRING		HOOK		STRING		DEVICE	STRING	PRIORITY	NUM
-			{
-				$<chain>0->type		= chain_type_name_lookup($2);
-				if ($<chain>0->type == NULL) {
-					erec_queue(error(&@2, "unknown chain type %s", $2),
-						   state->msgs);
-					YYERROR;
-				}
-				$<chain>0->hookstr	= chain_hookname_lookup($4);
-				if ($<chain>0->hookstr == NULL) {
-					erec_queue(error(&@4, "unknown chain hook %s", $4),
-						   state->msgs);
-					YYERROR;
-				}
-				$<chain>0->dev		= $6;
-				$<chain>0->priority	= $8;
-				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
-			}
-			|	TYPE		STRING		HOOK		STRING		DEVICE	STRING	PRIORITY	DASH	NUM
-			{
-				$<chain>0->type		= chain_type_name_lookup($2);
-				if ($<chain>0->type == NULL) {
-					erec_queue(error(&@2, "unknown type name %s", $2),
-						   state->msgs);
-					YYERROR;
-				}
-				$<chain>0->hookstr	= chain_hookname_lookup($4);
-				$<chain>0->dev		= $6;
-				$<chain>0->priority	= -$9;
-				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
-			}
+			;
+
+prio_spec		:	NUM			{ $$ = $1; }
+			|	DASH	NUM		{ $$ = -$2; }
+			;
+
+dev_spec		:	DEVICE	STRING		{ $$ = $2; }
+			|	/* empty */		{ $$ = NULL; }
 			;
 
 policy_spec		:	POLICY		chain_policy
@@ -1159,6 +1156,7 @@ identifier		:	STRING
 
 string			:	STRING
 			|	QUOTED_STRING
+			|	ASTERISK_STRING
 			;
 
 time_spec		:	STRING
@@ -1225,21 +1223,25 @@ set_identifier		:	identifier
 
 handle_spec		:	/* empty */
 			{
-				$$ = 0;
+				memset(&$$, 0, sizeof($$));
 			}
 			|	HANDLE		NUM
 			{
-				$$ = $2;
+				memset(&$$, 0, sizeof($$));
+				$$.location	= @$;
+				$$.id		= $2;
 			}
 			;
 
 position_spec		:	/* empty */
 			{
-				$$ = 0;
+				memset(&$$, 0, sizeof($$));
 			}
 			|	POSITION	NUM
 			{
-				$$ = $2;
+				memset(&$$, 0, sizeof($$));
+				$$.location	= @$;
+				$$.id		= $2;
 			}
 			;
 
@@ -1278,7 +1280,7 @@ rule			:	stmt_list	comment_spec
 				struct stmt *i;
 
 				$$ = rule_alloc(&@$, NULL);
-				$$->handle.comment = $2;
+				$$->comment = $2;
 				list_for_each_entry(i, $1, list)
 					$$->num_stmts++;
 				list_splice_tail($1, &$$->stmts);
@@ -1302,6 +1304,7 @@ stmt_list		:	stmt
 stmt			:	verdict_stmt
 			|	match_stmt
 			|	counter_stmt
+			|	payload_stmt
 			|	meta_stmt
 			|	log_stmt
 			|	limit_stmt
@@ -1312,6 +1315,7 @@ stmt			:	verdict_stmt
 			|	masq_stmt
 			|	redir_stmt
 			|	dup_stmt
+			|	fwd_stmt
 			|	set_stmt
 			;
 
@@ -1444,31 +1448,38 @@ level_type		:	LEVEL_EMERG	{ $$ = LOG_EMERG; }
 			|	LEVEL_DEBUG	{ $$ = LOG_DEBUG; }
 			;
 
-limit_stmt		:	LIMIT	RATE	NUM	SLASH	time_unit	limit_burst
+limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst
 	    		{
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate	= $3;
-				$$->limit.unit	= $5;
-				$$->limit.burst	= $6;
+				$$->limit.rate	= $4;
+				$$->limit.unit	= $6;
+				$$->limit.burst	= $7;
 				$$->limit.type	= NFT_LIMIT_PKTS;
+				$$->limit.flags = $3;
 			}
-			|	LIMIT RATE	NUM	STRING	limit_burst
+			|	LIMIT	RATE	limit_mode	NUM	STRING	limit_burst
 			{
 				struct error_record *erec;
 				uint64_t rate, unit;
 
-				erec = rate_parse(&@$, $4, &rate, &unit);
+				erec = rate_parse(&@$, $5, &rate, &unit);
 				if (erec != NULL) {
 					erec_queue(erec, state->msgs);
 					YYERROR;
 				}
 
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate	= rate * $3;
+				$$->limit.rate	= rate * $4;
 				$$->limit.unit	= unit;
-				$$->limit.burst	= $5;
+				$$->limit.burst	= $6;
 				$$->limit.type	= NFT_LIMIT_PKT_BYTES;
+				$$->limit.flags = $3;
 			}
+			;
+
+limit_mode		:	OVER				{ $$ = NFT_LIMIT_F_INV; }
+			|	UNTIL				{ $$ = 0; }
+			|	/* empty */			{ $$ = 0; }
 			;
 
 limit_burst		:	/* empty */			{ $$ = 0; }
@@ -1538,9 +1549,15 @@ reject_opts		:       /* empty */
 							  $4);
 				$<stmt>0->reject.expr->dtype = &icmpx_code_type;
 			}
-			|	WITH	TCP	RESET
+			|	WITH	TCP	STRING
 			{
-				$<stmt>0->reject.type = NFT_REJECT_TCP_RST;
+				if (strcmp($3, "reset") == 0) {
+					$<stmt>0->reject.type = NFT_REJECT_TCP_RST;
+				} else {
+					erec_queue(error(&@2, "unsupported reject type", $3),
+						   state->msgs);
+					YYERROR;
+				}
 			}
 			;
 
@@ -1559,34 +1576,76 @@ nat_stmt_alloc		:	SNAT
 			}
 			;
 
-nat_stmt_args		:	expr
+concat_stmt_expr	:	primary_expr
+			|	concat_stmt_expr	DOT	primary_expr
+			{
+				if ($$->ops->type != EXPR_CONCAT) {
+					$$ = concat_expr_alloc(&@$);
+					compound_expr_add($$, $1);
+				} else {
+					struct location rhs[] = {
+						[1]	= @2,
+						[2]	= @3,
+					};
+					location_update(&$3->location, rhs, 2);
+
+					$$ = $1;
+					$$->location = @$;
+				}
+				compound_expr_add($$, $3);
+			}
+			;
+
+map_stmt_expr		:	concat_stmt_expr	MAP	rhs_expr
+			{
+				$$ = map_expr_alloc(&@$, $1, $3);
+			}
+			;
+
+stmt_expr		:	map_stmt_expr
+			|	multiton_rhs_expr
+			|	primary_rhs_expr
+			;
+
+nat_stmt_args		:	stmt_expr
 			{
 				$<stmt>0->nat.addr = $1;
 			}
-			|	expr	COLON	expr
+			|	stmt_expr	COLON	stmt_expr
 			{
 				$<stmt>0->nat.addr = $1;
 				$<stmt>0->nat.proto = $3;
 			}
-			|	COLON	expr
+			|	COLON		stmt_expr
 			{
 				$<stmt>0->nat.proto = $2;
 			}
-			|	nat_stmt_args	nf_nat_flags
+			|       nat_stmt_args   nf_nat_flags
 			{
 				$<stmt>0->nat.flags = $2;
 			}
 			;
 
-masq_stmt		:	masq_stmt_alloc
-			|	masq_stmt_alloc	nf_nat_flags
-			{
-				$$ = $1;
-				$$->masq.flags = $2;
-			}
+masq_stmt		:	masq_stmt_alloc		masq_stmt_args
+			|	masq_stmt_alloc
 			;
 
 masq_stmt_alloc		:	MASQUERADE 	{ $$ = masq_stmt_alloc(&@$); }
+			;
+
+masq_stmt_args		:	TO 	COLON	stmt_expr
+			{
+				$<stmt>0->masq.proto = $3;
+			}
+			|	TO 	COLON	stmt_expr	nf_nat_flags
+			{
+				$<stmt>0->masq.proto = $3;
+				$<stmt>0->masq.flags = $4;
+			}
+			|	nf_nat_flags
+			{
+				$<stmt>0->masq.flags = $1;
+			}
 			;
 
 redir_stmt		:	redir_stmt_alloc	redir_stmt_arg
@@ -1596,7 +1655,7 @@ redir_stmt		:	redir_stmt_alloc	redir_stmt_arg
 redir_stmt_alloc	:	REDIRECT	{ $$ = redir_stmt_alloc(&@$); }
 			;
 
-redir_stmt_arg		:	TO	expr
+redir_stmt_arg		:	TO	stmt_expr
 			{
 				$<stmt>0->redir.proto = $2;
 			}
@@ -1604,23 +1663,30 @@ redir_stmt_arg		:	TO	expr
 			{
 				$<stmt>0->redir.flags = $1;
 			}
-			|	TO	expr	nf_nat_flags
+			|	TO	stmt_expr	nf_nat_flags
 			{
 				$<stmt>0->redir.proto = $2;
 				$<stmt>0->redir.flags = $3;
 			}
 			;
 
-dup_stmt		:	DUP	TO	expr
+dup_stmt		:	DUP	TO	stmt_expr
 			{
 				$$ = dup_stmt_alloc(&@$);
 				$$->dup.to = $3;
 			}
-			|	DUP	TO	expr 	DEVICE	expr
+			|	DUP	TO	stmt_expr 	DEVICE	stmt_expr
 			{
 				$$ = dup_stmt_alloc(&@$);
 				$$->dup.to = $3;
 				$$->dup.dev = $5;
+			}
+			;
+
+fwd_stmt		:	FWD	TO	expr
+			{
+				$$ = fwd_stmt_alloc(&@$);
+				$$->fwd.to = $3;
 			}
 			;
 
@@ -1653,9 +1719,10 @@ queue_stmt_args		:	queue_stmt_arg
 			|	queue_stmt_args	queue_stmt_arg
 			;
 
-queue_stmt_arg		:	QUEUENUM	expr
+queue_stmt_arg		:	QUEUENUM	stmt_expr
 			{
 				$<stmt>0->queue.queue = $2;
+				$<stmt>0->queue.queue->location = @$;
 			}
 			|	queue_stmt_flags
 			{
@@ -1798,33 +1865,19 @@ concat_expr		:	basic_expr
 			}
 			;
 
-list_expr		:	basic_expr		COMMA		basic_expr
-			{
-				$$ = list_expr_alloc(&@$);
-				compound_expr_add($$, $1);
-				compound_expr_add($$, $3);
-			}
-			|	list_expr		COMMA		basic_expr
-			{
-				$1->location = @$;
-				compound_expr_add($1, $3);
-				$$ = $1;
-			}
-			;
-
-prefix_expr		:	basic_expr		SLASH	NUM
+prefix_rhs_expr		:	basic_rhs_expr	SLASH	NUM
 			{
 				$$ = prefix_expr_alloc(&@$, $1, $3);
 			}
 			;
 
-range_expr		:	basic_expr		DASH	basic_expr
+range_rhs_expr		:	basic_rhs_expr	DASH	basic_rhs_expr
 			{
 				$$ = range_expr_alloc(&@$, $1, $3);
 			}
 			;
 
-wildcard_expr		:	ASTERISK
+wildcard_rhs_expr	:	ASTERISK
 	       		{
 				struct expr *expr;
 
@@ -1835,19 +1888,18 @@ wildcard_expr		:	ASTERISK
 			}
 			;
 
-multiton_expr		:	prefix_expr
-			|	range_expr
-			|	wildcard_expr
+multiton_rhs_expr	:	prefix_rhs_expr
+			|	range_rhs_expr
+			|	wildcard_rhs_expr
 			;
 
-map_expr		:	concat_expr	MAP	expr
+map_expr		:	concat_expr	MAP	rhs_expr
 			{
 				$$ = map_expr_alloc(&@$, $1, $3);
 			}
 			;
 
 expr			:	concat_expr
-			|	multiton_expr
 			|	set_expr
 			|       map_expr
 			;
@@ -1913,29 +1965,226 @@ set_elem_option		:	TIMEOUT			time_spec
 			}
 			;
 
-set_lhs_expr		:	concat_expr
-			|	multiton_expr
+set_lhs_expr		:	concat_rhs_expr
+			|	multiton_rhs_expr
 			;
 
-set_rhs_expr		:	concat_expr
+set_rhs_expr		:	concat_rhs_expr
 			|	verdict_expr
 			;
 
-initializer_expr	:	expr
-			|	list_expr
+initializer_expr	:	rhs_expr
+			|	list_rhs_expr
 			;
 
-relational_expr		:	expr	/* implicit */	expr
+relational_expr		:	expr	/* implicit */	rhs_expr
 			{
 				$$ = relational_expr_alloc(&@$, OP_IMPLICIT, $1, $2);
 			}
-			|	expr	/* implicit */	list_expr
+			|	expr	/* implicit */	list_rhs_expr
 			{
 				$$ = relational_expr_alloc(&@$, OP_FLAGCMP, $1, $2);
 			}
-			|	expr	relational_op	expr
+			|	expr	relational_op	rhs_expr
 			{
 				$$ = relational_expr_alloc(&@2, $2, $1, $3);
+			}
+			;
+
+list_rhs_expr		:	basic_rhs_expr		COMMA		basic_rhs_expr
+			{
+				$$ = list_expr_alloc(&@$);
+				compound_expr_add($$, $1);
+				compound_expr_add($$, $3);
+			}
+			|	list_rhs_expr		COMMA		basic_rhs_expr
+			{
+				$1->location = @$;
+				compound_expr_add($1, $3);
+				$$ = $1;
+			}
+			;
+
+rhs_expr		:	concat_rhs_expr		{ $$ = $1; }
+			|	multiton_rhs_expr	{ $$ = $1; }
+			|	set_expr		{ $$ = $1; }
+			;
+
+shift_rhs_expr		:	primary_rhs_expr
+			|	shift_rhs_expr		LSHIFT		primary_rhs_expr
+			{
+				$$ = binop_expr_alloc(&@$, OP_LSHIFT, $1, $3);
+			}
+			|	shift_rhs_expr		RSHIFT		primary_rhs_expr
+			{
+				$$ = binop_expr_alloc(&@$, OP_RSHIFT, $1, $3);
+			}
+			;
+
+and_rhs_expr		:	shift_rhs_expr
+			|	and_rhs_expr		AMPERSAND	shift_rhs_expr
+			{
+				$$ = binop_expr_alloc(&@$, OP_AND, $1, $3);
+			}
+			;
+
+exclusive_or_rhs_expr	:	and_rhs_expr
+			|	exclusive_or_rhs_expr	CARET		and_rhs_expr
+			{
+				$$ = binop_expr_alloc(&@$, OP_XOR, $1, $3);
+			}
+			;
+
+inclusive_or_rhs_expr	:	exclusive_or_rhs_expr
+			|	inclusive_or_rhs_expr	'|'		exclusive_or_rhs_expr
+			{
+				$$ = binop_expr_alloc(&@$, OP_OR, $1, $3);
+			}
+			;
+
+basic_rhs_expr		:	inclusive_or_rhs_expr
+			;
+
+concat_rhs_expr		:	basic_rhs_expr
+			|	concat_rhs_expr	DOT	basic_rhs_expr
+			{
+				if ($$->ops->type != EXPR_CONCAT) {
+					$$ = concat_expr_alloc(&@$);
+					compound_expr_add($$, $1);
+				} else {
+					struct location rhs[] = {
+						[1]	= @2,
+						[2]	= @3,
+					};
+					location_update(&$3->location, rhs, 2);
+
+					$$ = $1;
+					$$->location = @$;
+				}
+				compound_expr_add($$, $3);
+			}
+			;
+
+primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
+			|	integer_expr		{ $$ = $1; }
+			|	ETHER
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ether");
+			}
+			|	IP
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ip");
+			}
+			|	IP6
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ip6");
+			}
+			|	VLAN
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "vlan");
+			}
+			|	ARP
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "arp");
+			}
+			|	TCP
+			{
+				uint8_t data = IPPROTO_TCP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	UDP
+			{
+				uint8_t data = IPPROTO_UDP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	UDPLITE
+			{
+				uint8_t data = IPPROTO_UDPLITE;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	ESP
+			{
+				uint8_t data = IPPROTO_ESP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	AH
+			{
+				uint8_t data = IPPROTO_AH;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	ICMP
+			{
+				uint8_t data = IPPROTO_ICMP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	ICMP6
+			{
+				uint8_t data = IPPROTO_ICMPV6;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	COMP
+			{
+				uint8_t data = IPPROTO_COMP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	DCCP
+			{
+				uint8_t data = IPPROTO_DCCP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	SCTP
+			{
+				uint8_t data = IPPROTO_SCTP;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	REDIRECT
+			{
+				uint8_t data = ICMP_REDIRECT;
+				$$ = constant_expr_alloc(&@$, &icmp_type_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	SNAT
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "snat");
+			}
+			|	DNAT
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "dnat");
 			}
 			;
 
@@ -2024,9 +2273,22 @@ meta_stmt		:	META	meta_key	SET	expr
 			}
 			;
 
-ct_expr			:	CT	ct_key
+ct_expr			: 	CT	ct_key
 			{
-				$$ = ct_expr_alloc(&@$, $2);
+				$$ = ct_expr_alloc(&@$, $2, -1);
+			}
+			|	CT	STRING	ct_key_dir
+			{
+				struct error_record *erec;
+				int8_t direction;
+
+				erec = ct_dir_parse(&@$, $2, &direction);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = ct_expr_alloc(&@$, $3, direction);
 			}
 			;
 
@@ -2036,18 +2298,31 @@ ct_key			:	STATE		{ $$ = NFT_CT_STATE; }
 			|	MARK		{ $$ = NFT_CT_MARK; }
 			|	EXPIRATION	{ $$ = NFT_CT_EXPIRATION; }
 			|	HELPER		{ $$ = NFT_CT_HELPER; }
-			|	L3PROTOCOL	{ $$ = NFT_CT_L3PROTOCOL; }
-			|	SADDR		{ $$ = NFT_CT_SRC; }
+			|	LABEL		{ $$ = NFT_CT_LABELS; }
+			|	ct_key_counters
+			;
+ct_key_dir		:	SADDR		{ $$ = NFT_CT_SRC; }
 			|	DADDR		{ $$ = NFT_CT_DST; }
+			|	L3PROTOCOL	{ $$ = NFT_CT_L3PROTOCOL; }
 			|	PROTOCOL	{ $$ = NFT_CT_PROTOCOL; }
 			|	PROTO_SRC	{ $$ = NFT_CT_PROTO_SRC; }
 			|	PROTO_DST	{ $$ = NFT_CT_PROTO_DST; }
-			|	LABEL		{ $$ = NFT_CT_LABELS; }
+			|	ct_key_counters
+			;
+
+ct_key_counters		:	BYTES		{ $$ = NFT_CT_BYTES; }
+			|	PACKETS		{ $$ = NFT_CT_PKTS; }
 			;
 
 ct_stmt			:	CT	ct_key		SET	expr
 			{
 				$$ = ct_stmt_alloc(&@$, $2, $4);
+			}
+			;
+
+payload_stmt		:	payload_expr		SET	expr
+			{
+				$$ = payload_stmt_alloc(&@$, $1, $3);
 			}
 			;
 
@@ -2088,12 +2363,6 @@ eth_hdr_expr		:	ETHER	eth_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_eth, $2);
 			}
-			|	ETHER
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       "ether");
-			}
 			;
 
 eth_hdr_field		:	SADDR		{ $$ = ETHHDR_SADDR; }
@@ -2104,12 +2373,6 @@ eth_hdr_field		:	SADDR		{ $$ = ETHHDR_SADDR; }
 vlan_hdr_expr		:	VLAN	vlan_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_vlan, $2);
-			}
-			|	VLAN
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       "vlan");
 			}
 			;
 
@@ -2123,12 +2386,6 @@ arp_hdr_expr		:	ARP	arp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_arp, $2);
 			}
-			|	ARP
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       "arp");
-			}
 			;
 
 arp_hdr_field		:	HTYPE		{ $$ = ARPHDR_HRD; }
@@ -2141,12 +2398,6 @@ arp_hdr_field		:	HTYPE		{ $$ = ARPHDR_HRD; }
 ip_hdr_expr		:	IP	ip_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_ip, $2);
-			}
-			|	IP
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       "ip");
 			}
 			;
 
@@ -2167,13 +2418,6 @@ icmp_hdr_expr		:	ICMP	icmp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_icmp, $2);
 			}
-			|	ICMP
-			{
-				uint8_t data = IPPROTO_ICMP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
-			}
 			;
 
 icmp_hdr_field		:	TYPE		{ $$ = ICMPHDR_TYPE; }
@@ -2189,12 +2433,6 @@ ip6_hdr_expr		:	IP6	ip6_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_ip6, $2);
 			}
-			|	IP6
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       "ip6");
-			}
 			;
 
 ip6_hdr_field		:	HDRVERSION	{ $$ = IP6HDR_VERSION; }
@@ -2209,13 +2447,6 @@ ip6_hdr_field		:	HDRVERSION	{ $$ = IP6HDR_VERSION; }
 icmp6_hdr_expr		:	ICMP6	icmp6_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_icmp6, $2);
-			}
-			|	ICMP6
-			{
-				uint8_t data = IPPROTO_ICMPV6;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -2233,13 +2464,6 @@ auth_hdr_expr		:	AH	auth_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_ah, $2);
 			}
-			|	AH
-			{
-				uint8_t data = IPPROTO_AH;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
-			}
 			;
 
 auth_hdr_field		:	NEXTHDR		{ $$ = AHHDR_NEXTHDR; }
@@ -2253,13 +2477,6 @@ esp_hdr_expr		:	ESP	esp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_esp, $2);
 			}
-			|	ESP
-			{
-				uint8_t data = IPPROTO_ESP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
-			}
 			;
 
 esp_hdr_field		:	SPI		{ $$ = ESPHDR_SPI; }
@@ -2269,13 +2486,6 @@ esp_hdr_field		:	SPI		{ $$ = ESPHDR_SPI; }
 comp_hdr_expr		:	COMP	comp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_comp, $2);
-			}
-			|	COMP
-			{
-				uint8_t data = IPPROTO_COMP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -2287,13 +2497,6 @@ comp_hdr_field		:	NEXTHDR		{ $$ = COMPHDR_NEXTHDR; }
 udp_hdr_expr		:	UDP	udp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_udp, $2);
-			}
-			|	UDP
-			{
-				uint8_t data = IPPROTO_UDP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -2307,13 +2510,6 @@ udplite_hdr_expr	:	UDPLITE	udplite_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_udplite, $2);
 			}
-			|	UDPLITE
-			{
-				uint8_t data = IPPROTO_UDPLITE;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
-			}
 			;
 
 udplite_hdr_field	:	SPORT		{ $$ = UDPHDR_SPORT; }
@@ -2325,13 +2521,6 @@ udplite_hdr_field	:	SPORT		{ $$ = UDPHDR_SPORT; }
 tcp_hdr_expr		:	TCP	tcp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_tcp, $2);
-			}
-			|	TCP
-			{
-				uint8_t data = IPPROTO_TCP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 
@@ -2351,13 +2540,6 @@ dccp_hdr_expr		:	DCCP	dccp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_dccp, $2);
 			}
-			|	DCCP
-			{
-				uint8_t data = IPPROTO_DCCP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
-			}
 			;
 
 dccp_hdr_field		:	SPORT		{ $$ = DCCPHDR_SPORT; }
@@ -2368,13 +2550,6 @@ dccp_hdr_field		:	SPORT		{ $$ = DCCPHDR_SPORT; }
 sctp_hdr_expr		:	SCTP	sctp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_sctp, $2);
-			}
-			|	SCTP
-			{
-				uint8_t data = IPPROTO_SCTP;
-				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
 			;
 

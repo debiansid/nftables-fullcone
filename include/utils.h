@@ -69,6 +69,7 @@
 #define field_sizeof(t, f)	(sizeof(((t *)NULL)->f))
 #define array_size(arr)		(sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
 #define div_round_up(n, d)	(((n) + (d) - 1) / (d))
+#define round_up(n, b)		(div_round_up(n, b) * b)
 
 #define min(x, y) ({				\
 	typeof(x) _min1 = (x);			\
@@ -129,5 +130,6 @@ extern void *xmalloc(size_t size);
 extern void *xrealloc(void *ptr, size_t size);
 extern void *xzalloc(size_t size);
 extern char *xstrdup(const char *s);
+extern void xstrunescape(const char *in, char *out);
 
 #endif /* NFTABLES_UTILS_H */

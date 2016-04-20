@@ -18,7 +18,6 @@ Standards-Version: 3.9.7
 Homepage: http://www.netfilter.org/
 Vcs-Git: git://github.com/aborrero/pkg-nftables.git
 Vcs-Browser: https://github.com/aborrero/pkg-nftables
-XS-Testsuite: autopkgtest
 
 Package: nftables
 Architecture: linux-any

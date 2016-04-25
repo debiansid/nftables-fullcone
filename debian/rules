@@ -36,3 +36,8 @@ override_dh_auto_install:
 
 override_dh_installdocs:
 	dh_installdocs --link-doc=nftables
+
+override_dh_installinit:
+	# dh_installinit will try to mess with /etc/init.d/nftables in
+	# the maintainer scripts, but we don't ship it
+	dh_installinit -n

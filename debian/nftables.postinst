@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -e
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/bridge-filter \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/inet-filter \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv4-filter \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv4-mangle \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv4-nat \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv6-filter \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv6-mangle \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+dpkg-maintscript-helper rm_conffile \
+	/etc/nftables/ipv6-nat \
+	0.5+snapshot20151106-1 nftables -- "$@"
+
+#DEBHELPER#

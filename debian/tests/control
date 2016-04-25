@@ -9,3 +9,7 @@ Restrictions: needs-root, allow-stderr, isolation-container
 Tests: internaltest-py
 Depends: @, python
 Restrictions: needs-root, allow-stderr, isolation-container, build-needed
+
+Tests: systemd-service-test.sh
+Depends: @, systemd
+Restrictions: needs-root, allow-stderr, isolation-container

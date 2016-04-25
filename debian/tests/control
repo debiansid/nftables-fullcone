@@ -2,11 +2,11 @@ Test-Command: nft -h
 Depends: @
 Restrictions: needs-root
 
-Tests: internaltest-shell
+Tests: internaltest-shell.sh
 Depends: @, kmod
 Restrictions: needs-root, allow-stderr, isolation-container
 
-Tests: internaltest-py
+Tests: internaltest-py.sh
 Depends: @, python
 Restrictions: needs-root, allow-stderr, isolation-container, build-needed
 

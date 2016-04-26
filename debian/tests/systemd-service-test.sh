@@ -1,36 +1,66 @@
 #!/bin/sh
 
+set -ex
+
 SERVICE=nftables.service
 
-set -e
+systemctl_call()
+{
+	if systemctl $1 $SERVICE ; then
+		return 0
+	else
+		journalctl -u $SERVICE
+		return 1
+	fi
+}
+
+# package ships service disabled by default
+if ! systemctl_call enable ; then
+	: WARNING enabling the service failed
+fi
 
 if systemctl -q is-active $SERVICE ; then
-	echo "W: initial service running, stopping now" >&2
-	systemctl stop $SERVICE
+	: WARNING initial service running, stopping now
+	if ! systemctl_call stop ; then
+		: ERROR unable to stop the initial service
+		exit 1
+	fi
 fi
 
 if [ $(nft list ruleset | wc -l) -ne 0 ] ; then
-	echo "W: initial ruleset is not empty, flushing now" >&2
+	: WARNING initial ruleset is not empty, flushing now
 	nft flush ruleset
 fi
 
-systemctl start $SERVICE
+if ! systemctl_call start ; then
+	: ERROR failed to start systemd service
+	exit 1
+fi
 if [ $(nft list ruleset | wc -l) -eq 0 ] ; then
-	echo "E: called 'systemctl start ${SERVICE}' but no ruleset loaded" >&2
+	: ERROR no ruleset loaded after systemd service start
 	exit 1
 fi
 
-systemctl status $SERVICE
-systemctl stop $SERVICE
+systemctl_call status
+nft list ruleset
+
+if ! systemctl_call stop ; then
+	: ERROR failed to stop systemd service
+	exit 1
+fi
 if [ $(nft list ruleset | wc -l) -ne 0 ] ; then
-	echo "E: called 'systemctl stop ${SERVICE}' but ruleset still loaded" >&2
+	: ERROR ruleset still loaded after systemd service stop
 	exit 1
 fi
 
-systemctl restart $SERVICE
+if ! systemctl_call restart ; then
+	: ERROR failed to restart systemd service
+	exit 1
+fi
 if [ $(nft list ruleset | wc -l) -eq 0 ] ; then
-	echo "E: called 'systemctl restart ${SERVICE}' but no ruleset loaded" >&2
+	: ERROR no ruleset loaded after systemd service restart
 	exit 1
 fi
 
+: INFO test was OK
 exit 0

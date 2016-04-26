@@ -1,3 +1,11 @@
+nftables (0.5+snapshot20160426-1) unstable; urgency=medium
+
+  * [955e138] d/tests/systemd-service-test.sh: adapt script to
+    ci.debian.net
+  * [ad1699a] Imported Upstream version 0.5+snapshot20160426
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 26 Apr 2016 11:01:18 +0200
+
 nftables (0.5+snapshot20160419-3) unstable; urgency=medium
 
   * [f1d8880] d/control: bump standars-version to 3.9.8

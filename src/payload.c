@@ -85,8 +85,12 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	base = ctx->protocol[left->payload.base].desc;
 	desc = proto_find_upper(base, proto);
 
-	assert(left->payload.base + 1 <= PROTO_BASE_MAX);
-	proto_ctx_update(ctx, left->payload.base + 1, &expr->location, desc);
+	assert(desc->base <= PROTO_BASE_MAX);
+	if (desc->base == base->base) {
+		assert(base->length > 0);
+		ctx->protocol[base->base].offset += base->length;
+	}
+	proto_ctx_update(ctx, desc->base, &expr->location, desc);
 }
 
 static const struct expr_ops payload_expr_ops = {
@@ -136,6 +140,11 @@ void payload_init_raw(struct expr *expr, enum proto_bases base,
 	expr->payload.base	= base;
 	expr->payload.offset	= offset;
 	expr->len		= len;
+}
+
+unsigned int payload_hdr_field(const struct expr *expr)
+{
+	return expr->payload.tmpl - expr->payload.desc->templates;
 }
 
 static void payload_stmt_print(const struct stmt *stmt)
@@ -318,6 +327,70 @@ int exthdr_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 }
 
 /**
+ * payload_is_stacked - return whether a payload protocol match defines a stacked
+ * 			protocol on the same layer
+ *
+ * @desc: current protocol description on this layer
+ * @expr: payload match
+ */
+bool payload_is_stacked(const struct proto_desc *desc, const struct expr *expr)
+{
+	const struct proto_desc *next;
+
+	if (expr->left->ops->type != EXPR_PAYLOAD ||
+	    !(expr->left->flags & EXPR_F_PROTOCOL) ||
+	    expr->op != OP_EQ)
+		return false;
+
+	next = proto_find_upper(desc, mpz_get_be16(expr->right->value));
+	return next && next->base == desc->base;
+}
+
+/**
+ * payload_dependency_store - store a possibly redundant protocol match
+ *
+ * @ctx: payload dependency context
+ * @stmt: payload match
+ * @base: base of payload match
+ */
+void payload_dependency_store(struct payload_dep_ctx *ctx,
+			      struct stmt *stmt, enum proto_bases base)
+{
+	ctx->pbase = base + 1;
+	ctx->pdep  = stmt;
+}
+
+/**
+ * __payload_dependency_kill - kill a redundant payload depedency
+ *
+ * @ctx: payload dependency context
+ * @expr: higher layer payload expression
+ *
+ * Kill a redundant payload expression if a higher layer payload expression
+ * implies its existance.
+ */
+void __payload_dependency_kill(struct payload_dep_ctx *ctx,
+			       enum proto_bases base)
+{
+	if (ctx->pbase != PROTO_BASE_INVALID &&
+	    ctx->pbase == base &&
+	    ctx->pdep != NULL) {
+		list_del(&ctx->pdep->list);
+		stmt_free(ctx->pdep);
+
+		ctx->pbase = PROTO_BASE_INVALID;
+		if (ctx->pdep == ctx->prev)
+			ctx->prev = NULL;
+		ctx->pdep  = NULL;
+	}
+}
+
+void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
+{
+	__payload_dependency_kill(ctx, expr->payload.base);
+}
+
+/**
  * payload_expr_complete - fill in type information of a raw payload expr
  *
  * @expr:	the payload expression
@@ -483,23 +556,36 @@ raw:
 	list_add_tail(&new->list, list);
 }
 
-/**
- * payload_is_adjacent - return whether two payload expressions refer to
- * 			 adjacent header locations
- *
- * @e1:		first payload expression
- * @e2:		second payload expression
- */
-bool payload_is_adjacent(const struct expr *e1, const struct expr *e2)
+static bool payload_is_adjacent(const struct expr *e1, const struct expr *e2)
 {
-	if (e1->payload.offset % BITS_PER_BYTE || e1->len % BITS_PER_BYTE ||
-	    e2->payload.offset % BITS_PER_BYTE || e2->len % BITS_PER_BYTE)
-		return false;
-
 	if (e1->payload.base		 == e2->payload.base &&
 	    e1->payload.offset + e1->len == e2->payload.offset)
 		return true;
 	return false;
+}
+
+/**
+ * payload_can_merge - return whether two payload expressions can be merged
+ *
+ * @e1:		first payload expression
+ * @e2:		second payload expression
+ */
+bool payload_can_merge(const struct expr *e1, const struct expr *e2)
+{
+	unsigned int total;
+
+	if (!payload_is_adjacent(e1, e2))
+		return false;
+
+	if (e1->payload.offset % BITS_PER_BYTE || e1->len % BITS_PER_BYTE ||
+	    e2->payload.offset % BITS_PER_BYTE || e2->len % BITS_PER_BYTE)
+		return false;
+
+	total = e1->len + e2->len;
+	if (total < e1->len || total > (NFT_REG_SIZE * BITS_PER_BYTE))
+		return false;
+
+	return true;
 }
 
 /**

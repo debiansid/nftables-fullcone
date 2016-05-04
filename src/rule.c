@@ -32,7 +32,6 @@ void handle_free(struct handle *h)
 	xfree(h->table);
 	xfree(h->chain);
 	xfree(h->set);
-	xfree(h->comment);
 }
 
 void handle_merge(struct handle *dst, const struct handle *src)
@@ -45,12 +44,10 @@ void handle_merge(struct handle *dst, const struct handle *src)
 		dst->chain = xstrdup(src->chain);
 	if (dst->set == NULL && src->set != NULL)
 		dst->set = xstrdup(src->set);
-	if (dst->handle == 0)
+	if (dst->handle.id == 0)
 		dst->handle = src->handle;
-	if (dst->position == 0)
+	if (dst->position.id == 0)
 		dst->position = src->position;
-	if (dst->comment == NULL && src->comment != NULL)
-		dst->comment = xstrdup(src->comment);
 }
 
 static LIST_HEAD(table_list);
@@ -270,7 +267,7 @@ static void set_print_declaration(const struct set *set,
 	if (opts->table != NULL)
 		printf(" %s", opts->table);
 
-	printf(" %s { %s", set->handle.set, opts->nl);
+	printf(" %s {%s", set->handle.set, opts->nl);
 
 	printf("%s%stype %s", opts->tab, opts->tab, set->keytype->name);
 	if (set->flags & SET_F_MAP)
@@ -352,7 +349,7 @@ void set_print_plain(const struct set *s)
 {
 	struct print_fmt_options opts = {
 		.tab		= "",
-		.nl		= "",
+		.nl		= " ",
 		.table		= s->handle.table,
 		.family		= family2str(s->handle.family),
 		.stmt_separator	= ";",
@@ -378,6 +375,7 @@ void rule_free(struct rule *rule)
 {
 	stmt_list_free(&rule->stmts);
 	handle_free(&rule->handle);
+	xfree(rule->comment);
 	xfree(rule);
 }
 
@@ -387,14 +385,26 @@ void rule_print(const struct rule *rule)
 
 	list_for_each_entry(stmt, &rule->stmts, list) {
 		stmt->ops->print(stmt);
-		printf(" ");
+		if (!list_is_last(&stmt->list, &rule->stmts))
+			printf(" ");
 	}
 
-	if (rule->handle.comment)
-		printf("comment \"%s\" ", rule->handle.comment);
+	if (rule->comment)
+		printf(" comment \"%s\"", rule->comment);
 
 	if (handle_output > 0)
-		printf("# handle %" PRIu64, rule->handle.handle);
+		printf(" # handle %" PRIu64, rule->handle.handle.id);
+}
+
+struct rule *rule_lookup(const struct chain *chain, uint64_t handle)
+{
+	struct rule *rule;
+
+	list_for_each_entry(rule, &chain->rules, list) {
+		if (rule->handle.handle.id == handle)
+			return rule;
+	}
+	return NULL;
 }
 
 struct scope *scope_init(struct scope *scope, const struct scope *parent)
@@ -512,6 +522,9 @@ void chain_free(struct chain *chain)
 		rule_free(rule);
 	handle_free(&chain->handle);
 	scope_release(&chain->scope);
+	xfree(chain->type);
+	if (chain->dev != NULL)
+		xfree(chain->dev);
 	xfree(chain);
 }
 
@@ -935,6 +948,18 @@ static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd, bool excl)
 	return 0;
 }
 
+static int do_command_replace(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	switch (cmd->obj) {
+	case CMD_OBJ_RULE:
+		return netlink_replace_rule_batch(ctx, &cmd->handle, cmd->rule,
+						  &cmd->location);
+	default:
+		BUG("invalid command object type %u\n", cmd->obj);
+	}
+	return 0;
+}
+
 static int do_command_insert(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->obj) {
@@ -1010,6 +1035,8 @@ static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 		       table->handle.table);
 
 		list_for_each_entry(set, &table->sets, list) {
+			if (set->flags & SET_F_ANONYMOUS)
+				continue;
 			set_print_declaration(set, &opts);
 			printf("%s}%s", opts.tab, opts.nl);
 		}
@@ -1182,27 +1209,59 @@ static int do_command_rename(struct netlink_ctx *ctx, struct cmd *cmd)
 	return 0;
 }
 
-static int do_command_monitor(struct netlink_ctx *ctx, struct cmd *cmd)
+static bool need_cache(const struct cmd *cmd)
 {
-	struct table *t;
-	struct set *s;
-	struct netlink_mon_handler monhandler;
-
-	/* cache only needed if monitoring:
+	/*
 	 *  - new rules in default format
 	 *  - new elements
 	 */
 	if (((cmd->monitor->flags & (1 << NFT_MSG_NEWRULE)) &&
 	    (cmd->monitor->format == NFTNL_OUTPUT_DEFAULT)) ||
 	    (cmd->monitor->flags & (1 << NFT_MSG_NEWSETELEM)))
-		monhandler.cache_needed = true;
-	else
-		monhandler.cache_needed = false;
+		return true;
 
+	if (cmd->monitor->flags & (1 << NFT_MSG_TRACE))
+		return true;
+
+	return false;
+}
+
+static int do_command_monitor(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	struct table *t;
+	struct set *s;
+	struct netlink_mon_handler monhandler;
+
+	monhandler.cache_needed = need_cache(cmd);
 	if (monhandler.cache_needed) {
+		struct rule *rule, *nrule;
+		struct chain *chain;
+		int ret;
+
 		list_for_each_entry(t, &table_list, list) {
 			list_for_each_entry(s, &t->sets, list)
 				s->init = set_expr_alloc(&cmd->location);
+
+			if (!(cmd->monitor->flags & (1 << NFT_MSG_TRACE)))
+				continue;
+
+			/* When tracing we'd like to translate the rule handle
+			 * we receive in the trace messages to the actual rule
+			 * struct to print that out.  Populate rule cache now.
+			 */
+			ret = netlink_list_table(ctx, &t->handle,
+						 &internal_location);
+
+			if (ret != 0)
+				/* Shouldn't happen and doesn't break things
+				 * too badly
+				 */
+				continue;
+
+			list_for_each_entry_safe(rule, nrule, &ctx->list, list) {
+				chain = chain_lookup(t, &rule->handle);
+				list_move_tail(&rule->list, &chain->rules);
+			}
 		}
 	}
 
@@ -1229,6 +1288,8 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_command_add(ctx, cmd, true);
 	case CMD_INSERT:
 		return do_command_insert(ctx, cmd);
+	case CMD_REPLACE:
+		return do_command_replace(ctx, cmd);
 	case CMD_DELETE:
 		return do_command_delete(ctx, cmd);
 	case CMD_LIST:
@@ -1263,30 +1324,65 @@ static int payload_match_stmt_cmp(const void *p1, const void *p2)
 
 static void payload_do_merge(struct stmt *sa[], unsigned int n)
 {
-	struct expr *last, *this, *expr;
+	struct expr *last, *this, *expr1, *expr2;
 	struct stmt *stmt;
-	unsigned int i;
+	unsigned int i, j;
 
 	qsort(sa, n, sizeof(sa[0]), payload_match_stmt_cmp);
 
 	last = sa[0]->expr;
-	for (i = 1; i < n; i++) {
+	for (j = 0, i = 1; i < n; i++) {
 		stmt = sa[i];
 		this = stmt->expr;
 
-		if (!payload_is_adjacent(last->left, this->left) ||
+		if (!payload_can_merge(last->left, this->left) ||
 		    last->op != this->op) {
 			last = this;
+			j = i;
 			continue;
 		}
 
-		expr = payload_expr_join(last->left, this->left);
-		expr_free(last->left);
-		last->left = expr;
+		expr1 = payload_expr_join(last->left, this->left);
+		expr2 = constant_expr_join(last->right, this->right);
 
-		expr = constant_expr_join(last->right, this->right);
+		/* We can merge last into this, but we can't replace
+		 * the statement associated with this if it does contain
+		 * a higher level protocol.
+		 *
+		 * ether type ip ip saddr X ether saddr Y
+		 * ... can be changed to
+		 * ether type ip ether saddr Y ip saddr X
+		 * ... but not
+		 * ip saddr X ether type ip ether saddr Y
+		 *
+		 * The latter form means we perform ip saddr test before
+		 * ensuring ip dependency, plus it makes decoding harder
+		 * since we don't know the type of the network header
+		 * right away.
+		 *
+		 * So, if we're about to replace a statement
+		 * containing a protocol identifier, just swap this and last
+		 * and replace the other one (i.e., replace 'load ether type ip'
+		 * with the combined 'load both ether type and saddr') and not
+		 * the other way around.
+		 */
+		if (this->left->flags & EXPR_F_PROTOCOL) {
+			struct expr *tmp = last;
+
+			last = this;
+			this = tmp;
+
+			expr1->flags |= EXPR_F_PROTOCOL;
+			stmt = sa[j];
+			assert(stmt->expr == this);
+			j = i;
+		}
+
+		expr_free(last->left);
+		last->left = expr1;
+
 		expr_free(last->right);
-		last->right = expr;
+		last->right = expr2;
 
 		list_del(&stmt->list);
 		stmt_free(stmt);

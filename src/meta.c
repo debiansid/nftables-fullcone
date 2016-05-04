@@ -19,6 +19,8 @@
 #include <net/if_arp.h>
 #include <pwd.h>
 #include <grp.h>
+#include <arpa/inet.h>
+#include <linux/netfilter.h>
 #include <linux/pkt_sched.h>
 #include <linux/if_packet.h>
 
@@ -98,17 +100,17 @@ static struct error_record *tchandle_type_parse(const struct expr *sym,
 	else if (strcmp(sym->identifier, "none") == 0)
 		handle = TC_H_UNSPEC;
 	else if (sym->identifier[0] == ':') {
-		if (sscanf(sym->identifier, ":%04x", &handle) < 0)
+		if (sscanf(sym->identifier, ":%04x", &handle) != 1)
 			goto err;
 	} else if (sym->identifier[strlen(sym->identifier)-1] == ':') {
-		if (sscanf(sym->identifier, "%04x:", &handle) < 0)
+		if (sscanf(sym->identifier, "%04x:", &handle) != 1)
 			goto err;
 
 		handle <<= 16;
 	} else {
 		uint32_t min, max;
 
-		if (sscanf(sym->identifier, "%04x:%04x", &min, &max) < 0)
+		if (sscanf(sym->identifier, "%04x:%04x", &max, &min) != 2)
 			goto err;
 
 		handle = max << 16 | min;
@@ -468,7 +470,9 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 
 	switch (left->meta.key) {
 	case NFT_META_IIFTYPE:
-		if (h->base < PROTO_BASE_NETWORK_HDR)
+		if (h->base < PROTO_BASE_NETWORK_HDR &&
+		    ctx->family != NFPROTO_INET &&
+		    ctx->family != NFPROTO_NETDEV)
 			return;
 
 		desc = proto_dev_desc(mpz_get_uint16(right->value));
@@ -491,6 +495,16 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 			desc = &proto_unknown;
 
 		proto_ctx_update(ctx, PROTO_BASE_TRANSPORT_HDR, &expr->location, desc);
+		break;
+	case NFT_META_PROTOCOL:
+		if (h->base < PROTO_BASE_NETWORK_HDR && ctx->family != NFPROTO_NETDEV)
+			return;
+
+		desc = proto_find_upper(h->desc, ntohs(mpz_get_uint16(right->value)));
+		if (desc == NULL)
+			desc = &proto_unknown;
+
+		proto_ctx_update(ctx, PROTO_BASE_NETWORK_HDR, &expr->location, desc);
 		break;
 	default:
 		break;
@@ -526,6 +540,10 @@ struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
 	case NFT_META_L4PROTO:
 		expr->flags |= EXPR_F_PROTOCOL;
 		expr->meta.base = PROTO_BASE_NETWORK_HDR;
+		break;
+	case NFT_META_PROTOCOL:
+		expr->flags |= EXPR_F_PROTOCOL;
+		expr->meta.base = PROTO_BASE_LL_HDR;
 		break;
 	default:
 		break;
@@ -571,4 +589,24 @@ static void __init meta_init(void)
 	datatype_register(&gid_type);
 	datatype_register(&devgroup_type);
 	datatype_register(&pkttype_type);
+}
+
+/*
+ * @expr:	payload expression
+ * @res:	dependency expression
+ *
+ * Generate a NFT_META_IIFTYPE expression to check for ethernet frames.
+ * Only works on input path.
+ */
+struct stmt *meta_stmt_meta_iiftype(const struct location *loc, uint16_t type)
+{
+	struct expr *dep, *left, *right;
+
+	left = meta_expr_alloc(loc, NFT_META_IIFTYPE);
+	right = constant_expr_alloc(loc, &arphrd_type,
+				    BYTEORDER_HOST_ENDIAN,
+				    2 * BITS_PER_BYTE, &type);
+
+	dep = relational_expr_alloc(loc, OP_EQ, left, right);
+	return expr_stmt_alloc(&dep->location, dep);
 }

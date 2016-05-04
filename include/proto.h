@@ -68,6 +68,7 @@ struct proto_hdr_template {
  *
  * @name:	protocol name
  * @base:	header base
+ * @checksum_key: key of template containing checksum
  * @protocol_key: key of template containing upper layer protocol description
  * @length:	total size of the header, in bits
  * @protocols:	link to upper layer protocol descriptions indexed by protocol value
@@ -76,6 +77,7 @@ struct proto_hdr_template {
 struct proto_desc {
 	const char			*name;
 	enum proto_bases		base;
+	unsigned int			checksum_key;
 	unsigned int			protocol_key;
 	unsigned int			length;
 	struct {
@@ -83,6 +85,11 @@ struct proto_desc {
 		const struct proto_desc		*desc;
 	}				protocols[PROTO_UPPER_MAX];
 	struct proto_hdr_template	templates[PROTO_HDRS_MAX];
+	struct {
+		uint8_t				order[PROTO_HDRS_MAX];
+		uint32_t			filter;
+	}				format;
+
 };
 
 #define PROTO_LINK(__num, __desc)	{ .num = (__num), .desc = (__desc), }
@@ -157,9 +164,9 @@ enum eth_hdr_fields {
 
 enum vlan_hdr_fields {
 	VLANHDR_INVALID,
-	VLANHDR_VID,
-	VLANHDR_CFI,
 	VLANHDR_PCP,
+	VLANHDR_CFI,
+	VLANHDR_VID,
 	VLANHDR_TYPE,
 };
 
@@ -305,6 +312,8 @@ extern const struct proto_desc proto_arp;
 
 extern const struct proto_desc proto_vlan;
 extern const struct proto_desc proto_eth;
+
+extern const struct proto_desc proto_netdev;
 
 extern const struct proto_desc proto_unknown;
 extern const struct proto_hdr_template proto_unknown_template;

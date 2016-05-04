@@ -11,17 +11,17 @@ Build-Depends: automake,
                flex,
                libgmp-dev,
                libmnl-dev,
-               libnftnl-dev (>= 1.0.5+snapshot20151106),
+               libnftnl-dev (>= 1.0.5+snapshot20160416),
                libreadline-dev,
                libtool (>=2.2.6)
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 Homepage: http://www.netfilter.org/
-Vcs-Git: git://github.com/aborrero/pkg-nftables.git
+Vcs-Git: https://github.com/aborrero/pkg-nftables.git
 Vcs-Browser: https://github.com/aborrero/pkg-nftables
-XS-Testsuite: autopkgtest
 
 Package: nftables
 Architecture: linux-any
+Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Program to control packet filtering rules by Netfilter project
  These are the user-space administration tools for the Linux

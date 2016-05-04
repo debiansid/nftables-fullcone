@@ -184,8 +184,8 @@ static const struct ct_template ct_templates[] = {
 	[NFT_CT_HELPER]		= CT_TEMPLATE("helper",	    &string_type,
 					      BYTEORDER_HOST_ENDIAN,
 					      NF_CT_HELPER_NAME_LEN * BITS_PER_BYTE),
-	[NFT_CT_L3PROTOCOL]	= CT_TEMPLATE("l3proto",    &invalid_type,
-					      BYTEORDER_INVALID,
+	[NFT_CT_L3PROTOCOL]	= CT_TEMPLATE("l3proto",    &nfproto_type,
+					      BYTEORDER_HOST_ENDIAN,
 					      BITS_PER_BYTE),
 	[NFT_CT_SRC]		= CT_TEMPLATE("saddr",	    &invalid_type,
 					      BYTEORDER_BIG_ENDIAN, 0),
@@ -203,21 +203,41 @@ static const struct ct_template ct_templates[] = {
 	[NFT_CT_LABELS]		= CT_TEMPLATE("label", &ct_label_type,
 					      BYTEORDER_HOST_ENDIAN,
 					      CT_LABEL_BIT_SIZE),
+	[NFT_CT_BYTES]		= CT_TEMPLATE("bytes", &integer_type,
+					      BYTEORDER_HOST_ENDIAN, 64),
+	[NFT_CT_PKTS]		= CT_TEMPLATE("packets", &integer_type,
+					      BYTEORDER_HOST_ENDIAN, 64),
 };
 
 static void ct_expr_print(const struct expr *expr)
 {
-	printf("ct %s", ct_templates[expr->ct.key].token);
+	const struct symbolic_constant *s;
+
+	printf("ct ");
+	if (expr->ct.direction < 0)
+		goto done;
+
+	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
+		if (expr->ct.direction == (int) s->value) {
+			printf("%s ", s->identifier);
+			break;
+		}
+	}
+ done:
+	printf("%s", ct_templates[expr->ct.key].token);
 }
 
 static bool ct_expr_cmp(const struct expr *e1, const struct expr *e2)
 {
-	return e1->ct.key == e2->ct.key;
+	if (e1->ct.key != e2->ct.key)
+		return false;
+
+	return e1->ct.direction == e2->ct.direction;
 }
 
 static void ct_expr_clone(struct expr *new, const struct expr *expr)
 {
-	new->ct.key = expr->ct.key;
+	new->ct = expr->ct;
 }
 
 static void ct_expr_pctx_update(struct proto_ctx *ctx, const struct expr *expr)
@@ -249,7 +269,23 @@ static const struct expr_ops ct_expr_ops = {
 	.pctx_update	= ct_expr_pctx_update,
 };
 
-struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key)
+struct error_record *ct_dir_parse(const struct location *loc, const char *str,
+				  int8_t *direction)
+{
+	const struct symbolic_constant *s;
+
+	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
+		if (!strcmp(str, s->identifier)) {
+			*direction = s->value;
+			return NULL;
+		}
+	}
+
+	return error(loc, "Could not parse direction %s", str);
+}
+
+struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,
+			   int8_t direction)
 {
 	const struct ct_template *tmpl = &ct_templates[key];
 	struct expr *expr;
@@ -257,6 +293,7 @@ struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key)
 	expr = expr_alloc(loc, &ct_expr_ops, tmpl->dtype,
 			  tmpl->byteorder, tmpl->len);
 	expr->ct.key = key;
+	expr->ct.direction = direction;
 
 	switch (key) {
 	case NFT_CT_PROTOCOL:

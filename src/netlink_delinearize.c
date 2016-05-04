@@ -25,6 +25,7 @@
 #include <utils.h>
 #include <erec.h>
 #include <sys/socket.h>
+#include <libnftnl/udata.h>
 
 struct netlink_parse_ctx {
 	struct list_head	*msgs;
@@ -174,7 +175,7 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 		nld.verdict = nftnl_expr_get_u32(nle, NFTNL_EXPR_IMM_VERDICT); 
 		if  (nftnl_expr_is_set(nle, NFTNL_EXPR_IMM_CHAIN)) {
 			nld.chain = nftnl_expr_get(nle, NFTNL_EXPR_IMM_CHAIN,
-						      &nld.len);
+						   &nld.len);
 		}
 	} else if (nftnl_expr_is_set(nle, NFTNL_EXPR_IMM_DATA)) {
 		nld.value = nftnl_expr_get(nle, NFTNL_EXPR_IMM_DATA, &nld.len);
@@ -232,11 +233,11 @@ static void netlink_parse_cmp(struct netlink_parse_ctx *ctx,
 	nld.value = nftnl_expr_get(nle, NFTNL_EXPR_CMP_DATA, &nld.len);
 	right = netlink_alloc_value(loc, &nld);
 
-	if (left->len != right->len) {
-		if (left->len > right->len)
-			return netlink_error(ctx, loc,
-					     "Relational expression size "
-					     "mismatch");
+	if (left->len > right->len &&
+	    left->dtype != &string_type) {
+		return netlink_error(ctx, loc,
+				     "Relational expression size mismatch");
+	} else if (left->len > 0 && left->len < right->len) {
 		left = netlink_parse_concat_expr(ctx, loc, sreg, right->len);
 		if (left == NULL)
 			return;
@@ -331,12 +332,14 @@ static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
 		mpz_ior(m, m, o);
 	}
 
-	if (mpz_scan0(m, 0) != left->len) {
+	if (left->len > 0 && mpz_scan0(m, 0) == left->len) {
+		/* mask encompasses the entire value */
+		expr_free(mask);
+	} else {
 		mpz_set(mask->value, m);
 		expr = binop_expr_alloc(loc, OP_AND, expr, mask);
 		expr->len = left->len;
-	} else
-		expr_free(mask);
+	}
 
 	if (mpz_cmp_ui(x, 0)) {
 		mpz_set(xor->value, x);
@@ -347,7 +350,7 @@ static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
 
 	if (mpz_cmp_ui(o, 0)) {
 		nld.value = nftnl_expr_get(nle, NFTNL_EXPR_BITWISE_XOR,
-					      &nld.len);
+					   &nld.len);
 
 		or = netlink_alloc_value(loc, &nld);
 		mpz_set(or->value, o);
@@ -397,9 +400,9 @@ static void netlink_parse_byteorder(struct netlink_parse_ctx *ctx,
 	netlink_set_register(ctx, dreg, expr);
 }
 
-static void netlink_parse_payload(struct netlink_parse_ctx *ctx,
-				  const struct location *loc,
-				  const struct nftnl_expr *nle)
+static void netlink_parse_payload_expr(struct netlink_parse_ctx *ctx,
+				       const struct location *loc,
+				       const struct nftnl_expr *nle)
 {
 	enum nft_registers dreg;
 	uint32_t base, offset, len;
@@ -414,6 +417,39 @@ static void netlink_parse_payload(struct netlink_parse_ctx *ctx,
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_PAYLOAD_DREG);
 	netlink_set_register(ctx, dreg, expr);
+}
+
+static void netlink_parse_payload_stmt(struct netlink_parse_ctx *ctx,
+				       const struct location *loc,
+				       const struct nftnl_expr *nle)
+{
+	enum nft_registers sreg;
+	uint32_t base, offset, len;
+	struct expr *expr, *val;
+	struct stmt *stmt;
+
+	base   = nftnl_expr_get_u32(nle, NFTNL_EXPR_PAYLOAD_BASE) + 1;
+	offset = nftnl_expr_get_u32(nle, NFTNL_EXPR_PAYLOAD_OFFSET) * BITS_PER_BYTE;
+	len    = nftnl_expr_get_u32(nle, NFTNL_EXPR_PAYLOAD_LEN) * BITS_PER_BYTE;
+
+	expr = payload_expr_alloc(loc, NULL, 0);
+	payload_init_raw(expr, base, offset, len);
+
+	sreg = netlink_parse_register(nle, NFT_EXPR_PAYLOAD_SREG);
+	val  = netlink_get_register(ctx, loc, sreg);
+	stmt = payload_stmt_alloc(loc, expr, val);
+
+	list_add_tail(&stmt->list, &ctx->rule->stmts);
+}
+
+static void netlink_parse_payload(struct netlink_parse_ctx *ctx,
+				  const struct location *loc,
+				  const struct nftnl_expr *nle)
+{
+	if (nftnl_expr_is_set(nle, NFT_EXPR_PAYLOAD_DREG))
+		netlink_parse_payload_expr(ctx, loc, nle);
+	else
+		netlink_parse_payload_stmt(ctx, loc, nle);
 }
 
 static void netlink_parse_exthdr(struct netlink_parse_ctx *ctx,
@@ -503,12 +539,16 @@ static void netlink_parse_ct_expr(struct netlink_parse_ctx *ctx,
 				  const struct location *loc,
 				  const struct nftnl_expr *nle)
 {
+	struct expr *expr = NULL;
 	enum nft_registers dreg;
+	int8_t dir = -1;
 	uint32_t key;
-	struct expr *expr;
+
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_CT_DIR))
+		dir = nftnl_expr_get_u8(nle, NFTNL_EXPR_CT_DIR);
 
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_CT_KEY);
-	expr = ct_expr_alloc(loc, key);
+	expr = ct_expr_alloc(loc, key, dir);
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_CT_DREG);
 	netlink_set_register(ctx, dreg, expr);
@@ -531,10 +571,8 @@ static void netlink_parse_counter(struct netlink_parse_ctx *ctx,
 	struct stmt *stmt;
 
 	stmt = counter_stmt_alloc(loc);
-	stmt->counter.packets =
-		nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_PACKETS);
-	stmt->counter.bytes   =
-		nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_BYTES);
+	stmt->counter.packets = nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_PACKETS);
+	stmt->counter.bytes   = nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_BYTES);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -552,8 +590,7 @@ static void netlink_parse_log(struct netlink_parse_ctx *ctx,
 		stmt->log.flags |= STMT_LOG_PREFIX;
 	}
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_LOG_GROUP)) {
-		stmt->log.group =
-			nftnl_expr_get_u16(nle, NFTNL_EXPR_LOG_GROUP);
+		stmt->log.group = nftnl_expr_get_u16(nle, NFTNL_EXPR_LOG_GROUP);
 		stmt->log.flags |= STMT_LOG_GROUP;
 	}
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_LOG_SNAPLEN)) {
@@ -585,6 +622,7 @@ static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
 	stmt->limit.unit = nftnl_expr_get_u64(nle, NFTNL_EXPR_LIMIT_UNIT);
 	stmt->limit.type = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_TYPE);
 	stmt->limit.burst = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_BURST);
+	stmt->limit.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_FLAGS);
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -620,8 +658,7 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	family = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_FAMILY);
 
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_NAT_FLAGS))
-		stmt->nat.flags = nftnl_expr_get_u32(nle,
-							NFTNL_EXPR_NAT_FLAGS);
+		stmt->nat.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_FLAGS);
 
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN);
 	if (reg1) {
@@ -690,15 +727,40 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
 			       const struct location *loc,
 			       const struct nftnl_expr *nle)
 {
+	enum nft_registers reg1, reg2;
+	struct expr *proto;
 	struct stmt *stmt;
-	uint32_t flags;
+	uint32_t flags = 0;
 
-	flags = 0;
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_MASQ_FLAGS))
 		flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_MASQ_FLAGS);
 
 	stmt = masq_stmt_alloc(loc);
 	stmt->masq.flags = flags;
+
+	reg1 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_PROTO_MIN);
+	if (reg1) {
+		proto = netlink_get_register(ctx, loc, reg1);
+		if (proto == NULL)
+			return netlink_error(ctx, loc,
+					     "MASQUERADE statement"
+					     "has no proto expression");
+		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
+		stmt->masq.proto = proto;
+	}
+
+	reg2 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_PROTO_MAX);
+	if (reg2 && reg2 != reg1) {
+		proto = netlink_get_register(ctx, loc, reg2);
+		if (proto == NULL)
+			return netlink_error(ctx, loc,
+					     "MASQUERADE statement"
+					     "has no proto expression");
+		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
+		if (stmt->masq.proto != NULL)
+			proto = range_expr_alloc(loc, stmt->masq.proto, proto);
+		stmt->masq.proto = proto;
+	}
 
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
@@ -795,6 +857,30 @@ static void netlink_parse_dup(struct netlink_parse_ctx *ctx,
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
+static void netlink_parse_fwd(struct netlink_parse_ctx *ctx,
+			      const struct location *loc,
+			      const struct nftnl_expr *nle)
+{
+	enum nft_registers reg1;
+	struct expr *dev;
+	struct stmt *stmt;
+
+	stmt = fwd_stmt_alloc(loc);
+
+	reg1 = netlink_parse_register(nle, NFTNL_EXPR_FWD_SREG_DEV);
+	if (reg1) {
+		dev = netlink_get_register(ctx, loc, reg1);
+		if (dev == NULL)
+			return netlink_error(ctx, loc,
+					     "fwd statement has no output expression");
+
+		expr_set_type(dev, &ifindex_type, BYTEORDER_HOST_ENDIAN);
+		stmt->fwd.to = dev;
+	}
+
+	list_add_tail(&stmt->list, &ctx->rule->stmts);
+}
+
 static void netlink_parse_queue(struct netlink_parse_ctx *ctx,
 			      const struct location *loc,
 			      const struct nftnl_expr *nle)
@@ -886,6 +972,7 @@ static const struct {
 	{ .name = "dup",	.parse = netlink_parse_dup },
 	{ .name = "queue",	.parse = netlink_parse_queue },
 	{ .name = "dynset",	.parse = netlink_parse_dynset },
+	{ .name = "fwd",	.parse = netlink_parse_fwd },
 };
 
 static int netlink_parse_expr(struct nftnl_expr *nle, void *arg)
@@ -912,33 +999,11 @@ static int netlink_parse_expr(struct nftnl_expr *nle, void *arg)
 
 struct rule_pp_ctx {
 	struct proto_ctx	pctx;
-	enum proto_bases	pbase;
-	struct stmt		*pdep;
+	struct payload_dep_ctx	pdctx;
 	struct stmt		*stmt;
 };
 
-/*
- * Kill a redundant payload dependecy that is implied by a higher layer payload expression.
- */
-static void payload_dependency_kill(struct rule_pp_ctx *ctx, struct expr *expr)
-{
-	if (ctx->pbase != PROTO_BASE_INVALID &&
-	    ctx->pbase == expr->payload.base &&
-	    ctx->pdep != NULL) {
-		list_del(&ctx->pdep->list);
-		stmt_free(ctx->pdep);
-		ctx->pbase = PROTO_BASE_INVALID;
-		ctx->pdep = NULL;
-	}
-}
-
-static void payload_dependency_store(struct rule_pp_ctx *ctx,
-				     struct stmt *stmt,
-				     enum proto_bases base)
-{
-	ctx->pbase = base + 1;
-	ctx->pdep  = stmt;
-}
+static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp);
 
 static void integer_type_postprocess(struct expr *expr)
 {
@@ -969,8 +1034,7 @@ static void integer_type_postprocess(struct expr *expr)
 
 static void payload_match_expand(struct rule_pp_ctx *ctx,
 				 struct expr *expr,
-				 struct expr *payload,
-				 struct expr *mask)
+				 struct expr *payload)
 {
 	struct expr *left = payload, *right = expr->right, *tmp;
 	struct list_head list = LIST_HEAD_INIT(list);
@@ -978,8 +1042,9 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 	struct expr *nexpr = NULL;
 	enum proto_bases base = left->payload.base;
 	const struct expr_ops *payload_ops = left->ops;
+	bool stacked;
 
-	payload_expr_expand(&list, left, mask, &ctx->pctx);
+	payload_expr_expand(&list, left, &ctx->pctx);
 
 	list_for_each_entry(left, &list, list) {
 		tmp = constant_expr_splice(right, left->len);
@@ -999,32 +1064,20 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 		assert(left->payload.base);
 		assert(base == left->payload.base);
 
+		stacked = payload_is_stacked(ctx->pctx.protocol[base].desc, nexpr);
+
 		/* Remember the first payload protocol expression to
 		 * kill it later on if made redundant by a higher layer
 		 * payload expression.
 		 */
-		if (ctx->pbase == PROTO_BASE_INVALID &&
+		if (ctx->pdctx.pbase == PROTO_BASE_INVALID &&
+		    expr->op == OP_EQ &&
 		    left->flags & EXPR_F_PROTOCOL) {
-			unsigned int proto = mpz_get_be16(tmp->value);
-			const struct proto_desc *desc, *next;
-			bool stacked_header = false;
-
-			desc = ctx->pctx.protocol[base].desc;
-			assert(desc);
-			if (desc) {
-				next = proto_find_upper(desc, proto);
-				stacked_header = next && next->base == base;
-			}
-
-			if (stacked_header) {
-				ctx->pctx.protocol[base].desc = next;
-				ctx->pctx.protocol[base].offset += desc->length;
-				payload_dependency_store(ctx, nstmt, base - 1);
-			} else {
-				payload_dependency_store(ctx, nstmt, base);
-			}
+			payload_dependency_store(&ctx->pdctx, nstmt, base - stacked);
 		} else {
-			payload_dependency_kill(ctx, nexpr->left);
+			payload_dependency_kill(&ctx->pdctx, nexpr->left);
+			if (left->flags & EXPR_F_PROTOCOL)
+				payload_dependency_store(&ctx->pdctx, nstmt, base - stacked);
 		}
 	}
 	list_del(&ctx->stmt->list);
@@ -1034,8 +1087,7 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 
 static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 				      struct expr *expr,
-				      struct expr *payload,
-				      struct expr *mask)
+				      struct expr *payload)
 {
 	enum proto_bases base = payload->payload.base;
 
@@ -1046,7 +1098,7 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 	case OP_EQ:
 	case OP_NEQ:
 		if (expr->right->ops->type == EXPR_VALUE) {
-			payload_match_expand(ctx, expr, payload, mask);
+			payload_match_expand(ctx, expr, payload);
 			break;
 		}
 		/* Fall through */
@@ -1054,7 +1106,7 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 		payload_expr_complete(payload, &ctx->pctx);
 		expr_set_type(expr->right, payload->dtype,
 			      payload->byteorder);
-		payload_dependency_kill(ctx, payload);
+		payload_dependency_kill(&ctx->pdctx, payload);
 		break;
 	}
 }
@@ -1071,9 +1123,9 @@ static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 
 		expr->left->ops->pctx_update(&ctx->pctx, expr);
 
-		if (ctx->pbase == PROTO_BASE_INVALID &&
+		if (ctx->pdctx.pbase == PROTO_BASE_INVALID &&
 		    left->flags & EXPR_F_PROTOCOL)
-			payload_dependency_store(ctx, ctx->stmt,
+			payload_dependency_store(&ctx->pdctx, ctx->stmt,
 						 left->meta.base);
 		break;
 	case OP_LOOKUP:
@@ -1087,8 +1139,14 @@ static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 	}
 }
 
+static void ct_match_postprocess(struct rule_pp_ctx *ctx,
+				 const struct expr *expr)
+{
+	return meta_match_postprocess(ctx, expr);
+}
+
 /* Convert a bitmask to a prefix length */
-static unsigned int expr_mask_to_prefix(struct expr *expr)
+static unsigned int expr_mask_to_prefix(const struct expr *expr)
 {
 	unsigned long n;
 
@@ -1127,6 +1185,55 @@ static struct expr *binop_tree_to_list(struct expr *list, struct expr *expr)
 	return list;
 }
 
+static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
+{
+	struct expr *binop = expr->left, *value = expr->right;
+	struct expr *left = binop->left;
+	struct expr *mask = binop->right;
+	unsigned int shift;
+
+	if ((left->ops->type == EXPR_PAYLOAD &&
+	    payload_expr_trim(left, mask, &ctx->pctx, &shift)) ||
+	    (left->ops->type == EXPR_EXTHDR &&
+	     exthdr_find_template(left, mask, &shift))) {
+		/* mask is implicit, binop needs to be removed.
+		 *
+		 * Fix all values of the expression according to the mask
+		 * and then process the payload instruction using the real
+		 * sizes and offsets we're interested in.
+		 *
+		 * Finally, convert the expression to 1) by replacing
+		 * the binop with the binop payload/exthdr expression.
+		 */
+		if (value->ops->type == EXPR_VALUE) {
+			assert(value->len >= expr->left->right->len);
+			mpz_rshift_ui(value->value, shift);
+			value->len = left->len;
+		}
+
+		assert(expr->left->ops->type == EXPR_BINOP);
+		assert(binop->left == left);
+		expr->left = expr_get(left);
+		expr_free(binop);
+		if (left->ops->type == EXPR_PAYLOAD)
+			payload_match_postprocess(ctx, expr, left);
+		else if (left->ops->type == EXPR_EXTHDR)
+			expr_set_type(expr->right, left->dtype, left->byteorder);
+	}
+}
+
+static void map_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
+{
+	struct expr *binop = expr->left;
+
+	if (binop->op != OP_AND)
+		return;
+
+	if (binop->left->ops->type == EXPR_PAYLOAD &&
+	    binop->right->ops->type == EXPR_VALUE)
+		binop_postprocess(ctx, expr);
+}
+
 static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
 {
 	struct expr *binop = expr->left, *value = expr->right;
@@ -1157,11 +1264,7 @@ static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *e
 		expr_free(value);
 		expr_free(binop);
 	} else if (binop->op == OP_AND &&
-		   binop->left->ops->type == EXPR_PAYLOAD &&
 		   binop->right->ops->type == EXPR_VALUE) {
-		struct expr *payload = expr->left->left;
-		struct expr *mask = expr->left->right;
-
 		/*
 		 * This *might* be a payload match testing header fields that
 		 * have non byte divisible offsets and/or bit lengths.
@@ -1185,33 +1288,93 @@ static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *e
 		 * payload_expr_trim will figure out if the mask is needed to match
 		 * templates.
 		 */
-		if (payload_expr_trim(payload, mask, &ctx->pctx)) {
-			/* mask is implicit, binop needs to be removed.
-			 *
-			 * Fix all values of the expression according to the mask
-			 * and then process the payload instruction using the real
-			 * sizes and offsets we're interested in.
-			 *
-			 * Finally, convert the expression to 1) by replacing
-			 * the binop with the binop payload expr.
-			 */
-			if (value->ops->type == EXPR_VALUE) {
-				assert(value->len >= expr->left->right->len);
-				value->len = mask->len;
-			}
-
-			payload->len = mask->len;
-			payload->payload.offset += mpz_scan1(mask->value, 0);
-
-			payload_match_postprocess(ctx, expr, payload, mask);
-
-			assert(expr->left->ops->type == EXPR_BINOP);
-
-			assert(binop->left == payload);
-			expr->left = payload;
-			expr_free(binop);
-		}
+		binop_postprocess(ctx, expr);
 	}
+}
+
+static struct expr *string_wildcard_expr_alloc(struct location *loc,
+					       const struct expr *mask,
+					       const struct expr *expr)
+{
+	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
+	char data[len + 2];
+	int pos;
+
+	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
+	pos = div_round_up(expr_mask_to_prefix(mask), BITS_PER_BYTE);
+	data[pos] = '*';
+	data[pos + 1] = '\0';
+
+	return constant_expr_alloc(loc, &string_type, BYTEORDER_HOST_ENDIAN,
+				   expr->len + BITS_PER_BYTE, data);
+}
+
+static void escaped_string_wildcard_expr_alloc(struct expr **exprp,
+					       unsigned int len)
+{
+	struct expr *expr = *exprp, *tmp;
+	char data[len + 3];
+	int pos;
+
+	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
+	pos = div_round_up(len, BITS_PER_BYTE);
+	data[pos - 1] = '\\';
+	data[pos] = '*';
+
+	tmp = constant_expr_alloc(&expr->location, &string_type,
+				  BYTEORDER_HOST_ENDIAN,
+				  expr->len + BITS_PER_BYTE, data);
+	expr_free(expr);
+	*exprp = tmp;
+}
+
+/* This calculates the string length and checks if it is nul-terminated, this
+ * function is quite a hack :)
+ */
+static bool __expr_postprocess_string(struct expr **exprp)
+{
+	struct expr *expr = *exprp;
+	unsigned int len = expr->len;
+	bool nulterminated = false;
+	mpz_t tmp;
+
+	mpz_init(tmp);
+	while (len >= BITS_PER_BYTE) {
+		mpz_bitmask(tmp, BITS_PER_BYTE);
+		mpz_lshift_ui(tmp, len - BITS_PER_BYTE);
+		mpz_and(tmp, tmp, expr->value);
+		if (mpz_cmp_ui(tmp, 0))
+			break;
+		else
+			nulterminated = true;
+		len -= BITS_PER_BYTE;
+	}
+
+	mpz_rshift_ui(tmp, len - BITS_PER_BYTE);
+
+	if (nulterminated &&
+	    mpz_cmp_ui(tmp, '*') == 0)
+		escaped_string_wildcard_expr_alloc(exprp, len);
+
+	mpz_clear(tmp);
+	expr->len = len;
+
+	return nulterminated;
+}
+
+static struct expr *expr_postprocess_string(struct expr *expr)
+{
+	struct expr *mask;
+
+	assert(expr->dtype->type == TYPE_STRING);
+	if (__expr_postprocess_string(&expr))
+		return expr;
+
+	mask = constant_expr_alloc(&expr->location, &integer_type,
+				   BYTEORDER_HOST_ENDIAN,
+				   expr->len + BITS_PER_BYTE, NULL);
+	mpz_init_bitmask(mask->value, expr->len);
+	return string_wildcard_expr_alloc(&expr->location, mask, expr);
 }
 
 static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
@@ -1222,6 +1385,14 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 
 	switch (expr->ops->type) {
 	case EXPR_MAP:
+		switch (expr->map->ops->type) {
+		case EXPR_BINOP:
+			map_binop_postprocess(ctx, expr);
+			break;
+		default:
+			break;
+		}
+
 		expr_postprocess(ctx, &expr->map);
 		expr_postprocess(ctx, &expr->mappings);
 		break;
@@ -1269,7 +1440,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_RELATIONAL:
 		switch (expr->left->ops->type) {
 		case EXPR_PAYLOAD:
-			payload_match_postprocess(ctx, expr, expr->left, NULL);
+			payload_match_postprocess(ctx, expr, expr->left);
 			return;
 		default:
 			expr_postprocess(ctx, &expr->left);
@@ -1280,6 +1451,9 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		expr_postprocess(ctx, &expr->right);
 
 		switch (expr->left->ops->type) {
+		case EXPR_CT:
+			ct_match_postprocess(ctx, expr);
+			break;
 		case EXPR_META:
 			meta_match_postprocess(ctx, expr);
 			break;
@@ -1292,29 +1466,15 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		break;
 	case EXPR_PAYLOAD:
 		payload_expr_complete(expr, &ctx->pctx);
-		payload_dependency_kill(ctx, expr);
+		payload_dependency_kill(&ctx->pdctx, expr);
 		break;
 	case EXPR_VALUE:
 		// FIXME
 		if (expr->byteorder == BYTEORDER_HOST_ENDIAN)
 			mpz_switch_byteorder(expr->value, expr->len / BITS_PER_BYTE);
 
-		// Quite a hack :)
-		if (expr->dtype->type == TYPE_STRING) {
-			unsigned int len = expr->len;
-			mpz_t tmp;
-			mpz_init(tmp);
-			while (len >= BITS_PER_BYTE) {
-				mpz_bitmask(tmp, BITS_PER_BYTE);
-				mpz_lshift_ui(tmp, len - BITS_PER_BYTE);
-				mpz_and(tmp, tmp, expr->value);
-				if (mpz_cmp_ui(tmp, 0))
-					break;
-				len -= BITS_PER_BYTE;
-			}
-			mpz_clear(tmp);
-			expr->len = len;
-		}
+		if (expr->dtype->type == TYPE_STRING)
+			*exprp = expr_postprocess_string(expr);
 
 		if (expr->dtype->basetype != NULL &&
 		    expr->dtype->basetype->type == TYPE_BITMASK)
@@ -1328,11 +1488,15 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_SET_ELEM:
 		expr_postprocess(ctx, &expr->key);
 		break;
-	case EXPR_SET_REF:
 	case EXPR_EXTHDR:
+		__payload_dependency_kill(&ctx->pdctx, PROTO_BASE_NETWORK_HDR);
+		break;
+	case EXPR_SET_REF:
 	case EXPR_META:
-	case EXPR_CT:
 	case EXPR_VERDICT:
+		break;
+	case EXPR_CT:
+		ct_expr_update_type(&ctx->pctx, expr);
 		break;
 	default:
 		BUG("unknown expression type %s\n", expr->ops->name);
@@ -1432,46 +1596,47 @@ static bool expr_may_merge_range(struct expr *expr, struct expr *prev,
 	return false;
 }
 
-static void expr_postprocess_range(struct rule_pp_ctx *ctx, struct stmt *prev,
-				   enum ops op)
+static void expr_postprocess_range(struct rule_pp_ctx *ctx, enum ops op)
 {
 	struct stmt *nstmt, *stmt = ctx->stmt;
 	struct expr *nexpr, *rel;
 
-	nexpr = range_expr_alloc(&prev->location, expr_clone(prev->expr->right),
+	nexpr = range_expr_alloc(&ctx->pdctx.prev->location,
+				 expr_clone(ctx->pdctx.prev->expr->right),
 				 expr_clone(stmt->expr->right));
 	expr_set_type(nexpr, stmt->expr->right->dtype,
 		      stmt->expr->right->byteorder);
 
-	rel = relational_expr_alloc(&prev->location, op,
+	rel = relational_expr_alloc(&ctx->pdctx.prev->location, op,
 				    expr_clone(stmt->expr->left), nexpr);
 
 	nstmt = expr_stmt_alloc(&stmt->location, rel);
 	list_add_tail(&nstmt->list, &stmt->list);
 
-	list_del(&prev->list);
-	stmt_free(prev);
+	list_del(&ctx->pdctx.prev->list);
+	stmt_free(ctx->pdctx.prev);
 
 	list_del(&stmt->list);
 	stmt_free(stmt);
 	ctx->stmt = nstmt;
 }
 
-static void stmt_expr_postprocess(struct rule_pp_ctx *ctx, struct stmt *prev)
+static void stmt_expr_postprocess(struct rule_pp_ctx *ctx)
 {
 	enum ops op;
 
-	if (prev && ctx->stmt->ops->type == prev->ops->type &&
-	    expr_may_merge_range(ctx->stmt->expr, prev->expr, &op))
-		expr_postprocess_range(ctx, prev, op);
-
 	expr_postprocess(ctx, &ctx->stmt->expr);
+
+	if (ctx->pdctx.prev && ctx->stmt &&
+	    ctx->stmt->ops->type == ctx->pdctx.prev->ops->type &&
+	    expr_may_merge_range(ctx->stmt->expr, ctx->pdctx.prev->expr, &op))
+		expr_postprocess_range(ctx, op);
 }
 
 static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *rule)
 {
 	struct rule_pp_ctx rctx;
-	struct stmt *stmt, *next, *prev = NULL;
+	struct stmt *stmt, *next;
 
 	memset(&rctx, 0, sizeof(rctx));
 	proto_ctx_init(&rctx.pctx, rule->handle.family);
@@ -1481,7 +1646,14 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 
 		switch (stmt->ops->type) {
 		case STMT_EXPRESSION:
-			stmt_expr_postprocess(&rctx, prev);
+			stmt_expr_postprocess(&rctx);
+			break;
+		case STMT_PAYLOAD:
+			expr_postprocess(&rctx, &stmt->payload.expr);
+			expr_set_type(stmt->payload.val,
+				      stmt->payload.expr->dtype,
+				      stmt->payload.expr->byteorder);
+			expr_postprocess(&rctx, &stmt->payload.val);
 			break;
 		case STMT_META:
 			if (stmt->meta.expr != NULL)
@@ -1513,11 +1685,47 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 			if (stmt->dup.dev != NULL)
 				expr_postprocess(&rctx, &stmt->dup.dev);
 			break;
+		case STMT_FWD:
+			if (stmt->fwd.to != NULL)
+				expr_postprocess(&rctx, &stmt->fwd.to);
+			break;
 		default:
 			break;
 		}
-		prev = rctx.stmt;
+		rctx.pdctx.prev = rctx.stmt;
 	}
+}
+
+static int parse_udata_cb(const struct nftnl_udata *attr, void *data)
+{
+	unsigned char *value = nftnl_udata_get(attr);
+	uint8_t type = nftnl_udata_type(attr);
+	uint8_t len = nftnl_udata_len(attr);
+	const struct nftnl_udata **tb = data;
+
+	switch (type) {
+	case UDATA_TYPE_COMMENT:
+		if (value[len - 1] != '\0')
+			return -1;
+		break;
+	default:
+		return 0;
+	}
+	tb[type] = attr;
+	return 0;
+}
+
+static char *udata_get_comment(const void *data, uint32_t data_len)
+{
+	const struct nftnl_udata *tb[UDATA_TYPE_MAX + 1] = {};
+
+	if (nftnl_udata_parse(data, data_len, parse_udata_cb, tb) < 0)
+		return NULL;
+
+	if (!tb[UDATA_TYPE_COMMENT])
+		return NULL;
+
+	return xstrdup(nftnl_udata_get(tb[UDATA_TYPE_COMMENT]));
 }
 
 struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
@@ -1533,24 +1741,23 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 	h.family = nftnl_rule_get_u32(nlr, NFTNL_RULE_FAMILY);
 	h.table  = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_TABLE));
 	h.chain  = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_CHAIN));
-	h.handle = nftnl_rule_get_u64(nlr, NFTNL_RULE_HANDLE);
+	h.handle.id = nftnl_rule_get_u64(nlr, NFTNL_RULE_HANDLE);
 
 	if (nftnl_rule_is_set(nlr, NFTNL_RULE_POSITION))
-		h.position = nftnl_rule_get_u64(nlr, NFTNL_RULE_POSITION);
-
-	if (nftnl_rule_is_set(nlr, NFTNL_RULE_USERDATA)) {
-		uint32_t len;
-		const void *data;
-
-		data = nftnl_rule_get_data(nlr, NFTNL_RULE_USERDATA,
-					      &len);
-		h.comment = xmalloc(len);
-		memcpy((char *)h.comment, data, len);
-	}
+		h.position.id = nftnl_rule_get_u64(nlr, NFTNL_RULE_POSITION);
 
 	pctx->rule = rule_alloc(&netlink_location, &h);
 	pctx->table = table_lookup(&h);
 	assert(pctx->table != NULL);
+
+	if (nftnl_rule_is_set(nlr, NFTNL_RULE_USERDATA)) {
+		const void *data;
+		uint32_t len;
+
+		data = nftnl_rule_get_data(nlr, NFTNL_RULE_USERDATA, &len);
+		pctx->rule->comment = udata_get_comment(data, len);
+	}
+
 	nftnl_expr_foreach((struct nftnl_rule *)nlr, netlink_parse_expr, pctx);
 
 	rule_parse_postprocess(pctx, pctx->rule);

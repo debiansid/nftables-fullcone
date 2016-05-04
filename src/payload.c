@@ -85,8 +85,12 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	base = ctx->protocol[left->payload.base].desc;
 	desc = proto_find_upper(base, proto);
 
-	assert(left->payload.base + 1 <= PROTO_BASE_MAX);
-	proto_ctx_update(ctx, left->payload.base + 1, &expr->location, desc);
+	assert(desc->base <= PROTO_BASE_MAX);
+	if (desc->base == base->base) {
+		assert(base->length > 0);
+		ctx->protocol[base->base].offset += base->length;
+	}
+	proto_ctx_update(ctx, desc->base, &expr->location, desc);
 }
 
 static const struct expr_ops payload_expr_ops = {
@@ -138,6 +142,72 @@ void payload_init_raw(struct expr *expr, enum proto_bases base,
 	expr->len		= len;
 }
 
+unsigned int payload_hdr_field(const struct expr *expr)
+{
+	return expr->payload.tmpl - expr->payload.desc->templates;
+}
+
+static void payload_stmt_print(const struct stmt *stmt)
+{
+	expr_print(stmt->payload.expr);
+	printf(" set ");
+	expr_print(stmt->payload.val);
+}
+
+static const struct stmt_ops payload_stmt_ops = {
+	.type		= STMT_PAYLOAD,
+	.name		= "payload",
+	.print		= payload_stmt_print,
+};
+
+struct stmt *payload_stmt_alloc(const struct location *loc,
+				struct expr *expr, struct expr *val)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &payload_stmt_ops);
+	stmt->payload.expr = expr;
+	stmt->payload.val  = val;
+	return stmt;
+}
+
+static int payload_add_dependency(struct eval_ctx *ctx,
+				  const struct proto_desc *desc,
+				  const struct proto_desc *upper,
+				  const struct expr *expr,
+				  struct stmt **res)
+{
+	const struct proto_hdr_template *tmpl;
+	struct expr *dep, *left, *right;
+	struct stmt *stmt;
+	int protocol = proto_find_num(desc, upper);
+
+	if (protocol < 0)
+		return expr_error(ctx->msgs, expr,
+				  "conflicting protocols specified: %s vs. %s",
+				  desc->name, upper->name);
+
+	tmpl = &desc->templates[desc->protocol_key];
+	if (tmpl->meta_key)
+		left = meta_expr_alloc(&expr->location, tmpl->meta_key);
+	else
+		left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
+
+	right = constant_expr_alloc(&expr->location, tmpl->dtype,
+				    tmpl->dtype->byteorder, tmpl->len,
+				    constant_data_ptr(protocol, tmpl->len));
+
+	dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
+	stmt = expr_stmt_alloc(&dep->location, dep);
+	if (stmt_evaluate(ctx, stmt) < 0) {
+		return expr_error(ctx->msgs, expr,
+					  "dependency statement is invalid");
+	}
+	left->ops->pctx_update(&ctx->pctx, dep);
+	*res = stmt;
+	return 0;
+}
+
 /**
  * payload_gen_dependency - generate match expression on payload dependency
  *
@@ -166,10 +236,7 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 {
 	const struct hook_proto_desc *h = &hook_proto_desc[ctx->pctx.family];
 	const struct proto_desc *desc;
-	const struct proto_hdr_template *tmpl;
-	struct expr *dep, *left, *right;
 	struct stmt *stmt;
-	int protocol;
 	uint16_t type;
 
 	if (expr->payload.base < h->base) {
@@ -183,13 +250,7 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 					  "protocol specification is invalid "
 					  "for this family");
 
-		left = meta_expr_alloc(&expr->location, NFT_META_IIFTYPE);
-		right = constant_expr_alloc(&expr->location, &arphrd_type,
-					    BYTEORDER_HOST_ENDIAN,
-					    2 * BITS_PER_BYTE, &type);
-
-		dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
-		stmt = expr_stmt_alloc(&dep->location, dep);
+		stmt = meta_stmt_meta_iiftype(&expr->location, type);
 		if (stmt_evaluate(ctx, stmt) < 0) {
 			return expr_error(ctx->msgs, expr,
 					  "dependency statement is invalid");
@@ -215,10 +276,21 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 			}
 			break;
 		case NFPROTO_BRIDGE:
-		case NFPROTO_NETDEV:
 			switch (expr->payload.base) {
 			case PROTO_BASE_LL_HDR:
 				desc = &proto_eth;
+				break;
+			case PROTO_BASE_TRANSPORT_HDR:
+				desc = &proto_inet_service;
+				break;
+			default:
+				break;
+			}
+			break;
+		case NFPROTO_NETDEV:
+			switch (expr->payload.base) {
+			case PROTO_BASE_LL_HDR:
+				desc = &proto_netdev;
 				break;
 			case PROTO_BASE_TRANSPORT_HDR:
 				desc = &proto_inet_service;
@@ -236,31 +308,86 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 				  "no %s protocol specified",
 				  proto_base_names[expr->payload.base - 1]);
 
-	protocol = proto_find_num(desc, expr->payload.desc);
-	if (protocol < 0)
+	return payload_add_dependency(ctx, desc, expr->payload.desc, expr, res);
+}
+
+int exthdr_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
+			  struct stmt **res)
+{
+	const struct proto_desc *desc;
+
+	desc = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+	if (desc == NULL)
 		return expr_error(ctx->msgs, expr,
-				  "conflicting protocols specified: %s vs. %s",
-				  desc->name, expr->payload.desc->name);
+				  "Cannot generate dependency: "
+				  "no %s protocol specified",
+				  proto_base_names[PROTO_BASE_LL_HDR]);
 
-	tmpl = &desc->templates[desc->protocol_key];
-	if (tmpl->meta_key)
-		left = meta_expr_alloc(&expr->location, tmpl->meta_key);
-	else
-		left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
+	return payload_add_dependency(ctx, desc, &proto_ip6, expr, res);
+}
 
-	right = constant_expr_alloc(&expr->location, tmpl->dtype,
-				    tmpl->dtype->byteorder, tmpl->len,
-				    constant_data_ptr(protocol, tmpl->len));
+/**
+ * payload_is_stacked - return whether a payload protocol match defines a stacked
+ * 			protocol on the same layer
+ *
+ * @desc: current protocol description on this layer
+ * @expr: payload match
+ */
+bool payload_is_stacked(const struct proto_desc *desc, const struct expr *expr)
+{
+	const struct proto_desc *next;
 
-	dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
-	stmt = expr_stmt_alloc(&dep->location, dep);
-	if (stmt_evaluate(ctx, stmt) < 0) {
-		return expr_error(ctx->msgs, expr,
-					  "dependency statement is invalid");
+	if (expr->left->ops->type != EXPR_PAYLOAD ||
+	    !(expr->left->flags & EXPR_F_PROTOCOL) ||
+	    expr->op != OP_EQ)
+		return false;
+
+	next = proto_find_upper(desc, mpz_get_be16(expr->right->value));
+	return next && next->base == desc->base;
+}
+
+/**
+ * payload_dependency_store - store a possibly redundant protocol match
+ *
+ * @ctx: payload dependency context
+ * @stmt: payload match
+ * @base: base of payload match
+ */
+void payload_dependency_store(struct payload_dep_ctx *ctx,
+			      struct stmt *stmt, enum proto_bases base)
+{
+	ctx->pbase = base + 1;
+	ctx->pdep  = stmt;
+}
+
+/**
+ * __payload_dependency_kill - kill a redundant payload depedency
+ *
+ * @ctx: payload dependency context
+ * @expr: higher layer payload expression
+ *
+ * Kill a redundant payload expression if a higher layer payload expression
+ * implies its existance.
+ */
+void __payload_dependency_kill(struct payload_dep_ctx *ctx,
+			       enum proto_bases base)
+{
+	if (ctx->pbase != PROTO_BASE_INVALID &&
+	    ctx->pbase == base &&
+	    ctx->pdep != NULL) {
+		list_del(&ctx->pdep->list);
+		stmt_free(ctx->pdep);
+
+		ctx->pbase = PROTO_BASE_INVALID;
+		if (ctx->pdep == ctx->prev)
+			ctx->prev = NULL;
+		ctx->pdep  = NULL;
 	}
-	left->ops->pctx_update(&ctx->pctx, dep);
-	*res = stmt;
-	return 0;
+}
+
+void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
+{
+	__payload_dependency_kill(ctx, expr->payload.base);
 }
 
 /**
@@ -321,18 +448,21 @@ static unsigned int mask_length(const struct expr *mask)
  * Walk the template list and determine if a match can be found without
  * using the provided mask.
  *
- * If the mask has to be used, trim the mask length accordingly
- * and return true to let the caller know that the mask is a dependency.
+ * If the mask has to be used, trim the payload expression length accordingly,
+ * adjust the payload offset and return true to let the caller know that the
+ * mask can be removed. This function also returns the shift for the right hand
+ * constant side of the expression.
  */
 bool payload_expr_trim(struct expr *expr, struct expr *mask,
-		       const struct proto_ctx *ctx)
+		       const struct proto_ctx *ctx, unsigned int *shift)
 {
-	unsigned int payload_offset = expr->payload.offset + mask_to_offset(mask);
+	unsigned int payload_offset = expr->payload.offset;
+	unsigned int mask_offset = mask_to_offset(mask);
 	unsigned int mask_len = mask_length(mask);
 	const struct proto_hdr_template *tmpl;
 	unsigned int payload_len = expr->len;
 	const struct proto_desc *desc;
-	unsigned int i, matched_len = mask_to_offset(mask);
+	unsigned int off, i, len = 0;
 
 	assert(expr->ops->type == EXPR_PAYLOAD);
 
@@ -347,6 +477,9 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 		payload_offset -= ctx->protocol[expr->payload.base].offset;
 	}
 
+	off = round_up(mask->len, BITS_PER_BYTE) - mask_len;
+	payload_offset += off;
+
 	for (i = 1; i < array_size(desc->templates); i++) {
 		tmpl = &desc->templates[i];
 		if (tmpl->offset != payload_offset)
@@ -356,14 +489,15 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 			return false;
 
 		payload_len -= tmpl->len;
-		matched_len += tmpl->len;
 		payload_offset += tmpl->len;
+		len += tmpl->len;
 		if (payload_len == 0)
 			return false;
 
-		if (matched_len == mask_len) {
-			assert(mask->len >= mask_len);
-			mask->len = mask_len;
+		if (mask_offset + len == mask_len) {
+			expr->payload.offset += off;
+			expr->len = len;
+			*shift = mask_offset;
 			return true;
 		}
 	}
@@ -377,7 +511,6 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
  *
  * @list:	list to append expanded payload expressions to
  * @expr:	the payload expression to expand
- * @mask:	optional/implicit mask to use when searching templates
  * @ctx:	protocol context
  *
  * Expand a merged adjacent payload expression into its original components
@@ -387,16 +520,14 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
  * 	 offset order.
  */
 void payload_expr_expand(struct list_head *list, struct expr *expr,
-			 struct expr *mask, const struct proto_ctx *ctx)
+			 const struct proto_ctx *ctx)
 {
-	unsigned int off = mask_to_offset(mask);
 	const struct proto_hdr_template *tmpl;
 	const struct proto_desc *desc;
 	struct expr *new;
 	unsigned int i;
 
 	assert(expr->ops->type == EXPR_PAYLOAD);
-	assert(!mask || mask->len != 0);
 
 	desc = ctx->protocol[expr->payload.base].desc;
 	if (desc == NULL)
@@ -413,7 +544,7 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 			list_add_tail(&new->list, list);
 			expr->len	     -= tmpl->len;
 			expr->payload.offset += tmpl->len;
-			if (expr->len == off)
+			if (expr->len == 0)
 				return;
 		} else
 			break;
@@ -425,23 +556,36 @@ raw:
 	list_add_tail(&new->list, list);
 }
 
-/**
- * payload_is_adjacent - return whether two payload expressions refer to
- * 			 adjacent header locations
- *
- * @e1:		first payload expression
- * @e2:		second payload expression
- */
-bool payload_is_adjacent(const struct expr *e1, const struct expr *e2)
+static bool payload_is_adjacent(const struct expr *e1, const struct expr *e2)
 {
-	if (e1->payload.offset % BITS_PER_BYTE || e1->len % BITS_PER_BYTE ||
-	    e2->payload.offset % BITS_PER_BYTE || e2->len % BITS_PER_BYTE)
-		return false;
-
 	if (e1->payload.base		 == e2->payload.base &&
 	    e1->payload.offset + e1->len == e2->payload.offset)
 		return true;
 	return false;
+}
+
+/**
+ * payload_can_merge - return whether two payload expressions can be merged
+ *
+ * @e1:		first payload expression
+ * @e2:		second payload expression
+ */
+bool payload_can_merge(const struct expr *e1, const struct expr *e2)
+{
+	unsigned int total;
+
+	if (!payload_is_adjacent(e1, e2))
+		return false;
+
+	if (e1->payload.offset % BITS_PER_BYTE || e1->len % BITS_PER_BYTE ||
+	    e2->payload.offset % BITS_PER_BYTE || e2->len % BITS_PER_BYTE)
+		return false;
+
+	total = e1->len + e2->len;
+	if (total < e1->len || total > (NFT_REG_SIZE * BITS_PER_BYTE))
+		return false;
+
+	return true;
 }
 
 /**

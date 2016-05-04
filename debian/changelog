@@ -1,3 +1,52 @@
+nftables (0.5+snapshot20160426-1) unstable; urgency=medium
+
+  * [955e138] d/tests/systemd-service-test.sh: adapt script to
+    ci.debian.net
+  * [ad1699a] Imported Upstream version 0.5+snapshot20160426
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Tue, 26 Apr 2016 11:01:18 +0200
+
+nftables (0.5+snapshot20160419-3) unstable; urgency=medium
+
+  * [f1d8880] d/control: bump standars-version to 3.9.8
+  * [65bae17] d/tests: add systemd-service-test.sh
+  * [e2e4cd7] d/tests: include script extension in file names
+  * [fd16851] d/: gracefully delete old config files from /etc/nftables
+    (Closes: #822239)
+  * [af57b91] d/rules: prevent dh_installinit to act on
+    /etc/init.d/nftables
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 25 Apr 2016 11:37:00 +0200
+
+nftables (0.5+snapshot20160419-2) unstable; urgency=medium
+
+  * [cf22dca] d/tests/control: internaltests-shell requires kmod
+  * [dd847bb] d/README.Debian: fix several typos
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 20 Apr 2016 17:25:50 +0200
+
+nftables (0.5+snapshot20160419-1) unstable; urgency=medium
+
+  * [88b9c37] d/rules: don't add /etc/nftables/ dir to 'nftables' binary package
+  * [e0472f0] sysvinit: the init script is now just an example
+  * [f89907b] examples: restore upstream examples
+  * [8228918] d/nftables.examples: cleanup leftover line regarding upstream
+  examples
+  * [0655029] nftables.conf: provide a skeleton firewall and use the old one as
+  example (Closes: #804648)
+  * [dc504e4] examples/syntax/README: point to the nftables wiki
+  * [ecd9257] examples/syntax/nat: add new example file
+  * [406baf9] examples/syntax/: add a new example file: overview
+  * [3fa3d3e] d/control: bump standards to 3.9.7
+  * [79a8520] Imported Upstream version 0.5+snapshot20160419
+  * [775f2af] d/control: get rid of XS-Testsuite
+  * [9ac90db] d/control: change Vcs-git from git:// to https://
+  * [b4b8ee7] d/control: bump dependency with libnftnl
+  * [9e6b0eb] d/tests: run internal nftables tests (shell)
+  * [f8e3da1] d/tests: run internal nftables tests (py)
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Wed, 20 Apr 2016 12:00:22 +0200
+
 nftables (0.5+snapshot20151106-1~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.

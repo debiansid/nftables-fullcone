@@ -6,6 +6,28 @@
 #include <list.h>
 
 /**
+ * struct handle_spec - handle ID
+ *
+ * @location:	location this handle was defined at
+ * @id:		handle ID value
+ */
+struct handle_spec {
+	struct location		location;
+	uint64_t		id;
+};
+
+/**
+ * struct position_spec - position ID
+ *
+ * @location:	location this position was defined at
+ * @id:		position ID value
+ */
+struct position_spec {
+	struct location		location;
+	uint64_t		id;
+};
+
+/**
  * struct handle - handle for tables, chains, rules and sets
  *
  * @family:	protocol family
@@ -15,17 +37,15 @@
  * @handle:	rule handle (rules only)
  * @position:	rule position (rules only)
  * @set_id:	set ID (sets only)
- * @comment:	human-readable comment (rules only)
  */
 struct handle {
 	uint32_t		family;
 	const char		*table;
 	const char		*chain;
 	const char		*set;
-	uint64_t		handle;
-	uint64_t		position;
+	struct handle_spec	handle;
+	struct position_spec	position;
 	uint32_t		set_id;
-	const char		*comment;
 };
 
 extern void handle_merge(struct handle *dst, const struct handle *src);
@@ -157,6 +177,7 @@ extern void chain_print_plain(const struct chain *chain);
  * @location:	location the rule was defined at
  * @stmt:	list of statements
  * @num_stmts:	number of statements in stmts list
+ * @comment:	comment
  */
 struct rule {
 	struct list_head	list;
@@ -164,12 +185,14 @@ struct rule {
 	struct location		location;
 	struct list_head	stmts;
 	unsigned int		num_stmts;
+	const char		*comment;
 };
 
 extern struct rule *rule_alloc(const struct location *loc,
 			       const struct handle *h);
 extern void rule_free(struct rule *rule);
 extern void rule_print(const struct rule *rule);
+extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
 
 /**
  * enum set_flags
@@ -237,6 +260,7 @@ extern void set_print_plain(const struct set *s);
  *
  * @CMD_INVALID:	invalid
  * @CMD_ADD:		add object (non-exclusive)
+ * @CMD_REPLACE,	replace object
  * @CMD_CREATE:		create object (exclusive)
  * @CMD_INSERT:		insert object
  * @CMD_DELETE:		delete object
@@ -250,6 +274,7 @@ extern void set_print_plain(const struct set *s);
 enum cmd_ops {
 	CMD_INVALID,
 	CMD_ADD,
+	CMD_REPLACE,
 	CMD_CREATE,
 	CMD_INSERT,
 	CMD_DELETE,
@@ -393,5 +418,11 @@ extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 
 extern int cache_update(enum cmd_ops cmd, struct list_head *msgs);
 extern void cache_release(void);
+
+enum udata_type {
+	UDATA_TYPE_COMMENT,
+	__UDATA_TYPE_MAX,
+};
+#define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
 
 #endif /* NFTABLES_RULE_H */

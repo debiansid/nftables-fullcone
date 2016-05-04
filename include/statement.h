@@ -17,6 +17,14 @@ struct counter_stmt {
 
 extern struct stmt *counter_stmt_alloc(const struct location *loc);
 
+struct payload_stmt {
+	struct expr			*expr;
+	struct expr			*val;
+};
+
+extern struct stmt *payload_stmt_alloc(const struct location *loc,
+				       struct expr *payload, struct expr *expr);
+
 #include <meta.h>
 struct meta_stmt {
 	enum nft_meta_keys		key;
@@ -53,6 +61,7 @@ struct limit_stmt {
 	uint64_t		unit;
 	enum nft_limit_type	type;
 	uint32_t		burst;
+	uint32_t		flags;
 };
 
 extern struct stmt *limit_stmt_alloc(const struct location *loc);
@@ -77,6 +86,7 @@ extern struct stmt *nat_stmt_alloc(const struct location *loc);
 
 struct masq_stmt {
 	uint32_t		flags;
+	struct expr		*proto;
 };
 
 extern struct stmt *masq_stmt_alloc(const struct location *loc);
@@ -113,6 +123,13 @@ struct dup_stmt {
 struct stmt *dup_stmt_alloc(const struct location *loc);
 uint32_t dup_stmt_type(const char *type);
 
+struct fwd_stmt {
+	struct expr		*to;
+};
+
+struct stmt *fwd_stmt_alloc(const struct location *loc);
+uint32_t fwd_stmt_type(const char *type);
+
 struct set_stmt {
 	struct expr		*set;
 	struct expr		*key;
@@ -128,6 +145,7 @@ extern struct stmt *set_stmt_alloc(const struct location *loc);
  * @STMT_EXPRESSION:	expression statement (relational)
  * @STMT_VERDICT:	verdict statement
  * @STMT_COUNTER:	counters
+ * @STMT_PAYLOAD:	payload statement
  * @STMT_META:		meta statement
  * @STMT_LIMIT:		limit statement
  * @STMT_LOG:		log statement
@@ -139,12 +157,14 @@ extern struct stmt *set_stmt_alloc(const struct location *loc);
  * @STMT_CT:		conntrack statement
  * @STMT_SET:		set statement
  * @STMT_DUP:		dup statement
+ * @STMT_FWD:		forward statement
  */
 enum stmt_types {
 	STMT_INVALID,
 	STMT_EXPRESSION,
 	STMT_VERDICT,
 	STMT_COUNTER,
+	STMT_PAYLOAD,
 	STMT_META,
 	STMT_LIMIT,
 	STMT_LOG,
@@ -156,6 +176,7 @@ enum stmt_types {
 	STMT_CT,
 	STMT_SET,
 	STMT_DUP,
+	STMT_FWD,
 };
 
 /**
@@ -196,6 +217,7 @@ struct stmt {
 	union {
 		struct expr		*expr;
 		struct counter_stmt	counter;
+		struct payload_stmt	payload;
 		struct meta_stmt	meta;
 		struct log_stmt		log;
 		struct limit_stmt	limit;
@@ -207,6 +229,7 @@ struct stmt {
 		struct ct_stmt		ct;
 		struct set_stmt		set;
 		struct dup_stmt		dup;
+		struct fwd_stmt		fwd;
 	};
 };
 

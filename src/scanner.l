@@ -114,6 +114,7 @@ range		({decstring}?:{decstring}?)
 letter		[a-zA-Z]
 string		({letter})({letter}|{digit}|[/\-_\.])*
 quotedstring	\"[^"]*\"
+asteriskstring	({string}\*|{string}\\\*)
 comment		#.*$
 slash		\/
 
@@ -259,6 +260,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "netdev"		{ return NETDEV; }
 
 "add"			{ return ADD; }
+"replace"		{ return REPLACE; }
 "update"		{ return UPDATE; }
 "create"		{ return CREATE; }
 "insert"		{ return INSERT; }
@@ -310,6 +312,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "limit"			{ return LIMIT; }
 "rate"			{ return RATE; }
 "burst"			{ return BURST; }
+"until"			{ return UNTIL; }
+"over"			{ return OVER; }
 
 "nanosecond"		{ return NANOSECOND; }
 "microsecond"		{ return MICROSECOND; }
@@ -322,7 +326,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "reject"		{ return _REJECT; }
 "with"			{ return WITH; }
-"reset"			{ return RESET; }
 "icmpx"			{ return ICMPX; }
 
 "snat"			{ return SNAT; }
@@ -458,6 +461,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "label"			{ return LABEL; }
 
 "dup"			{ return DUP; }
+"fwd"			{ return FWD; }
 
 "xml"			{ return XML; }
 "json"			{ return JSON; }
@@ -496,6 +500,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 				yytext[yyleng - 1] = '\0';
 				yylval->string = xstrdup(yytext + 1);
 				return QUOTED_STRING;
+			}
+
+{asteriskstring}	{
+				yylval->string = xstrdup(yytext);
+				return ASTERISK_STRING;
 			}
 
 {string}		{

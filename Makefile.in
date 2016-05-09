@@ -255,6 +255,7 @@ SUBDIRS = src	\
 		doc	\
 		files
 
+EXTRA_DIST = tests
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

@@ -1,3 +1,13 @@
+nftables (0.5+snapshot20160509-1) unstable; urgency=medium
+
+  * [5a7c867] d/tests/internaltests-py.sh: run testsuite with installed
+    binary
+  * [b2282c4] d/tests/systemd-service-test.sh: don't run tests if old
+    kernel is present
+  * [b389985] Imported Upstream version 0.5+snapshot20160509
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 09 May 2016 13:58:32 +0200
+
 nftables (0.5+snapshot20160426-1) unstable; urgency=medium
 
   * [955e138] d/tests/systemd-service-test.sh: adapt script to

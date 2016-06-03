@@ -41,6 +41,8 @@ struct stmt *stmt_alloc(const struct location *loc,
 
 void stmt_free(struct stmt *stmt)
 {
+	if (stmt == NULL)
+		return;
 	if (stmt->ops->destroy)
 		stmt->ops->destroy(stmt);
 	xfree(stmt);
@@ -103,6 +105,39 @@ struct stmt *verdict_stmt_alloc(const struct location *loc, struct expr *expr)
 	return stmt;
 }
 
+static void flow_stmt_print(const struct stmt *stmt)
+{
+	printf("flow ");
+	if (stmt->flow.set) {
+		expr_print(stmt->flow.set);
+		printf(" ");
+	}
+	printf("{ ");
+	expr_print(stmt->flow.key);
+	printf(" ");
+	stmt_print(stmt->flow.stmt);
+	printf("} ");
+}
+
+static void flow_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->flow.key);
+	expr_free(stmt->flow.set);
+	stmt_free(stmt->flow.stmt);
+}
+
+static const struct stmt_ops flow_stmt_ops = {
+	.type		= STMT_FLOW,
+	.name		= "flow",
+	.print		= flow_stmt_print,
+	.destroy	= flow_stmt_destroy,
+};
+
+struct stmt *flow_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &flow_stmt_ops);
+}
+
 static void counter_stmt_print(const struct stmt *stmt)
 {
 	printf("counter packets %" PRIu64 " bytes %" PRIu64,
@@ -117,7 +152,11 @@ static const struct stmt_ops counter_stmt_ops = {
 
 struct stmt *counter_stmt_alloc(const struct location *loc)
 {
-	return stmt_alloc(loc, &counter_stmt_ops);
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &counter_stmt_ops);
+	stmt->flags |= STMT_F_STATEFUL;
+	return stmt;
 }
 
 static const char *syslog_level[LOG_DEBUG + 1] = {
@@ -249,7 +288,11 @@ static const struct stmt_ops limit_stmt_ops = {
 
 struct stmt *limit_stmt_alloc(const struct location *loc)
 {
-	return stmt_alloc(loc, &limit_stmt_ops);
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &limit_stmt_ops);
+	stmt->flags |= STMT_F_STATEFUL;
+	return stmt;
 }
 
 static void queue_stmt_print(const struct stmt *stmt)

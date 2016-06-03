@@ -206,6 +206,7 @@ enum set_flags {
 	SET_F_INTERVAL		= 0x4,
 	SET_F_MAP		= 0x8,
 	SET_F_TIMEOUT		= 0x10,
+	SET_F_EVAL		= 0x20,
 };
 
 /**
@@ -315,6 +316,10 @@ enum cmd_obj {
 	CMD_OBJ_EXPR,
 	CMD_OBJ_MONITOR,
 	CMD_OBJ_EXPORT,
+	CMD_OBJ_FLOWTABLE,
+	CMD_OBJ_FLOWTABLES,
+	CMD_OBJ_MAP,
+	CMD_OBJ_MAPS,
 };
 
 struct export {
@@ -424,5 +429,7 @@ enum udata_type {
 	__UDATA_TYPE_MAX,
 };
 #define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
+
+#define UDATA_COMMENT_MAXLEN 128
 
 #endif /* NFTABLES_RULE_H */

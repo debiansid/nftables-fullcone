@@ -512,6 +512,67 @@ const struct proto_desc proto_sctp = {
  */
 
 #include <netinet/ip.h>
+
+static const struct symbol_table dscp_type_tbl = {
+	.symbols	= {
+		SYMBOL("cs0",	0x00),
+		SYMBOL("cs1",	0x08),
+		SYMBOL("cs2",	0x10),
+		SYMBOL("cs3",	0x18),
+		SYMBOL("cs4",	0x20),
+		SYMBOL("cs5",	0x28),
+		SYMBOL("cs6",	0x30),
+		SYMBOL("cs7",	0x38),
+		SYMBOL("be",	0x00),
+		SYMBOL("af11",	0x0a),
+		SYMBOL("af12",	0x0c),
+		SYMBOL("af13",	0x0e),
+		SYMBOL("af21",	0x12),
+		SYMBOL("af22",	0x14),
+		SYMBOL("af23",	0x16),
+		SYMBOL("af31",	0x1a),
+		SYMBOL("af32",	0x1c),
+		SYMBOL("af33",	0x1e),
+		SYMBOL("af41",	0x22),
+		SYMBOL("af42",	0x24),
+		SYMBOL("af43",	0x26),
+		SYMBOL("ef",	0x2e),
+		SYMBOL_LIST_END
+	},
+};
+
+static const struct datatype dscp_type = {
+	.type		= TYPE_DSCP,
+	.name		= "dscp",
+	.desc		= "Differentiated Services Code Point",
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.size		= 6,
+	.basetype	= &integer_type,
+	.basefmt	= "0x%.2Zx",
+	.sym_tbl	= &dscp_type_tbl,
+};
+
+static const struct symbol_table ecn_type_tbl = {
+	.symbols	= {
+		SYMBOL("not-ect",	0x00),
+		SYMBOL("ect1",		0x01),
+		SYMBOL("ect0",		0x02),
+		SYMBOL("ce",		0x03),
+		SYMBOL_LIST_END
+	},
+};
+
+static const struct datatype ecn_type = {
+	.type		= TYPE_ECN,
+	.name		= "ecn",
+	.desc		= "Explicit Congestion Notification",
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.size		= 2,
+	.basetype	= &integer_type,
+	.basefmt	= "0x%.1Zx",
+	.sym_tbl	= &ecn_type_tbl,
+};
+
 #define IPHDR_FIELD(__name, __member) \
 	HDR_FIELD(__name, struct iphdr, __member)
 #define IPHDR_ADDR(__name, __member) \
@@ -536,7 +597,8 @@ const struct proto_desc proto_ip = {
 	.templates	= {
 		[IPHDR_VERSION]		= HDR_BITFIELD("version", &integer_type, 0, 4),
 		[IPHDR_HDRLENGTH]	= HDR_BITFIELD("hdrlength", &integer_type, 4, 4),
-		[IPHDR_TOS]		= IPHDR_FIELD("tos",		tos),
+		[IPHDR_DSCP]            = HDR_BITFIELD("dscp", &dscp_type, 8, 6),
+		[IPHDR_ECN]		= HDR_BITFIELD("ecn", &ecn_type, 14, 2),
 		[IPHDR_LENGTH]		= IPHDR_FIELD("length",		tot_len),
 		[IPHDR_ID]		= IPHDR_FIELD("id",		id),
 		[IPHDR_FRAG_OFF]	= IPHDR_FIELD("frag-off",	frag_off),
@@ -548,8 +610,8 @@ const struct proto_desc proto_ip = {
 	},
 	.format		= {
 		.order	= {
-			IPHDR_SADDR, IPHDR_DADDR, IPHDR_TOS, IPHDR_TTL,
-			IPHDR_ID, IPHDR_PROTOCOL, IPHDR_LENGTH,
+			IPHDR_SADDR, IPHDR_DADDR, IPHDR_DSCP, IPHDR_ECN,
+			IPHDR_TTL, IPHDR_ID, IPHDR_PROTOCOL, IPHDR_LENGTH,
 		},
 		.filter	= (1 << IPHDR_VERSION)  | (1 << IPHDR_HDRLENGTH) |
 			  (1 << IPHDR_FRAG_OFF),
@@ -642,8 +704,9 @@ const struct proto_desc proto_ip6 = {
 	},
 	.templates	= {
 		[IP6HDR_VERSION]	= HDR_BITFIELD("version", &integer_type, 0, 4),
-		[IP6HDR_PRIORITY]	= HDR_BITFIELD("priority", &integer_type, 4, 4),
-		[IP6HDR_FLOWLABEL]	= IP6HDR_FIELD("flowlabel",	flow_lbl),
+		[IP6HDR_DSCP]		= HDR_BITFIELD("dscp", &dscp_type, 4, 6),
+		[IP6HDR_ECN]		= HDR_BITFIELD("ecn", &ecn_type, 10, 2),
+		[IP6HDR_FLOWLABEL]	= HDR_BITFIELD("flowlabel", &integer_type, 12, 20),
 		[IP6HDR_LENGTH]		= IP6HDR_FIELD("length",	payload_len),
 		[IP6HDR_NEXTHDR]	= INET_PROTOCOL("nexthdr", struct ipv6hdr, nexthdr),
 		[IP6HDR_HOPLIMIT]	= IP6HDR_FIELD("hoplimit",	hop_limit),
@@ -652,7 +715,7 @@ const struct proto_desc proto_ip6 = {
 	},
 	.format		= {
 		.order	= {
-			IP6HDR_SADDR, IP6HDR_DADDR, IP6HDR_PRIORITY,
+			IP6HDR_SADDR, IP6HDR_DADDR, IP6HDR_DSCP, IP6HDR_ECN,
 			IP6HDR_HOPLIMIT, IP6HDR_FLOWLABEL, IP6HDR_NEXTHDR,
 			IP6HDR_LENGTH,
 		},
@@ -882,4 +945,6 @@ static void __init proto_init(void)
 	datatype_register(&arpop_type);
 	datatype_register(&ethertype_type);
 	datatype_register(&icmp6_type_type);
+	datatype_register(&dscp_type);
+	datatype_register(&ecn_type);
 }

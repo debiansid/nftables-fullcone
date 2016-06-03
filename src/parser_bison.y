@@ -178,6 +178,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token SET			"set"
 %token ELEMENT			"element"
 %token MAP			"map"
+%token MAPS			"maps"
 %token HANDLE			"handle"
 %token RULESET			"ruleset"
 
@@ -216,6 +217,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token PERFORMANCE		"performance"
 %token SIZE			"size"
 
+%token FLOW			"flow"
+
 %token <val> NUM		"number"
 %token <string> STRING		"string"
 %token <string> QUOTED_STRING
@@ -248,7 +251,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token IP			"ip"
 %token HDRVERSION		"version"
 %token HDRLENGTH		"hdrlength"
-%token TOS			"tos"
+%token DSCP			"dscp"
+%token ECN			"ecn"
 %token LENGTH			"length"
 %token FRAG_OFF			"frag-off"
 %token TTL			"ttl"
@@ -437,7 +441,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
 %type <chain>			chain_block_alloc chain_block
 %destructor { close_scope(state); chain_free($$); }	chain_block_alloc
-%type <rule>			rule
+%type <rule>			rule rule_alloc
 %destructor { rule_free($$); }	rule
 
 %type <val>			set_flag_list	set_flag
@@ -483,6 +487,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			set_stmt
 %destructor { stmt_free($$); }	set_stmt
 %type <val>			set_stmt_op
+%type <stmt>			flow_stmt flow_stmt_alloc
+%destructor { stmt_free($$); }	flow_stmt flow_stmt_alloc
 
 %type <expr>			symbol_expr verdict_expr integer_expr
 %destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr
@@ -517,6 +523,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { expr_free($$); }	set_expr set_list_expr set_list_member_expr
 %type <expr>			set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
 %destructor { expr_free($$); }	set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
+
+%type <expr>			flow_key_expr flow_key_expr_alloc
+%destructor { expr_free($$); }	flow_key_expr flow_key_expr_alloc
 
 %type <expr>			expr initializer_expr
 %destructor { expr_free($$); }	expr initializer_expr
@@ -828,6 +837,22 @@ list_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_RULESET, &$2, &@$, NULL);
 			}
+			|	FLOW TABLES	ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_FLOWTABLES, &$3, &@$, NULL);
+			}
+			|	FLOW TABLE	set_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_FLOWTABLE, &$3, &@$, NULL);
+			}
+			|	MAPS		ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_MAPS, &$2, &@$, NULL);
+			}
+			|	MAP		set_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_MAP, &$2, &@$, NULL);
+			}
 			;
 
 flush_cmd		:	TABLE		table_spec
@@ -1102,16 +1127,20 @@ type_identifier_list	:	type_identifier
 
 type_identifier		:	STRING	{ $$ = $1; }
 			|	MARK	{ $$ = xstrdup("mark"); }
+			|	DSCP	{ $$ = xstrdup("dscp"); }
+			|	ECN	{ $$ = xstrdup("ecn"); }
 			;
 
 hook_spec		:	TYPE		STRING		HOOK		STRING		dev_spec	PRIORITY	prio_spec
 			{
-				$<chain>0->type		= xstrdup(chain_type_name_lookup($2));
-				if ($<chain>0->type == NULL) {
+				const char *chain_type = chain_type_name_lookup($2);
+
+				if (chain_type == NULL) {
 					erec_queue(error(&@2, "unknown chain type %s", $2),
 						   state->msgs);
 					YYERROR;
 				}
+				$<chain>0->type		= xstrdup(chain_type);
 				xfree($2);
 
 				$<chain>0->hookstr	= chain_hookname_lookup($4);
@@ -1253,12 +1282,13 @@ ruleid_spec		:	chain_spec	handle_spec	position_spec
 			}
 			;
 
-comment_spec		:	/* empty */
+comment_spec		:	COMMENT		string
 			{
-				$$ = NULL;
-			}
-			|	COMMENT		string
-			{
+				if (strlen($2) > UDATA_COMMENT_MAXLEN) {
+					erec_queue(error(&@2, "comment too long, %d characters maximum allowed", UDATA_COMMENT_MAXLEN),
+						   state->msgs);
+					YYERROR;
+				}
 				$$ = $2;
 			}
 			;
@@ -1275,12 +1305,21 @@ ruleset_spec		:	/* empty */
 			}
 			;
 
-rule			:	stmt_list	comment_spec
+rule			:	rule_alloc
+			{
+				$$->comment = NULL;
+			}
+			|	rule_alloc	comment_spec
+			{
+				$$->comment = $2;
+			}
+			;
+
+rule_alloc		:	stmt_list
 			{
 				struct stmt *i;
 
 				$$ = rule_alloc(&@$, NULL);
-				$$->comment = $2;
 				list_for_each_entry(i, $1, list)
 					$$->num_stmts++;
 				list_splice_tail($1, &$$->stmts);
@@ -1303,6 +1342,7 @@ stmt_list		:	stmt
 
 stmt			:	verdict_stmt
 			|	match_stmt
+			|	flow_stmt
 			|	counter_stmt
 			|	payload_stmt
 			|	meta_stmt
@@ -1754,6 +1794,41 @@ set_stmt_op		:	ADD	{ $$ = NFT_DYNSET_OP_ADD; }
 			|	UPDATE	{ $$ = NFT_DYNSET_OP_UPDATE; }
 			;
 
+flow_stmt		:	flow_stmt_alloc		flow_stmt_opts	'{' flow_key_expr stmt '}'
+			{
+				$1->flow.key  = $4;
+				$1->flow.stmt = $5;
+				$$->location  = @$;
+				$$ = $1;
+			}
+			|	flow_stmt_alloc		'{' flow_key_expr stmt '}'
+			{
+				$1->flow.key  = $3;
+				$1->flow.stmt = $4;
+				$$->location  = @$;
+				$$ = $1;
+			}
+			;
+
+flow_stmt_alloc		:	FLOW
+			{
+				$$ = flow_stmt_alloc(&@$);
+			}
+			;
+
+flow_stmt_opts		:	flow_stmt_opt
+			{
+				$<stmt>$	= $<stmt>0;
+			}
+			|	flow_stmt_opts		flow_stmt_opt
+			;
+
+flow_stmt_opt		:	TABLE			identifier
+			{
+				$<stmt>0->flow.table = $2;
+			}
+			;
+
 match_stmt		:	relational_expr
 			{
 				$$ = expr_stmt_alloc(&@$, $1);
@@ -1938,6 +2013,20 @@ set_list_member_expr	:	opt_newline	set_expr	opt_newline
 			}
 			;
 
+flow_key_expr		:	flow_key_expr_alloc
+			|	flow_key_expr_alloc		set_elem_options
+			{
+				$$->location = @$;
+				$$ = $1;
+			}
+			;
+
+flow_key_expr_alloc	:	concat_expr
+			{
+				$$ = set_elem_expr_alloc(&@1, $1);
+			}
+			;
+
 set_elem_expr		:	set_elem_expr_alloc
 			|	set_elem_expr_alloc		set_elem_options
 			;
@@ -1959,9 +2048,9 @@ set_elem_option		:	TIMEOUT			time_spec
 			{
 				$<expr>0->timeout = $2 * 1000;
 			}
-			|	COMMENT			string
+			|	comment_spec
 			{
-				$<expr>0->comment = $2;
+				$<expr>0->comment = $1;
 			}
 			;
 
@@ -2186,6 +2275,12 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 						       current_scope(state),
 						       "dnat");
 			}
+			|	ECN
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       "ecn");
+			}
 			;
 
 relational_op		:	EQ		{ $$ = OP_EQ; }
@@ -2403,7 +2498,8 @@ ip_hdr_expr		:	IP	ip_hdr_field
 
 ip_hdr_field		:	HDRVERSION	{ $$ = IPHDR_VERSION; }
 			|	HDRLENGTH	{ $$ = IPHDR_HDRLENGTH; }
-			|	TOS		{ $$ = IPHDR_TOS; }
+			|	DSCP		{ $$ = IPHDR_DSCP; }
+			|	ECN		{ $$ = IPHDR_ECN; }
 			|	LENGTH		{ $$ = IPHDR_LENGTH; }
 			|	ID		{ $$ = IPHDR_ID; }
 			|	FRAG_OFF	{ $$ = IPHDR_FRAG_OFF; }
@@ -2436,7 +2532,8 @@ ip6_hdr_expr		:	IP6	ip6_hdr_field
 			;
 
 ip6_hdr_field		:	HDRVERSION	{ $$ = IP6HDR_VERSION; }
-			|	PRIORITY	{ $$ = IP6HDR_PRIORITY; }
+			|	DSCP		{ $$ = IP6HDR_DSCP; }
+			|	ECN		{ $$ = IP6HDR_ECN; }
 			|	FLOWLABEL	{ $$ = IP6HDR_FLOWLABEL; }
 			|	LENGTH		{ $$ = IP6HDR_LENGTH; }
 			|	NEXTHDR		{ $$ = IP6HDR_NEXTHDR; }

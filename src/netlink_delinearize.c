@@ -31,8 +31,12 @@ struct netlink_parse_ctx {
 	struct list_head	*msgs;
 	struct table		*table;
 	struct rule		*rule;
+	struct stmt		*stmt;
 	struct expr		*registers[1 + NFT_REG32_15 - NFT_REG32_00 + 1];
 };
+
+static int netlink_parse_expr(const struct nftnl_expr *nle,
+			      struct netlink_parse_ctx *ctx);
 
 static void __fmtstring(3, 4) netlink_error(struct netlink_parse_ctx *ctx,
 					    const struct location *loc,
@@ -168,7 +172,6 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 {
 	struct nft_data_delinearize nld;
 	enum nft_registers dreg;
-	struct stmt *stmt;
 	struct expr *expr;
 
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_IMM_VERDICT)) {
@@ -184,10 +187,9 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_IMM_DREG);
 
 	expr = netlink_alloc_data(loc, &nld, dreg);
-	if (dreg == NFT_REG_VERDICT) {
-		stmt = verdict_stmt_alloc(loc, expr);
-		list_add_tail(&stmt->list, &ctx->rule->stmts);
-	} else
+	if (dreg == NFT_REG_VERDICT)
+		ctx->stmt = verdict_stmt_alloc(loc, expr);
+	else
 		netlink_set_register(ctx, dreg, expr);
 }
 
@@ -218,7 +220,6 @@ static void netlink_parse_cmp(struct netlink_parse_ctx *ctx,
 	struct nft_data_delinearize nld;
 	enum nft_registers sreg;
 	struct expr *expr, *left, *right;
-	struct stmt *stmt;
 	enum ops op;
 
 	sreg = netlink_parse_register(nle, NFTNL_EXPR_CMP_SREG);
@@ -247,8 +248,7 @@ static void netlink_parse_cmp(struct netlink_parse_ctx *ctx,
 	}
 
 	expr = relational_expr_alloc(loc, op, left, right);
-	stmt = expr_stmt_alloc(loc, expr);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = expr_stmt_alloc(loc, expr);
 }
 
 static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
@@ -257,7 +257,6 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 {
 	enum nft_registers sreg, dreg;
 	const char *name;
-	struct stmt *stmt;
 	struct expr *expr, *left, *right;
 	struct set *set;
 
@@ -291,8 +290,7 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 		expr = relational_expr_alloc(loc, OP_LOOKUP, left, right);
 	}
 
-	stmt = expr_stmt_alloc(loc, expr);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = expr_stmt_alloc(loc, expr);
 }
 
 static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
@@ -503,7 +501,7 @@ static void netlink_parse_meta_stmt(struct netlink_parse_ctx *ctx,
 	stmt = meta_stmt_alloc(loc, key, expr);
 	expr_set_type(expr, stmt->meta.tmpl->dtype, stmt->meta.tmpl->byteorder);
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_meta(struct netlink_parse_ctx *ctx,
@@ -532,7 +530,7 @@ static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 	stmt = ct_stmt_alloc(loc, key, expr);
 	expr_set_type(expr, stmt->ct.tmpl->dtype, stmt->ct.tmpl->byteorder);
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_ct_expr(struct netlink_parse_ctx *ctx,
@@ -573,7 +571,8 @@ static void netlink_parse_counter(struct netlink_parse_ctx *ctx,
 	stmt = counter_stmt_alloc(loc);
 	stmt->counter.packets = nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_PACKETS);
 	stmt->counter.bytes   = nftnl_expr_get_u64(nle, NFTNL_EXPR_CTR_BYTES);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_log(struct netlink_parse_ctx *ctx,
@@ -608,7 +607,8 @@ static void netlink_parse_log(struct netlink_parse_ctx *ctx,
 			nftnl_expr_get_u32(nle, NFTNL_EXPR_LOG_LEVEL);
 		stmt->log.flags |= STMT_LOG_LEVEL;
 	}
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
@@ -623,7 +623,8 @@ static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
 	stmt->limit.type = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_TYPE);
 	stmt->limit.burst = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_BURST);
 	stmt->limit.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_FLAGS);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_reject(struct netlink_parse_ctx *ctx,
@@ -640,7 +641,7 @@ static void netlink_parse_reject(struct netlink_parse_ctx *ctx,
 	stmt->reject.expr = constant_expr_alloc(loc, &integer_type,
 						BYTEORDER_HOST_ENDIAN, 8,
 						&icmp_code);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
@@ -720,7 +721,7 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 		stmt->nat.proto = proto;
 	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
@@ -762,7 +763,7 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
 		stmt->masq.proto = proto;
 	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
@@ -808,7 +809,7 @@ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
 		stmt->redir.proto = proto;
 	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_dup(struct netlink_parse_ctx *ctx,
@@ -854,7 +855,7 @@ static void netlink_parse_dup(struct netlink_parse_ctx *ctx,
 			stmt->dup.dev = dev;
 	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_fwd(struct netlink_parse_ctx *ctx,
@@ -878,7 +879,7 @@ static void netlink_parse_fwd(struct netlink_parse_ctx *ctx,
 		stmt->fwd.to = dev;
 	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_queue(struct netlink_parse_ctx *ctx,
@@ -904,15 +905,17 @@ static void netlink_parse_queue(struct netlink_parse_ctx *ctx,
 	stmt = queue_stmt_alloc(loc);
 	stmt->queue.queue = expr;
 	stmt->queue.flags = nftnl_expr_get_u16(nle, NFTNL_EXPR_QUEUE_FLAGS);
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 				 const struct location *loc,
 				 const struct nftnl_expr *nle)
 {
+	const struct nftnl_expr *dnle;
 	struct expr *expr;
-	struct stmt *stmt;
+	struct stmt *stmt, *dstmt;
 	struct set *set;
 	enum nft_registers sreg;
 	const char *name;
@@ -939,12 +942,30 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 	expr = set_elem_expr_alloc(&expr->location, expr);
 	expr->timeout = nftnl_expr_get_u64(nle, NFTNL_EXPR_DYNSET_TIMEOUT);
 
-	stmt = set_stmt_alloc(loc);
-	stmt->set.set = set_ref_expr_alloc(loc, set);
-	stmt->set.op  = nftnl_expr_get_u32(nle, NFTNL_EXPR_DYNSET_OP);
-	stmt->set.key = expr;
+	dstmt = NULL;
+	dnle = nftnl_expr_get(nle, NFTNL_EXPR_DYNSET_EXPR, NULL);
+	if (dnle != NULL) {
+		if (netlink_parse_expr(dnle, ctx) < 0)
+			return;
+		if (ctx->stmt == NULL)
+			return netlink_error(ctx, loc,
+					     "Could not parse dynset stmt");
+		dstmt = ctx->stmt;
+	}
 
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	if (dstmt != NULL) {
+		stmt = flow_stmt_alloc(loc);
+		stmt->flow.set  = set_ref_expr_alloc(loc, set);
+		stmt->flow.key  = expr;
+		stmt->flow.stmt = dstmt;
+	} else {
+		stmt = set_stmt_alloc(loc);
+		stmt->set.set   = set_ref_expr_alloc(loc, set);
+		stmt->set.op    = nftnl_expr_get_u32(nle, NFTNL_EXPR_DYNSET_OP);
+		stmt->set.key   = expr;
+	}
+
+	ctx->stmt = stmt;
 }
 
 static const struct {
@@ -975,10 +996,10 @@ static const struct {
 	{ .name = "fwd",	.parse = netlink_parse_fwd },
 };
 
-static int netlink_parse_expr(struct nftnl_expr *nle, void *arg)
+static int netlink_parse_expr(const struct nftnl_expr *nle,
+			      struct netlink_parse_ctx *ctx)
 {
 	const char *type = nftnl_expr_get_str(nle, NFTNL_EXPR_NAME);
-	struct netlink_parse_ctx *ctx = arg;
 	struct location loc;
 	unsigned int i;
 
@@ -994,7 +1015,36 @@ static int netlink_parse_expr(struct nftnl_expr *nle, void *arg)
 	}
 
 	netlink_error(ctx, &loc, "unknown expression type '%s'", type);
+	return -1;
+}
+
+static int netlink_parse_rule_expr(struct nftnl_expr *nle, void *arg)
+{
+	struct netlink_parse_ctx *ctx = arg;
+	int err;
+
+	err = netlink_parse_expr(nle, ctx);
+	if (err < 0)
+		return err;
+	if (ctx->stmt != NULL) {
+		list_add_tail(&ctx->stmt->list, &ctx->rule->stmts);
+		ctx->stmt = NULL;
+	}
 	return 0;
+}
+
+struct stmt *netlink_parse_set_expr(const struct set *set,
+				    const struct nftnl_expr *nle)
+{
+	struct netlink_parse_ctx ctx, *pctx = &ctx;
+
+	pctx->rule = rule_alloc(&netlink_location, &set->handle);
+	pctx->table = table_lookup(&set->handle);
+	assert(pctx->table != NULL);
+
+	if (netlink_parse_expr(nle, pctx) < 0)
+		return NULL;
+	return pctx->stmt;
 }
 
 struct rule_pp_ctx {
@@ -1111,6 +1161,23 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 	}
 }
 
+static void ct_meta_common_postprocess(const struct expr *expr)
+{
+	const struct expr *left = expr->left;
+	struct expr *right = expr->right;
+
+	switch (expr->op) {
+	case OP_LOOKUP:
+		expr_set_type(right, left->dtype, left->byteorder);
+		if (right->dtype == &integer_type)
+			integer_type_postprocess(right);
+		break;
+
+	default:
+		break;
+	}
+}
+
 static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 				   const struct expr *expr)
 {
@@ -1128,13 +1195,8 @@ static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 			payload_dependency_store(&ctx->pdctx, ctx->stmt,
 						 left->meta.base);
 		break;
-	case OP_LOOKUP:
-		expr_set_type(expr->right, expr->left->dtype,
-			      expr->left->byteorder);
-		if (expr->right->dtype == &integer_type)
-			integer_type_postprocess(expr->right);
-		break;
 	default:
+		ct_meta_common_postprocess(expr);
 		break;
 	}
 }
@@ -1142,7 +1204,17 @@ static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 static void ct_match_postprocess(struct rule_pp_ctx *ctx,
 				 const struct expr *expr)
 {
-	return meta_match_postprocess(ctx, expr);
+	switch (expr->op) {
+	case OP_EQ:
+		if (expr->right->ops->type == EXPR_RANGE)
+			break;
+
+		expr->left->ops->pctx_update(&ctx->pctx, expr);
+		break;
+	default:
+		ct_meta_common_postprocess(expr);
+		break;
+	}
 }
 
 /* Convert a bitmask to a prefix length */
@@ -1185,9 +1257,61 @@ static struct expr *binop_tree_to_list(struct expr *list, struct expr *expr)
 	return list;
 }
 
+static void binop_adjust_one(const struct expr *binop, struct expr *value,
+			     unsigned int shift)
+{
+	struct expr *left = binop->left;
+
+	assert(value->len >= binop->right->len);
+
+	mpz_rshift_ui(value->value, shift);
+	switch (left->ops->type) {
+	case EXPR_PAYLOAD:
+	case EXPR_EXTHDR:
+		value->len = left->len;
+		break;
+	default:
+		BUG("unknown expression type %s\n", left->ops->name);
+		break;
+	}
+}
+
+static void binop_adjust(struct expr *expr, unsigned int shift)
+{
+	const struct expr *binop = expr->left;
+	struct expr *right = expr->right, *i;
+
+	switch (right->ops->type) {
+	case EXPR_VALUE:
+		binop_adjust_one(binop, right, shift);
+		break;
+	case EXPR_SET_REF:
+		list_for_each_entry(i, &right->set->init->expressions, list) {
+			switch (i->key->ops->type) {
+			case EXPR_VALUE:
+				binop_adjust_one(binop, i->key, shift);
+				break;
+			case EXPR_RANGE:
+				binop_adjust_one(binop, i->key->left, shift);
+				binop_adjust_one(binop, i->key->right, shift);
+				break;
+			case EXPR_SET_ELEM:
+				binop_adjust_one(binop, i->key->key, shift);
+				break;
+			default:
+				BUG("unknown expression type %s\n", i->key->ops->name);
+			}
+		}
+		break;
+	default:
+		BUG("unknown expression type %s\n", expr->ops->name);
+		break;
+	}
+}
+
 static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
 {
-	struct expr *binop = expr->left, *value = expr->right;
+	struct expr *binop = expr->left;
 	struct expr *left = binop->left;
 	struct expr *mask = binop->right;
 	unsigned int shift;
@@ -1205,11 +1329,7 @@ static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
 		 * Finally, convert the expression to 1) by replacing
 		 * the binop with the binop payload/exthdr expression.
 		 */
-		if (value->ops->type == EXPR_VALUE) {
-			assert(value->len >= expr->left->right->len);
-			mpz_rshift_ui(value->value, shift);
-			value->len = left->len;
-		}
+		binop_adjust(expr, shift);
 
 		assert(expr->left->ops->type == EXPR_BINOP);
 		assert(binop->left == left);
@@ -1655,6 +1775,9 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 				      stmt->payload.expr->byteorder);
 			expr_postprocess(&rctx, &stmt->payload.val);
 			break;
+		case STMT_FLOW:
+			expr_postprocess(&rctx, &stmt->flow.key);
+			break;
 		case STMT_META:
 			if (stmt->meta.expr != NULL)
 				expr_postprocess(&rctx, &stmt->meta.expr);
@@ -1729,7 +1852,7 @@ static char *udata_get_comment(const void *data, uint32_t data_len)
 }
 
 struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
-				      const struct nftnl_rule *nlr)
+				      struct nftnl_rule *nlr)
 {
 	struct netlink_parse_ctx _ctx, *pctx = &_ctx;
 	struct handle h;
@@ -1758,7 +1881,7 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 		pctx->rule->comment = udata_get_comment(data, len);
 	}
 
-	nftnl_expr_foreach((struct nftnl_rule *)nlr, netlink_parse_expr, pctx);
+	nftnl_expr_foreach(nlr, netlink_parse_rule_expr, pctx);
 
 	rule_parse_postprocess(pctx, pctx->rule);
 	netlink_release_registers(pctx);

@@ -34,7 +34,7 @@ Description: Program to control packet filtering rules by Netfilter project
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
  .
- A Linux kernel >= 3.13 is required. However, >= 4.2 is recommended.
+ A Linux kernel >= 3.13 is required. However, >= 4.7 is recommended.
 
 Package: nftables-dbg
 Architecture: linux-any
@@ -51,6 +51,6 @@ Description: debugging symbols for nftables
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
  .
- A Linux kernel >= 3.13 is required. However, >= 4.2 is recommended.
+ A Linux kernel >= 3.13 is required. However, >= 4.7 is recommended.
  .
  This package contains the debugging symbols for nftables.

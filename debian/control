@@ -10,7 +10,7 @@ Build-Depends: automake,
                docbook2x,
                flex,
                libgmp-dev,
-               libmnl-dev,
+               libmnl-dev (>= 1.0.3),
                libnftnl-dev (>= 1.0.6),
                libreadline-dev,
                libtool (>=2.2.6)

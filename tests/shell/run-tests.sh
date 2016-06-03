@@ -61,16 +61,25 @@ kernel_cleanup() {
 	nf_tables_ipv4 nf_tables_ipv6 nf_tables
 }
 
+find_tests() {
+	${FIND} ${TESTDIR} -executable -regex \
+		.*${RETURNCODE_SEPARATOR}[0-9]+ | sort
+}
+
 echo ""
 ok=0
 failed=0
-for testfile in $(${FIND} ${TESTDIR} -executable -regex .*${RETURNCODE_SEPARATOR}[0-9]+)
+for testfile in $(find_tests)
 do
 	kernel_cleanup
 
 	rc_spec=$(awk -F${RETURNCODE_SEPARATOR} '{print $NF}' <<< $testfile)
+
+	msg_info "[EXECUTING]	$testfile"
 	test_output=$(NFT=$NFT ${testfile} ${TESTS_OUTPUT} 2>&1)
 	rc_got=$?
+	echo -en "\033[1A\033[K" # clean the [EXECUTING] foobar line
+
 	if [ "$rc_got" == "$rc_spec" ] ; then
 		msg_info "[OK]		$testfile"
 		[ "$VERBOSE" == "y" ] && [ ! -z "$test_output" ] && echo "$test_output"

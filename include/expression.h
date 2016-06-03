@@ -237,6 +237,7 @@ struct expr {
 			uint64_t		timeout;
 			uint64_t		expiration;
 			const char		*comment;
+			struct stmt		*stmt;
 		};
 		struct {
 			/* EXPR_UNARY */
@@ -366,6 +367,7 @@ extern struct expr *list_expr_alloc(const struct location *loc);
 extern struct expr *set_expr_alloc(const struct location *loc);
 extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add);
+extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,
 				       struct expr *from, struct expr *to);

@@ -1,0 +1,33 @@
+--- tests/py/ip6/ip6.t.payload.inet
++++ tests/py/ip6/ip6.t.payload.inet
+@@ -13,24 +13,24 @@ inet test-inet input
+   [ cmp neq reg 1 0x00e90000 ]
+ 
+ # ip6 flowlabel { 33, 55, 67, 88}
+-set%d test-inet 3
+-set%d test-inet 0
++__set%d test-inet 3
++__set%d test-inet 0
+ 	element 00210000  : 0 [end]	element 00370000  : 0 [end]	element 00430000  : 0 [end]	element 00580000  : 0 [end]
+ inet test-inet input
+   [ meta load nfproto => reg 1 ]
+   [ cmp eq reg 1 0x0000000a ]
+   [ payload load 3b @ network header + 1 => reg 1 ]
+-  [ lookup reg 1 set set%d ]
++  [ lookup reg 1 set __set%d ]
+ 
+ # ip6 flowlabel { 33-55}
+-set%d test-inet 7
+-set%d test-inet 0
++__set%d test-inet 7
++__set%d test-inet 0
+ 	element 00000000  : 1 [end]	element 00210000  : 0 [end]	element 00380000  : 1 [end]
+ inet test-inet input
+   [ meta load nfproto => reg 1 ]
+   [ cmp eq reg 1 0x0000000a ]
+   [ payload load 3b @ network header + 1 => reg 1 ]
+-  [ lookup reg 1 set set%d ]
++  [ lookup reg 1 set __set%d ]
+ 
+ # ip6 length 22
+ inet test-inet input

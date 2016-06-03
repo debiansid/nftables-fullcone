@@ -87,6 +87,7 @@ static int __fmtstring(3, 4) set_error(struct eval_ctx *ctx,
 }
 
 static struct expr *implicit_set_declaration(struct eval_ctx *ctx,
+					     const char *name,
 					     const struct datatype *keytype,
 					     unsigned int keylen,
 					     struct expr *expr)
@@ -96,8 +97,8 @@ static struct expr *implicit_set_declaration(struct eval_ctx *ctx,
 	struct handle h;
 
 	set = set_alloc(&expr->location);
-	set->flags	= SET_F_CONSTANT | SET_F_ANONYMOUS | expr->set_flags;
-	set->handle.set = xstrdup(set->flags & SET_F_MAP ? "map%d" : "set%d");
+	set->flags	= SET_F_ANONYMOUS | expr->set_flags;
+	set->handle.set = xstrdup(name),
 	set->keytype 	= keytype;
 	set->keylen	= keylen;
 	set->init	= expr;
@@ -362,30 +363,116 @@ conflict_resolution_gen_dependency(struct eval_ctx *ctx, int protocol,
 	return 0;
 }
 
+static uint8_t expr_offset_shift(const struct expr *expr, unsigned int offset,
+				 unsigned int *extra_len)
+{
+	unsigned int new_offset, len;
+	int shift;
+
+	new_offset = offset % BITS_PER_BYTE;
+	len = round_up(expr->len, BITS_PER_BYTE);
+	shift = len - (new_offset + expr->len);
+	while (shift < 0) {
+		shift += BITS_PER_BYTE;
+		*extra_len += BITS_PER_BYTE;
+	}
+	return shift;
+}
+
+static void expr_evaluate_bits(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp, *and, *mask, *lshift, *off;
+	unsigned masklen, len = expr->len, extra_len = 0;
+	uint8_t shift;
+	mpz_t bitmask;
+
+	switch (expr->ops->type) {
+	case EXPR_PAYLOAD:
+		shift = expr_offset_shift(expr, expr->payload.offset,
+					  &extra_len);
+		break;
+	case EXPR_EXTHDR:
+		shift = expr_offset_shift(expr, expr->exthdr.tmpl->offset,
+					  &extra_len);
+		break;
+	default:
+		BUG("Unknown expression %s\n", expr->ops->name);
+	}
+
+	masklen = len + shift;
+	assert(masklen <= NFT_REG_SIZE * BITS_PER_BYTE);
+
+	mpz_init2(bitmask, masklen);
+	mpz_bitmask(bitmask, len);
+	mpz_lshift_ui(bitmask, shift);
+
+	mask = constant_expr_alloc(&expr->location, expr_basetype(expr),
+				   BYTEORDER_HOST_ENDIAN, masklen, NULL);
+	mpz_set(mask->value, bitmask);
+
+	and = binop_expr_alloc(&expr->location, OP_AND, expr, mask);
+	and->dtype	= expr->dtype;
+	and->byteorder	= expr->byteorder;
+	and->len	= masklen;
+
+	if (shift) {
+		off = constant_expr_alloc(&expr->location,
+					  expr_basetype(expr),
+					  BYTEORDER_BIG_ENDIAN,
+					  sizeof(shift), &shift);
+
+		lshift = binop_expr_alloc(&expr->location, OP_RSHIFT, and, off);
+		lshift->dtype		= expr->dtype;
+		lshift->byteorder	= expr->byteorder;
+		lshift->len		= masklen;
+
+		*exprp = lshift;
+	} else
+		*exprp = and;
+
+	if (extra_len)
+		expr->len += extra_len;
+}
+
+static int __expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp;
+
+	if (expr_evaluate_primary(ctx, exprp) < 0)
+		return -1;
+
+	if (expr->exthdr.tmpl->offset % BITS_PER_BYTE != 0 ||
+	    expr->len % BITS_PER_BYTE != 0)
+		expr_evaluate_bits(ctx, exprp);
+
+	return 0;
+}
+
 /*
  * Exthdr expression: check whether dependencies are fulfilled, otherwise
  * generate the necessary relational expression and prepend it to the current
  * statement.
  */
-static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **expr)
+static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 {
 	const struct proto_desc *base;
+	struct expr *expr = *exprp;
 	struct stmt *nstmt;
 
 	base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
 	if (base == &proto_ip6)
-		return expr_evaluate_primary(ctx, expr);
+		return __expr_evaluate_exthdr(ctx, exprp);
 
 	if (base)
-		return expr_error(ctx->msgs, *expr,
+		return expr_error(ctx->msgs, expr,
 				  "cannot use exthdr with %s", base->name);
 
-	if (exthdr_gen_dependency(ctx, *expr, &nstmt) < 0)
+	if (exthdr_gen_dependency(ctx, expr, &nstmt) < 0)
 		return -1;
 
 	list_add(&nstmt->list, &ctx->rule->stmts);
 
-	return expr_evaluate_primary(ctx, expr);
+	return __expr_evaluate_exthdr(ctx, exprp);
 }
 
 /* dependency supersede.
@@ -446,7 +533,7 @@ static int resolve_protocol_conflict(struct eval_ctx *ctx,
 		list_add_tail(&nstmt->list, &ctx->stmt->list);
 	}
 
-	assert(base < PROTO_BASE_MAX);
+	assert(base <= PROTO_BASE_MAX);
 	/* This payload and the existing context don't match, conflict. */
 	if (ctx->pctx.protocol[base + 1].desc != NULL)
 		return 1;
@@ -509,12 +596,21 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 	return 0;
 }
 
-static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **expr)
+static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
 {
-	if (__expr_evaluate_payload(ctx, *expr) < 0)
+	struct expr *expr = *exprp;
+
+	if (__expr_evaluate_payload(ctx, expr) < 0)
 		return -1;
 
-	return expr_evaluate_primary(ctx, expr);
+	if (expr_evaluate_primary(ctx, exprp) < 0)
+		return -1;
+
+	if (expr->payload.offset % BITS_PER_BYTE != 0 ||
+	    expr->len % BITS_PER_BYTE != 0)
+		expr_evaluate_bits(ctx, exprp);
+
+	return 0;
 }
 
 /*
@@ -698,6 +794,7 @@ static int constant_binop_simplify(struct eval_ctx *ctx, struct expr **expr)
 		break;
 	case OP_LSHIFT:
 		assert(left->byteorder == BYTEORDER_HOST_ENDIAN);
+		mpz_set(val, left->value);
 		mpz_lshift_ui(val, mpz_get_uint32(right->value));
 		mpz_and(val, val, mask);
 		break;
@@ -979,6 +1076,8 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 			set->set_flags |= SET_F_INTERVAL;
 	}
 
+	set->set_flags |= SET_F_CONSTANT;
+
 	set->dtype = ctx->ectx.dtype;
 	set->len   = ctx->ectx.len;
 	set->flags |= EXPR_F_CONSTANT;
@@ -1002,7 +1101,8 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 
 	switch (map->mappings->ops->type) {
 	case EXPR_SET:
-		mappings = implicit_set_declaration(ctx, ctx->ectx.dtype,
+		mappings = implicit_set_declaration(ctx, "__map%d",
+						    ctx->ectx.dtype,
 						    ctx->ectx.len, mappings);
 		mappings->set->datatype = ectx.dtype;
 		mappings->set->datalen  = ectx.len;
@@ -1094,6 +1194,10 @@ static int binop_can_transfer(struct eval_ctx *ctx,
 			return expr_binary_error(ctx->msgs, right, left,
 						 "Comparison is always false");
 		return 1;
+	case OP_RSHIFT:
+		if (ctx->ectx.len < right->len + mpz_get_uint32(left->right->value))
+			ctx->ectx.len += mpz_get_uint32(left->right->value);
+		return 1;
 	case OP_XOR:
 		return 1;
 	default:
@@ -1111,6 +1215,10 @@ static int binop_transfer_one(struct eval_ctx *ctx,
 		(*right) = binop_expr_alloc(&(*right)->location, OP_RSHIFT,
 					    *right, expr_get(left->right));
 		break;
+	case OP_RSHIFT:
+		(*right) = binop_expr_alloc(&(*right)->location, OP_LSHIFT,
+					    *right, expr_get(left->right));
+		break;
 	case OP_XOR:
 		(*right) = binop_expr_alloc(&(*right)->location, OP_XOR,
 					    *right, expr_get(left->right));
@@ -1125,6 +1233,7 @@ static int binop_transfer_one(struct eval_ctx *ctx,
 static int binop_transfer(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *left = (*expr)->left, *i, *next;
+	unsigned int shift;
 	int err;
 
 	if (left->ops->type != EXPR_BINOP)
@@ -1136,6 +1245,18 @@ static int binop_transfer(struct eval_ctx *ctx, struct expr **expr)
 		if (err <= 0)
 			return err;
 		if (binop_transfer_one(ctx, left, &(*expr)->right) < 0)
+			return -1;
+		break;
+	case EXPR_RANGE:
+		err = binop_can_transfer(ctx, left, (*expr)->right->left);
+		if (err <= 0)
+			return err;
+		err = binop_can_transfer(ctx, left, (*expr)->right->right);
+		if (err <= 0)
+			return err;
+		if (binop_transfer_one(ctx, left, &(*expr)->right->left) < 0)
+			return -1;
+		if (binop_transfer_one(ctx, left, &(*expr)->right->right) < 0)
 			return -1;
 		break;
 	case EXPR_SET:
@@ -1152,14 +1273,68 @@ static int binop_transfer(struct eval_ctx *ctx, struct expr **expr)
 			list_add_tail(&i->list, &next->list);
 		}
 		break;
+	case EXPR_SET_REF:
+		list_for_each_entry(i, &(*expr)->right->set->init->expressions, list) {
+			switch (i->key->ops->type) {
+			case EXPR_VALUE:
+				err = binop_can_transfer(ctx, left, i->key);
+				if (err <= 0)
+					return err;
+				break;
+			case EXPR_RANGE:
+				err = binop_can_transfer(ctx, left, i->key->left);
+				if (err <= 0)
+					return err;
+				err = binop_can_transfer(ctx, left, i->key->right);
+				if (err <= 0)
+					return err;
+				break;
+			default:
+				break;
+			}
+		}
+		list_for_each_entry_safe(i, next, &(*expr)->right->set->init->expressions,
+					 list) {
+			list_del(&i->list);
+			switch (i->key->ops->type) {
+			case EXPR_VALUE:
+				if (binop_transfer_one(ctx, left, &i->key) < 0)
+					return -1;
+				break;
+			case EXPR_RANGE:
+				if (binop_transfer_one(ctx, left, &i->key->left) < 0)
+					return -1;
+				if (binop_transfer_one(ctx, left, &i->key->right) < 0)
+					return -1;
+				break;
+			default:
+				break;
+			}
+			list_add_tail(&i->list, &next->list);
+		}
+		break;
 	default:
 		return 0;
 	}
 
-	left = expr_get((*expr)->left->left);
-	left->dtype = (*expr)->left->dtype;
-	expr_free((*expr)->left);
-	(*expr)->left = left;
+	switch (left->op) {
+	case OP_RSHIFT:
+		/* Mask out the bits the shift would have masked out */
+		shift = mpz_get_uint8(left->right->value);
+		mpz_bitmask(left->right->value, left->left->len);
+		mpz_lshift_ui(left->right->value, shift);
+		left->op = OP_AND;
+		break;
+	case OP_LSHIFT:
+	case OP_XOR:
+		left = expr_get((*expr)->left->left);
+		left->dtype = (*expr)->left->dtype;
+		expr_free((*expr)->left);
+		(*expr)->left = left;
+		break;
+	default:
+		BUG("invalid binop operation %u", left->op);
+	}
 	return 0;
 }
 
@@ -1210,16 +1385,33 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 
 	switch (rel->op) {
 	case OP_LOOKUP:
-		/* A literal set expression implicitly declares the set */
-		if (right->ops->type == EXPR_SET)
+		switch (right->ops->type) {
+		case EXPR_SET:
+			/* A literal set expression implicitly declares
+			 * the set
+			 */
 			right = rel->right =
-				implicit_set_declaration(ctx, left->dtype, left->len, right);
-		else if (!datatype_equal(left->dtype, right->dtype))
-			return expr_binary_error(ctx->msgs, right, left,
-						 "datatype mismatch, expected %s, "
-						 "set has type %s",
-						 left->dtype->desc,
-						 right->dtype->desc);
+				implicit_set_declaration(ctx, "__set%d",
+							 left->dtype,
+							 left->len, right);
+			break;
+		case EXPR_SET_REF:
+			if (right->dtype == NULL)
+				return expr_binary_error(ctx->msgs, right,
+							 left, "the referenced"
+							 " set does not "
+							 "exist");
+			if (!datatype_equal(left->dtype, right->dtype))
+				return expr_binary_error(ctx->msgs, right,
+							 left, "datatype "
+							 "mismatch, expected "
+							 "%s, set has type %s",
+							 left->dtype->desc,
+							 right->dtype->desc);
+			break;
+		default:
+			BUG("Unknown expression %s\n", right->ops->name);
+		}
 
 		/* Data for range lookups needs to be in big endian order */
 		if (right->set->flags & SET_F_INTERVAL &&
@@ -1444,6 +1636,41 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 				 stmt->payload.expr->dtype,
 				 stmt->payload.expr->len,
 				 &stmt->payload.val);
+}
+
+static int stmt_evaluate_flow(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct expr *key, *set, *setref;
+
+	expr_set_context(&ctx->ectx, NULL, 0);
+	if (expr_evaluate(ctx, &stmt->flow.key) < 0)
+		return -1;
+	if (expr_is_constant(stmt->flow.key))
+		return expr_error(ctx->msgs, stmt->flow.key,
+				  "Flow key expression can not be constant");
+	if (stmt->flow.key->comment)
+		return expr_error(ctx->msgs, stmt->flow.key,
+				  "Flow key expression can not contain comments");
+
+	/* Declare an empty set */
+	key = stmt->flow.key;
+	set = set_expr_alloc(&key->location);
+	set->set_flags |= SET_F_EVAL;
+	if (key->timeout)
+		set->set_flags |= SET_F_TIMEOUT;
+
+	setref = implicit_set_declaration(ctx, stmt->flow.table ?: "__ft%d",
+					  key->dtype, key->len, set);
+
+	stmt->flow.set = setref;
+
+	if (stmt_evaluate(ctx, stmt->flow.stmt) < 0)
+		return -1;
+	if (!(stmt->flow.stmt->flags & STMT_F_STATEFUL))
+		return stmt_binary_error(ctx, stmt->flow.stmt, stmt,
+					 "Per-flow statement must be stateful");
+
+	return 0;
 }
 
 static int stmt_evaluate_meta(struct eval_ctx *ctx, struct stmt *stmt)
@@ -2065,6 +2292,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_verdict(ctx, stmt);
 	case STMT_PAYLOAD:
 		return stmt_evaluate_payload(ctx, stmt);
+	case STMT_FLOW:
+		return stmt_evaluate_flow(ctx, stmt);
 	case STMT_META:
 		return stmt_evaluate_meta(ctx, stmt);
 	case STMT_CT:
@@ -2423,6 +2652,7 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table;
+	struct set *set;
 	int ret;
 
 	ret = cache_update(cmd->op, ctx->msgs);
@@ -2444,8 +2674,29 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
-		if (set_lookup(table, cmd->handle.set) == NULL)
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || set->flags & (SET_F_MAP | SET_F_EVAL))
 			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
+					 cmd->handle.set);
+		return 0;
+	case CMD_OBJ_FLOWTABLE:
+		table = table_lookup(&cmd->handle);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || !(set->flags & SET_F_EVAL))
+			return cmd_error(ctx, "Could not process rule: Flow table '%s' does not exist",
+					 cmd->handle.set);
+		return 0;
+	case CMD_OBJ_MAP:
+		table = table_lookup(&cmd->handle);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || !(set->flags & SET_F_MAP))
+			return cmd_error(ctx, "Could not process rule: Map '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_CHAIN:
@@ -2460,6 +2711,8 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_CHAINS:
 	case CMD_OBJ_SETS:
 	case CMD_OBJ_RULESET:
+	case CMD_OBJ_FLOWTABLES:
+	case CMD_OBJ_MAPS:
 		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);

@@ -9,14 +9,12 @@
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - ip6 version 6;ok
-- ip6 priority 3;ok
 
-# $ sudo nft add rule ip6 test6 input ip6 priority 33
-# <cmdline>:1:39-40: Error: Value 33 exceeds valid range 0-15
-# $ sudo nft add rule ip6 test6 input ip6 priority 3
-# <cmdline>:1:1-39: Error: Could not process rule: Invalid argument
-# add rule ip6 test6 input ip6 priority 3
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ip6 dscp cs1;ok
+ip6 dscp != cs1;ok
+ip6 dscp 0x38;ok;ip6 dscp cs7
+ip6 dscp != 0x20;ok;ip6 dscp != cs4
+ip6 dscp {cs0, cs1, cs2, cs3, cs4, cs5, cs6, cs7, af11, af12, af13, af21, af22, af23, af31, af32, af33, af41, af42, af43, ef};ok
 
 ip6 flowlabel 22;ok
 ip6 flowlabel != 233;ok

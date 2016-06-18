@@ -1,3 +1,9 @@
+nftables (0.6-1~bpo8+1) jessie-backports; urgency=medium
+
+  * Rebuild for jessie-backports.
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Sat, 18 Jun 2016 13:49:27 +0200
+
 nftables (0.6-1) unstable; urgency=medium
 
   * [5564626] Imported Upstream version 0.6

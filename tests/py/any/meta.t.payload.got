@@ -1,0 +1,162 @@
+# meta length { 33-55, 55-88, 100-120}
+set%d test-ip4 7
+set%d test-ip4 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+ip test-ip4 input 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta length { 33-55, 55-88, 100-120}
+set%d test-ip6 7
+set%d test-ip6 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+ip6 test-ip6 input 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta length { 33-55, 55-88, 100-120}
+set%d test-inet 7
+set%d test-inet 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+inet test-inet input 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta length { 33-55, 55-88, 100-120}
+set%d test-arp 7
+set%d test-arp 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+arp test-arp input 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta length { 33-55, 55-88, 100-120}
+set%d test-bridge 7
+set%d test-bridge 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+bridge test-bridge input 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta length { 33-55, 55-88, 100-120}
+set%d test-netdev 7
+set%d test-netdev 0
+	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 59000000  : 1 [end]	element 64000000  : 0 [end]	element 79000000  : 1 [end]
+netdev test-netdev ingress 
+  [ meta load len => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-ip4 7
+set%d test-ip4 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+ip test-ip4 input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-ip6 7
+set%d test-ip6 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+ip6 test-ip6 input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-inet 7
+set%d test-inet 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+inet test-inet input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-arp 7
+set%d test-arp 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+arp test-arp input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-bridge 7
+set%d test-bridge 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+bridge test-bridge input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-netdev 7
+set%d test-netdev 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+netdev test-netdev ingress 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-ip4 7
+set%d test-ip4 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+ip test-ip4 input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-ip6 7
+set%d test-ip6 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+ip6 test-ip6 input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-inet 7
+set%d test-inet 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+inet test-inet input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-arp 7
+set%d test-arp 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+arp test-arp input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-bridge 7
+set%d test-bridge 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+bridge test-bridge input 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+
+# meta cpu { 2-3, 5-7}
+set%d test-netdev 7
+set%d test-netdev 0
+	element 00000000  : 1 [end]	element 02000000  : 0 [end]	element 04000000  : 1 [end]	element 05000000  : 0 [end]	element 08000000  : 1 [end]
+netdev test-netdev ingress 
+  [ meta load cpu => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set set%d ]
+

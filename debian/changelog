@@ -1,3 +1,22 @@
+nftables (0.6-1) unstable; urgency=medium
+
+  * [5564626] Imported Upstream version 0.6
+  * [65ce938] d/control: bump dependency version on libnftnl
+  * [2127d04] d/control: adjust dependecy on libmnl 1.0.3
+  * [d18e174] d/control: point to linux 4.7 in package descriptions
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Fri, 03 Jun 2016 10:31:34 +0200
+
+nftables (0.5+snapshot20160509-1) unstable; urgency=medium
+
+  * [5a7c867] d/tests/internaltests-py.sh: run testsuite with installed
+    binary
+  * [b2282c4] d/tests/systemd-service-test.sh: don't run tests if old
+    kernel is present
+  * [b389985] Imported Upstream version 0.5+snapshot20160509
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 09 May 2016 13:58:32 +0200
+
 nftables (0.5+snapshot20160426-1~bpo8+1) jessie-backports; urgency=medium
 
   * Rebuild for jessie-backports.

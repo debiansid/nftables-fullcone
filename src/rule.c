@@ -258,7 +258,13 @@ static void set_print_declaration(const struct set *set,
 	const char *type;
 	uint32_t flags;
 
-	type = set->flags & SET_F_MAP ? "map" : "set";
+	if (set->flags & SET_F_MAP)
+		type = "map";
+	else if (set->flags & SET_F_EVAL)
+		type = "flow table";
+	else
+		type = "set";
+
 	printf("%s%s", opts->tab, type);
 
 	if (opts->family != NULL)
@@ -874,12 +880,29 @@ static int do_add_chain(struct netlink_ctx *ctx, const struct handle *h,
 	return 0;
 }
 
-static int do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
-			   const struct expr *expr)
+static int __do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
+			     struct set *set, struct expr *expr)
 {
+	if (set->flags & SET_F_INTERVAL &&
+	    set_to_intervals(ctx->msgs, set, expr, true) < 0)
+		return -1;
+
 	if (netlink_add_setelems(ctx, h, expr) < 0)
 		return -1;
+
 	return 0;
+}
+
+static int do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
+			   struct expr *init)
+{
+	struct table *table;
+	struct set *set;
+
+	table = table_lookup(h);
+	set = set_lookup(table, h->set);
+
+	return __do_add_setelems(ctx, h, set, init);
 }
 
 static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
@@ -887,13 +910,9 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 {
 	if (netlink_add_set(ctx, h, set) < 0)
 		return -1;
-	if (set->init != NULL) {
-		if (set->flags & SET_F_INTERVAL &&
-		    set_to_intervals(ctx->msgs, set) < 0)
-			return -1;
-		if (do_add_setelems(ctx, &set->handle, set->init) < 0)
-			return -1;
-	}
+	if (set->init != NULL)
+		return __do_add_setelems(ctx, &set->handle, set, set->init);
+
 	return 0;
 }
 
@@ -972,6 +991,25 @@ static int do_command_insert(struct netlink_ctx *ctx, struct cmd *cmd)
 	return 0;
 }
 
+static int do_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
+			      struct expr *expr)
+{
+	struct table *table;
+	struct set *set;
+
+	table = table_lookup(h);
+	set = set_lookup(table, h->set);
+
+	if (set->flags & SET_F_INTERVAL &&
+	    set_to_intervals(ctx->msgs, set, expr, false) < 0)
+		return -1;
+
+	if (netlink_delete_setelems(ctx, h, expr) < 0)
+		return -1;
+
+	return 0;
+}
+
 static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->obj) {
@@ -985,7 +1023,7 @@ static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SET:
 		return netlink_delete_set(ctx, &cmd->handle, &cmd->location);
 	case CMD_OBJ_SETELEM:
-		return netlink_delete_setelems(ctx, &cmd->handle, cmd->expr);
+		return do_delete_setelems(ctx, &cmd->handle, cmd->expr);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
@@ -1035,7 +1073,15 @@ static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 		       table->handle.table);
 
 		list_for_each_entry(set, &table->sets, list) {
-			if (set->flags & SET_F_ANONYMOUS)
+			if (cmd->obj == CMD_OBJ_SETS &&
+			    (set->flags & SET_F_ANONYMOUS ||
+			    set->flags & SET_F_MAP))
+				continue;
+			if (cmd->obj == CMD_OBJ_FLOWTABLES &&
+			    !(set->flags & SET_F_EVAL))
+				continue;
+			if (cmd->obj == CMD_OBJ_MAPS &&
+			    !(set->flags & SET_F_MAP))
 				continue;
 			set_print_declaration(set, &opts);
 			printf("%s}%s", opts.tab, opts.nl);
@@ -1170,6 +1216,14 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_list_set(ctx, cmd, table);
 	case CMD_OBJ_RULESET:
 		return do_list_ruleset(ctx, cmd);
+	case CMD_OBJ_FLOWTABLES:
+		return do_list_sets(ctx, cmd);
+	case CMD_OBJ_FLOWTABLE:
+		return do_list_set(ctx, cmd, table);
+	case CMD_OBJ_MAPS:
+		return do_list_sets(ctx, cmd);
+	case CMD_OBJ_MAP:
+		return do_list_set(ctx, cmd, table);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}

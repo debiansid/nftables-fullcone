@@ -1,0 +1,10 @@
+# dup to mark map { 0x00000001-0x00000003: lo, 0x00000010-0x00000020: lo}
+map%d test-netdev f
+map%d test-netdev 0
+	element 00000000  : 1 [end]	element 01000000  : 00000001 0 [end]	element 04000000  : 1 [end]	element 10000000  : 00000001 0 [end]	element 21000000  : 1 [end]
+netdev test-netdev ingress 
+  [ meta load mark => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ lookup reg 1 set map%d dreg 1 ]
+  [ dup sreg_dev 1 ]
+

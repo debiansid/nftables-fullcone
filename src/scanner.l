@@ -245,6 +245,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "set"			{ return SET; }
 "element"		{ return ELEMENT; }
 "map"			{ return MAP; }
+"maps"			{ return MAPS; }
 "handle"		{ return HANDLE; }
 "ruleset"		{ return RULESET; }
 
@@ -284,6 +285,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "size"			{ return SIZE; }
 "performance"		{ return PERFORMANCE; }
 "memory"		{ return MEMORY; }
+
+"flow"			{ return FLOW; }
 
 "counter"		{ return COUNTER; }
 "packets"		{ return PACKETS; }
@@ -362,7 +365,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "ip"			{ return IP; }
 "version"		{ return HDRVERSION; }
 "hdrlength"		{ return HDRLENGTH; }
-"tos"			{ return TOS; }
+"dscp"			{ return DSCP; }
+"ecn"			{ return ECN; }
 "length"		{ return LENGTH; }
 "frag-off"		{ return FRAG_OFF; }
 "ttl"			{ return TTL; }

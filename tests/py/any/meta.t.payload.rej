@@ -1,0 +1,41 @@
+--- tests/py/any/meta.t.payload
++++ tests/py/any/meta.t.payload
+@@ -28,29 +28,29 @@ ip test-ip4 input
+   [ cmp gt reg 1 0x2d000000 ]
+ 
+ # meta length { 33, 55, 67, 88}
+-set%d test-ip4 3
+-set%d test-ip4 0
++__set%d test-ip4 3
++__set%d test-ip4 0
+ 	element 00000021  : 0 [end]	element 00000037  : 0 [end]	element 00000043  : 0 [end]	element 00000058  : 0 [end]
+ ip test-ip4 input
+   [ meta load len => reg 1 ]
+-  [ lookup reg 1 set set%d ]
++  [ lookup reg 1 set __set%d ]
+ 
+ # meta length { 33-55}
+-set%d test-ip4 7
+-set%d test-ip4 0
++__set%d test-ip4 7
++__set%d test-ip4 0
+ 	element 00000000  : 1 [end]	element 21000000  : 0 [end]	element 38000000  : 1 [end]
+ ip test-ip4 input
+   [ meta load len => reg 1 ]
+   [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+-  [ lookup reg 1 set set%d ]
++  [ lookup reg 1 set __set%d ]
+ 
+ # meta protocol { ip, arp, ip6, vlan }
+-set%d test-ip4 3
+-set%d test-ip4 0
++__set%d test-ip4 3
++__set%d test-ip4 0
+ 	element 00000008  : 0 [end]	element 00000608  : 0 [end]	element 0000dd86  : 0 [end]	element 00000081  : 0 [end]
+ ip test-ip4 input
+   [ meta load protocol => reg 1 ]
+-  [ lookup reg 1 set set%d ]
++  [ lookup reg 1 set __set%d ]
+ 
+ # meta protocol ip
+ ip test-ip4 input

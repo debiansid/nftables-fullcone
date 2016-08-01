@@ -1,3 +1,14 @@
+nftables (0.6-2) unstable; urgency=medium
+
+  * [2ff280b] d/tests/systemd-service-test.sh: dont use echo in the
+    initial warning
+  * [89a01ba] d/tests/internaltests-shell.sh: dont' run testsuite if
+    kernel is < 4.x
+  * [59e6ac2] d/nftables.{postinst,postrm,preinst}: gracefully delete
+    /etc/init.d/nftables (Closes: #833078)
+
+ -- Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>  Mon, 01 Aug 2016 12:26:56 +0200
+
 nftables (0.6-1) unstable; urgency=medium
 
   * [5564626] Imported Upstream version 0.6

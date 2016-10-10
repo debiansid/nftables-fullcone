@@ -5,7 +5,7 @@ release happened, authored by Patrick McHardy <kaber@trash.net>.
 Please, read it carefully as it contains valuable information about the new
 nftables framework.
 			-- 28/jan/2014
-			Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+			Arturo Borrero Gonzalez <arturo@debian.org>
 ===============================================================================
 
 The Netfilter project presents:

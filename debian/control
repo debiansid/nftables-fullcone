@@ -1,7 +1,7 @@
 Source: nftables
 Section: net
 Priority: extra
-Maintainer: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+Maintainer: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
                bison,
                debhelper (>= 9.20141022),

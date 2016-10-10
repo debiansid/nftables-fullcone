@@ -9,7 +9,7 @@
 # Description:       nftables firewall system service
 ### END INIT INFO
 
-# Author: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+# Author: Arturo Borrero Gonzalez <arturo@debian.org>
 
 # Do NOT "set -e"
 

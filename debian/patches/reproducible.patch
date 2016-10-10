@@ -1,4 +1,4 @@
-From: Arturo Borrero Gonzalez <arturo.borrero.glez@gmail.com>
+From: Arturo Borrero Gonzalez <arturo@debian.org>
 Subject: Allow nftables reproducible build
  This patch allows nftables to have reproducible build as seen by
  the service at reproducible.debian.net.

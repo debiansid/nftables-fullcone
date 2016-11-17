@@ -28,6 +28,7 @@
 #include <erec.h>
 #include <gmputil.h>
 #include <utils.h>
+#include <xt.h>
 
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr);
 
@@ -37,40 +38,12 @@ static const char *byteorder_names[] = {
 	[BYTEORDER_BIG_ENDIAN]		= "big endian",
 };
 
-static int __fmtstring(4, 5) __stmt_binary_error(struct eval_ctx *ctx,
-						 const struct location *l1,
-						 const struct location *l2,
-						 const char *fmt, ...)
-{
-	struct error_record *erec;
-	va_list ap;
-
-	va_start(ap, fmt);
-	erec = erec_vcreate(EREC_ERROR, l1, fmt, ap);
-	if (l2 != NULL)
-		erec_add_location(erec, l2);
-	va_end(ap);
-	erec_queue(erec, ctx->msgs);
-	return -1;
-
-}
-
-#define stmt_error(ctx, s1, fmt, args...) \
-	__stmt_binary_error(ctx, &(s1)->location, NULL, fmt, ## args)
-#define stmt_binary_error(ctx, s1, s2, fmt, args...) \
-	__stmt_binary_error(ctx, &(s1)->location, &(s2)->location, fmt, ## args)
 #define chain_error(ctx, s1, fmt, args...) \
 	__stmt_binary_error(ctx, &(s1)->location, NULL, fmt, ## args)
 #define monitor_error(ctx, s1, fmt, args...) \
 	__stmt_binary_error(ctx, &(s1)->location, NULL, fmt, ## args)
 #define cmd_error(ctx, fmt, args...) \
 	__stmt_binary_error(ctx, &(ctx->cmd)->location, NULL, fmt, ## args)
-#define handle_error(ctx, fmt, args...) \
-	__stmt_binary_error(ctx, &ctx->cmd->handle.handle.location, NULL, fmt, ## args)
-#define position_error(ctx, fmt, args...) \
-	__stmt_binary_error(ctx, &ctx->cmd->handle.position.location, NULL, fmt, ## args)
-#define handle_position_error(ctx, fmt, args...) \
-	__stmt_binary_error(ctx, &ctx->cmd->handle.handle.location, &ctx->cmd->handle.position.location, fmt, ## args)
 
 static int __fmtstring(3, 4) set_error(struct eval_ctx *ctx,
 				       const struct set *set,
@@ -248,6 +221,7 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 	memset(data + len, 0, data_len - len);
 	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
 
+	assert(strlen(data) > 0);
 	datalen = strlen(data) - 1;
 	if (data[datalen] != '*') {
 		/* We need to reallocate the constant expression with the right
@@ -261,7 +235,7 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 		return 0;
 	}
 
-	if (datalen - 1 >= 0 &&
+	if (datalen >= 1 &&
 	    data[datalen - 1] == '\\') {
 		char unescaped_str[data_len];
 
@@ -290,27 +264,46 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 	return 0;
 }
 
-static int expr_evaluate_value(struct eval_ctx *ctx, struct expr **expr)
+static int expr_evaluate_integer(struct eval_ctx *ctx, struct expr **exprp)
 {
+	struct expr *expr = *exprp;
+	char *valstr, *rangestr;
 	mpz_t mask;
 
+	if (ctx->ectx.maxval > 0 &&
+	    mpz_cmp_ui(expr->value, ctx->ectx.maxval) > 0) {
+		valstr = mpz_get_str(NULL, 10, expr->value);
+		expr_error(ctx->msgs, expr,
+			   "Value %s exceeds valid range 0-%u",
+			   valstr, ctx->ectx.maxval);
+		free(valstr);
+		return -1;
+	}
+
+	mpz_init_bitmask(mask, ctx->ectx.len);
+	if (mpz_cmp(expr->value, mask) > 0) {
+		valstr = mpz_get_str(NULL, 10, expr->value);
+		rangestr = mpz_get_str(NULL, 10, mask);
+		expr_error(ctx->msgs, expr,
+			   "Value %s exceeds valid range 0-%s",
+			   valstr, rangestr);
+		free(valstr);
+		free(rangestr);
+		mpz_clear(mask);
+		return -1;
+	}
+	expr->byteorder = ctx->ectx.byteorder;
+	expr->len = ctx->ectx.len;
+	mpz_clear(mask);
+	return 0;
+}
+
+static int expr_evaluate_value(struct eval_ctx *ctx, struct expr **expr)
+{
 	switch (expr_basetype(*expr)->type) {
 	case TYPE_INTEGER:
-		mpz_init_bitmask(mask, ctx->ectx.len);
-		if (mpz_cmp((*expr)->value, mask) > 0) {
-			char *valstr = mpz_get_str(NULL, 10, (*expr)->value);
-			char *rangestr = mpz_get_str(NULL, 10, mask);
-			expr_error(ctx->msgs, *expr,
-				   "Value %s exceeds valid range 0-%s",
-				   valstr, rangestr);
-			free(valstr);
-			free(rangestr);
-			mpz_clear(mask);
+		if (expr_evaluate_integer(ctx, expr) < 0)
 			return -1;
-		}
-		(*expr)->byteorder = ctx->ectx.byteorder;
-		(*expr)->len = ctx->ectx.len;
-		mpz_clear(mask);
 		break;
 	case TYPE_STRING:
 		if (expr_evaluate_string(ctx, expr) < 0)
@@ -328,7 +321,7 @@ static int expr_evaluate_value(struct eval_ctx *ctx, struct expr **expr)
 static int expr_evaluate_primary(struct eval_ctx *ctx, struct expr **expr)
 {
 	__expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->byteorder,
-			   (*expr)->len);
+			   (*expr)->len, 0);
 	return 0;
 }
 
@@ -596,6 +589,12 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 	return 0;
 }
 
+static bool payload_needs_adjustment(const struct expr *expr)
+{
+	return expr->payload.offset % BITS_PER_BYTE != 0 ||
+	       expr->len % BITS_PER_BYTE != 0;
+}
+
 static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
 {
 	struct expr *expr = *exprp;
@@ -606,11 +605,42 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
 	if (expr_evaluate_primary(ctx, exprp) < 0)
 		return -1;
 
-	if (expr->payload.offset % BITS_PER_BYTE != 0 ||
-	    expr->len % BITS_PER_BYTE != 0)
+	if (payload_needs_adjustment(expr))
 		expr_evaluate_bits(ctx, exprp);
 
 	return 0;
+}
+
+/*
+ * RT expression: validate protocol dependencies.
+ */
+static int expr_evaluate_rt(struct eval_ctx *ctx, struct expr **expr)
+{
+	const struct proto_desc *base;
+	struct expr *rt = *expr;
+
+	rt_expr_update_type(&ctx->pctx, rt);
+
+	base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+	switch (rt->rt.key) {
+	case NFT_RT_NEXTHOP4:
+		if (base != &proto_ip)
+			goto err;
+		break;
+	case NFT_RT_NEXTHOP6:
+		if (base != &proto_ip6)
+			goto err;
+		break;
+	default:
+		break;
+	}
+
+	return expr_evaluate_primary(ctx, expr);
+
+err:
+	return expr_error(ctx->msgs, rt,
+			  "meta nfproto ipv4 or ipv6 must be specified "
+			  "before routing expression");
 }
 
 /*
@@ -957,19 +987,22 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 						 "expecting %s",
 						 dtype->desc);
 
+		if (dtype == NULL)
+			tmp = datatype_lookup(TYPE_INVALID);
+		else
+			tmp = concat_subtype_lookup(type, --off);
+		expr_set_context(&ctx->ectx, tmp, tmp->size);
+
+		if (list_member_evaluate(ctx, &i) < 0)
+			return -1;
+		flags &= i->flags;
+
 		if (dtype == NULL && i->dtype->size == 0)
 			return expr_binary_error(ctx->msgs, i, *expr,
 						 "can not use variable sized "
 						 "data types (%s) in concat "
 						 "expressions",
 						 i->dtype->name);
-
-		tmp = concat_subtype_lookup(type, --off);
-		expr_set_context(&ctx->ectx, tmp, tmp->size);
-
-		if (list_member_evaluate(ctx, &i) < 0)
-			return -1;
-		flags &= i->flags;
 
 		ntype = concat_subtype_add(ntype, i->dtype->type);
 	}
@@ -1177,6 +1210,55 @@ static int expr_evaluate_mapping(struct eval_ctx *ctx, struct expr **expr)
 				  "Value must be a singleton");
 
 	mapping->flags |= EXPR_F_CONSTANT;
+	return 0;
+}
+
+/* We got datatype context via statement. If the basetype is compatible, set
+ * this expression datatype to the one of the statement to make it datatype
+ * compatible. This is a more conservative approach than enabling datatype
+ * compatibility between two different datatypes whose basetype is the same,
+ * let's revisit this later once users come with valid usecases to generalize
+ * this.
+ */
+static void expr_dtype_integer_compatible(struct eval_ctx *ctx,
+					  struct expr *expr)
+{
+	if (ctx->ectx.dtype &&
+	    ctx->ectx.dtype->basetype == &integer_type &&
+	    ctx->ectx.len == 4 * BITS_PER_BYTE) {
+		expr->dtype = ctx->ectx.dtype;
+		expr->len   = ctx->ectx.len;
+	}
+}
+
+static int expr_evaluate_numgen(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp;
+
+	expr_dtype_integer_compatible(ctx, expr);
+
+	__expr_set_context(&ctx->ectx, expr->dtype, expr->byteorder, expr->len,
+			   expr->numgen.mod - 1);
+	return 0;
+}
+
+static int expr_evaluate_hash(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp;
+
+	expr_dtype_integer_compatible(ctx, expr);
+
+	expr_set_context(&ctx->ectx, NULL, 0);
+	if (expr_evaluate(ctx, &expr->hash.expr) < 0)
+		return -1;
+
+	/* expr_evaluate_primary() sets the context to what to the input
+         * expression to be hashed. Since this input is transformed to a 4 bytes
+	 * integer, restore context to the datatype that results from hashing.
+	 */
+	__expr_set_context(&ctx->ectx, expr->dtype, expr->byteorder, expr->len,
+			   expr->hash.mod - 1);
+
 	return 0;
 }
 
@@ -1539,7 +1621,8 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 #ifdef DEBUG
 	if (debug_level & DEBUG_EVALUATION) {
 		struct error_record *erec;
-		erec = erec_create(EREC_INFORMATIONAL, &(*expr)->location, "Evaluate");
+		erec = erec_create(EREC_INFORMATIONAL, &(*expr)->location,
+				   "Evaluate %s", (*expr)->ops->name);
 		erec_print(stdout, erec); expr_print(*expr); printf("\n\n");
 	}
 #endif
@@ -1555,9 +1638,12 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 		return expr_evaluate_exthdr(ctx, expr);
 	case EXPR_VERDICT:
 	case EXPR_META:
+	case EXPR_FIB:
 		return expr_evaluate_primary(ctx, expr);
 	case EXPR_PAYLOAD:
 		return expr_evaluate_payload(ctx, expr);
+	case EXPR_RT:
+		return expr_evaluate_rt(ctx, expr);
 	case EXPR_CT:
 		return expr_evaluate_ct(ctx, expr);
 	case EXPR_PREFIX:
@@ -1582,6 +1668,10 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 		return expr_evaluate_mapping(ctx, expr);
 	case EXPR_RELATIONAL:
 		return expr_evaluate_relational(ctx, expr);
+	case EXPR_NUMGEN:
+		return expr_evaluate_numgen(ctx, expr);
+	case EXPR_HASH:
+		return expr_evaluate_hash(ctx, expr);
 	default:
 		BUG("unknown expression type %s\n", (*expr)->ops->name);
 	}
@@ -1627,15 +1717,118 @@ static int stmt_evaluate_verdict(struct eval_ctx *ctx, struct stmt *stmt)
 	return 0;
 }
 
+static bool stmt_evaluate_payload_need_csum(const struct expr *payload)
+{
+	const struct proto_desc *desc;
+
+	desc = payload->payload.desc;
+
+	return desc && desc->checksum_key;
+}
+
 static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 {
+	struct expr *binop, *mask, *and, *payload_bytes;
+	unsigned int masklen, extra_len = 0;
+	unsigned int payload_byte_size, payload_byte_offset;
+	uint8_t shift_imm, data[NFT_REG_SIZE];
+	struct expr *payload;
+	mpz_t bitmask, ff;
+	bool need_csum;
+
 	if (__expr_evaluate_payload(ctx, stmt->payload.expr) < 0)
 		return -1;
 
-	return stmt_evaluate_arg(ctx, stmt,
-				 stmt->payload.expr->dtype,
-				 stmt->payload.expr->len,
-				 &stmt->payload.val);
+	payload = stmt->payload.expr;
+	if (stmt_evaluate_arg(ctx, stmt, payload->dtype, payload->len,
+			      &stmt->payload.val) < 0)
+		return -1;
+
+	need_csum = stmt_evaluate_payload_need_csum(payload);
+
+	if (!payload_needs_adjustment(payload)) {
+
+		/* We still need to munge the payload in case we have to
+		 * update checksum and the length is not even because
+		 * kernel checksum functions cannot deal with odd lengths.
+		 */
+		if (!need_csum || ((payload->len / BITS_PER_BYTE) & 1) == 0)
+			return 0;
+	}
+
+	payload_byte_offset = payload->payload.offset / BITS_PER_BYTE;
+
+	shift_imm = expr_offset_shift(payload, payload->payload.offset,
+				      &extra_len);
+	if (shift_imm) {
+		struct expr *off;
+
+		off = constant_expr_alloc(&payload->location,
+					  expr_basetype(payload),
+					  BYTEORDER_HOST_ENDIAN,
+					  sizeof(shift_imm), &shift_imm);
+
+		binop = binop_expr_alloc(&payload->location, OP_LSHIFT,
+					 stmt->payload.val, off);
+		binop->dtype		= payload->dtype;
+		binop->byteorder	= payload->byteorder;
+
+		stmt->payload.val = binop;
+	}
+
+	payload_byte_size = round_up(payload->len, BITS_PER_BYTE) / BITS_PER_BYTE;
+	payload_byte_size += (extra_len / BITS_PER_BYTE);
+
+	if (need_csum && payload_byte_size & 1) {
+		payload_byte_size++;
+
+		if (payload_byte_offset & 1) { /* prefer 16bit aligned fetch */
+			payload_byte_offset--;
+			assert(payload->payload.offset >= BITS_PER_BYTE);
+		}
+	}
+
+	masklen = payload_byte_size * BITS_PER_BYTE;
+	mpz_init_bitmask(ff, masklen);
+
+	mpz_init2(bitmask, masklen);
+	mpz_bitmask(bitmask, payload->len);
+	mpz_lshift_ui(bitmask, shift_imm);
+
+	mpz_xor(bitmask, ff, bitmask);
+	mpz_clear(ff);
+
+	assert(sizeof(data) * BITS_PER_BYTE >= masklen);
+	mpz_export_data(data, bitmask, BYTEORDER_HOST_ENDIAN, masklen);
+	mask = constant_expr_alloc(&payload->location, expr_basetype(payload),
+				   BYTEORDER_HOST_ENDIAN, masklen, data);
+
+	payload_bytes = payload_expr_alloc(&payload->location, NULL, 0);
+	payload_init_raw(payload_bytes, payload->payload.base,
+			 payload_byte_offset * BITS_PER_BYTE,
+			 payload_byte_size * BITS_PER_BYTE);
+
+	payload_bytes->payload.desc	 = payload->payload.desc;
+	payload_bytes->dtype		 = &integer_type;
+	payload_bytes->byteorder	 = payload->byteorder;
+
+	payload->len = payload_bytes->len;
+	payload->payload.offset = payload_bytes->payload.offset;
+
+	and = binop_expr_alloc(&payload->location, OP_AND, payload_bytes, mask);
+
+	and->dtype		 = payload_bytes->dtype;
+	and->byteorder		 = payload_bytes->byteorder;
+	and->len		 = payload_bytes->len;
+
+	binop = binop_expr_alloc(&payload->location, OP_XOR, and,
+				 stmt->payload.val);
+	binop->dtype		= payload->dtype;
+	binop->byteorder	= payload->byteorder;
+	binop->len		= mask->len;
+	stmt->payload.val = binop;
+
+	return expr_evaluate(ctx, &stmt->payload.val);
 }
 
 static int stmt_evaluate_flow(struct eval_ctx *ctx, struct stmt *stmt)
@@ -2013,9 +2206,7 @@ static int stmt_evaluate_reset(struct eval_ctx *ctx, struct stmt *stmt)
 		return 0;
 
 	base = pctx->protocol[PROTO_BASE_NETWORK_HDR].desc;
-	if (base == NULL &&
-	    (ctx->pctx.family == NFPROTO_INET ||
-	     ctx->pctx.family == NFPROTO_BRIDGE))
+	if (base == NULL)
 		base = &proto_inet_service;
 
 	protonum = proto_find_num(base, desc);
@@ -2277,7 +2468,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 #ifdef DEBUG
 	if (debug_level & DEBUG_EVALUATION) {
 		struct error_record *erec;
-		erec = erec_create(EREC_INFORMATIONAL, &stmt->location, "Evaluate");
+		erec = erec_create(EREC_INFORMATIONAL, &stmt->location,
+				   "Evaluate %s", stmt->ops->name);
 		erec_print(stdout, erec); stmt_print(stmt); printf("\n\n");
 	}
 #endif
@@ -2285,6 +2477,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 	switch (stmt->ops->type) {
 	case STMT_COUNTER:
 	case STMT_LIMIT:
+	case STMT_QUOTA:
+	case STMT_NOTRACK:
 		return 0;
 	case STMT_EXPRESSION:
 		return stmt_evaluate_expr(ctx, stmt);
@@ -2394,67 +2588,10 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	return 0;
 }
 
-static int rule_evaluate_cmd(struct eval_ctx *ctx)
-{
-	struct handle *handle = &ctx->cmd->handle;
-
-	/* allowed:
-	 * - insert [position] (no handle)
-	 * - add [position] (no handle)
-	 * - replace <handle> (no position)
-	 * - delete <handle> (no position)
-	 */
-
-	switch (ctx->cmd->op) {
-	case CMD_INSERT:
-		if (handle->handle.id && handle->position.id)
-			return handle_position_error(ctx, "use only `position'"
-						     " instead");
-
-		if (handle->handle.id)
-			return handle_error(ctx, "use `position' instead");
-		break;
-	case CMD_ADD:
-		if (handle->handle.id && handle->position.id)
-			return handle_position_error(ctx, "use only `position'"
-						     " instead");
-
-		if (handle->handle.id)
-			return handle_error(ctx, "use `position' instead");
-
-		break;
-	case CMD_REPLACE:
-		if (handle->handle.id && handle->position.id)
-			return handle_position_error(ctx, "use only `handle' "
-						     "instead");
-		if (handle->position.id)
-			return position_error(ctx, "use `handle' instead");
-		if (!handle->handle.id)
-			return cmd_error(ctx, "missing `handle'");
-		break;
-	case CMD_DELETE:
-		if (handle->handle.id && handle->position.id)
-			return handle_position_error(ctx, "use only `handle' "
-						     "instead");
-		if (handle->position.id)
-			return position_error(ctx, "use `handle' instead");
-		if (!handle->handle.id)
-			return cmd_error(ctx, "missing `handle'");
-		break;
-	default:
-		BUG("unkown command type %u\n", ctx->cmd->op);
-	}
-
-	return 0;
-}
-
 static int rule_evaluate(struct eval_ctx *ctx, struct rule *rule)
 {
 	struct stmt *stmt, *tstmt = NULL;
 	struct error_record *erec;
-
-	if (rule_evaluate_cmd(ctx) < 0)
-		return -1;
 
 	proto_ctx_init(&ctx->pctx, rule->handle.family);
 	memset(&ctx->ectx, 0, sizeof(ctx->ectx));
@@ -2636,11 +2773,8 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 			return ret;
 
 		return setelem_evaluate(ctx, &cmd->expr);
-	case CMD_OBJ_RULE:
-		if (rule_evaluate_cmd(ctx) < 0)
-			return -1;
-		/* fall through */
 	case CMD_OBJ_SET:
+	case CMD_OBJ_RULE:
 	case CMD_OBJ_CHAIN:
 	case CMD_OBJ_TABLE:
 		return 0;
@@ -2838,12 +2972,38 @@ static int cmd_evaluate_export(struct eval_ctx *ctx, struct cmd *cmd)
 	return cache_update(cmd->op, ctx->msgs);
 }
 
+#ifdef DEBUG
+static const char *cmd_op_name[] = {
+	[CMD_INVALID]	= "invalid",
+	[CMD_ADD]	= "add",
+	[CMD_REPLACE]	= "replace",
+	[CMD_CREATE]	= "create",
+	[CMD_INSERT]	= "insert",
+	[CMD_DELETE]	= "delete",
+	[CMD_LIST]	= "list",
+	[CMD_FLUSH]	= "flush",
+	[CMD_RENAME]	= "rename",
+	[CMD_EXPORT]	= "export",
+	[CMD_MONITOR]	= "monitor",
+	[CMD_DESCRIBE]	= "describe",
+};
+
+static const char *cmd_op_to_name(enum cmd_ops op)
+{
+	if (op > CMD_DESCRIBE)
+		return "unknown";
+
+	return cmd_op_name[op];
+}
+#endif
+
 int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 {
 #ifdef DEBUG
 	if (debug_level & DEBUG_EVALUATION) {
 		struct error_record *erec;
-		erec = erec_create(EREC_INFORMATIONAL, &cmd->location, "Evaluate");
+		erec = erec_create(EREC_INFORMATIONAL, &cmd->location,
+				   "Evaluate %s", cmd_op_to_name(cmd->op));
 		erec_print(stdout, erec); printf("\n\n");
 	}
 #endif

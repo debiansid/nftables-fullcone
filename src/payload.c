@@ -26,6 +26,18 @@
 #include <gmputil.h>
 #include <utils.h>
 
+bool payload_is_known(const struct expr *expr)
+{
+	const struct proto_hdr_template *tmpl;
+	const struct proto_desc *desc;
+
+	desc = expr->payload.desc;
+	tmpl = expr->payload.tmpl;
+
+	return desc && tmpl && desc != &proto_unknown &&
+	       tmpl != &proto_unknown_template;
+}
+
 static void payload_expr_print(const struct expr *expr)
 {
 	const struct proto_desc *desc;
@@ -33,7 +45,7 @@ static void payload_expr_print(const struct expr *expr)
 
 	desc = expr->payload.desc;
 	tmpl = expr->payload.tmpl;
-	if (desc != NULL && tmpl != NULL)
+	if (payload_is_known(expr))
 		printf("%s %s", desc->name, tmpl->token);
 	else
 		printf("payload @%s,%u,%u",
@@ -84,6 +96,9 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 
 	base = ctx->protocol[left->payload.base].desc;
 	desc = proto_find_upper(base, proto);
+
+	if (!desc)
+		return;
 
 	assert(desc->base <= PROTO_BASE_MAX);
 	if (desc->base == base->base) {

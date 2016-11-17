@@ -377,7 +377,7 @@ static int set_to_segtree(struct list_head *msgs, struct set *set,
 	/* We are updating an existing set with new elements, check if the new
 	 * interval overlaps with any of the existing ones.
 	 */
-	if (add && set->init != init) {
+	if (add && set->init && set->init != init) {
 		err = set_overlap(msgs, set, init, tree->keylen);
 		if (err < 0)
 			return err;
@@ -522,9 +522,13 @@ static void set_insert_interval(struct expr *set, struct seg_tree *tree,
 	mpz_set(expr->value, ei->left);
 	expr = set_elem_expr_alloc(&internal_location, expr);
 
-	if (ei->expr != NULL && ei->expr->ops->type == EXPR_MAPPING)
-		expr = mapping_expr_alloc(&ei->expr->location, expr,
-					  expr_get(ei->expr->right));
+	if (ei->expr != NULL) {
+		if (ei->expr->comment)
+			expr->comment = xstrdup(ei->expr->comment);
+		if (ei->expr->ops->type == EXPR_MAPPING)
+			expr = mapping_expr_alloc(&ei->expr->location, expr,
+						  expr_get(ei->expr->right));
+	}
 
 	if (ei->flags & EI_F_INTERVAL_END)
 		expr->flags |= EXPR_F_INTERVAL_END;

@@ -12,6 +12,20 @@
 
 #include <rule.h>
 
+struct netlink_parse_ctx {
+	struct list_head	*msgs;
+	struct table		*table;
+	struct rule		*rule;
+	struct stmt		*stmt;
+	struct expr		*registers[1 + NFT_REG32_15 - NFT_REG32_00 + 1];
+};
+
+struct rule_pp_ctx {
+	struct proto_ctx	pctx;
+	struct payload_dep_ctx	pdctx;
+	struct stmt		*stmt;
+};
+
 extern const struct input_descriptor indesc_netlink;
 extern const struct location netlink_location;
 
@@ -134,7 +148,7 @@ extern int netlink_flush_table(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
 
 extern int netlink_add_set(struct netlink_ctx *ctx, const struct handle *h,
-			   struct set *set);
+			   struct set *set, bool excl);
 extern int netlink_delete_set(struct netlink_ctx *ctx, const struct handle *h,
 			      const struct location *loc);
 extern int netlink_list_sets(struct netlink_ctx *ctx, const struct handle *h,
@@ -146,7 +160,7 @@ extern struct stmt *netlink_parse_set_expr(const struct set *set,
 					   const struct nftnl_expr *nle);
 
 extern int netlink_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
-				const struct expr *expr);
+				const struct expr *expr, bool excl);
 extern int netlink_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
 				   const struct expr *expr);
 extern int netlink_get_setelems(struct netlink_ctx *ctx, const struct handle *h,

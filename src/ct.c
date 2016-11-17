@@ -13,13 +13,14 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_conntrack_common.h>
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
 
+#include <errno.h>
 #include <erec.h>
 #include <expression.h>
 #include <datatype.h>
@@ -28,6 +29,8 @@
 #include <gmputil.h>
 #include <utils.h>
 #include <statement.h>
+
+#define CONNLABEL_CONF	DEFAULT_INCLUDE_PATH "/connlabel.conf"
 
 static const struct symbol_table ct_state_tbl = {
 	.symbols	= {
@@ -106,11 +109,11 @@ static void ct_label_type_print(const struct expr *expr)
 	for (s = ct_label_tbl->symbols; s->identifier != NULL; s++) {
 		if (bit != s->value)
 			continue;
-		printf("%s", s->identifier);
+		printf("\"%s\"", s->identifier);
 		return;
 	}
 	/* can happen when connlabel.conf is altered after rules were added */
-	gmp_printf("0x%Zx", expr->value);
+	printf("%ld\n", (long)mpz_scan1(expr->value, 0));
 }
 
 static struct error_record *ct_label_type_parse(const struct expr *sym,
@@ -119,6 +122,7 @@ static struct error_record *ct_label_type_parse(const struct expr *sym,
 	const struct symbolic_constant *s;
 	const struct datatype *dtype;
 	uint8_t data[CT_LABEL_BIT_SIZE];
+	uint64_t bit;
 	mpz_t value;
 
 	for (s = ct_label_tbl->symbols; s->identifier != NULL; s++) {
@@ -127,15 +131,28 @@ static struct error_record *ct_label_type_parse(const struct expr *sym,
 	}
 
 	dtype = sym->dtype;
-	if (s->identifier == NULL)
-		return error(&sym->location, "Could not parse %s", dtype->desc);
+	if (s->identifier == NULL) {
+		char *ptr;
 
-	if (s->value >= CT_LABEL_BIT_SIZE)
-		return error(&sym->location, "%s: out of range (%u max)",
-			     s->identifier, s->value, CT_LABEL_BIT_SIZE);
+		errno = 0;
+		bit = strtoull(sym->identifier, &ptr, 0);
+		if (*ptr)
+			return error(&sym->location, "%s: could not parse %s \"%s\"",
+				     CONNLABEL_CONF, dtype->desc, sym->identifier);
+		if (errno)
+			return error(&sym->location, "%s: could not parse %s \"%s\": %s",
+				     CONNLABEL_CONF, dtype->desc, sym->identifier, strerror(errno));
+
+	} else {
+		bit = s->value;
+	}
+
+	if (bit >= CT_LABEL_BIT_SIZE)
+		return error(&sym->location, "%s: bit %" PRIu64 " out of range (%u max)",
+			     sym->identifier, bit, CT_LABEL_BIT_SIZE);
 
 	mpz_init2(value, dtype->size);
-	mpz_setbit(value, s->value);
+	mpz_setbit(value, bit);
 	mpz_export_data(data, value, BYTEORDER_HOST_ENDIAN, sizeof(data));
 
 	*res = constant_expr_alloc(&sym->location, dtype,
@@ -158,7 +175,12 @@ static const struct datatype ct_label_type = {
 
 static void __init ct_label_table_init(void)
 {
-	ct_label_tbl = rt_symbol_table_init("/etc/xtables/connlabel.conf");
+	ct_label_tbl = rt_symbol_table_init(CONNLABEL_CONF);
+}
+
+static void __exit ct_label_table_exit(void)
+{
+	rt_symbol_table_free(ct_label_tbl);
 }
 
 #ifndef NF_CT_HELPER_NAME_LEN
@@ -284,6 +306,41 @@ struct error_record *ct_dir_parse(const struct location *loc, const char *str,
 	return error(loc, "Could not parse direction %s", str);
 }
 
+struct error_record *ct_key_parse(const struct location *loc, const char *str,
+				  unsigned int *key)
+{
+	int ret, len, offset = 0;
+	const char *sep = "";
+	unsigned int i;
+	char buf[1024];
+	size_t size;
+
+	for (i = 0; i < array_size(ct_templates); i++) {
+		if (!ct_templates[i].token || strcmp(ct_templates[i].token, str))
+			continue;
+
+		*key = i;
+		return NULL;
+	}
+
+	len = (int)sizeof(buf);
+	size = sizeof(buf);
+
+	for (i = 0; i < array_size(ct_templates); i++) {
+		if (!ct_templates[i].token)
+			continue;
+
+		if (offset)
+			sep = ", ";
+
+		ret = snprintf(buf+offset, len, "%s%s", sep, ct_templates[i].token);
+		SNPRINTF_BUFFER_SIZE(ret, size, len, offset);
+		assert(offset < (int)sizeof(buf));
+	}
+
+	return error(loc, "syntax error, unexpected %s, known keys are %s", str, buf);
+}
+
 struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,
 			   int8_t direction)
 {
@@ -355,6 +412,22 @@ struct stmt *ct_stmt_alloc(const struct location *loc, enum nft_ct_keys key,
 	stmt->ct.tmpl	= &ct_templates[key];
 	stmt->ct.expr	= expr;
 	return stmt;
+}
+
+static void notrack_stmt_print(const struct stmt *stmt)
+{
+	printf("notrack");
+}
+
+static const struct stmt_ops notrack_stmt_ops = {
+	.type		= STMT_NOTRACK,
+	.name		= "notrack",
+	.print		= notrack_stmt_print,
+};
+
+struct stmt *notrack_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &notrack_stmt_ops);
 }
 
 static void __init ct_init(void)

@@ -86,7 +86,8 @@ void datatype_print(const struct expr *expr)
 		if (dtype->print != NULL)
 			return dtype->print(expr);
 		if (dtype->sym_tbl != NULL)
-			return symbolic_constant_print(dtype->sym_tbl, expr);
+			return symbolic_constant_print(dtype->sym_tbl, expr,
+						       false);
 	} while ((dtype = dtype->basetype));
 
 	BUG("datatype %s has no print method or symbol table\n",
@@ -154,7 +155,7 @@ out:
 }
 
 void symbolic_constant_print(const struct symbol_table *tbl,
-			     const struct expr *expr)
+			     const struct expr *expr, bool quotes)
 {
 	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
 	const struct symbolic_constant *s;
@@ -173,7 +174,10 @@ void symbolic_constant_print(const struct symbol_table *tbl,
 	if (s->identifier == NULL)
 		return expr_basetype(expr)->print(expr);
 
-	printf("%s", s->identifier);
+	if (quotes)
+		printf("\"%s\"", s->identifier);
+	else
+		printf("%s", s->identifier);
 }
 
 void symbol_table_print(const struct symbol_table *tbl,
@@ -344,7 +348,8 @@ static void lladdr_type_print(const struct expr *expr)
 	uint8_t data[len];
 	unsigned int i;
 
-	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
+	mpz_export_data(data, expr->value, BYTEORDER_BIG_ENDIAN, len);
+
 	for (i = 0; i < len; i++) {
 		printf("%s%.2x", delim, data[i]);
 		delim = ":";
@@ -370,7 +375,7 @@ static struct error_record *lladdr_type_parse(const struct expr *sym,
 	}
 
 	*res = constant_expr_alloc(&sym->location, sym->dtype,
-				   BYTEORDER_HOST_ENDIAN, len * BITS_PER_BYTE,
+				   BYTEORDER_BIG_ENDIAN, len * BITS_PER_BYTE,
 				   buf);
 	return NULL;
 }
@@ -379,7 +384,7 @@ const struct datatype lladdr_type = {
 	.type		= TYPE_LLADDR,
 	.name		= "ll_addr",
 	.desc		= "link layer address",
-	.byteorder	= BYTEORDER_HOST_ENDIAN,
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
 	.basetype	= &integer_type,
 	.print		= lladdr_type_print,
 	.parse		= lladdr_type_parse,
@@ -684,7 +689,7 @@ static void __exit mark_table_exit(void)
 
 static void mark_type_print(const struct expr *expr)
 {
-	return symbolic_constant_print(mark_tbl, expr);
+	return symbolic_constant_print(mark_tbl, expr, true);
 }
 
 static struct error_record *mark_type_parse(const struct expr *sym,
@@ -883,7 +888,7 @@ struct error_record *time_parse(const struct location *loc, const char *str,
 
 static void time_type_print(const struct expr *expr)
 {
-	time_print(mpz_get_uint64(expr->value));
+	time_print(mpz_get_uint64(expr->value) / MSEC_PER_SEC);
 }
 
 static struct error_record *time_type_parse(const struct expr *sym,
@@ -896,6 +901,7 @@ static struct error_record *time_type_parse(const struct expr *sym,
 	if (erec != NULL)
 		return erec;
 
+	s *= MSEC_PER_SEC;
 	if (s > UINT32_MAX)
 		return error(&sym->location, "value too large");
 

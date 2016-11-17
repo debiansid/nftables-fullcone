@@ -27,7 +27,7 @@
  * @TYPE_IFINDEX:	interface index (integer subtype)
  * @TYPE_ARPHRD:	interface type (integer subtype)
  * @TYPE_REALM:		routing realm (integer subtype)
- * @TYPE_TC_HANDLE:	TC handle (integer subtype)
+ * @TYPE_CLASSID:	TC classid (integer subtype)
  * @TYPE_UID:		user ID (integer subtype)
  * @TYPE_GID:		group ID (integer subtype)
  * @TYPE_CT_STATE:	conntrack state (bitmask subtype)
@@ -66,7 +66,7 @@ enum datatypes {
 	TYPE_IFINDEX,
 	TYPE_ARPHRD,
 	TYPE_REALM,
-	TYPE_TC_HANDLE,
+	TYPE_CLASSID,
 	TYPE_UID,
 	TYPE_GID,
 	TYPE_CT_STATE,
@@ -81,6 +81,7 @@ enum datatypes {
 	TYPE_DEVGROUP,
 	TYPE_DSCP,
 	TYPE_ECN,
+	TYPE_FIB_ADDR,
 	__TYPE_MAX
 };
 #define TYPE_MAX		(__TYPE_MAX - 1)
@@ -188,7 +189,7 @@ extern struct error_record *symbolic_constant_parse(const struct expr *sym,
 						    const struct symbol_table *tbl,
 						    struct expr **res);
 extern void symbolic_constant_print(const struct symbol_table *tbl,
-				    const struct expr *expr);
+				    const struct expr *expr, bool quotes);
 extern void symbol_table_print(const struct symbol_table *tbl,
 			       const struct datatype *dtype);
 

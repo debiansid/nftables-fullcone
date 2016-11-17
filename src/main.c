@@ -114,9 +114,8 @@ static void show_help(const char *name)
 "  -i, --interactive		Read input from interactive CLI\n"
 "\n"
 "  -n, --numeric			When specified once, show network addresses numerically (default behaviour).\n"
-"  				When specified twice, show Internet services,\n"
-"				user IDs and group IDs numerically.\n"
-"				When specified thrice, also show protocols numerically.\n"
+"  				Specify twice to also show Internet services (port numbers) numerically.\n"
+"				Specify three times to also show protocols, user IDs, and group IDs numerically.\n"
 "  -N				Translate IP addresses to names.\n"
 "  -a, --handle			Output rule handle.\n"
 "  -I, --includepath <directory>	Add <directory> to the paths searched for include files.\n"
@@ -328,12 +327,13 @@ int main(int argc, char * const *argv)
 		for (len = 0, i = optind; i < argc; i++)
 			len += strlen(argv[i]) + strlen(" ");
 
-		buf = xzalloc(len + 1);
+		buf = xzalloc(len + 2);
 		for (i = optind; i < argc; i++) {
 			strcat(buf, argv[i]);
 			if (i + 1 < argc)
 				strcat(buf, " ");
 		}
+		strcat(buf, "\n");
 		parser_init(&state, &msgs);
 		scanner = scanner_init(&state);
 		scanner_push_buffer(scanner, &indesc_cmdline, buf);

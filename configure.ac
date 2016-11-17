@@ -29,6 +29,12 @@ AC_ARG_ENABLE([debug],
 AC_SUBST(with_debug)
 AM_CONDITIONAL([BUILD_DEBUG], [test "x$with_debug" != xno])
 
+AC_ARG_ENABLE([pdf-doc],
+	      AS_HELP_STRING([--enable-pdf-doc], [Enable PDF documentation]),
+	      AS_IF([test "x$enable_pdf_doc" = "xno"], [enable_pdf_doc=no],
+	      [enable_pdf_doc=yes]), [enable_pdf_doc=no])
+AM_CONDITIONAL([BUILD_PDF], [test "x$enable_pdf_doc" == "xyes" ])
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_MKDIR_P
@@ -63,11 +69,11 @@ AS_IF([test "$DOCBOOK2X_MAN" != "no"], [DB2MAN="$DOCBOOK2X_MAN"],
 AC_SUBST(DB2MAN)
 AM_CONDITIONAL([BUILD_MAN], [test -n "$DB2MAN"])
 
-AC_CHECK_PROG(DBLATEX, [dblatex], [found], [no])
-AS_IF([test "$DBLATEX" == "no"],
-	[AC_MSG_WARN([dblatex not found, no PDF manpages will be built])]
-)
-AM_CONDITIONAL([BUILD_PDF], [test "$DBLATEX" == "found"])
+AM_COND_IF([BUILD_PDF], [
+	AC_CHECK_PROG(DBLATEX, [dblatex], [found], [no])
+	AS_IF([test "$DBLATEX" == "no"],
+	      [AC_MSG_ERROR([dblatex not found])])
+])
 
 # Checks for libraries.
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
@@ -91,6 +97,16 @@ AC_DEFINE([HAVE_LIBREADLINE], [1], [])
 ])
 AC_SUBST(with_cli)
 AM_CONDITIONAL([BUILD_CLI], [test "x$with_cli" != xno])
+
+AC_ARG_WITH([xtables], [AS_HELP_STRING([--with-xtables],
+            [Use libxtables for iptables interaction)])],
+	    [with_libxtables=yes], [with_libxtables=no])
+AS_IF([test "x$with_libxtables" != xno], [
+PKG_CHECK_MODULES([XTABLES], [xtables >= 1.6.0])
+AC_DEFINE([HAVE_LIBXTABLES], [1], [0])
+])
+AC_SUBST(with_libxtables)
+AM_CONDITIONAL([BUILD_XTABLES], [test "x$with_libxtables" == xyes])
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -126,6 +142,10 @@ AC_CONFIG_FILES([					\
 		include/Makefile			\
 		include/linux/Makefile			\
 		include/linux/netfilter/Makefile	\
+		include/linux/netfilter_arp/Makefile	\
+		include/linux/netfilter_bridge/Makefile	\
+		include/linux/netfilter_ipv4/Makefile	\
+		include/linux/netfilter_ipv6/Makefile	\
 		doc/Makefile				\
 		files/Makefile				\
 		files/nftables/Makefile			\
@@ -136,4 +156,6 @@ echo "
 nft configuration:
   cli support:			${with_cli}
   enable debugging:		${with_debug}
-  use mini-gmp:			${with_mini_gmp}"
+  use mini-gmp:			${with_mini_gmp}
+  enable pdf documentation:	${enable_pdf_doc}
+  libxtables support:		${with_libxtables}"

@@ -10,6 +10,8 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <errno.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -47,7 +49,7 @@ static void __exit realm_table_exit(void)
 
 static void realm_type_print(const struct expr *expr)
 {
-	return symbolic_constant_print(realm_tbl, expr);
+	return symbolic_constant_print(realm_tbl, expr, true);
 }
 
 static struct error_record *realm_type_parse(const struct expr *sym,
@@ -80,14 +82,7 @@ static void tchandle_type_print(const struct expr *expr)
 		printf("none");
 		break;
 	default:
-		if (TC_H_MAJ(handle) == 0)
-			printf(":%04x", TC_H_MIN(handle));
-		else if (TC_H_MIN(handle) == 0)
-			printf("%04x:", TC_H_MAJ(handle) >> 16);
-		else {
-			printf("%04x:%04x",
-			       TC_H_MAJ(handle) >> 16, TC_H_MIN(handle));
-		}
+		printf("%0x:%0x", TC_H_MAJ(handle) >> 16, TC_H_MIN(handle));
 		break;
 	}
 }
@@ -96,40 +91,57 @@ static struct error_record *tchandle_type_parse(const struct expr *sym,
 						struct expr **res)
 {
 	uint32_t handle;
+	char *str = NULL;
 
 	if (strcmp(sym->identifier, "root") == 0)
 		handle = TC_H_ROOT;
 	else if (strcmp(sym->identifier, "none") == 0)
 		handle = TC_H_UNSPEC;
-	else if (sym->identifier[0] == ':') {
-		if (sscanf(sym->identifier, ":%04x", &handle) != 1)
-			goto err;
-	} else if (sym->identifier[strlen(sym->identifier)-1] == ':') {
-		if (sscanf(sym->identifier, "%04x:", &handle) != 1)
+	else if (strchr(sym->identifier, ':')) {
+		uint16_t tmp;
+		char *colon;
+
+		str = xstrdup(sym->identifier);
+
+		colon = strchr(str, ':');
+		if (!colon)
 			goto err;
 
-		handle <<= 16;
+		*colon = '\0';
+
+		errno = 0;
+		tmp = strtoull(str, NULL, 16);
+		if (errno != 0)
+			goto err;
+
+		handle = (tmp << 16);
+		if (str[strlen(str) - 1] == ':')
+			goto out;
+
+		errno = 0;
+		tmp = strtoull(colon + 1, NULL, 16);
+		if (errno != 0)
+			goto err;
+
+		handle |= tmp;
 	} else {
-		uint32_t min, max;
-
-		if (sscanf(sym->identifier, "%04x:%04x", &max, &min) != 2)
-			goto err;
-
-		handle = max << 16 | min;
+		handle = strtoull(sym->identifier, NULL, 0);
 	}
+out:
+	xfree(str);
 	*res = constant_expr_alloc(&sym->location, sym->dtype,
 				   BYTEORDER_HOST_ENDIAN,
 				   sizeof(handle) * BITS_PER_BYTE, &handle);
 	return NULL;
 err:
-	return error(&sym->location, "Could not parse %s",
-		     sym->dtype->desc);
+	xfree(str);
+	return error(&sym->location, "Could not parse %s", sym->dtype->desc);
 }
 
 static const struct datatype tchandle_type = {
-	.type		= TYPE_TC_HANDLE,
-	.name		= "tc_handle",
-	.desc		= "TC handle",
+	.type		= TYPE_CLASSID,
+	.name		= "classid",
+	.desc		= "TC classid",
 	.byteorder	= BYTEORDER_HOST_ENDIAN,
 	.size		= 4 * BITS_PER_BYTE,
 	.basetype	= &integer_type,
@@ -144,7 +156,7 @@ static void ifindex_type_print(const struct expr *expr)
 
 	ifindex = mpz_get_uint32(expr->value);
 	if (nft_if_indextoname(ifindex, name))
-		printf("%s", name);
+		printf("\"%s\"", name);
 	else
 		printf("%d", ifindex);
 }
@@ -155,8 +167,18 @@ static struct error_record *ifindex_type_parse(const struct expr *sym,
 	int ifindex;
 
 	ifindex = nft_if_nametoindex(sym->identifier);
-	if (ifindex == 0)
-		return error(&sym->location, "Interface does not exist");
+	if (ifindex == 0) {
+		char *end;
+		long res;
+
+		errno = 0;
+		res = strtol(sym->identifier, &end, 10);
+
+		if (res < 0 || res > INT_MAX || *end || errno)
+			return error(&sym->location, "Interface does not exist");
+
+		ifindex = (int)res;
+	}
 
 	*res = constant_expr_alloc(&sym->location, sym->dtype,
 				   BYTEORDER_HOST_ENDIAN,
@@ -208,7 +230,7 @@ static void uid_type_print(const struct expr *expr)
 
 		pw = getpwuid(uid);
 		if (pw != NULL)
-			printf("%s", pw->pw_name);
+			printf("\"%s\"", pw->pw_name);
 		else
 			printf("%d", uid);
 		return;
@@ -260,7 +282,7 @@ static void gid_type_print(const struct expr *expr)
 
 		gr = getgrgid(gid);
 		if (gr != NULL)
-			printf("%s", gr->gr_name);
+			printf("\"%s\"", gr->gr_name);
 		else
 			printf("%u", gid);
 		return;
@@ -305,16 +327,18 @@ static const struct datatype gid_type = {
 
 static const struct symbol_table pkttype_type_tbl = {
 	.symbols	= {
-		SYMBOL("unicast", PACKET_HOST),
+		SYMBOL("host", PACKET_HOST),
+		SYMBOL("unicast", PACKET_HOST), /* backwards compat */
 		SYMBOL("broadcast", PACKET_BROADCAST),
 		SYMBOL("multicast", PACKET_MULTICAST),
+		SYMBOL("other", PACKET_OTHERHOST),
 		SYMBOL_LIST_END,
 	},
 };
 
 static void pkttype_type_print(const struct expr *expr)
 {
-	return symbolic_constant_print(&pkttype_type_tbl, expr);
+	return symbolic_constant_print(&pkttype_type_tbl, expr, false);
 }
 
 static const struct datatype pkttype_type = {
@@ -341,7 +365,7 @@ static void __exit devgroup_table_exit(void)
 
 static void devgroup_type_print(const struct expr *expr)
 {
-	return symbolic_constant_print(devgroup_tbl, expr);
+	return symbolic_constant_print(devgroup_tbl, expr, true);
 }
 
 static struct error_record *devgroup_type_parse(const struct expr *sym,
@@ -418,6 +442,9 @@ static const struct meta_template meta_templates[] = {
 	[NFT_META_CGROUP]	= META_TEMPLATE("cgroup",    &integer_type,
 						4 * BITS_PER_BYTE,
 						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_PRANDOM]	= META_TEMPLATE("random",    &integer_type,
+						4 * BITS_PER_BYTE,
+						BYTEORDER_BIG_ENDIAN), /* avoid conversion; doesn't have endianess */
 };
 
 static bool meta_key_is_qualified(enum nft_meta_keys key)
@@ -428,6 +455,7 @@ static bool meta_key_is_qualified(enum nft_meta_keys key)
 	case NFT_META_L4PROTO:
 	case NFT_META_PROTOCOL:
 	case NFT_META_PRIORITY:
+	case NFT_META_PRANDOM:
 		return true;
 	default:
 		return false;
@@ -611,4 +639,40 @@ struct stmt *meta_stmt_meta_iiftype(const struct location *loc, uint16_t type)
 
 	dep = relational_expr_alloc(loc, OP_EQ, left, right);
 	return expr_stmt_alloc(&dep->location, dep);
+}
+
+struct error_record *meta_key_parse(const struct location *loc,
+                                    const char *str,
+                                    unsigned int *value)
+{
+	int ret, len, offset = 0;
+	const char *sep = "";
+	unsigned int i;
+	char buf[1024];
+	size_t size;
+
+	for (i = 0; i < array_size(meta_templates); i++) {
+		if (!meta_templates[i].token || strcmp(meta_templates[i].token, str))
+			continue;
+
+		*value = i;
+		return NULL;
+	}
+
+	len = (int)sizeof(buf);
+	size = sizeof(buf);
+
+	for (i = 0; i < array_size(meta_templates); i++) {
+		if (!meta_templates[i].token)
+			continue;
+
+		if (offset)
+			sep = ", ";
+
+		ret = snprintf(buf+offset, len, "%s%s", sep, meta_templates[i].token);
+		SNPRINTF_BUFFER_SIZE(ret, size, len, offset);
+		assert(offset < (int)sizeof(buf));
+	}
+
+	return error(loc, "syntax error, unexpected %s, known keys are %s", str, buf);
 }

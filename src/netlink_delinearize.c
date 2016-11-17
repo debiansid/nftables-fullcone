@@ -26,14 +26,7 @@
 #include <erec.h>
 #include <sys/socket.h>
 #include <libnftnl/udata.h>
-
-struct netlink_parse_ctx {
-	struct list_head	*msgs;
-	struct table		*table;
-	struct rule		*rule;
-	struct stmt		*stmt;
-	struct expr		*registers[1 + NFT_REG32_15 - NFT_REG32_00 + 1];
-};
+#include <xt.h>
 
 static int netlink_parse_expr(const struct nftnl_expr *nle,
 			      struct netlink_parse_ctx *ctx);
@@ -191,6 +184,46 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 		ctx->stmt = verdict_stmt_alloc(loc, expr);
 	else
 		netlink_set_register(ctx, dreg, expr);
+}
+
+static enum ops netlink_parse_range_op(const struct nftnl_expr *nle)
+{
+	switch (nftnl_expr_get_u32(nle, NFTNL_EXPR_RANGE_OP)) {
+	case NFT_RANGE_EQ:
+		return OP_EQ;
+	case NFT_RANGE_NEQ:
+		return OP_NEQ;
+	default:
+		return OP_INVALID;
+	}
+}
+
+static void netlink_parse_range(struct netlink_parse_ctx *ctx,
+				const struct location *loc,
+				const struct nftnl_expr *nle)
+{
+	struct expr *expr, *left, *right, *from, *to;
+	struct nft_data_delinearize nld;
+	enum nft_registers sreg;
+	enum ops op;
+
+	sreg = netlink_parse_register(nle, NFTNL_EXPR_RANGE_SREG);
+	left = netlink_get_register(ctx, loc, sreg);
+	if (left == NULL)
+		return netlink_error(ctx, loc,
+				     "Relational expression has no left hand side");
+
+	op = netlink_parse_range_op(nle);
+
+	nld.value = nftnl_expr_get(nle, NFTNL_EXPR_RANGE_FROM_DATA, &nld.len);
+	from = netlink_alloc_value(loc, &nld);
+
+	nld.value = nftnl_expr_get(nle, NFTNL_EXPR_RANGE_TO_DATA, &nld.len);
+	to = netlink_alloc_value(loc, &nld);
+
+	right = range_expr_alloc(loc, from, to);
+	expr = relational_expr_alloc(loc, op, left, right);
+	ctx->stmt = expr_stmt_alloc(loc, expr);
 }
 
 static enum ops netlink_parse_cmp_op(const struct nftnl_expr *nle)
@@ -433,8 +466,12 @@ static void netlink_parse_payload_stmt(struct netlink_parse_ctx *ctx,
 	expr = payload_expr_alloc(loc, NULL, 0);
 	payload_init_raw(expr, base, offset, len);
 
-	sreg = netlink_parse_register(nle, NFT_EXPR_PAYLOAD_SREG);
+	sreg = netlink_parse_register(nle, NFTNL_EXPR_PAYLOAD_SREG);
 	val  = netlink_get_register(ctx, loc, sreg);
+	if (val == NULL)
+		return netlink_error(ctx, loc,
+				     "payload statement has no expression");
+
 	stmt = payload_stmt_alloc(loc, expr, val);
 
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
@@ -444,7 +481,7 @@ static void netlink_parse_payload(struct netlink_parse_ctx *ctx,
 				  const struct location *loc,
 				  const struct nftnl_expr *nle)
 {
-	if (nftnl_expr_is_set(nle, NFT_EXPR_PAYLOAD_DREG))
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_PAYLOAD_DREG))
 		netlink_parse_payload_expr(ctx, loc, nle);
 	else
 		netlink_parse_payload_stmt(ctx, loc, nle);
@@ -467,6 +504,55 @@ static void netlink_parse_exthdr(struct netlink_parse_ctx *ctx,
 	exthdr_init_raw(expr, type, offset, len);
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_EXTHDR_DREG);
+	netlink_set_register(ctx, dreg, expr);
+}
+
+static void netlink_parse_hash(struct netlink_parse_ctx *ctx,
+			       const struct location *loc,
+			       const struct nftnl_expr *nle)
+{
+	enum nft_registers sreg, dreg;
+	struct expr *expr, *hexpr;
+	uint32_t mod, seed, len, offset;
+
+	sreg = netlink_parse_register(nle, NFTNL_EXPR_HASH_SREG);
+	hexpr = netlink_get_register(ctx, loc, sreg);
+	if (hexpr == NULL)
+		return netlink_error(ctx, loc,
+				     "hash statement has no expression");
+
+	offset = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_OFFSET);
+	seed = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_SEED);
+	mod  = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_MODULUS);
+	len = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_LEN) * BITS_PER_BYTE;
+
+	if (hexpr->len < len) {
+		hexpr = netlink_parse_concat_expr(ctx, loc, sreg, len);
+		if (hexpr == NULL)
+			return;
+	}
+
+	expr = hash_expr_alloc(loc, mod, seed, offset);
+	expr->hash.expr = hexpr;
+
+	dreg = netlink_parse_register(nle, NFTNL_EXPR_HASH_DREG);
+	netlink_set_register(ctx, dreg, expr);
+}
+
+static void netlink_parse_fib(struct netlink_parse_ctx *ctx,
+			      const struct location *loc,
+			      const struct nftnl_expr *nle)
+{
+	enum nft_registers dreg;
+	struct expr *expr;
+	uint32_t flags, result;
+
+	flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_FIB_FLAGS);
+	result = nftnl_expr_get_u32(nle, NFTNL_EXPR_FIB_RESULT);
+
+	expr = fib_expr_alloc(loc, flags, result);
+
+	dreg = netlink_parse_register(nle, NFTNL_EXPR_FIB_DREG);
 	netlink_set_register(ctx, dreg, expr);
 }
 
@@ -496,6 +582,9 @@ static void netlink_parse_meta_stmt(struct netlink_parse_ctx *ctx,
 
 	sreg = netlink_parse_register(nle, NFTNL_EXPR_META_SREG);
 	expr = netlink_get_register(ctx, loc, sreg);
+	if (expr == NULL)
+		return netlink_error(ctx, loc,
+				     "meta statement has no expression");
 
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_META_KEY);
 	stmt = meta_stmt_alloc(loc, key, expr);
@@ -514,6 +603,45 @@ static void netlink_parse_meta(struct netlink_parse_ctx *ctx,
 		netlink_parse_meta_stmt(ctx, loc, nle);
 }
 
+static void netlink_parse_rt(struct netlink_parse_ctx *ctx,
+			     const struct location *loc,
+			     const struct nftnl_expr *nle)
+{
+	enum nft_registers dreg;
+	uint32_t key;
+	struct expr *expr;
+
+	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_RT_KEY);
+	expr = rt_expr_alloc(loc, key, false);
+
+	dreg = netlink_parse_register(nle, NFTNL_EXPR_RT_DREG);
+	netlink_set_register(ctx, dreg, expr);
+}
+
+static void netlink_parse_numgen(struct netlink_parse_ctx *ctx,
+				 const struct location *loc,
+				 const struct nftnl_expr *nle)
+{
+	enum nft_registers dreg;
+	uint32_t type, until, offset;
+	struct expr *expr;
+
+	type  = nftnl_expr_get_u32(nle, NFTNL_EXPR_NG_TYPE);
+	until = nftnl_expr_get_u32(nle, NFTNL_EXPR_NG_MODULUS);
+	offset = nftnl_expr_get_u32(nle, NFTNL_EXPR_NG_OFFSET);
+
+	expr = numgen_expr_alloc(loc, type, until, offset);
+	dreg = netlink_parse_register(nle, NFTNL_EXPR_NG_DREG);
+	netlink_set_register(ctx, dreg, expr);
+}
+
+static void netlink_parse_notrack(struct netlink_parse_ctx *ctx,
+				  const struct location *loc,
+				  const struct nftnl_expr *nle)
+{
+	ctx->stmt = notrack_stmt_alloc(loc);
+}
+
 static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 				  const struct location *loc,
 				  const struct nftnl_expr *nle)
@@ -525,6 +653,9 @@ static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 
 	sreg = netlink_parse_register(nle, NFTNL_EXPR_CT_SREG);
 	expr = netlink_get_register(ctx, loc, sreg);
+	if (expr == NULL)
+		return netlink_error(ctx, loc,
+				     "ct statement has no expression");
 
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_CT_KEY);
 	stmt = ct_stmt_alloc(loc, key, expr);
@@ -623,6 +754,19 @@ static void netlink_parse_limit(struct netlink_parse_ctx *ctx,
 	stmt->limit.type = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_TYPE);
 	stmt->limit.burst = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_BURST);
 	stmt->limit.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_LIMIT_FLAGS);
+
+	ctx->stmt = stmt;
+}
+
+static void netlink_parse_quota(struct netlink_parse_ctx *ctx,
+				const struct location *loc,
+				const struct nftnl_expr *nle)
+{
+	struct stmt *stmt;
+
+	stmt = quota_stmt_alloc(loc);
+	stmt->quota.bytes = nftnl_expr_get_u64(nle, NFTNL_EXPR_QUOTA_BYTES);
+	stmt->quota.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_QUOTA_FLAGS);
 
 	ctx->stmt = stmt;
 }
@@ -982,18 +1126,27 @@ static const struct {
 	{ .name = "payload",	.parse = netlink_parse_payload },
 	{ .name = "exthdr",	.parse = netlink_parse_exthdr },
 	{ .name = "meta",	.parse = netlink_parse_meta },
+	{ .name = "rt",		.parse = netlink_parse_rt },
 	{ .name = "ct",		.parse = netlink_parse_ct },
 	{ .name = "counter",	.parse = netlink_parse_counter },
 	{ .name = "log",	.parse = netlink_parse_log },
 	{ .name = "limit",	.parse = netlink_parse_limit },
+	{ .name = "range",	.parse = netlink_parse_range },
 	{ .name = "reject",	.parse = netlink_parse_reject },
 	{ .name = "nat",	.parse = netlink_parse_nat },
+	{ .name = "notrack",	.parse = netlink_parse_notrack },
 	{ .name = "masq",	.parse = netlink_parse_masq },
 	{ .name = "redir",	.parse = netlink_parse_redir },
 	{ .name = "dup",	.parse = netlink_parse_dup },
 	{ .name = "queue",	.parse = netlink_parse_queue },
 	{ .name = "dynset",	.parse = netlink_parse_dynset },
 	{ .name = "fwd",	.parse = netlink_parse_fwd },
+	{ .name = "target",	.parse = netlink_parse_target },
+	{ .name = "match",	.parse = netlink_parse_match },
+	{ .name = "quota",	.parse = netlink_parse_quota },
+	{ .name = "numgen",	.parse = netlink_parse_numgen },
+	{ .name = "hash",	.parse = netlink_parse_hash },
+	{ .name = "fib",	.parse = netlink_parse_fib },
 };
 
 static int netlink_parse_expr(const struct nftnl_expr *nle,
@@ -1047,12 +1200,6 @@ struct stmt *netlink_parse_set_expr(const struct set *set,
 	return pctx->stmt;
 }
 
-struct rule_pp_ctx {
-	struct proto_ctx	pctx;
-	struct payload_dep_ctx	pdctx;
-	struct stmt		*stmt;
-};
-
 static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp);
 
 static void integer_type_postprocess(struct expr *expr)
@@ -1099,8 +1246,6 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 	list_for_each_entry(left, &list, list) {
 		tmp = constant_expr_splice(right, left->len);
 		expr_set_type(tmp, left->dtype, left->byteorder);
-		if (tmp->byteorder == BYTEORDER_HOST_ENDIAN)
-			mpz_switch_byteorder(tmp->value, tmp->len / BITS_PER_BYTE);
 
 		nexpr = relational_expr_alloc(&expr->location, expr->op,
 					      left, tmp);
@@ -1276,10 +1421,10 @@ static void binop_adjust_one(const struct expr *binop, struct expr *value,
 	}
 }
 
-static void binop_adjust(struct expr *expr, unsigned int shift)
+static void __binop_adjust(const struct expr *binop, struct expr *right,
+			   unsigned int shift)
 {
-	const struct expr *binop = expr->left;
-	struct expr *right = expr->right, *i;
+	struct expr *i;
 
 	switch (right->ops->type) {
 	case EXPR_VALUE:
@@ -1303,10 +1448,19 @@ static void binop_adjust(struct expr *expr, unsigned int shift)
 			}
 		}
 		break;
+	case EXPR_RANGE:
+		binop_adjust_one(binop, right->left, shift);
+		binop_adjust_one(binop, right->right, shift);
+		break;
 	default:
-		BUG("unknown expression type %s\n", expr->ops->name);
+		BUG("unknown expression type %s\n", right->ops->name);
 		break;
 	}
+}
+
+static void binop_adjust(struct expr *expr, unsigned int shift)
+{
+	__binop_adjust(expr->left, expr->right, shift);
 }
 
 static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
@@ -1613,7 +1767,13 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		break;
 	case EXPR_SET_REF:
 	case EXPR_META:
+	case EXPR_RT:
 	case EXPR_VERDICT:
+	case EXPR_NUMGEN:
+	case EXPR_FIB:
+		break;
+	case EXPR_HASH:
+		expr_postprocess(ctx, &expr->hash.expr);
 		break;
 	case EXPR_CT:
 		ct_expr_update_type(&ctx->pctx, expr);
@@ -1753,6 +1913,183 @@ static void stmt_expr_postprocess(struct rule_pp_ctx *ctx)
 		expr_postprocess_range(ctx, op);
 }
 
+static void stmt_payload_binop_pp(struct rule_pp_ctx *ctx, struct expr *binop)
+{
+	struct expr *payload = binop->left;
+	struct expr *mask = binop->right;
+	unsigned int shift;
+
+	assert(payload->ops->type == EXPR_PAYLOAD);
+	if (payload_expr_trim(payload, mask, &ctx->pctx, &shift)) {
+		__binop_adjust(binop, mask, shift);
+		payload_expr_complete(payload, &ctx->pctx);
+		expr_set_type(mask, payload->dtype,
+			      payload->byteorder);
+	}
+}
+
+/**
+ * stmt_payload_binop_postprocess - decode payload set binop
+ *
+ * @ctx:	rule postprocessing context
+ *
+ * This helper has to be called if expr_postprocess() failed to
+ * decode the payload operation.
+ *
+ * Usually a failure to decode means that userspace had to munge
+ * the original payload expression because it has an odd size or
+ * a non-byte divisible offset/length.
+ *
+ * Of that was the case, the 'value' expression is not a value but
+ * a binop expression with a munged payload expression on the left
+ * and a mask to clear the real payload offset/length.
+ *
+ * So chech if we have one of the following binops:
+ * I)
+ *           binop (|)
+ *       binop(&)   value/set
+ * payload   value(mask)
+ *
+ * This is the normal case, the | RHS is the value the user wants
+ * to set, the & RHS is the mask value that discards bits we need
+ * to clear but retains everything unrelated to the set operation.
+ *
+ * IIa)
+ *     binop (&)
+ * payload   mask
+ *
+ * User specified a zero set value -- netlink bitwise decoding
+ * discarded the redundant "| 0" part.  This is identical to I),
+ * we can just set value to 0 after we inferred the real payload size.
+ *
+ * IIb)
+ *     binop (|)
+ * payload     value/set
+ *
+ * This happens when user wants to set all bits, netlink bitwise
+ * decoding changed '(payload & mask) ^ bits_to_set' into
+ * 'payload | bits_to_set', discarding the redundant "& 0xfff...".
+ */
+static void stmt_payload_binop_postprocess(struct rule_pp_ctx *ctx)
+{
+	struct expr *expr, *binop, *payload, *value, *mask;
+	struct stmt *stmt = ctx->stmt;
+	mpz_t bitmask;
+
+	expr = stmt->payload.val;
+
+	if (expr->ops->type != EXPR_BINOP)
+		return;
+
+	switch (expr->left->ops->type) {
+	case EXPR_BINOP: {/* I? */
+		mpz_t tmp;
+
+		if (expr->op != OP_OR)
+			return;
+
+		value = expr->right;
+		if (value->ops->type != EXPR_VALUE)
+			return;
+
+		binop = expr->left;
+		if (binop->op != OP_AND)
+			return;
+
+		payload = binop->left;
+		if (payload->ops->type != EXPR_PAYLOAD)
+			return;
+
+		if (!payload->ops->cmp(stmt->payload.expr, payload))
+			return;
+
+		mask = binop->right;
+		if (mask->ops->type != EXPR_VALUE)
+			return;
+
+		mpz_init(tmp);
+		mpz_set(tmp, mask->value);
+
+		mpz_init_bitmask(bitmask, payload->len);
+		mpz_xor(bitmask, bitmask, mask->value);
+		mpz_xor(bitmask, bitmask, value->value);
+		mpz_set(mask->value, bitmask);
+		mpz_clear(bitmask);
+
+		binop_postprocess(ctx, expr);
+		if (!payload_is_known(payload)) {
+			mpz_set(mask->value, tmp);
+			mpz_clear(tmp);
+			return;
+		}
+
+		mpz_clear(tmp);
+		expr_free(stmt->payload.expr);
+		stmt->payload.expr = expr_get(payload);
+		stmt->payload.val = expr_get(expr->right);
+		expr_free(expr);
+		break;
+	}
+	case EXPR_PAYLOAD: /* II? */
+		value = expr->right;
+		if (value->ops->type != EXPR_VALUE)
+			return;
+
+		switch (expr->op) {
+		case OP_AND: /* IIa */
+			payload = expr->left;
+			mpz_init_bitmask(bitmask, payload->len);
+			mpz_xor(bitmask, bitmask, value->value);
+			mpz_set(value->value, bitmask);
+			break;
+		case OP_OR: /* IIb */
+			break;
+		default: /* No idea */
+			return;
+		}
+
+		stmt_payload_binop_pp(ctx, expr);
+		if (!payload_is_known(expr->left))
+			return;
+
+		expr_free(stmt->payload.expr);
+
+		switch (expr->op) {
+		case OP_AND:
+			/* Mask was used to match payload, i.e.
+			 * user asked to set zero value.
+			 */
+			mpz_set_ui(value->value, 0);
+			break;
+		default:
+			break;
+		}
+
+		stmt->payload.expr = expr_get(expr->left);
+		stmt->payload.val = expr_get(expr->right);
+		expr_free(expr);
+		break;
+	default: /* No idea */
+		break;
+	}
+}
+
+static void stmt_payload_postprocess(struct rule_pp_ctx *ctx)
+{
+	struct stmt *stmt = ctx->stmt;
+
+	expr_postprocess(ctx, &stmt->payload.expr);
+
+	expr_set_type(stmt->payload.val,
+		      stmt->payload.expr->dtype,
+		      stmt->payload.expr->byteorder);
+
+	if (!payload_is_known(stmt->payload.expr))
+		stmt_payload_binop_postprocess(ctx);
+
+	expr_postprocess(ctx, &stmt->payload.val);
+}
+
 static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *rule)
 {
 	struct rule_pp_ctx rctx;
@@ -1769,11 +2106,7 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 			stmt_expr_postprocess(&rctx);
 			break;
 		case STMT_PAYLOAD:
-			expr_postprocess(&rctx, &stmt->payload.expr);
-			expr_set_type(stmt->payload.val,
-				      stmt->payload.expr->dtype,
-				      stmt->payload.expr->byteorder);
-			expr_postprocess(&rctx, &stmt->payload.val);
+			stmt_payload_postprocess(&rctx);
 			break;
 		case STMT_FLOW:
 			expr_postprocess(&rctx, &stmt->flow.key);
@@ -1811,6 +2144,9 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 		case STMT_FWD:
 			if (stmt->fwd.to != NULL)
 				expr_postprocess(&rctx, &stmt->fwd.to);
+			break;
+		case STMT_XT:
+			stmt_xt_postprocess(&rctx, stmt, rule);
 			break;
 		default:
 			break;

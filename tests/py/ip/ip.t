@@ -75,6 +75,9 @@ ip protocol != tcp;ok;ip protocol != 6
 ip protocol { icmp, esp, ah, comp, udp, udplite, tcp, dccp, sctp} accept;ok;ip protocol { 33, 136, 17, 51, 50, 6, 132, 1, 108} accept
 - ip protocol != { icmp, esp, ah, comp, udp, udplite, tcp, dccp, sctp} accept;ok
 
+ip protocol 255;ok
+ip protocol 256;fail
+
 ip checksum 13172 drop;ok
 ip checksum 22;ok
 ip checksum != 233;ok
@@ -118,3 +121,13 @@ ip version 4 ip hdrlength 5;ok
 ip hdrlength 0;ok
 ip hdrlength 15;ok
 ip hdrlength 16;fail
+
+# limit impact to lo
+iif "lo" ip daddr set 127.0.0.1;ok
+iif "lo" ip checksum set 0;ok
+iif "lo" ip id set 0;ok
+iif "lo" ip ecn set 1;ok;iif "lo" ip ecn set ect1
+iif "lo" ip ecn set ce;ok
+
+iif "lo" ip dscp set af23;ok
+iif "lo" ip dscp set cs0;ok

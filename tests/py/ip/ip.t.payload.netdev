@@ -25,8 +25,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 2b @ network header + 2 => reg 1 ]
-  [ cmp lt reg 1 0x00004d01 ]
-  [ cmp gt reg 1 0x0000c501 ]
+  [ range neq reg 1 0x00004d01 0x0000c501 ]
 
 # ip length { 333, 553, 673, 838}
 __set%d test-netdev 3
@@ -75,8 +74,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 2b @ network header + 4 => reg 1 ]
-  [ cmp lt reg 1 0x00002100 ]
-  [ cmp gt reg 1 0x00002d00 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
 
 # ip id { 33, 55, 67, 88}
 __set%d test-netdev 3
@@ -126,8 +124,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 2b @ network header + 6 => reg 1 ]
-  [ cmp lt reg 1 0x00002100 ]
-  [ cmp gt reg 1 0x00002d00 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
 
 # ip frag-off { 33, 55, 67, 88}
 __set%d test-netdev 3
@@ -170,8 +167,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 1b @ network header + 8 => reg 1 ]
-  [ cmp lt reg 1 0x0000002d ]
-  [ cmp gt reg 1 0x00000032 ]
+  [ range neq reg 1 0x0000002d 0x00000032 ]
 
 # ip ttl {43, 53, 45 }
 __set%d test-netdev 3
@@ -203,6 +199,13 @@ netdev test-netdev ingress
   [ payload load 1b @ network header + 9 => reg 1 ]
   [ lookup reg 1 set __set%d ]
   [ immediate reg 0 accept ]
+
+# ip protocol 255
+ip test-ip4 input
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x000000ff ]
 
 # ip checksum 13172 drop
 netdev test-netdev ingress 
@@ -239,8 +242,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 2b @ network header + 10 => reg 1 ]
-  [ cmp lt reg 1 0x00002100 ]
-  [ cmp gt reg 1 0x00002d00 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
 
 # ip checksum { 33, 55, 67, 88}
 __set%d test-netdev 3
@@ -329,8 +331,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 4b @ network header + 16 => reg 1 ]
-  [ cmp lt reg 1 0x0100a8c0 ]
-  [ cmp gt reg 1 0xfa00a8c0 ]
+  [ range neq reg 1 0x0100a8c0 0xfa00a8c0 ]
 
 # ip daddr { 192.168.0.1-192.168.0.250}
 __set%d test-netdev 7
@@ -366,8 +367,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 4b @ network header + 16 => reg 1 ]
-  [ cmp lt reg 1 0x0201a8c0 ]
-  [ cmp gt reg 1 0x3701a8c0 ]
+  [ range neq reg 1 0x0201a8c0 0x3701a8c0 ]
 
 # ip saddr 192.168.1.3-192.168.33.55
 netdev test-netdev ingress 
@@ -382,8 +382,7 @@ netdev test-netdev ingress
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 4b @ network header + 12 => reg 1 ]
-  [ cmp lt reg 1 0x0301a8c0 ]
-  [ cmp gt reg 1 0x3721a8c0 ]
+  [ range neq reg 1 0x0301a8c0 0x3721a8c0 ]
 
 # ip daddr 192.168.0.1
 netdev test-netdev ingress 
@@ -640,4 +639,71 @@ netdev test-netdev ingress
   [ payload load 1b @ network header + 1 => reg 1 ]
   [ bitwise reg 1 = (reg=1 & 0x000000fc ) ^ 0x00000000 ]
   [ lookup reg 1 set __set%d ]
+
+# iif "lo" ip daddr set 127.0.0.1
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ immediate reg 1 0x0100007f ]
+  [ payload write reg 1 => 4b @ network header + 16 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip checksum set 0
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ immediate reg 1 0x00000000 ]
+  [ payload write reg 1 => 2b @ network header + 10 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip id set 0
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ immediate reg 1 0x00000000 ]
+  [ payload write reg 1 => 2b @ network header + 4 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip ecn set 1
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 0 => reg 1 ]
+  [ bitwise reg 1 = (reg=1 & 0x0000fcff ) ^ 0x00000100 ]
+  [ payload write reg 1 => 2b @ network header + 0 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip ecn set ce
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 0 => reg 1 ]
+  [ bitwise reg 1 = (reg=1 & 0x0000fcff ) ^ 0x00000300 ]
+  [ payload write reg 1 => 2b @ network header + 0 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip dscp set af23
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 0 => reg 1 ]
+  [ bitwise reg 1 = (reg=1 & 0x000003ff ) ^ 0x00005800 ]
+  [ payload write reg 1 => 2b @ network header + 0 csum_type 1 csum_off 10 ]
+
+# iif "lo" ip dscp set cs0
+netdev test-netdev ingress
+  [ meta load iif => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 0 => reg 1 ]
+  [ bitwise reg 1 = (reg=1 & 0x000003ff ) ^ 0x00000000 ]
+  [ payload write reg 1 => 2b @ network header + 0 csum_type 1 csum_off 10 ]
 

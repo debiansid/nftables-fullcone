@@ -33,6 +33,9 @@
  * @EXPR_UNARY:		byteorder conversion, generated during evaluation
  * @EXPR_BINOP:		binary operations (bitwise, shifts)
  * @EXPR_RELATIONAL:	equality and relational expressions
+ * @EXPR_NUMGEN:	number generation expression
+ * @EXPR_HASH:		hash expression
+ * @EXPR_RT:		routing expression
  */
 enum expr_types {
 	EXPR_INVALID,
@@ -55,6 +58,10 @@ enum expr_types {
 	EXPR_UNARY,
 	EXPR_BINOP,
 	EXPR_RELATIONAL,
+	EXPR_NUMGEN,
+	EXPR_HASH,
+	EXPR_RT,
+	EXPR_FIB,
 };
 
 enum ops {
@@ -100,21 +107,24 @@ enum symbol_types {
  * @dtype:	expected datatype
  * @byteorder:	expected byteorder
  * @len:	expected len
+ * @maxval:	expected maximum value
  */
 struct expr_ctx {
 	const struct datatype	*dtype;
 	enum byteorder		byteorder;
 	unsigned int		len;
+	unsigned int		maxval;
 };
 
 static inline void __expr_set_context(struct expr_ctx *ctx,
 				      const struct datatype *dtype,
 				      enum byteorder byteorder,
-				      unsigned int len)
+				      unsigned int len, unsigned int maxval)
 {
 	ctx->dtype	= dtype;
 	ctx->byteorder	= byteorder;
 	ctx->len	= len;
+	ctx->maxval	= maxval;
 }
 
 static inline void expr_set_context(struct expr_ctx *ctx,
@@ -122,7 +132,8 @@ static inline void expr_set_context(struct expr_ctx *ctx,
 				    unsigned int len)
 {
 	__expr_set_context(ctx, dtype,
-			   dtype ? dtype->byteorder : BYTEORDER_INVALID, len);
+			   dtype ? dtype->byteorder : BYTEORDER_INVALID,
+			   len, 0);
 }
 
 /**
@@ -170,7 +181,11 @@ enum expr_flags {
 
 #include <payload.h>
 #include <exthdr.h>
+#include <fib.h>
+#include <numgen.h>
 #include <meta.h>
+#include <rt.h>
+#include <hash.h>
 #include <ct.h>
 
 /**
@@ -273,10 +288,32 @@ struct expr {
 			enum proto_bases	base;
 		} meta;
 		struct {
+			/* EXPR_RT */
+			enum nft_rt_keys	key;
+		} rt;
+		struct {
 			/* EXPR_CT */
 			enum nft_ct_keys	key;
 			int8_t			direction;
 		} ct;
+		struct {
+			/* EXPR_NUMGEN */
+			enum nft_ng_types	type;
+			uint32_t		mod;
+			uint32_t		offset;
+		} numgen;
+		struct {
+			/* EXPR_HASH */
+			struct expr		*expr;
+			uint32_t		mod;
+			uint32_t		seed;
+			uint32_t		offset;
+		} hash;
+		struct {
+			/* EXPR_FIB */
+			uint32_t		flags;
+			uint32_t		result;
+		} fib;
 	};
 };
 

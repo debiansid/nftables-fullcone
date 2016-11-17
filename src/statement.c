@@ -23,6 +23,7 @@
 #include <statement.h>
 #include <utils.h>
 #include <list.h>
+#include <xt.h>
 
 #include <netinet/in.h>
 #include <linux/netfilter/nf_nat.h>
@@ -324,6 +325,32 @@ struct stmt *queue_stmt_alloc(const struct location *loc)
 	return stmt_alloc(loc, &queue_stmt_ops);
 }
 
+static void quota_stmt_print(const struct stmt *stmt)
+{
+	bool inv = stmt->quota.flags & NFT_QUOTA_F_INV;
+	const char *data_unit;
+	uint64_t bytes;
+
+	data_unit = get_rate(stmt->quota.bytes, &bytes);
+	printf("quota %s%"PRIu64" %s",
+	       inv ? "over " : "", bytes, data_unit);
+}
+
+static const struct stmt_ops quota_stmt_ops = {
+	.type		= STMT_QUOTA,
+	.name		= "quota",
+	.print		= quota_stmt_print,
+};
+
+struct stmt *quota_stmt_alloc(const struct location *loc)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &quota_stmt_ops);
+	stmt->flags |= STMT_F_STATEFUL;
+	return stmt;
+}
+
 static void reject_stmt_print(const struct stmt *stmt)
 {
 	printf("reject");
@@ -395,9 +422,27 @@ static void nat_stmt_print(const struct stmt *stmt)
 		[NFT_NAT_DNAT]	= "dnat",
 	};
 
-	printf("%s ", nat_types[stmt->nat.type]);
-	if (stmt->nat.addr)
-		expr_print(stmt->nat.addr);
+	printf("%s to ", nat_types[stmt->nat.type]);
+	if (stmt->nat.addr) {
+		if (stmt->nat.proto) {
+			if (stmt->nat.addr->ops->type == EXPR_VALUE &&
+			    stmt->nat.addr->dtype->type == TYPE_IP6ADDR) {
+				printf("[");
+				expr_print(stmt->nat.addr);
+				printf("]");
+			} else if (stmt->nat.addr->ops->type == EXPR_RANGE &&
+				   stmt->nat.addr->left->dtype->type == TYPE_IP6ADDR) {
+				printf("[");
+				expr_print(stmt->nat.addr->left);
+				printf("]-[");
+				expr_print(stmt->nat.addr->right);
+				printf("]");
+			}
+		} else {
+			expr_print(stmt->nat.addr);
+		}
+	}
+
 	if (stmt->nat.proto) {
 		printf(":");
 		expr_print(stmt->nat.proto);
@@ -458,7 +503,7 @@ static void redir_stmt_print(const struct stmt *stmt)
 	printf("redirect");
 
 	if (stmt->redir.proto) {
-		printf(" to ");
+		printf(" to :");
 		expr_print(stmt->redir.proto);
 	}
 
@@ -566,4 +611,28 @@ static const struct stmt_ops fwd_stmt_ops = {
 struct stmt *fwd_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &fwd_stmt_ops);
+}
+
+static void xt_stmt_print(const struct stmt *stmt)
+{
+	xt_stmt_xlate(stmt);
+}
+
+static void xt_stmt_destroy(struct stmt *stmt)
+{
+	xfree(stmt->xt.name);
+	xfree(stmt->xt.opts);
+	xt_stmt_release(stmt);
+}
+
+static const struct stmt_ops xt_stmt_ops = {
+	.type		= STMT_XT,
+	.name		= "xt",
+	.print		= xt_stmt_print,
+	.destroy	= xt_stmt_destroy,
+};
+
+struct stmt *xt_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &xt_stmt_ops);
 }

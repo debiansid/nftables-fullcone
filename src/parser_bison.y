@@ -162,9 +162,12 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token DASH			"-"
 %token AT			"@"
 %token VMAP			"vmap"
+%token LOOKUP			"lookup"
 
 %token INCLUDE			"include"
 %token DEFINE			"define"
+
+%token FIB			"fib"
 
 %token HOOK			"hook"
 %token DEVICE			"device"
@@ -221,8 +224,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token <val> NUM		"number"
 %token <string> STRING		"string"
-%token <string> QUOTED_STRING
-%token <string> ASTERISK_STRING
+%token <string> QUOTED_STRING	"quoted string"
+%token <string> ASTERISK_STRING	"string with a trailing asterisk"
 %destructor { xfree($$); }	STRING QUOTED_STRING ASTERISK_STRING
 
 %token LL_HDR			"ll"
@@ -319,8 +322,6 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token MH			"mh"
 
 %token META			"meta"
-%token NFPROTO			"nfproto"
-%token L4PROTO			"l4proto"
 %token MARK			"mark"
 %token IIF			"iif"
 %token IIFNAME			"iifname"
@@ -339,6 +340,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token IIFGROUP			"iifgroup"
 %token OIFGROUP			"oifgroup"
 %token CGROUP			"cgroup"
+
+%token CLASSID			"classid"
+%token NEXTHOP			"nexthop"
 
 %token CT			"ct"
 %token DIRECTION		"direction"
@@ -376,6 +380,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token OVER			"over"
 %token UNTIL			"until"
 
+%token QUOTA			"quota"
+
 %token NANOSECOND		"nanosecond"
 %token MICROSECOND		"microsecond"
 %token MILLISECOND		"millisecond"
@@ -405,11 +411,21 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token DUP			"dup"
 %token FWD			"fwd"
 
+%token NUMGEN			"numgen"
+%token INC			"inc"
+%token MOD			"mod"
+%token OFFSET			"offset"
+
+%token JHASH			"jhash"
+%token SEED			"seed"
+
 %token POSITION			"position"
 %token COMMENT			"comment"
 
 %token XML			"xml"
 %token JSON			"json"
+
+%token NOTRACK			"notrack"
 
 %type <string>			identifier type_identifier string comment_spec
 %destructor { xfree($$); }	identifier type_identifier string comment_spec
@@ -425,17 +441,14 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
 %destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
 
-%type <handle>			table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
-%destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec ruleset_spec
+%type <handle>			table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
+%destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
 %type <handle>			set_spec set_identifier
 %destructor { handle_free(&$$); } set_spec set_identifier
 %type <val>			family_spec family_spec_explicit chain_policy prio_spec
 
-%type <handle_spec>		handle_spec
-%type <position_spec>		position_spec
-
-%type <string>			dev_spec
-%destructor { xfree($$); }	dev_spec
+%type <string>			dev_spec quota_unit
+%destructor { xfree($$); }	dev_spec quota_unit
 
 %type <table>			table_block_alloc table_block
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
@@ -469,14 +482,14 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			log_stmt log_stmt_alloc
 %destructor { stmt_free($$); }	log_stmt log_stmt_alloc
 %type <val>			level_type
-%type <stmt>			limit_stmt
-%destructor { stmt_free($$); }	limit_stmt
-%type <val>			limit_burst limit_mode time_unit
+%type <stmt>			limit_stmt quota_stmt
+%destructor { stmt_free($$); }	limit_stmt quota_stmt
+%type <val>			limit_burst limit_mode time_unit quota_mode
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
 %type <stmt>			nat_stmt nat_stmt_alloc masq_stmt masq_stmt_alloc redir_stmt redir_stmt_alloc
 %destructor { stmt_free($$); }	nat_stmt nat_stmt_alloc masq_stmt masq_stmt_alloc redir_stmt redir_stmt_alloc
-%type <val>			nf_nat_flags nf_nat_flag
+%type <val>			nf_nat_flags nf_nat_flag offset_opt
 %type <stmt>			queue_stmt queue_stmt_alloc
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
 %type <val>			queue_stmt_flags queue_stmt_flag
@@ -490,8 +503,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			flow_stmt flow_stmt_alloc
 %destructor { stmt_free($$); }	flow_stmt flow_stmt_alloc
 
-%type <expr>			symbol_expr verdict_expr integer_expr
-%destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr
+%type <expr>			symbol_expr verdict_expr integer_expr variable_expr
+%destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr variable_expr
 %type <expr>			primary_expr shift_expr and_expr
 %destructor { expr_free($$); }	primary_expr shift_expr and_expr
 %type <expr>			exclusive_or_expr inclusive_or_expr
@@ -519,10 +532,12 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <expr>			verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
 %destructor { expr_free($$); }	verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
 
-%type <expr>			set_expr set_list_expr set_list_member_expr
-%destructor { expr_free($$); }	set_expr set_list_expr set_list_member_expr
+%type <expr>			set_expr set_block_expr set_list_expr set_list_member_expr
+%destructor { expr_free($$); }	set_expr set_block_expr set_list_expr set_list_member_expr
 %type <expr>			set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
 %destructor { expr_free($$); }	set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
+%type <expr>			set_elem_expr_stmt set_elem_expr_stmt_alloc
+%destructor { expr_free($$); }	set_elem_expr_stmt set_elem_expr_stmt_alloc
 
 %type <expr>			flow_key_expr flow_key_expr_alloc
 %destructor { expr_free($$); }	flow_key_expr flow_key_expr_alloc
@@ -551,8 +566,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <expr>			arp_hdr_expr
 %destructor { expr_free($$); }	arp_hdr_expr
 %type <val>			arp_hdr_field
-%type <expr>			ip_hdr_expr	icmp_hdr_expr
-%destructor { expr_free($$); }	ip_hdr_expr	icmp_hdr_expr
+%type <expr>			ip_hdr_expr	icmp_hdr_expr		numgen_expr	hash_expr
+%destructor { expr_free($$); }	ip_hdr_expr	icmp_hdr_expr		numgen_expr	hash_expr
 %type <val>			ip_hdr_field	icmp_hdr_field
 %type <expr>			ip6_hdr_expr    icmp6_hdr_expr
 %destructor { expr_free($$); }	ip6_hdr_expr	icmp6_hdr_expr
@@ -581,11 +596,19 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %type <expr>			meta_expr
 %destructor { expr_free($$); }	meta_expr
-%type <val>			meta_key	meta_key_qualified	meta_key_unqualified
+%type <val>			meta_key	meta_key_qualified	meta_key_unqualified	numgen_type
+
+%type <expr>			rt_expr
+%destructor { expr_free($$); }	rt_expr
+%type <val>			rt_key
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
 %type <val>			ct_key		ct_key_dir	ct_key_counters
+
+%type <expr>			fib_expr
+%destructor { expr_free($$); }	fib_expr
+%type <val>			fib_tuple	fib_result	fib_flag
 
 %type <val>			export_format
 %type <string>			monitor_event
@@ -633,7 +656,7 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_seperator
 				struct scope *scope = current_scope(state);
 
 				if (symbol_lookup(scope, $2) != NULL) {
-					erec_queue(error(&@2, "redfinition of symbol '%s'", $2),
+					erec_queue(error(&@2, "redefinition of symbol '%s'", $2),
 						   state->msgs);
 					YYERROR;
 				}
@@ -718,11 +741,11 @@ add_cmd			:	TABLE		table_spec
 				close_scope(state);
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_CHAIN, &$2, &@$, $5);
 			}
-			|	RULE		ruleid_spec	rule
+			|	RULE		rule_position	rule
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_RULE, &$2, &@$, $3);
 			}
-			|	/* empty */	ruleid_spec	rule
+			|	/* empty */	rule_position	rule
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_RULE, &$1, &@$, $2);
 			}
@@ -740,7 +763,7 @@ add_cmd			:	TABLE		table_spec
 				handle_merge(&$3->handle, &$2);
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SET, &$2, &@$, $5);
 			}
-			|	ELEMENT		set_spec	set_expr
+			|	ELEMENT		set_spec	set_block_expr
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SETELEM, &$2, &@$, $3);
 			}
@@ -775,9 +798,27 @@ create_cmd		:	TABLE		table_spec
 				close_scope(state);
 				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_CHAIN, &$2, &@$, $5);
 			}
+			|	SET		set_spec	set_block_alloc
+						'{'	set_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SET, &$2, &@$, $5);
+			}
+			|	MAP		set_spec	map_block_alloc
+						'{'	map_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SET, &$2, &@$, $5);
+			}
+			|	ELEMENT		set_spec	set_block_expr
+			{
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SETELEM, &$2, &@$, $3);
+			}
 			;
 
-insert_cmd		:	RULE		ruleid_spec	rule
+insert_cmd		:	RULE		rule_position	rule
 			{
 				$$ = cmd_alloc(CMD_INSERT, CMD_OBJ_RULE, &$2, &@$, $3);
 			}
@@ -803,7 +844,7 @@ delete_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SET, &$2, &@$, NULL);
 			}
-			|	ELEMENT		set_spec	set_expr
+			|	ELEMENT		set_spec	set_block_expr
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SETELEM, &$2, &@$, $3);
 			}
@@ -880,7 +921,13 @@ rename_cmd		:	CHAIN		chain_spec	identifier
 			}
 			;
 
-export_cmd		:	export_format
+export_cmd		:	RULESET		export_format
+			{
+				struct handle h = { .family = NFPROTO_UNSPEC };
+				struct export *export = export_alloc($2);
+				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_EXPORT, &h, &@$, export);
+			}
+			|	export_format
 			{
 				struct handle h = { .family = NFPROTO_UNSPEC };
 				struct export *export = export_alloc($1);
@@ -1029,12 +1076,16 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->gc_int = $3 * 1000;
 				$$ = $1;
 			}
-			|	set_block	ELEMENTS	'='		set_expr
+			|	set_block	ELEMENTS	'='		set_block_expr
 			{
 				$1->init = $4;
 				$$ = $1;
 			}
 			|	set_block	set_mechanism	stmt_seperator
+			;
+
+set_block_expr		:	set_expr
+			|	variable_expr
 			;
 
 set_flag_list		:	set_flag_list	COMMA		set_flag
@@ -1069,10 +1120,10 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	map_block	FLAGS		set_flag_list	stmt_seperator
 			{
-				$1->flags = $3;
+				$1->flags |= $3;
 				$$ = $1;
 			}
-			|	map_block	ELEMENTS	'='		set_expr
+			|	map_block	ELEMENTS	'='		set_block_expr
 			{
 				$1->init = $4;
 				$$ = $1;
@@ -1250,35 +1301,37 @@ set_identifier		:	identifier
 			}
 			;
 
-handle_spec		:	/* empty */
+handle_spec		:	HANDLE		NUM
 			{
 				memset(&$$, 0, sizeof($$));
-			}
-			|	HANDLE		NUM
-			{
-				memset(&$$, 0, sizeof($$));
-				$$.location	= @$;
-				$$.id		= $2;
+				$$.handle.location	= @$;
+				$$.handle.id		= $2;
 			}
 			;
 
-position_spec		:	/* empty */
+position_spec		:	POSITION	NUM
 			{
 				memset(&$$, 0, sizeof($$));
-			}
-			|	POSITION	NUM
-			{
-				memset(&$$, 0, sizeof($$));
-				$$.location	= @$;
-				$$.id		= $2;
+				$$.position.location	= @$;
+				$$.position.id		= $2;
 			}
 			;
 
-ruleid_spec		:	chain_spec	handle_spec	position_spec
+rule_position		:	chain_spec
 			{
-				$$		= $1;
-				$$.handle	= $2;
-				$$.position	= $3;
+				$$ = $1;
+			}
+			|	chain_spec	position_spec
+			{
+				handle_merge(&$1, &$2);
+				$$ = $1;
+			}
+			;
+
+ruleid_spec		:	chain_spec	handle_spec
+			{
+				handle_merge(&$1, &$2);
+				$$ = $1;
 			}
 			;
 
@@ -1348,6 +1401,7 @@ stmt			:	verdict_stmt
 			|	meta_stmt
 			|	log_stmt
 			|	limit_stmt
+			|	quota_stmt
 			|	reject_stmt
 			|	nat_stmt
 			|	queue_stmt
@@ -1478,14 +1532,30 @@ log_arg			:	PREFIX			string
 			}
 			;
 
-level_type		:	LEVEL_EMERG	{ $$ = LOG_EMERG; }
-			|	LEVEL_ALERT	{ $$ = LOG_ALERT; }
-			|	LEVEL_CRIT	{ $$ = LOG_CRIT; }
-			|	LEVEL_ERR	{ $$ = LOG_ERR; }
-			|	LEVEL_WARN	{ $$ = LOG_WARNING; }
-			|	LEVEL_NOTICE	{ $$ = LOG_NOTICE; }
-			|	LEVEL_INFO	{ $$ = LOG_INFO; }
-			|	LEVEL_DEBUG	{ $$ = LOG_DEBUG; }
+level_type		:	string
+			{
+				if (!strcmp("emerg", $1))
+					$$ = LOG_EMERG;
+				else if (!strcmp("alert", $1))
+					$$ = LOG_ALERT;
+				else if (!strcmp("crit", $1))
+					$$ = LOG_CRIT;
+				else if (!strcmp("err", $1))
+					$$ = LOG_ERR;
+				else if (!strcmp("warn", $1))
+					$$ = LOG_WARNING;
+				else if (!strcmp("notice", $1))
+					$$ = LOG_NOTICE;
+				else if (!strcmp("info", $1))
+					$$ = LOG_INFO;
+				else if (!strcmp("debug", $1))
+					$$ = LOG_DEBUG;
+				else {
+					erec_queue(error(&@1, "invalid log level", $1),
+						   state->msgs);
+					YYERROR;
+				}
+			}
 			;
 
 limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst
@@ -1514,6 +1584,31 @@ limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst
 				$$->limit.burst	= $6;
 				$$->limit.type	= NFT_LIMIT_PKT_BYTES;
 				$$->limit.flags = $3;
+			}
+			;
+
+quota_mode		:	OVER		{ $$ = NFT_QUOTA_F_INV; }
+			|	UNTIL		{ $$ = 0; }
+			|	/* empty */	{ $$ = 0; }
+			;
+
+quota_unit		:	BYTES		{ $$ = xstrdup("bytes"); }
+			|	STRING		{ $$ = $1; }
+			;
+
+quota_stmt		:	QUOTA	quota_mode NUM quota_unit
+			{
+				struct error_record *erec;
+				uint64_t rate;
+
+				erec = data_unit_parse(&@$, $4, &rate);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+				$$ = quota_stmt_alloc(&@$);
+				$$->quota.bytes	= $3 * rate;
+				$$->quota.flags	= $2;
 			}
 			;
 
@@ -1651,14 +1746,27 @@ nat_stmt_args		:	stmt_expr
 			{
 				$<stmt>0->nat.addr = $1;
 			}
+			|	TO	stmt_expr
+			{
+				$<stmt>0->nat.addr = $2;
+			}
 			|	stmt_expr	COLON	stmt_expr
 			{
 				$<stmt>0->nat.addr = $1;
 				$<stmt>0->nat.proto = $3;
 			}
+			|	TO	stmt_expr	COLON	stmt_expr
+			{
+				$<stmt>0->nat.addr = $2;
+				$<stmt>0->nat.proto = $4;
+			}
 			|	COLON		stmt_expr
 			{
 				$<stmt>0->nat.proto = $2;
+			}
+			|	TO	COLON		stmt_expr
+			{
+				$<stmt>0->nat.proto = $3;
 			}
 			|       nat_stmt_args   nf_nat_flags
 			{
@@ -1699,6 +1807,10 @@ redir_stmt_arg		:	TO	stmt_expr
 			{
 				$<stmt>0->redir.proto = $2;
 			}
+			|	TO	COLON	stmt_expr
+			{
+				$<stmt>0->redir.proto = $3;
+			}
 			|	nf_nat_flags
 			{
 				$<stmt>0->redir.flags = $1;
@@ -1707,6 +1819,11 @@ redir_stmt_arg		:	TO	stmt_expr
 			{
 				$<stmt>0->redir.proto = $2;
 				$<stmt>0->redir.flags = $3;
+			}
+			|	TO	COLON	stmt_expr	nf_nat_flags
+			{
+				$<stmt>0->redir.proto = $3;
+				$<stmt>0->redir.flags = $4;
 			}
 			;
 
@@ -1781,7 +1898,17 @@ queue_stmt_flag		:	BYPASS	{ $$ = NFT_QUEUE_FLAG_BYPASS; }
 			|	FANOUT	{ $$ = NFT_QUEUE_FLAG_CPU_FANOUT; }
 			;
 
-set_stmt		:	SET	set_stmt_op	set_elem_expr	symbol_expr
+set_elem_expr_stmt	:	set_elem_expr_stmt_alloc
+			|	set_elem_expr_stmt_alloc	set_elem_options
+			;
+
+set_elem_expr_stmt_alloc:	concat_expr
+			{
+				$$ = set_elem_expr_alloc(&@1, $1);
+			}
+			;
+
+set_stmt		:	SET	set_stmt_op	set_elem_expr_stmt	symbol_expr
 			{
 				$$ = set_stmt_alloc(&@$);
 				$$->set.op  = $2;
@@ -1835,14 +1962,7 @@ match_stmt		:	relational_expr
 			}
 			;
 
-symbol_expr		:	string
-			{
-				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
-						       current_scope(state),
-						       $1);
-				xfree($1);
-			}
-			|	'$'	identifier
+variable_expr		:	'$'	identifier
 			{
 				struct scope *scope = current_scope(state);
 
@@ -1855,6 +1975,16 @@ symbol_expr		:	string
 				$$ = symbol_expr_alloc(&@$, SYMBOL_DEFINE,
 						       scope, $2);
 				xfree($2);
+			}
+			;
+
+symbol_expr		:	variable_expr
+			|	string
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       $1);
+				xfree($1);
 			}
 			|	AT	identifier
 			{
@@ -1881,8 +2011,54 @@ primary_expr		:	symbol_expr			{ $$ = $1; }
 			|	payload_expr			{ $$ = $1; }
 			|	exthdr_expr			{ $$ = $1; }
 			|	meta_expr			{ $$ = $1; }
+			|	rt_expr				{ $$ = $1; }
 			|	ct_expr				{ $$ = $1; }
+			|	numgen_expr			{ $$ = $1; }
+			|	hash_expr			{ $$ = $1; }
+			|	fib_expr			{ $$ = $1; }
 			|	'('	basic_expr	')'	{ $$ = $2; }
+			;
+
+fib_expr		:	FIB	fib_tuple	fib_result
+			{
+				if (($2 & (NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) == 0) {
+					erec_queue(error(&@2, "fib: need either saddr or daddr"), state->msgs);
+					YYERROR;
+				}
+
+				if (($2 & (NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) ==
+					  (NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) {
+					erec_queue(error(&@2, "fib: saddr and daddr are mutually exclusive"), state->msgs);
+					YYERROR;
+				}
+
+				if (($2 & (NFTA_FIB_F_IIF|NFTA_FIB_F_OIF)) ==
+					  (NFTA_FIB_F_IIF|NFTA_FIB_F_OIF)) {
+					erec_queue(error(&@2, "fib: iif and oif are mutually exclusive"), state->msgs);
+					YYERROR;
+				}
+
+				$$ = fib_expr_alloc(&@$, $2, $3);
+			}
+			;
+
+fib_result		:	OIF	{ $$ =NFT_FIB_RESULT_OIF; }
+			|	OIFNAME { $$ =NFT_FIB_RESULT_OIFNAME; }
+			|	TYPE	{ $$ =NFT_FIB_RESULT_ADDRTYPE; }
+			;
+
+fib_flag		:       SADDR	{ $$ = NFTA_FIB_F_SADDR; }
+			|	DADDR	{ $$ = NFTA_FIB_F_DADDR; }
+			|	MARK	{ $$ = NFTA_FIB_F_MARK; }
+			|	IIF	{ $$ = NFTA_FIB_F_IIF; }
+			|	OIF	{ $$ = NFTA_FIB_F_OIF; }
+			;
+
+fib_tuple		:  	fib_flag	DOT	fib_tuple
+			{
+				$$ = $1 | $3;
+			}
+			|	fib_flag
 			;
 
 shift_expr		:	primary_expr
@@ -2325,17 +2501,28 @@ meta_expr		:	META	meta_key
 			{
 				$$ = meta_expr_alloc(&@$, $1);
 			}
-			;
+			|	META	STRING
+			{
+				struct error_record *erec;
+				unsigned int key;
+
+				erec = meta_key_parse(&@$, $2, &key);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = meta_expr_alloc(&@$, key);
+			}
 
 meta_key		:	meta_key_qualified
 			|	meta_key_unqualified
 			;
 
 meta_key_qualified	:	LENGTH		{ $$ = NFT_META_LEN; }
-			|	NFPROTO		{ $$ = NFT_META_NFPROTO; }
-			|	L4PROTO		{ $$ = NFT_META_L4PROTO; }
 			|	PROTOCOL	{ $$ = NFT_META_PROTOCOL; }
 			|	PRIORITY	{ $$ = NFT_META_PRIORITY; }
+			|	RANDOM		{ $$ = NFT_META_PRANDOM; }
 			;
 
 meta_key_unqualified	:	MARK		{ $$ = NFT_META_MARK; }
@@ -2366,11 +2553,77 @@ meta_stmt		:	META	meta_key	SET	expr
 			{
 				$$ = meta_stmt_alloc(&@$, $1, $3);
 			}
+			|	META	STRING	SET	expr
+			{
+				struct error_record *erec;
+				unsigned int key;
+
+				erec = meta_key_parse(&@$, $2, &key);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = meta_stmt_alloc(&@$, key, $4);
+			}
+			|	NOTRACK
+			{
+				$$ = notrack_stmt_alloc(&@$);
+			}
+			;
+
+offset_opt		:	/* empty */	{ $$ = 0; }
+			|	OFFSET	NUM	{ $$ = $2; }
+			;
+
+numgen_type		:	INC		{ $$ = NFT_NG_INCREMENTAL; }
+			|	RANDOM		{ $$ = NFT_NG_RANDOM; }
+			;
+
+numgen_expr		:	NUMGEN	numgen_type	MOD	NUM	offset_opt
+			{
+				$$ = numgen_expr_alloc(&@$, $2, $4, $5);
+			}
+			;
+
+hash_expr		:	JHASH	expr	MOD	NUM	SEED	NUM	offset_opt
+			{
+				$$ = hash_expr_alloc(&@$, $4, $6, $7);
+				$$->hash.expr = $2;
+			}
+			|	JHASH	expr	MOD	NUM	offset_opt
+			{
+				$$ = hash_expr_alloc(&@$, $4, 0, $5);
+				$$->hash.expr = $2;
+			}
+			;
+
+rt_expr			:	RT	rt_key
+			{
+				$$ = rt_expr_alloc(&@$, $2, true);
+			}
+			;
+
+rt_key			:	CLASSID		{ $$ = NFT_RT_CLASSID; }
+			|	NEXTHOP		{ $$ = NFT_RT_NEXTHOP4; }
 			;
 
 ct_expr			: 	CT	ct_key
 			{
 				$$ = ct_expr_alloc(&@$, $2, -1);
+			}
+			| 	CT	STRING
+			{
+				struct error_record *erec;
+				unsigned int key;
+
+				erec = ct_key_parse(&@$, $2, &key);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = ct_expr_alloc(&@$, key, -1);
 			}
 			|	CT	STRING	ct_key_dir
 			{
@@ -2387,13 +2640,9 @@ ct_expr			: 	CT	ct_key
 			}
 			;
 
-ct_key			:	STATE		{ $$ = NFT_CT_STATE; }
-			|	DIRECTION	{ $$ = NFT_CT_DIRECTION; }
-			|	STATUS		{ $$ = NFT_CT_STATUS; }
+ct_key			:	L3PROTOCOL	{ $$ = NFT_CT_L3PROTOCOL; }
+			|	PROTOCOL	{ $$ = NFT_CT_PROTOCOL; }
 			|	MARK		{ $$ = NFT_CT_MARK; }
-			|	EXPIRATION	{ $$ = NFT_CT_EXPIRATION; }
-			|	HELPER		{ $$ = NFT_CT_HELPER; }
-			|	LABEL		{ $$ = NFT_CT_LABELS; }
 			|	ct_key_counters
 			;
 ct_key_dir		:	SADDR		{ $$ = NFT_CT_SRC; }
@@ -2412,6 +2661,19 @@ ct_key_counters		:	BYTES		{ $$ = NFT_CT_BYTES; }
 ct_stmt			:	CT	ct_key		SET	expr
 			{
 				$$ = ct_stmt_alloc(&@$, $2, $4);
+			}
+			|	CT	STRING		SET	expr
+			{
+				struct error_record *erec;
+				unsigned int key;
+
+				erec = ct_key_parse(&@$, $2, &key);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = ct_stmt_alloc(&@$, key, $4);
 			}
 			;
 

@@ -193,7 +193,7 @@ ip6 test-ip6 input
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 2 => reg 1 ]
   [ cmp eq reg 1 0x0000ae08 ]
-  [ log prefix (null) ]
+  [ log ]
 
 # icmpv6 checksum != 2222 log
 ip6 test-ip6 input
@@ -201,7 +201,7 @@ ip6 test-ip6 input
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 2 => reg 1 ]
   [ cmp neq reg 1 0x0000ae08 ]
-  [ log prefix (null) ]
+  [ log ]
 
 # icmpv6 checksum 222-226
 ip6 test-ip6 input
@@ -217,7 +217,7 @@ ip6 test-ip6 input
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 2 => reg 1 ]
   [ cmp neq reg 1 0x0000ae08 ]
-  [ log prefix (null) ]
+  [ log ]
 
 # icmpv6 checksum { 222, 226}
 __set%d test-ip6 3
@@ -266,8 +266,7 @@ ip6 test-ip6 input
   [ payload load 1b @ network header + 6 => reg 1 ]
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 4b @ transport header + 4 => reg 1 ]
-  [ cmp lt reg 1 0x21000000 ]
-  [ cmp gt reg 1 0x2d000000 ]
+  [ range neq reg 1 0x21000000 0x2d000000 ]
 
 # icmpv6 mtu {33, 55, 67, 88}
 __set%d test-ip6 3
@@ -302,8 +301,7 @@ ip6 test-ip6 input
   [ payload load 1b @ network header + 6 => reg 1 ]
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 4 => reg 1 ]
-  [ cmp lt reg 1 0x00002100 ]
-  [ cmp gt reg 1 0x00002d00 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
 
 # icmpv6 id {33, 55, 67, 88}
 __set%d test-ip6 3
@@ -366,8 +364,7 @@ ip6 test-ip6 input
   [ payload load 1b @ network header + 6 => reg 1 ]
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 6 => reg 1 ]
-  [ cmp lt reg 1 0x00000200 ]
-  [ cmp gt reg 1 0x00000400 ]
+  [ range neq reg 1 0x00000200 0x00000400 ]
 
 # icmpv6 sequence { 2-4}
 __set%d test-ip6 7
@@ -392,8 +389,7 @@ ip6 test-ip6 input
   [ payload load 1b @ network header + 6 => reg 1 ]
   [ cmp eq reg 1 0x0000003a ]
   [ payload load 2b @ transport header + 4 => reg 1 ]
-  [ cmp lt reg 1 0x00002100 ]
-  [ cmp gt reg 1 0x00002d00 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
 
 # icmpv6 max-delay {33, 55, 67, 88}
 __set%d test-ip6 3

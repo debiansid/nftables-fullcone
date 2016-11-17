@@ -110,9 +110,8 @@ digit		[0-9]
 hexdigit	[0-9a-fA-F]
 decstring	{digit}+
 hexstring	0[xX]{hexdigit}+
-range		({decstring}?:{decstring}?)
 letter		[a-zA-Z]
-string		({letter})({letter}|{digit}|[/\-_\.])*
+string		({letter}|[_.])({letter}|{digit}|[/\-_\.])*
 quotedstring	\"[^"]*\"
 asteriskstring	({string}\*|{string}\\\*)
 comment		#.*$
@@ -169,7 +168,9 @@ v60		(::)
 macaddr		(([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2})
 ip4addr		(([[:digit:]]{1,3}"."){3}([[:digit:]]{1,3}))
 ip6addr		({v680}|{v67}|{v66}|{v65}|{v64}|{v63}|{v62}|{v61}|{v60})
+ip6addr_rfc2732	(\[{ip6addr}\])
 
+classid		({hexdigit}{1,4}:{hexdigit}{1,4})
 addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 %option prefix="nft_"
@@ -298,14 +299,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "snaplen"		{ return SNAPLEN; }
 "queue-threshold"	{ return QUEUE_THRESHOLD; }
 "level"			{ return LEVEL; }
-"emerg"			{ return LEVEL_EMERG; }
-"alert"			{ return LEVEL_ALERT; }
-"crit"			{ return LEVEL_CRIT; }
-"err"			{ return LEVEL_ERR; }
-"warn"			{ return LEVEL_WARN; }
-"notice"		{ return LEVEL_NOTICE; }
-"info"			{ return LEVEL_INFO; }
-"debug"			{ return LEVEL_DEBUG; }
 
 "queue"			{ return QUEUE;}
 "num"			{ return QUEUENUM;}
@@ -317,6 +310,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "burst"			{ return BURST; }
 "until"			{ return UNTIL; }
 "over"			{ return OVER; }
+
+"quota"			{ return QUOTA; }
 
 "nanosecond"		{ return NANOSECOND; }
 "microsecond"		{ return MICROSECOND; }
@@ -432,8 +427,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "mh"			{ return MH; }
 
 "meta"			{ return META; }
-"nfproto"		{ return NFPROTO; }
-"l4proto"		{ return L4PROTO; }
 "mark"			{ return MARK; }
 "iif"			{ return IIF; }
 "iifname"		{ return IIFNAME; }
@@ -453,25 +446,40 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "oifgroup"		{ return OIFGROUP; }
 "cgroup"		{ return CGROUP; }
 
+"classid"		{ return CLASSID; }
+"nexthop"		{ return NEXTHOP; }
+
 "ct"			{ return CT; }
-"direction"		{ return DIRECTION; }
-"state"			{ return STATE; }
-"status"		{ return STATUS; }
-"expiration"		{ return EXPIRATION; }
-"helper"		{ return HELPER; }
 "l3proto"		{ return L3PROTOCOL; }
 "proto-src"		{ return PROTO_SRC; }
 "proto-dst"		{ return PROTO_DST; }
-"label"			{ return LABEL; }
+
+"numgen"		{ return NUMGEN; }
+"inc"			{ return INC; }
+"mod"			{ return MOD; }
+"offset"		{ return OFFSET; }
+
+"jhash"			{ return JHASH; }
+"seed"			{ return SEED; }
 
 "dup"			{ return DUP; }
 "fwd"			{ return FWD; }
+
+"fib"			{ return FIB; }
+
+"notrack"		{ return NOTRACK; }
 
 "xml"			{ return XML; }
 "json"			{ return JSON; }
 
 {addrstring}		{
 				yylval->string = xstrdup(yytext);
+				return STRING;
+			}
+
+{ip6addr_rfc2732}	{
+				yytext[yyleng - 1] = '\0';
+				yylval->string = xstrdup(yytext + 1);
 				return STRING;
 			}
 
@@ -498,6 +506,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 					return STRING;
 				}
 				return NUM;
+			}
+
+{classid}/[ \t\n:\-},]	{
+				yylval->string = xstrdup(yytext);
+				return STRING;
 			}
 
 {quotedstring}		{
@@ -611,6 +624,13 @@ err:
 	return -1;
 }
 
+static bool search_in_include_path(const char *filename)
+{
+	return (strncmp(filename, "./", strlen("./") != 0) &&
+		strncmp(filename, "../", strlen("../") != 0) &&
+		filename[0] != '/');
+}
+
 int scanner_include_file(void *scanner, const char *filename,
 			 const struct location *loc)
 {
@@ -622,22 +642,24 @@ int scanner_include_file(void *scanner, const char *filename,
 	FILE *f;
 
 	f = NULL;
-	for (i = 0; i < INCLUDE_PATHS_MAX; i++) {
-		if (include_paths[i] == NULL)
-			break;
-		snprintf(buf, sizeof(buf), "%s/%s", include_paths[i], filename);
-		f = fopen(buf, "r");
-		if (f != NULL)
-			break;
+	if (search_in_include_path(filename)) {
+		for (i = 0; i < INCLUDE_PATHS_MAX; i++) {
+			if (include_paths[i] == NULL)
+				break;
+			snprintf(buf, sizeof(buf), "%s/%s",
+				 include_paths[i], filename);
+			f = fopen(buf, "r");
+			if (f != NULL)
+				break;
+		}
+	} else {
+		f = fopen(filename, "r");
+		name = filename;
 	}
 	if (f == NULL) {
-		f = fopen(filename, "r");
-		if (f == NULL) {
-			erec = error(loc, "Could not open file \"%s\": %s\n",
-				     filename, strerror(errno));
-			goto err;
-		}
-		name = filename;
+		erec = error(loc, "Could not open file \"%s\": %s",
+			     filename, strerror(errno));
+		goto err;
 	}
 
 	erec = scanner_push_file(scanner, name, f, loc);

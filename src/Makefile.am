@@ -8,6 +8,9 @@ AM_CPPFLAGS += -DDEFAULT_INCLUDE_PATH="\"${sysconfdir}\"" \
 if BUILD_DEBUG
 AM_CPPFLAGS += -g -DDEBUG
 endif
+if BUILD_XTABLES
+AM_CPPFLAGS += ${XTABLES_CFLAGS}
+endif
 
 AM_CFLAGS = -Wall								\
 	    -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations	\
@@ -33,7 +36,11 @@ nft_SOURCES =	main.c				\
 		proto.c				\
 		payload.c			\
 		exthdr.c			\
+		fib.c				\
+		hash.c				\
 		meta.c				\
+		rt.c				\
+		numgen.c			\
 		ct.c				\
 		netlink.c			\
 		netlink_linearize.c		\
@@ -59,3 +66,8 @@ nft_SOURCES +=	mini-gmp.c
 endif
 
 nft_LDADD	= ${LIBMNL_LIBS} ${LIBNFTNL_LIBS}
+
+if BUILD_XTABLES
+nft_SOURCES +=	xt.c
+nft_LDADD   +=  ${XTABLES_LIBS}
+endif

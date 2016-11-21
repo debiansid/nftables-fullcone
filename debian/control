@@ -22,6 +22,7 @@ Vcs-Browser: https://github.com/aborrero/pkg-nftables
 
 Package: nftables
 Architecture: linux-any
+Multi-Arch: same
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Program to control packet filtering rules by Netfilter project

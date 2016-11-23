@@ -1,3 +1,11 @@
+nftables (0.6+snapshot20161117-2) unstable; urgency=medium
+
+  * [078c41a] d/tests/: disable internaltest-py.sh
+  * [0560a63] nftables-dbg: use Multi-Arch: same
+  * [f2ace74] nftables: don't use libxtables11
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 23 Nov 2016 12:43:46 +0100
+
 nftables (0.6+snapshot20161117-1) unstable; urgency=medium
 
   * [2540606] New upstream version 0.6+snapshot20161117

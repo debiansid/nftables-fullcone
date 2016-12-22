@@ -24,7 +24,7 @@ override_dh_systemd_start:
 # https://wiki.debian.org/DebugPackage
 .PHONY: override_dh_strip
 override_dh_strip:
-	dh_strip --dbg-package=nftables-dbg
+	dh_strip --dbgsym-migration='nftables-dbg (<< 0.7~)'
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/nftables

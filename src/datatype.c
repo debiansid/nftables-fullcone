@@ -180,15 +180,36 @@ void symbolic_constant_print(const struct symbol_table *tbl,
 		printf("%s", s->identifier);
 }
 
+static void switch_byteorder(void *data, unsigned int len)
+{
+	mpz_t op;
+
+	mpz_init(op);
+	mpz_import_data(op, data, BYTEORDER_BIG_ENDIAN, len);
+	mpz_export_data(data, op, BYTEORDER_HOST_ENDIAN, len);
+	mpz_clear(op);
+}
+
 void symbol_table_print(const struct symbol_table *tbl,
-			const struct datatype *dtype)
+			const struct datatype *dtype,
+			enum byteorder byteorder)
 {
 	const struct symbolic_constant *s;
-	unsigned int size = 2 * dtype->size / BITS_PER_BYTE;
+	unsigned int len = dtype->size / BITS_PER_BYTE;
+	uint64_t value;
 
-	for (s = tbl->symbols; s->identifier != NULL; s++)
-		printf("\t%-30s\t0x%.*" PRIx64 "\n",
-		       s->identifier, size, s->value);
+	for (s = tbl->symbols; s->identifier != NULL; s++) {
+		value = s->value;
+
+		if (byteorder == BYTEORDER_BIG_ENDIAN)
+			switch_byteorder(&value, len);
+
+		if (tbl->base == BASE_DECIMAL)
+			printf("\t%-30s\t%20lu\n", s->identifier, value);
+		else
+			printf("\t%-30s\t0x%.*" PRIx64 "\n",
+			       s->identifier, 2 * len, value);
+	}
 }
 
 static void invalid_type_print(const struct expr *expr)
@@ -246,6 +267,7 @@ const struct datatype verdict_type = {
 };
 
 static const struct symbol_table nfproto_tbl = {
+	.base		= BASE_DECIMAL,
 	.symbols	= {
 		SYMBOL("ipv4",		NFPROTO_IPV4),
 		SYMBOL("ipv6",		NFPROTO_IPV6),
@@ -559,19 +581,11 @@ const struct datatype inet_protocol_type = {
 
 static void inet_service_type_print(const struct expr *expr)
 {
-	struct sockaddr_in sin = { .sin_family = AF_INET };
-	char buf[NI_MAXSERV];
-	int err;
-
-	sin.sin_port = mpz_get_be16(expr->value);
-	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL, 0,
-			  buf, sizeof(buf),
-			  numeric_output < NUMERIC_PORT ? 0 : NI_NUMERICSERV);
-	if (err != 0) {
-		getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL,
-			    0, buf, sizeof(buf), NI_NUMERICSERV);
+	if (numeric_output >= NUMERIC_PORT) {
+		integer_type_print(expr);
+		return;
 	}
-	printf("%s", buf);
+	symbolic_constant_print(&inet_service_tbl, expr, false);
 }
 
 static struct error_record *inet_service_type_parse(const struct expr *sym,
@@ -615,6 +629,7 @@ const struct datatype inet_service_type = {
 	.basetype	= &integer_type,
 	.print		= inet_service_type_print,
 	.parse		= inet_service_type_parse,
+	.sym_tbl	= &inet_service_tbl,
 };
 
 #define RT_SYM_TAB_INITIAL_SIZE		16
@@ -712,6 +727,7 @@ const struct datatype mark_type = {
 };
 
 static const struct symbol_table icmp_code_tbl = {
+	.base		= BASE_DECIMAL,
 	.symbols	= {
 		SYMBOL("net-unreachable",	ICMP_NET_UNREACH),
 		SYMBOL("host-unreachable",	ICMP_HOST_UNREACH),
@@ -735,6 +751,7 @@ const struct datatype icmp_code_type = {
 };
 
 static const struct symbol_table icmpv6_code_tbl = {
+	.base		= BASE_DECIMAL,
 	.symbols	= {
 		SYMBOL("no-route",		ICMPV6_NOROUTE),
 		SYMBOL("admin-prohibited",	ICMPV6_ADM_PROHIBITED),
@@ -757,6 +774,7 @@ const struct datatype icmpv6_code_type = {
 };
 
 static const struct symbol_table icmpx_code_tbl = {
+	.base		= BASE_DECIMAL,
 	.symbols	= {
 		SYMBOL("port-unreachable",	NFT_REJECT_ICMPX_PORT_UNREACH),
 		SYMBOL("admin-prohibited",	NFT_REJECT_ICMPX_ADMIN_PROHIBITED),

@@ -176,12 +176,24 @@ struct symbolic_constant {
 #define SYMBOL_LIST_END	(struct symbolic_constant) { }
 
 /**
+ * enum base - indicate how to display symbol table values
+ *
+ * @BASE_HEXADECIMAL:	hexadecimal
+ * @BASE_DECIMAL:	decimal
+ */
+enum base {
+	BASE_HEXADECIMAL,
+	BASE_DECIMAL,
+};
+
+/**
  * struct symbol_table - type construction from symbolic values
  *
+ * @base:	base of symbols representation
  * @symbols:	the symbols
  */
 struct symbol_table {
-	int				gcc_workaround;
+	enum base 			base;
 	struct symbolic_constant	symbols[];
 };
 
@@ -191,10 +203,13 @@ extern struct error_record *symbolic_constant_parse(const struct expr *sym,
 extern void symbolic_constant_print(const struct symbol_table *tbl,
 				    const struct expr *expr, bool quotes);
 extern void symbol_table_print(const struct symbol_table *tbl,
-			       const struct datatype *dtype);
+			       const struct datatype *dtype,
+			       enum byteorder byteorder);
 
 extern struct symbol_table *rt_symbol_table_init(const char *filename);
 extern void rt_symbol_table_free(struct symbol_table *tbl);
+
+extern const struct symbol_table inet_service_tbl;
 
 extern const struct datatype invalid_type;
 extern const struct datatype verdict_type;

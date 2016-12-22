@@ -336,6 +336,10 @@ static unsigned int expr_to_intervals(const struct expr *set,
 static bool interval_overlap(const struct elementary_interval *e1,
 			     const struct elementary_interval *e2)
 {
+	if (mpz_cmp(e1->left, e2->left) == 0 &&
+	    mpz_cmp(e1->right, e2->right) == 0)
+		return false;
+
 	return (mpz_cmp(e1->left, e2->left) >= 0 &&
 	        mpz_cmp(e1->left, e2->right) <= 0) ||
 	       (mpz_cmp(e1->right, e2->left) >= 0 &&
@@ -693,7 +697,8 @@ void interval_map_decompose(struct expr *set)
 			prefix_len = expr_value(i)->len - mpz_scan0(range, 0);
 			prefix = prefix_expr_alloc(&low->location, expr_value(low),
 						   prefix_len);
-			prefix->len = low->len;
+			prefix->len = expr_value(i)->len;
+
 			prefix = set_elem_expr_alloc(&low->location, prefix);
 			if (low->ops->type == EXPR_MAPPING)
 				prefix = mapping_expr_alloc(&low->location, prefix,

@@ -1,0 +1,392 @@
+# ah hdrlength != 11-23
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah reserved != 33-45
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah spi != 111-222
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah sequence != 23-33
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah hdrlength != 11-23
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah reserved != 33-45
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah spi != 111-222
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah sequence != 23-33
+ip test-ip4 input 
+  [ payload load 1b @ network header + 9 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah hdrlength != 11-23
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah reserved != 33-45
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah spi != 111-222
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah sequence != 23-33
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah hdrlength != 11-23
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah hdrlength != 11-23
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 1b @ transport header + 1 => reg 1 ]
+  [ range neq reg 1 0x0000000b 0x00000017 ]
+
+# ah reserved != 33-45
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah reserved != 33-45
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 2b @ transport header + 2 => reg 1 ]
+  [ range neq reg 1 0x00002100 0x00002d00 ]
+
+# ah spi != 111-222
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah spi != 111-222
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 4 => reg 1 ]
+  [ range neq reg 1 0x6f000000 0xde000000 ]
+
+# ah sequence != 23-33
+ip6 test-ip6 input 
+  [ payload load 1b @ network header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+inet test-inet input 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+
+# ah sequence != 23-33
+netdev test-netdev ingress 
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000033 ]
+  [ payload load 4b @ transport header + 8 => reg 1 ]
+  [ range neq reg 1 0x17000000 0x21000000 ]
+

@@ -1,0 +1,3140 @@
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level warn
+ip test-ip4 output 
+  [ log level 4 ]
+
+# log level warn
+ip6 test-ip6 output 
+  [ log level 4 ]
+
+# log level warn
+inet test-inet output 
+  [ log level 4 ]
+
+# log level warn
+arp test-arp output 
+  [ log level 4 ]
+
+# log level warn
+bridge test-bridge output 
+  [ log level 4 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 snaplen 33
+ip test-ip4 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+inet test-inet output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+arp test-arp output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 snaplen 33
+bridge test-bridge output 
+  [ log group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip test-ip4 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+ip6 test-ip6 output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+inet test-inet output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+arp test-arp output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log group 2 prefix \"nft-test: \"
+bridge test-bridge output 
+  [ log prefix nft-test:  group 2 snaplen 0 qthreshold 0 ]
+
+# log
+ip test-ip4 output 
+  [ log ]
+
+# log
+ip6 test-ip6 output 
+  [ log ]
+
+# log
+inet test-inet output 
+  [ log ]
+
+# log
+arp test-arp output 
+  [ log ]
+
+# log
+bridge test-bridge output 
+  [ log ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+
+# log level notice
+ip test-ip4 output 
+  [ log level 5 ]
+
+# log level notice
+ip6 test-ip6 output 
+  [ log level 5 ]
+
+# log level notice
+inet test-inet output 
+  [ log level 5 ]
+
+# log level notice
+arp test-arp output 
+  [ log level 5 ]
+
+# log level notice
+bridge test-bridge output 
+  [ log level 5 ]
+
+# log level info
+ip test-ip4 output 
+  [ log level 6 ]
+
+# log level info
+ip6 test-ip6 output 
+  [ log level 6 ]
+
+# log level info
+inet test-inet output 
+  [ log level 6 ]
+
+# log level info
+arp test-arp output 
+  [ log level 6 ]
+
+# log level info
+bridge test-bridge output 
+  [ log level 6 ]
+
+# log level debug
+ip test-ip4 output 
+  [ log level 7 ]
+
+# log level debug
+ip6 test-ip6 output 
+  [ log level 7 ]
+
+# log level debug
+inet test-inet output 
+  [ log level 7 ]
+
+# log level debug
+arp test-arp output 
+  [ log level 7 ]
+
+# log level debug
+bridge test-bridge output 
+  [ log level 7 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip test-ip4 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+ip6 test-ip6 output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+inet test-inet output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+arp test-arp output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log prefix aaaaa-aaaaaa group 2 snaplen 33
+bridge test-bridge output 
+  [ log prefix aaaaa-aaaaaa group 2 snaplen 33 qthreshold 0 ]
+
+# log group 2 queue-threshold 2
+ip test-ip4 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+ip6 test-ip6 output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+inet test-inet output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+arp test-arp output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log group 2 queue-threshold 2
+bridge test-bridge output 
+  [ log group 2 snaplen 0 qthreshold 2 ]
+
+# log level emerg
+ip test-ip4 output 
+  [ log level 0 ]
+
+# log level emerg
+ip6 test-ip6 output 
+  [ log level 0 ]
+
+# log level emerg
+inet test-inet output 
+  [ log level 0 ]
+
+# log level emerg
+arp test-arp output 
+  [ log level 0 ]
+
+# log level emerg
+bridge test-bridge output 
+  [ log level 0 ]
+
+# log level alert
+ip test-ip4 output 
+  [ log level 1 ]
+
+# log level alert
+ip6 test-ip6 output 
+  [ log level 1 ]
+
+# log level alert
+inet test-inet output 
+  [ log level 1 ]
+
+# log level alert
+arp test-arp output 
+  [ log level 1 ]
+
+# log level alert
+bridge test-bridge output 
+  [ log level 1 ]
+
+# log level crit
+ip test-ip4 output 
+  [ log level 2 ]
+
+# log level crit
+ip6 test-ip6 output 
+  [ log level 2 ]
+
+# log level crit
+inet test-inet output 
+  [ log level 2 ]
+
+# log level crit
+arp test-arp output 
+  [ log level 2 ]
+
+# log level crit
+bridge test-bridge output 
+  [ log level 2 ]
+
+# log level err
+ip test-ip4 output 
+  [ log level 3 ]
+
+# log level err
+ip6 test-ip6 output 
+  [ log level 3 ]
+
+# log level err
+inet test-inet output 
+  [ log level 3 ]
+
+# log level err
+arp test-arp output 
+  [ log level 3 ]
+
+# log level err
+bridge test-bridge output 
+  [ log level 3 ]
+

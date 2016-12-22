@@ -35,4 +35,4 @@ Description: Program to control packet filtering rules by Netfilter project
  connection sharing, firewalls, IP accounting, transparent proxying,
  advanced routing and traffic control.
  .
- A Linux kernel >= 3.13 is required. However, >= 4.7 is recommended.
+ A Linux kernel >= 3.13 is required. However, >= 4.10 is recommended.

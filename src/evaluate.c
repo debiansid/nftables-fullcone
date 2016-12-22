@@ -140,7 +140,7 @@ static struct table *table_lookup_global(struct eval_ctx *ctx)
 	struct table *table;
 
 	if (ctx->table != NULL)
-		return ctx->cmd->table;
+		return ctx->table;
 
 	table = table_lookup(&ctx->cmd->handle);
 	if (table == NULL)
@@ -1467,33 +1467,18 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 
 	switch (rel->op) {
 	case OP_LOOKUP:
-		switch (right->ops->type) {
-		case EXPR_SET:
-			/* A literal set expression implicitly declares
-			 * the set
-			 */
+		/* A literal set expression implicitly declares the set */
+		if (right->ops->type == EXPR_SET)
 			right = rel->right =
 				implicit_set_declaration(ctx, "__set%d",
 							 left->dtype,
 							 left->len, right);
-			break;
-		case EXPR_SET_REF:
-			if (right->dtype == NULL)
-				return expr_binary_error(ctx->msgs, right,
-							 left, "the referenced"
-							 " set does not "
-							 "exist");
-			if (!datatype_equal(left->dtype, right->dtype))
-				return expr_binary_error(ctx->msgs, right,
-							 left, "datatype "
-							 "mismatch, expected "
-							 "%s, set has type %s",
-							 left->dtype->desc,
-							 right->dtype->desc);
-			break;
-		default:
-			BUG("Unknown expression %s\n", right->ops->name);
-		}
+		else if (!datatype_equal(left->dtype, right->dtype))
+			return expr_binary_error(ctx->msgs, right, left,
+						 "datatype mismatch, expected %s, "
+						 "set has type %s",
+						 left->dtype->desc,
+						 right->dtype->desc);
 
 		/* Data for range lookups needs to be in big endian order */
 		if (right->set->flags & SET_F_INTERVAL &&
@@ -1539,6 +1524,20 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 			break;
 		case EXPR_VALUE:
 			if (byteorder_conversion(ctx, &rel->right, left->byteorder) < 0)
+				return -1;
+			break;
+		case EXPR_SET:
+			assert(rel->op == OP_NEQ);
+			right = rel->right =
+				implicit_set_declaration(ctx, "__set%d",
+							 left->dtype, left->len,
+							 right);
+			/* fall through */
+		case EXPR_SET_REF:
+			assert(rel->op == OP_NEQ);
+			/* Data for range lookups needs to be in big endian order */
+			if (right->set->flags & SET_F_INTERVAL &&
+			    byteorder_conversion(ctx, &rel->left, BYTEORDER_BIG_ENDIAN) < 0)
 				return -1;
 			break;
 		default:
@@ -2429,12 +2428,14 @@ static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_log(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	if (stmt->log.flags & STMT_LOG_LEVEL &&
-	    (stmt->log.flags & STMT_LOG_GROUP	||
-	     stmt->log.flags & STMT_LOG_SNAPLEN	||
-	     stmt->log.flags & STMT_LOG_QTHRESHOLD)) {
-		return stmt_error(ctx, stmt,
+	if (stmt->log.flags & (STMT_LOG_GROUP | STMT_LOG_SNAPLEN |
+			       STMT_LOG_QTHRESHOLD)) {
+		if (stmt->log.flags & STMT_LOG_LEVEL)
+			return stmt_error(ctx, stmt,
 				  "level and group are mutually exclusive");
+		if (stmt->log.logflags)
+			return stmt_error(ctx, stmt,
+				  "flags and group are mutually exclusive");
 	}
 	return 0;
 }
@@ -2548,9 +2549,6 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 		return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 				 ctx->cmd->handle.table);
 
-	if (set_lookup(table, set->handle.set) == NULL)
-		set_add_hash(set_get(set), table);
-
 	type = set->flags & SET_F_MAP ? "map" : "set";
 
 	if (set->keytype == NULL)
@@ -2580,6 +2578,9 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 			return -1;
 	}
 	ctx->set = NULL;
+
+	if (set_lookup(table, set->handle.set) == NULL)
+		set_add_hash(set_get(set), table);
 
 	/* Default timeout value implies timeout support */
 	if (set->timeout)
@@ -2853,6 +2854,32 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	}
 }
 
+static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	int ret;
+
+	ret = cache_update(cmd->op, ctx->msgs);
+	if (ret < 0)
+		return ret;
+
+	switch (cmd->obj) {
+	case CMD_OBJ_RULESET:
+		cache_flush();
+		break;
+	case CMD_OBJ_TABLE:
+		/* Flushing a table does not empty the sets in the table nor remove
+		 * any chains.
+		 */
+	case CMD_OBJ_CHAIN:
+		/* Chains don't hold sets */
+	case CMD_OBJ_SET:
+		break;
+	default:
+		BUG("invalid command object type %u\n", cmd->obj);
+	}
+	return 0;
+}
+
 static int cmd_evaluate_rename(struct eval_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table;
@@ -3020,7 +3047,7 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_LIST:
 		return cmd_evaluate_list(ctx, cmd);
 	case CMD_FLUSH:
-		return 0;
+		return cmd_evaluate_flush(ctx, cmd);
 	case CMD_RENAME:
 		return cmd_evaluate_rename(ctx, cmd);
 	case CMD_EXPORT:

@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
                bison,
-               debhelper (>= 9.20141022),
+               debhelper (>= 10),
                dh-autoreconf,
                dh-systemd,
                docbook2x,

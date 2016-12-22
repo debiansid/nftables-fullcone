@@ -4,4 +4,4 @@ config.*
 doc/Makefile
 files/Makefile
 src/Makefile
-
+debian/files

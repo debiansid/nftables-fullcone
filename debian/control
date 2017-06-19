@@ -1,7 +1,8 @@
 Source: nftables
 Section: net
 Priority: extra
-Maintainer: Arturo Borrero Gonzalez <arturo@debian.org>
+Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
+Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
                bison,
                debhelper (>= 10),
@@ -17,8 +18,8 @@ Build-Depends: automake,
                libtool (>=2.2.6)
 Standards-Version: 3.9.8
 Homepage: http://www.netfilter.org/
-Vcs-Git: https://github.com/aborrero/pkg-nftables.git
-Vcs-Browser: https://github.com/aborrero/pkg-nftables
+Vcs-Git: https://anonscm.debian.org/git/pkg-netfilter/pkg-nftables.git/
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-netfilter/pkg-nftables.git/
 
 Package: nftables
 Architecture: linux-any

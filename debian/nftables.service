@@ -1,6 +1,7 @@
 [Unit]
 Description=nftables
 Documentation=man:nft(8) http://wiki.nftables.org
+Before=network-pre.target
 
 [Service]
 Type=oneshot
@@ -13,4 +14,4 @@ ExecReload=/usr/sbin/nft -f /etc/nftables.conf
 ExecStop=/usr/sbin/nft flush ruleset
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=network.target

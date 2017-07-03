@@ -1,3 +1,17 @@
+nftables (0.7-2) unstable; urgency=medium
+
+  [ Arturo Borrero Gonzalez ]
+  * [058867f] d/control: move package to pkg-netfilter
+
+  [ Martin Dickopp ]
+  * [bf9bd6e] nftables.service: load firewall earlier in the boot process
+    (Closes: #866902)
+
+  [ Arturo Borrero Gonzalez ]
+  * [772f6ea] d/control: bump std-version to 4.0.0
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 03 Jul 2017 09:23:22 +0200
+
 nftables (0.7-1) unstable; urgency=medium
 
   * [c7b6524] New upstream version 0.7

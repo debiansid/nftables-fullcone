@@ -24,9 +24,30 @@ Files: src/iface.c
 Copyright: 2015 Pablo Neira Ayuso <pablo@netfilter.org>
 License: GPL-2
 
+Files: src/hash.c
+Copyright: 2016 Pablo Neira Ayuso <pablo@netfilter.org>
+License: GPL-2
+
 Files: src/mini-gmp.c
 Copyright: 1991-1997, 1999-2014, Free Software Foundation, Inc
 License: GPL-2+
+
+Files: src/xt.c
+Copyright: 2013-2015 Pablo Neira Ayuso <pablo@netfilter.org>
+	   2015 Arturo Borrero Gonzalez <arturo@debian.org>
+License: GPL-2
+
+Files: src/mergesort.c
+Copyright: 2017 Elise Lennion <elise.lennion@gmail.com>
+License: GPL-2
+
+File: src/rt.c
+Copyright: 2016 Anders K. Pedersen <akp@cohaesio.com>
+License: GPL-2
+
+File: src/fib.c
+Copyright: Red Hat GmbH
+License: GPL-2
 
 Files: include/linux/netfilter_arp.h
 Copyright: 2002 Rusty Russell - IBM

@@ -44,7 +44,7 @@ table inet overview_test_table {
 		# counter and reject all traffic
 		counter reject
 
-		# reject with a concrete ICMP code (reject
+		# reject with a concrete ICMP code
 		reject with icmp type host-unreachable
 
 		# reject with a concrete ICMPv6 code

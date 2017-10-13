@@ -1,188 +1,43 @@
-The following message was published the 20th Jan 2014 in the Netfilter
-devel mailing list <netfilter-devel@vger.kernel.org> when the nftables
-release happened, authored by Patrick McHardy <kaber@trash.net>.
-
-Please, read it carefully as it contains valuable information about the new
-nftables framework.
-			-- 28/jan/2014
-			Arturo Borrero Gonzalez <arturo@debian.org>
-===============================================================================
-
-The Netfilter project presents:
-
-        nftables 0.099
-
-With the release of Linux 3.13 and almost 5 years after the last nftables
-release, the time has come to finally get this code out to our users.
-
-Since this is the first regular release intended for users, I'm including
-a bit of extra information.
-
-Overview
-========
-
-nf_tables is the new firewalling infrastructure in the Linux kernel,
-intended to replace ip_tables, ip6_tables, arp_tables and ebtables
-in the long term. nftables is the corresponding userspace frontend,
-replacing their respective userspace utilities.
-
-nftables features native support for sets and dictionaries of arbitrary
-types, support for many different protocols, meta data types, connection
-tracking, NAT, logging, atomic incremental and full ruleset updates,
-a netlink API with notification support, a format grammar, a compatibility
-layer for iptables/ip6tables and more.
-
-While the internal architecture is fundamentally different from
-ip_tables etc, many of the well proven concepts like tables and chains
-have been retained. The syntax differs significantly from iptables
-and friends, most notable, the options style parsing has been replaced
-by a formal grammar and a set of keywords. For anyone familiar with
-BPF the syntax should be quite easy to learn.
-
-Architecture
+How to start
 ============
 
-As mentioned previously, the architecture differs significantly from
-the existing packet filtering mechanisms. While ip_tables etc. include
-special modules for each and every protocol they support, for each meta
-data type etc and each each of these modules implement a set of usually
-similar operations on this data, nftables contains a small evaluation
-engine (sometimes called a virtual machine) with extensions to support
-getting packet payload data, meta data, ... and performing operations
-with this data, altering flow control and so on.
+The nftables Debian package gives you access to the 'nft' utility.
+There is another component, in the kernel, which is the nf_tables subsystem.
+From the nft utility you control which rules are loaded into the kernel.
 
-The userspace frontend performs parsing of the ruleset and compiles it
-into instructions for the virtual machine. F.i. while an iptables tcp
-dport match would instruct the xt_tcpudp module to compare the TCP port
-number, nftables userspace emits instructions to load 2 bytes at the
-position network header + 2 into a so called register and a second
-instruction to compare that register to a given value. IOW, the kernel
-doesn't require knowledge of particular protocols, support for them
-can in most cases be added completely in the nftables frontend.
+The Debian package comes with some example ruleset you may use as a starting
+point. Check them at /usr/share/doc/nftables/examples/
 
-Data gathered from the packet (or elsewhere) can not only be used for
-matches (called relational expressions in nftables), but for dynamically
-parameterizing other extensions. F.i. the following expression would
-select the DNAT destination address based on the source address of the
-packet:
+user@debian:~$ sudo cp /usr/share/doc/nftables/examples/syntax/workstation /etc/nftables.conf
+user@debian:~# sudo nft -f /etc/nftables.conf
 
-... dnat ip saddr map {
-        192.168.0.0/24 : 10.0.0.1,
-        192.168.1.0/24 : 10.0.0.2,
-        * : 10.0.0.3
-    }
+Extensive documentation is available at:
 
-while the following expression would store the input interface index
-in the upper 8 bits of the packet mark to be used in the POSTROUTING
-hook where it is not available anymore:
+ https://wiki.nftables.org
 
-... mark set iif
+Some basic commands
+===================
 
-Similar to ip_tables, rules are organized in address family specific
-tables and chains. The kernel doesn't include any pre-defined tables
-anymore, they can be created at will from userspace. Special features
-of tables like the NAT table and mangle table are available as so
-called "chain types", which instruct nftables to perform operations
-like setting up NAT mappings or rerouting packets after remarking.
-A set of predefined tables corresponding to the tables existing in
-ip_tables etc is contained in nftables.
+Try these basic commands to know more about nftables on your machine:
 
-Dictionaries, as shown in the previous dnat example, can not only
-be used for parameterizing different extensions, but also to alter
-control flow, allowing to build match trees with efficient branching:
+user@debian:~$ sudo nft list ruleset
+user@debian:~$ sudo nft flush ruleset
+user@debian:~$ sudo nft add table inet filter
+user@debian:~$ sudo nft add chain inet filter input { type filter hook input priority 0 \; policy drop }
+user@debian:~$ sudo nft add rule inet filter input ct state established counter accept
+user@debian:~$ sudo nft list ruleset
 
-... iif vmap {
-        eth0 : jump from_lan,
-        eth1 : jump from_dmz,
-        eth2 : jump from_wan,
-        *    : drop,
-    }
+System service (auto-load at boot)
+==================================
 
-Status
-======
+This package includes pre-configured a systemd service file which you can
+optionally enable to auto-load your firewall at boot time.
 
-There are still a few rough edges, but we believe the code is ready
-to be used for testing and personal usage. It is not ready for
-production use, but we should be getting there quickly. Userspace
-may occasionally produce an unexpected error for uncommon cases,
-the kernel side is expected to be pretty much solid. Any bugs
-reported will be fixed quickly.
+This is 'nftables.service' and is disabled by default.
 
-While trying to avoid it when possible, until the 0.1 release we may
-still change the grammar or other things in incompatible ways. This
-should result in only small impact though, most of the grammar is
-expected to stay as it is.
+Migrating from iptables
+=======================
 
-Naming
-======
+Please read the docs at:
 
-nftables releases have names. The last release v0.01-alpha1 was named
-schäublefilter, honoring the minister of the interieur of Germany,
-Wolfgang Schäuble, and his attempts to introduce legislation to allow
-the state to crack computers.
-
-Owing to the fact that his term is over since over four years and that
-in retrospective his attempts really seem only alpha, the new release
-is named keith-alexander-filter, in celebration of not being backdoored
-by the NSA so far.
-
-Resources
-=========
-
-The nftables code can be obtained from:
-
-* http://netfilter.org/projects/nftables/downloads.html
-* ftp://ftp.netfilter.org/pub/nftables
-* git://git.netfilter.org/nftables
-
-To build the code, you libnftnl and libmnl are required:
-
-* http://netfilter.org/projects/libnftnl/index.html
-* http://netfilter.org/projects/libmnl/index.html
-
-The iptables compatibility layer is available at:
-
-* git://git.netfilter.org/iptables-nftables
-
-The code should appear on the website and FTP shortly.
-
-Further reading
-===============
-
-While documentation is still scarce at the moment, the next release
-will include a full command reference and further documentation.
-
-The project page on netfilter.org contains some further pointers:
-
-  http://netfilter.org/projects/nftables/index.html
-
-Eric Leblond has written a short howto:
-
-  https://home.regit.org/netfilter-en/nftables-quick-howto/
-
-and has given a presentation on nftables:
-
-  https://home.regit.org/wp-content/uploads/2013/09/2013_kernel_recipes_nftables.pdf
-
-My first presentation on nftables during NFWS 2008 in Paris:
-
-  http://people.netfilter.org/kaber/nfws2008/nftables.odp
-
-And there's a Wiki-page with some further information on the basic
-building blocks, the syntax ...:
-
-  http://people.netfilter.org/wiki-nftables/index.php/Main_Page
-
-Thanks
-======
-
-A lot of people have started contributing to nftables during the past
-1.5 years and helped to get both the kernel and userspace components in
-shape for merging and release. Pablo revived the project after I stopped
-working on it for quite a while, Eric Leblond, Tomasz Burstyka, Arturo
-Borrero, Alvaro Neira and Giuseppe Longo all made important contributions
-to nftables and the surrounding infrastructure.
-
-
-On behalf of the Netfilter Core Team,
-Happy bytecode execution :)
+ https://wiki.nftables.org/wiki-nftables/index.php/Moving_from_iptables_to_nftables

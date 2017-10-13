@@ -1,6 +1,6 @@
 Source: nftables
 Section: net
-Priority: extra
+Priority: optional
 Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
@@ -16,7 +16,7 @@ Build-Depends: automake,
                libreadline-dev,
 	       libxtables-dev (>= 1.6.0+snapshot20161117-4),
                libtool (>=2.2.6)
-Standards-Version: 4.0.0
+Standards-Version: 4.1.1
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://anonscm.debian.org/git/pkg-netfilter/pkg-nftables.git/
 Vcs-Browser: https://anonscm.debian.org/cgit/pkg-netfilter/pkg-nftables.git/

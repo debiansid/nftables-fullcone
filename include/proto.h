@@ -130,6 +130,7 @@ extern const struct proto_desc *proto_dev_desc(uint16_t type);
 /**
  * struct proto_ctx - protocol context
  *
+ * debug_mask:	display debugging information
  * @family:	hook family
  * @location:	location of the relational expression defining the context
  * @desc:	protocol description for this layer
@@ -140,6 +141,7 @@ extern const struct proto_desc *proto_dev_desc(uint16_t type);
  * through a dependency.
  */
 struct proto_ctx {
+	unsigned int			debug_mask;
 	unsigned int			family;
 	struct {
 		struct location			location;
@@ -148,7 +150,8 @@ struct proto_ctx {
 	} protocol[PROTO_BASE_MAX + 1];
 };
 
-extern void proto_ctx_init(struct proto_ctx *ctx, unsigned int family);
+extern void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,
+			   unsigned int debug_mask);
 extern void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 			     const struct location *loc,
 			     const struct proto_desc *desc);
@@ -321,5 +324,13 @@ extern const struct proto_desc proto_netdev;
 
 extern const struct proto_desc proto_unknown;
 extern const struct proto_hdr_template proto_unknown_template;
+
+extern const struct datatype icmp_type_type;
+extern const struct datatype tcp_flag_type;
+extern const struct datatype dccp_pkttype_type;
+extern const struct datatype arpop_type;
+extern const struct datatype icmp6_type_type;
+extern const struct datatype dscp_type;
+extern const struct datatype ecn_type;
 
 #endif /* NFTABLES_PROTO_H */

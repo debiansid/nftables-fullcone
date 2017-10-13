@@ -10,12 +10,27 @@ extern struct stmt *expr_stmt_alloc(const struct location *loc,
 extern struct stmt *verdict_stmt_alloc(const struct location *loc,
 				       struct expr *expr);
 
+struct objref_stmt {
+	uint32_t		type;
+	struct expr		*expr;
+};
+
+struct stmt *objref_stmt_alloc(const struct location *loc);
+
 struct counter_stmt {
 	uint64_t		packets;
 	uint64_t		bytes;
 };
 
 extern struct stmt *counter_stmt_alloc(const struct location *loc);
+
+struct exthdr_stmt {
+	struct expr			*expr;
+	struct expr			*val;
+};
+
+extern struct stmt *exthdr_stmt_alloc(const struct location *loc,
+				      struct expr *payload, struct expr *expr);
 
 struct payload_stmt {
 	struct expr			*expr;
@@ -66,6 +81,7 @@ struct limit_stmt {
 };
 
 extern struct stmt *limit_stmt_alloc(const struct location *loc);
+extern void __limit_stmt_print(const struct limit_stmt *limit);
 
 struct reject_stmt {
 	struct expr		*expr;
@@ -108,6 +124,7 @@ extern struct stmt *queue_stmt_alloc(const struct location *loc);
 
 struct quota_stmt {
 	uint64_t		bytes;
+	uint64_t		used;
 	uint32_t		flags;
 };
 
@@ -118,10 +135,12 @@ struct ct_stmt {
 	enum nft_ct_keys		key;
 	const struct ct_template	*tmpl;
 	struct expr			*expr;
+	int8_t				direction;
 };
 
 extern struct stmt *ct_stmt_alloc(const struct location *loc,
 				  enum nft_ct_keys key,
+				  int8_t direction,
 				  struct expr *expr);
 struct dup_stmt {
 	struct expr		*to;
@@ -184,8 +203,6 @@ struct xt_stmt {
 	void				*entry;
 };
 
-extern struct stmt *xt_stmt_alloc(const struct location *loc);
-
 /**
  * enum stmt_types - statement types
  *
@@ -210,6 +227,8 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_XT:		XT statement
  * @STMT_QUOTA:		quota statement
  * @STMT_NOTRACK:	notrack statement
+ * @STMT_OBJREF:	stateful object reference statement
+ * @STMT_EXTHDR:	extension header statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -233,6 +252,8 @@ enum stmt_types {
 	STMT_XT,
 	STMT_QUOTA,
 	STMT_NOTRACK,
+	STMT_OBJREF,
+	STMT_EXTHDR,
 };
 
 /**
@@ -248,7 +269,8 @@ struct stmt_ops {
 	enum stmt_types		type;
 	const char		*name;
 	void			(*destroy)(struct stmt *stmt);
-	void			(*print)(const struct stmt *stmt);
+	void			(*print)(const struct stmt *stmt,
+					 struct output_ctx *octx);
 };
 
 enum stmt_flags {
@@ -273,6 +295,7 @@ struct stmt {
 
 	union {
 		struct expr		*expr;
+		struct exthdr_stmt	exthdr;
 		struct flow_stmt	flow;
 		struct counter_stmt	counter;
 		struct payload_stmt	payload;
@@ -290,6 +313,7 @@ struct stmt {
 		struct dup_stmt		dup;
 		struct fwd_stmt		fwd;
 		struct xt_stmt		xt;
+		struct objref_stmt	objref;
 	};
 };
 
@@ -298,6 +322,9 @@ extern struct stmt *stmt_alloc(const struct location *loc,
 int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt);
 extern void stmt_free(struct stmt *stmt);
 extern void stmt_list_free(struct list_head *list);
-extern void stmt_print(const struct stmt *stmt);
+extern void stmt_print(const struct stmt *stmt, struct output_ctx *octx);
+
+const char *get_rate(uint64_t byte_rate, uint64_t *rate);
+const char *get_unit(uint64_t u);
 
 #endif /* NFTABLES_STATEMENT_H */

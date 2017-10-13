@@ -32,7 +32,7 @@
 
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr);
 
-static const char *byteorder_names[] = {
+static const char * const byteorder_names[] = {
 	[BYTEORDER_INVALID]		= "invalid",
 	[BYTEORDER_HOST_ENDIAN]		= "host endian",
 	[BYTEORDER_BIG_ENDIAN]		= "big endian",
@@ -59,21 +59,33 @@ static int __fmtstring(3, 4) set_error(struct eval_ctx *ctx,
 	return -1;
 }
 
+static void key_fix_dtype_byteorder(struct expr *key)
+{
+	const struct datatype *dtype = key->dtype;
+
+	if (dtype->byteorder == key->byteorder)
+		return;
+
+	key->dtype = set_datatype_alloc(dtype, key->byteorder);
+	if (dtype->flags & DTYPE_F_ALLOC)
+		concat_type_destroy(dtype);
+}
+
 static struct expr *implicit_set_declaration(struct eval_ctx *ctx,
 					     const char *name,
-					     const struct datatype *keytype,
-					     unsigned int keylen,
+					     struct expr *key,
 					     struct expr *expr)
 {
 	struct cmd *cmd;
 	struct set *set;
 	struct handle h;
 
+	key_fix_dtype_byteorder(key);
+
 	set = set_alloc(&expr->location);
-	set->flags	= SET_F_ANONYMOUS | expr->set_flags;
-	set->handle.set = xstrdup(name),
-	set->keytype 	= keytype;
-	set->keylen	= keylen;
+	set->flags	= NFT_SET_ANONYMOUS | expr->set_flags;
+	set->handle.set = xstrdup(name);
+	set->key	= key;
 	set->init	= expr;
 
 	if (ctx->table != NULL)
@@ -142,7 +154,7 @@ static struct table *table_lookup_global(struct eval_ctx *ctx)
 	if (ctx->table != NULL)
 		return ctx->table;
 
-	table = table_lookup(&ctx->cmd->handle);
+	table = table_lookup(&ctx->cmd->handle, ctx->cache);
 	if (table == NULL)
 		return NULL;
 
@@ -179,7 +191,8 @@ static int expr_evaluate_symbol(struct eval_ctx *ctx, struct expr **expr)
 		new = expr_clone(sym->expr);
 		break;
 	case SYMBOL_SET:
-		ret = cache_update(ctx->cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, ctx->cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -190,8 +203,9 @@ static int expr_evaluate_symbol(struct eval_ctx *ctx, struct expr **expr)
 
 		set = set_lookup(table, (*expr)->identifier);
 		if (set == NULL)
-			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
-					 (*expr)->identifier);
+			return expr_error(ctx->msgs, *expr,
+					  "Set '%s' does not exist",
+					  (*expr)->identifier);
 		new = set_ref_expr_alloc(&(*expr)->location, set);
 		break;
 	}
@@ -431,12 +445,34 @@ static int __expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 {
 	struct expr *expr = *exprp;
 
+	if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
+		expr->dtype = &boolean_type;
+
 	if (expr_evaluate_primary(ctx, exprp) < 0)
 		return -1;
 
 	if (expr->exthdr.tmpl->offset % BITS_PER_BYTE != 0 ||
 	    expr->len % BITS_PER_BYTE != 0)
 		expr_evaluate_bits(ctx, exprp);
+
+	switch (expr->exthdr.op) {
+	case NFT_EXTHDR_OP_TCPOPT: {
+		static const unsigned int max_tcpoptlen = (15 * 4 - 20) * BITS_PER_BYTE;
+		unsigned int totlen = 0;
+
+		totlen += expr->exthdr.tmpl->offset;
+		totlen += expr->exthdr.tmpl->len;
+		totlen += expr->exthdr.offset;
+
+		if (totlen > max_tcpoptlen)
+			return expr_error(ctx->msgs, expr,
+					  "offset and size %u exceeds max tcp headerlen (%u)",
+					  totlen, max_tcpoptlen);
+		break;
+	}
+	default:
+		break;
+	}
 
 	return 0;
 }
@@ -448,19 +484,33 @@ static int __expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
  */
 static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 {
-	const struct proto_desc *base;
+	const struct proto_desc *base, *dependency = NULL;
+	enum proto_bases pb = PROTO_BASE_NETWORK_HDR;
 	struct expr *expr = *exprp;
 	struct stmt *nstmt;
 
-	base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
-	if (base == &proto_ip6)
+	switch (expr->exthdr.op) {
+	case NFT_EXTHDR_OP_TCPOPT:
+		dependency = &proto_tcp;
+		pb = PROTO_BASE_TRANSPORT_HDR;
+		break;
+	case NFT_EXTHDR_OP_IPV6:
+	default:
+		dependency = &proto_ip6;
+		break;
+	}
+
+	assert(dependency);
+
+	base = ctx->pctx.protocol[pb].desc;
+	if (base == dependency)
 		return __expr_evaluate_exthdr(ctx, exprp);
 
 	if (base)
 		return expr_error(ctx->msgs, expr,
 				  "cannot use exthdr with %s", base->name);
 
-	if (exthdr_gen_dependency(ctx, expr, &nstmt) < 0)
+	if (exthdr_gen_dependency(ctx, expr, dependency, pb - 1, &nstmt) < 0)
 		return -1;
 
 	list_add(&nstmt->list, &ctx->rule->stmts);
@@ -470,7 +520,7 @@ static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 
 /* dependency supersede.
  *
- * 'inet' is a 'phony' l2 dependeny used by NFPROTO_INET to fulfill network
+ * 'inet' is a 'phony' l2 dependency used by NFPROTO_INET to fulfill network
  * header dependency, i.e. ensure that 'ip saddr 1.2.3.4' only sees ip headers.
  *
  * If a match expression that depends on a particular L2 header, e.g. ethernet,
@@ -616,31 +666,89 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
  */
 static int expr_evaluate_rt(struct eval_ctx *ctx, struct expr **expr)
 {
-	const struct proto_desc *base;
+	static const char emsg[] = "cannot determine ip protocol version, use \"ip nexthop\" or \"ip6 nexthop\" instead";
 	struct expr *rt = *expr;
 
 	rt_expr_update_type(&ctx->pctx, rt);
 
-	base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
 	switch (rt->rt.key) {
 	case NFT_RT_NEXTHOP4:
-		if (base != &proto_ip)
-			goto err;
+		if (rt->dtype != &ipaddr_type)
+			return expr_error(ctx->msgs, rt, "%s", emsg);
+		if (ctx->pctx.family == NFPROTO_IPV6)
+			return expr_error(ctx->msgs, rt, "%s nexthop will not match", "ip");
 		break;
 	case NFT_RT_NEXTHOP6:
-		if (base != &proto_ip6)
-			goto err;
+		if (rt->dtype != &ip6addr_type)
+			return expr_error(ctx->msgs, rt, "%s", emsg);
+		if (ctx->pctx.family == NFPROTO_IPV4)
+			return expr_error(ctx->msgs, rt, "%s nexthop will not match", "ip6");
 		break;
 	default:
 		break;
 	}
 
 	return expr_evaluate_primary(ctx, expr);
+}
 
-err:
-	return expr_error(ctx->msgs, rt,
-			  "meta nfproto ipv4 or ipv6 must be specified "
-			  "before routing expression");
+static int ct_gen_nh_dependency(struct eval_ctx *ctx, struct expr *ct)
+{
+	const struct proto_desc *base, *base_now;
+	struct expr *left, *right, *dep;
+	struct stmt *nstmt = NULL;
+
+	base_now = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+
+	switch (ct->ct.nfproto) {
+	case NFPROTO_IPV4:
+		base = &proto_ip;
+		break;
+	case NFPROTO_IPV6:
+		base = &proto_ip6;
+		break;
+	default:
+		base = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
+		if (base == &proto_ip)
+			ct->ct.nfproto = NFPROTO_IPV4;
+		else if (base == &proto_ip)
+			ct->ct.nfproto = NFPROTO_IPV6;
+
+		if (base)
+			break;
+
+		return expr_error(ctx->msgs, ct,
+				  "cannot determine ip protocol version, use \"ip %1$caddr\" or \"ip6 %1$caddr\" instead",
+				  ct->ct.key == NFT_CT_SRC ? 's' : 'd');
+	}
+
+	/* no additional dependency needed? */
+	if (base == base_now)
+		return 0;
+
+	if (base_now && base_now != base)
+		return expr_error(ctx->msgs, ct,
+				  "conflicting dependencies: %s vs. %s\n",
+				  base->name,
+				  ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc->name);
+	switch (ctx->pctx.family) {
+	case NFPROTO_IPV4:
+	case NFPROTO_IPV6:
+		return 0;
+	}
+
+	left = ct_expr_alloc(&ct->location, NFT_CT_L3PROTOCOL, ct->ct.direction, ct->ct.nfproto);
+
+	right = constant_expr_alloc(&ct->location, left->dtype,
+				    left->dtype->byteorder, left->len,
+				    constant_data_ptr(ct->ct.nfproto, left->len));
+	dep = relational_expr_alloc(&ct->location, OP_EQ, left, right);
+
+	left->ops->pctx_update(&ctx->pctx, dep);
+
+	nstmt = expr_stmt_alloc(&dep->location, dep);
+
+	list_add_tail(&nstmt->list, &ctx->stmt->list);
+	return 0;
 }
 
 /*
@@ -650,6 +758,15 @@ err:
 static int expr_evaluate_ct(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *ct = *expr;
+
+	switch (ct->ct.key) {
+	case NFT_CT_SRC:
+	case NFT_CT_DST:
+		ct_gen_nh_dependency(ctx, ct);
+		break;
+	default:
+		break;
+	}
 
 	ct_expr_update_type(&ctx->pctx, ct);
 
@@ -1060,7 +1177,7 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 		return -1;
 
 	if (ctx->set &&
-	    !(ctx->set->flags & (SET_F_ANONYMOUS | SET_F_INTERVAL))) {
+	    !(ctx->set->flags & (NFT_SET_ANONYMOUS | NFT_SET_INTERVAL))) {
 		switch (elem->key->ops->type) {
 		case EXPR_PREFIX:
 			return expr_error(ctx->msgs, elem,
@@ -1094,6 +1211,16 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 			return expr_error(ctx->msgs, i,
 					  "Set reference cannot be part of another set");
 
+		if (i->ops->type == EXPR_SET_ELEM &&
+		    i->key->ops->type == EXPR_SET) {
+			struct expr *new = expr_clone(i->key);
+
+			set->set_flags |= i->key->set_flags;
+			list_replace(&i->list, &new->list);
+			expr_free(i);
+			i = new;
+		}
+
 		if (!expr_is_constant(i))
 			return expr_error(ctx->msgs, i,
 					  "Set member is not constant");
@@ -1102,14 +1229,14 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 			/* Merge recursive set definitions */
 			list_splice_tail_init(&i->expressions, &i->list);
 			list_del(&i->list);
-			set->size      += i->size;
+			set->size      += i->size - 1;
 			set->set_flags |= i->set_flags;
 			expr_free(i);
 		} else if (!expr_is_singleton(i))
-			set->set_flags |= SET_F_INTERVAL;
+			set->set_flags |= NFT_SET_INTERVAL;
 	}
 
-	set->set_flags |= SET_F_CONSTANT;
+	set->set_flags |= NFT_SET_CONSTANT;
 
 	set->dtype = ctx->ectx.dtype;
 	set->len   = ctx->ectx.len;
@@ -1121,6 +1248,7 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr_ctx ectx = ctx->ectx;
 	struct expr *map = *expr, *mappings;
+	struct expr *key;
 
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &map->map) < 0)
@@ -1130,14 +1258,20 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 				  "Map expression can not be constant");
 
 	mappings = map->mappings;
-	mappings->set_flags |= SET_F_MAP;
+	mappings->set_flags |= NFT_SET_MAP;
 
 	switch (map->mappings->ops->type) {
 	case EXPR_SET:
+		key = constant_expr_alloc(&map->location,
+				 ctx->ectx.dtype,
+				 ctx->ectx.byteorder,
+				 ctx->ectx.len, NULL);
+
 		mappings = implicit_set_declaration(ctx, "__map%d",
-						    ctx->ectx.dtype,
-						    ctx->ectx.len, mappings);
-		mappings->set->datatype = ectx.dtype;
+						    key,
+						    mappings);
+		mappings->set->datatype = set_datatype_alloc(ectx.dtype,
+							     ectx.byteorder);
 		mappings->set->datalen  = ectx.len;
 
 		map->mappings = mappings;
@@ -1162,18 +1296,18 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 		    map->mappings->ops->name);
 	}
 
-	if (!datatype_equal(map->map->dtype, map->mappings->set->keytype))
+	if (!datatype_equal(map->map->dtype, map->mappings->set->key->dtype))
 		return expr_binary_error(ctx->msgs, map->mappings, map->map,
 					 "datatype mismatch, map expects %s, "
 					 "mapping expression has type %s",
-					 map->mappings->set->keytype->desc,
+					 map->mappings->set->key->dtype->desc,
 					 map->map->dtype->desc);
 
 	map->dtype = map->mappings->set->datatype;
 	map->flags |= EXPR_F_CONSTANT;
 
 	/* Data for range lookups needs to be in big endian order */
-	if (map->mappings->set->flags & SET_F_INTERVAL &&
+	if (map->mappings->set->flags & NFT_SET_INTERVAL &&
 	    byteorder_conversion(ctx, &map->map, BYTEORDER_BIG_ENDIAN) < 0)
 		return -1;
 
@@ -1188,10 +1322,10 @@ static int expr_evaluate_mapping(struct eval_ctx *ctx, struct expr **expr)
 	if (set == NULL)
 		return expr_error(ctx->msgs, mapping,
 				  "mapping outside of map context");
-	if (!(set->flags & SET_F_MAP))
+	if (!(set->flags & (NFT_SET_MAP | NFT_SET_OBJECT)))
 		return set_error(ctx, set, "set is not a map");
 
-	expr_set_context(&ctx->ectx, set->keytype, set->keylen);
+	expr_set_context(&ctx->ectx, set->key->dtype, set->key->len);
 	if (expr_evaluate(ctx, &mapping->left) < 0)
 		return -1;
 	if (!expr_is_constant(mapping->left))
@@ -1249,7 +1383,8 @@ static int expr_evaluate_hash(struct eval_ctx *ctx, struct expr **exprp)
 	expr_dtype_integer_compatible(ctx, expr);
 
 	expr_set_context(&ctx->ectx, NULL, 0);
-	if (expr_evaluate(ctx, &expr->hash.expr) < 0)
+	if (expr->hash.expr &&
+	    expr_evaluate(ctx, &expr->hash.expr) < 0)
 		return -1;
 
 	/* expr_evaluate_primary() sets the context to what to the input
@@ -1471,8 +1606,7 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 		if (right->ops->type == EXPR_SET)
 			right = rel->right =
 				implicit_set_declaration(ctx, "__set%d",
-							 left->dtype,
-							 left->len, right);
+							 left, right);
 		else if (!datatype_equal(left->dtype, right->dtype))
 			return expr_binary_error(ctx->msgs, right, left,
 						 "datatype mismatch, expected %s, "
@@ -1481,7 +1615,7 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 						 right->dtype->desc);
 
 		/* Data for range lookups needs to be in big endian order */
-		if (right->set->flags & SET_F_INTERVAL &&
+		if (right->set->flags & NFT_SET_INTERVAL &&
 		    byteorder_conversion(ctx, &rel->left,
 					 BYTEORDER_BIG_ENDIAN) < 0)
 			return -1;
@@ -1529,14 +1663,12 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 		case EXPR_SET:
 			assert(rel->op == OP_NEQ);
 			right = rel->right =
-				implicit_set_declaration(ctx, "__set%d",
-							 left->dtype, left->len,
-							 right);
+				implicit_set_declaration(ctx, "__set%d", left, right);
 			/* fall through */
 		case EXPR_SET_REF:
 			assert(rel->op == OP_NEQ);
 			/* Data for range lookups needs to be in big endian order */
-			if (right->set->flags & SET_F_INTERVAL &&
+			if (right->set->flags & NFT_SET_INTERVAL &&
 			    byteorder_conversion(ctx, &rel->left, BYTEORDER_BIG_ENDIAN) < 0)
 				return -1;
 			break;
@@ -1615,16 +1747,40 @@ range:
 	return 0;
 }
 
+static int expr_evaluate_fib(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp;
+
+	if (expr->flags & EXPR_F_BOOLEAN) {
+		expr->fib.flags |= NFTA_FIB_F_PRESENT;
+		expr->dtype = &boolean_type;
+	}
+	return expr_evaluate_primary(ctx, exprp);
+}
+
+static int expr_evaluate_meta(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *meta = *exprp;
+
+	if (ctx->pctx.family != NFPROTO_INET &&
+	    meta->flags & EXPR_F_PROTOCOL &&
+	    meta->meta.key == NFT_META_NFPROTO)
+		return expr_error(ctx->msgs, meta,
+					  "meta nfproto is only useful in the inet family");
+	return expr_evaluate_primary(ctx, exprp);
+}
+
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 {
-#ifdef DEBUG
-	if (debug_level & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & DEBUG_EVALUATION) {
 		struct error_record *erec;
 		erec = erec_create(EREC_INFORMATIONAL, &(*expr)->location,
 				   "Evaluate %s", (*expr)->ops->name);
-		erec_print(stdout, erec); expr_print(*expr); printf("\n\n");
+		erec_print(ctx->octx, erec, ctx->debug_mask);
+		expr_print(*expr, ctx->octx);
+		nft_print(ctx->octx, "\n\n");
+		erec_destroy(erec);
 	}
-#endif
 
 	switch ((*expr)->ops->type) {
 	case EXPR_SYMBOL:
@@ -1636,9 +1792,11 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 	case EXPR_EXTHDR:
 		return expr_evaluate_exthdr(ctx, expr);
 	case EXPR_VERDICT:
-	case EXPR_META:
-	case EXPR_FIB:
 		return expr_evaluate_primary(ctx, expr);
+	case EXPR_META:
+		return expr_evaluate_meta(ctx, expr);
+	case EXPR_FIB:
+		return expr_evaluate_fib(ctx, expr);
 	case EXPR_PAYLOAD:
 		return expr_evaluate_payload(ctx, expr);
 	case EXPR_RT:
@@ -1684,9 +1842,9 @@ static int stmt_evaluate_expr(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 			     const struct datatype *dtype, unsigned int len,
-			     struct expr **expr)
+			     enum byteorder byteorder, struct expr **expr)
 {
-	expr_set_context(&ctx->ectx, dtype, len);
+	__expr_set_context(&ctx->ectx, dtype, byteorder, len, 0);
 	if (expr_evaluate(ctx, expr) < 0)
 		return -1;
 
@@ -1695,12 +1853,29 @@ static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 					 "datatype mismatch: expected %s, "
 					 "expression has type %s",
 					 dtype->desc, (*expr)->dtype->desc);
+
+	/* we are setting a value, we can't use a set */
+	switch ((*expr)->ops->type) {
+	case EXPR_SET:
+		return stmt_binary_error(ctx, *expr, stmt,
+					 "you cannot use a set here, unknown "
+					 "value to use");
+	case EXPR_SET_REF:
+		return stmt_binary_error(ctx, *expr, stmt,
+					 "you cannot reference a set here, "
+					 "unknown value to use");
+	case EXPR_RT:
+		return byteorder_conversion(ctx, expr, byteorder);
+	default:
+		break;
+	}
+
 	return 0;
 }
 
 static int stmt_evaluate_verdict(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	if (stmt_evaluate_arg(ctx, stmt, &verdict_type, 0, &stmt->expr) < 0)
+	if (stmt_evaluate_arg(ctx, stmt, &verdict_type, 0, 0, &stmt->expr) < 0)
 		return -1;
 
 	switch (stmt->expr->ops->type) {
@@ -1725,6 +1900,19 @@ static bool stmt_evaluate_payload_need_csum(const struct expr *payload)
 	return desc && desc->checksum_key;
 }
 
+static int stmt_evaluate_exthdr(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct expr *exthdr;
+
+	if (__expr_evaluate_exthdr(ctx, &stmt->exthdr.expr) < 0)
+		return -1;
+
+	exthdr = stmt->exthdr.expr;
+	return stmt_evaluate_arg(ctx, stmt, exthdr->dtype, exthdr->len,
+				 BYTEORDER_BIG_ENDIAN,
+				 &stmt->exthdr.val);
+}
+
 static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	struct expr *binop, *mask, *and, *payload_bytes;
@@ -1740,7 +1928,7 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 
 	payload = stmt->payload.expr;
 	if (stmt_evaluate_arg(ctx, stmt, payload->dtype, payload->len,
-			      &stmt->payload.val) < 0)
+			      payload->byteorder, &stmt->payload.val) < 0)
 		return -1;
 
 	need_csum = stmt_evaluate_payload_need_csum(payload);
@@ -1759,6 +1947,20 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 
 	shift_imm = expr_offset_shift(payload, payload->payload.offset,
 				      &extra_len);
+	payload_byte_size = round_up(payload->len, BITS_PER_BYTE) / BITS_PER_BYTE;
+	payload_byte_size += (extra_len / BITS_PER_BYTE);
+
+	if (need_csum && payload_byte_size & 1) {
+		payload_byte_size++;
+
+		if (payload_byte_offset & 1) { /* prefer 16bit aligned fetch */
+			payload_byte_offset--;
+			assert(payload->payload.offset >= BITS_PER_BYTE);
+		} else {
+			shift_imm += BITS_PER_BYTE;
+		}
+	}
+
 	if (shift_imm) {
 		struct expr *off;
 
@@ -1775,17 +1977,6 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 		stmt->payload.val = binop;
 	}
 
-	payload_byte_size = round_up(payload->len, BITS_PER_BYTE) / BITS_PER_BYTE;
-	payload_byte_size += (extra_len / BITS_PER_BYTE);
-
-	if (need_csum && payload_byte_size & 1) {
-		payload_byte_size++;
-
-		if (payload_byte_offset & 1) { /* prefer 16bit aligned fetch */
-			payload_byte_offset--;
-			assert(payload->payload.offset >= BITS_PER_BYTE);
-		}
-	}
 
 	masklen = payload_byte_size * BITS_PER_BYTE;
 	mpz_init_bitmask(ff, masklen);
@@ -1798,7 +1989,7 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	mpz_clear(ff);
 
 	assert(sizeof(data) * BITS_PER_BYTE >= masklen);
-	mpz_export_data(data, bitmask, BYTEORDER_HOST_ENDIAN, masklen);
+	mpz_export_data(data, bitmask, BYTEORDER_HOST_ENDIAN, sizeof(data));
 	mask = constant_expr_alloc(&payload->location, expr_basetype(payload),
 				   BYTEORDER_HOST_ENDIAN, masklen, data);
 
@@ -1846,13 +2037,13 @@ static int stmt_evaluate_flow(struct eval_ctx *ctx, struct stmt *stmt)
 
 	/* Declare an empty set */
 	key = stmt->flow.key;
-	set = set_expr_alloc(&key->location);
-	set->set_flags |= SET_F_EVAL;
+	set = set_expr_alloc(&key->location, NULL);
+	set->set_flags |= NFT_SET_EVAL;
 	if (key->timeout)
-		set->set_flags |= SET_F_TIMEOUT;
+		set->set_flags |= NFT_SET_TIMEOUT;
 
 	setref = implicit_set_declaration(ctx, stmt->flow.table ?: "__ft%d",
-					  key->dtype, key->len, set);
+					  key, set);
 
 	stmt->flow.set = setref;
 
@@ -1870,6 +2061,7 @@ static int stmt_evaluate_meta(struct eval_ctx *ctx, struct stmt *stmt)
 	return stmt_evaluate_arg(ctx, stmt,
 				 stmt->meta.tmpl->dtype,
 				 stmt->meta.tmpl->len,
+				 stmt->meta.tmpl->byteorder,
 				 &stmt->meta.expr);
 }
 
@@ -1878,6 +2070,7 @@ static int stmt_evaluate_ct(struct eval_ctx *ctx, struct stmt *stmt)
 	return stmt_evaluate_arg(ctx, stmt,
 				 stmt->ct.tmpl->dtype,
 				 stmt->ct.tmpl->len,
+				 stmt->ct.tmpl->byteorder,
 				 &stmt->ct.expr);
 }
 
@@ -1948,6 +2141,14 @@ static int stmt_reject_gen_dependency(struct eval_ctx *ctx, struct stmt *stmt,
 	if (payload_gen_dependency(ctx, payload, &nstmt) < 0)
 		return -1;
 
+	/*
+	 * Unlike payload deps this adds the dependency at the beginning, i.e.
+	 * log ... reject with tcp-reset
+	 * turns into
+	 * meta l4proto tcp log ... reject with tcp-reset
+	 *
+	 * Otherwise we'd log things that won't be rejected.
+	 */
 	list_add(&nstmt->list, &ctx->rule->stmts);
 	return 0;
 }
@@ -2268,7 +2469,8 @@ static int evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 		len   = 16 * BITS_PER_BYTE;
 	}
 
-	return stmt_evaluate_arg(ctx, stmt, dtype, len, expr);
+	return stmt_evaluate_arg(ctx, stmt, dtype, len, BYTEORDER_BIG_ENDIAN,
+				 expr);
 }
 
 static int nat_evaluate_transport(struct eval_ctx *ctx, struct stmt *stmt,
@@ -2283,7 +2485,7 @@ static int nat_evaluate_transport(struct eval_ctx *ctx, struct stmt *stmt,
 
 	return stmt_evaluate_arg(ctx, stmt,
 				 &inet_service_type, 2 * BITS_PER_BYTE,
-				 expr);
+				 BYTEORDER_BIG_ENDIAN, expr);
 }
 
 static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
@@ -2362,6 +2564,7 @@ static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
 		if (stmt->dup.dev != NULL) {
 			err = stmt_evaluate_arg(ctx, stmt, &ifindex_type,
 						sizeof(uint32_t) * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN,
 						&stmt->dup.dev);
 			if (err < 0)
 				return err;
@@ -2376,7 +2579,7 @@ static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
 
 		err = stmt_evaluate_arg(ctx, stmt, &ifindex_type,
 					sizeof(uint32_t) * BITS_PER_BYTE,
-					&stmt->dup.to);
+					BYTEORDER_HOST_ENDIAN, &stmt->dup.to);
 		if (err < 0)
 			return err;
 		break;
@@ -2398,7 +2601,7 @@ static int stmt_evaluate_fwd(struct eval_ctx *ctx, struct stmt *stmt)
 
 		err = stmt_evaluate_arg(ctx, stmt, &ifindex_type,
 					sizeof(uint32_t) * BITS_PER_BYTE,
-					&stmt->fwd.to);
+					BYTEORDER_HOST_ENDIAN, &stmt->fwd.to);
 		if (err < 0)
 			return err;
 		break;
@@ -2412,6 +2615,7 @@ static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	if (stmt->queue.queue != NULL) {
 		if (stmt_evaluate_arg(ctx, stmt, &integer_type, 16,
+				      BYTEORDER_HOST_ENDIAN,
 				      &stmt->queue.queue) < 0)
 			return -1;
 		if (!expr_is_constant(stmt->queue.queue))
@@ -2450,8 +2654,9 @@ static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 				  "Expression does not refer to a set");
 
 	if (stmt_evaluate_arg(ctx, stmt,
-			      stmt->set.set->set->keytype,
-			      stmt->set.set->set->keylen,
+			      stmt->set.set->set->key->dtype,
+			      stmt->set.set->set->key->len,
+			      stmt->set.set->set->key->byteorder,
 			      &stmt->set.key) < 0)
 		return -1;
 	if (expr_is_constant(stmt->set.key))
@@ -2464,16 +2669,104 @@ static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 	return 0;
 }
 
+static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct expr *map = stmt->objref.expr;
+	struct expr *mappings;
+	struct expr *key;
+
+	expr_set_context(&ctx->ectx, NULL, 0);
+	if (expr_evaluate(ctx, &map->map) < 0)
+		return -1;
+	if (expr_is_constant(map->map))
+		return expr_error(ctx->msgs, map->map,
+				  "Map expression can not be constant");
+
+	mappings = map->mappings;
+	mappings->set_flags |= NFT_SET_OBJECT;
+
+	switch (map->mappings->ops->type) {
+	case EXPR_SET:
+		key = constant_expr_alloc(&stmt->location,
+					  ctx->ectx.dtype,
+					  ctx->ectx.byteorder,
+					  ctx->ectx.len, NULL);
+
+		mappings = implicit_set_declaration(ctx, "__objmap%d",
+						    key, mappings);
+		mappings->set->datatype = &string_type;
+		mappings->set->datalen  = NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE;
+		mappings->set->objtype  = stmt->objref.type;
+
+		map->mappings = mappings;
+
+		ctx->set = mappings->set;
+		if (expr_evaluate(ctx, &map->mappings->set->init) < 0)
+			return -1;
+		ctx->set = NULL;
+
+		map->mappings->set->flags |=
+			map->mappings->set->init->set_flags;
+	case EXPR_SYMBOL:
+		if (expr_evaluate(ctx, &map->mappings) < 0)
+			return -1;
+		if (map->mappings->ops->type != EXPR_SET_REF ||
+		    !(map->mappings->set->flags & NFT_SET_OBJECT))
+			return expr_error(ctx->msgs, map->mappings,
+					  "Expression is not a map");
+		break;
+	default:
+		BUG("invalid mapping expression %s\n",
+		    map->mappings->ops->name);
+	}
+
+	if (!datatype_equal(map->map->dtype, map->mappings->set->key->dtype))
+		return expr_binary_error(ctx->msgs, map->mappings, map->map,
+					 "datatype mismatch, map expects %s, "
+					 "mapping expression has type %s",
+					 map->mappings->set->key->dtype->desc,
+					 map->map->dtype->desc);
+
+	map->dtype = map->mappings->set->datatype;
+	map->flags |= EXPR_F_CONSTANT;
+
+	/* Data for range lookups needs to be in big endian order */
+	if (map->mappings->set->flags & NFT_SET_INTERVAL &&
+	    byteorder_conversion(ctx, &map->map, BYTEORDER_BIG_ENDIAN) < 0)
+		return -1;
+
+	return 0;
+}
+
+static int stmt_evaluate_objref(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	/* We need specific map evaluation for stateful objects. */
+	if (stmt->objref.expr->ops->type == EXPR_MAP)
+		return stmt_evaluate_objref_map(ctx, stmt);
+
+	if (stmt_evaluate_arg(ctx, stmt,
+			      &string_type, NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE,
+			      BYTEORDER_HOST_ENDIAN, &stmt->objref.expr) < 0)
+		return -1;
+
+	if (!expr_is_constant(stmt->objref.expr))
+		return expr_error(ctx->msgs, stmt->objref.expr,
+				  "Counter expression must be constant");
+
+	return 0;
+}
+
 int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 {
-#ifdef DEBUG
-	if (debug_level & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & DEBUG_EVALUATION) {
 		struct error_record *erec;
 		erec = erec_create(EREC_INFORMATIONAL, &stmt->location,
 				   "Evaluate %s", stmt->ops->name);
-		erec_print(stdout, erec); stmt_print(stmt); printf("\n\n");
+		erec_print(ctx->octx, erec, ctx->debug_mask);
+		stmt_print(stmt, ctx->octx);
+		nft_print(ctx->octx, "\n\n");
+		erec_destroy(erec);
 	}
-#endif
 
 	switch (stmt->ops->type) {
 	case STMT_COUNTER:
@@ -2487,6 +2780,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_verdict(ctx, stmt);
 	case STMT_PAYLOAD:
 		return stmt_evaluate_payload(ctx, stmt);
+	case STMT_EXTHDR:
+		return stmt_evaluate_exthdr(ctx, stmt);
 	case STMT_FLOW:
 		return stmt_evaluate_flow(ctx, stmt);
 	case STMT_META:
@@ -2511,6 +2806,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_fwd(ctx, stmt);
 	case STMT_SET:
 		return stmt_evaluate_set(ctx, stmt);
+	case STMT_OBJREF:
+		return stmt_evaluate_objref(ctx, stmt);
 	default:
 		BUG("unknown statement type %s\n", stmt->ops->name);
 	}
@@ -2532,7 +2829,7 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct expr **expr)
 				 ctx->cmd->handle.set);
 
 	ctx->set = set;
-	expr_set_context(&ctx->ectx, set->keytype, set->keylen);
+	expr_set_context(&ctx->ectx, set->key->dtype, set->key->len);
 	if (expr_evaluate(ctx, expr) < 0)
 		return -1;
 	ctx->set = NULL;
@@ -2549,18 +2846,23 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 		return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 				 ctx->cmd->handle.table);
 
-	type = set->flags & SET_F_MAP ? "map" : "set";
+	type = set->flags & NFT_SET_MAP ? "map" : "set";
 
-	if (set->keytype == NULL)
-		return set_error(ctx, set, "%s definition does not specify "
-				 "key data type", type);
+	if (set->key == NULL)
+		return set_error(ctx, set, "%s definition does not specify key",
+				 type);
 
-	set->keylen = set->keytype->size;
-	if (set->keylen == 0)
-		return set_error(ctx, set, "unqualified key data type "
-				 "specified in %s definition", type);
+	if (set->key->len == 0) {
+		if (set->key->ops->type == EXPR_CONCAT &&
+		    expr_evaluate_concat(ctx, &set->key) < 0)
+			return -1;
 
-	if (set->flags & SET_F_MAP) {
+		if (set->key->len == 0)
+			return set_error(ctx, set, "unqualified key type %s "
+					 "specified in %s definition",
+					 set->key->dtype->name, type);
+	}
+	if (set->flags & NFT_SET_MAP) {
 		if (set->datatype == NULL)
 			return set_error(ctx, set, "map definition does not "
 					 "specify mapping data type");
@@ -2569,11 +2871,14 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 		if (set->datalen == 0 && set->datatype->type != TYPE_VERDICT)
 			return set_error(ctx, set, "unqualified mapping data "
 					 "type specified in map definition");
+	} else if (set->flags & NFT_SET_OBJECT) {
+		set->datatype = &string_type;
+		set->datalen  = NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE;
 	}
 
 	ctx->set = set;
 	if (set->init != NULL) {
-		expr_set_context(&ctx->ectx, set->keytype, set->keylen);
+		expr_set_context(&ctx->ectx, set->key->dtype, set->key->len);
 		if (expr_evaluate(ctx, &set->init) < 0)
 			return -1;
 	}
@@ -2584,7 +2889,7 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 
 	/* Default timeout value implies timeout support */
 	if (set->timeout)
-		set->flags |= SET_F_TIMEOUT;
+		set->flags |= NFT_SET_TIMEOUT;
 
 	return 0;
 }
@@ -2594,7 +2899,7 @@ static int rule_evaluate(struct eval_ctx *ctx, struct rule *rule)
 	struct stmt *stmt, *tstmt = NULL;
 	struct error_record *erec;
 
-	proto_ctx_init(&ctx->pctx, rule->handle.family);
+	proto_ctx_init(&ctx->pctx, rule->handle.family, ctx->debug_mask);
 	memset(&ctx->ectx, 0, sizeof(ctx->ectx));
 
 	ctx->rule = rule;
@@ -2701,13 +3006,13 @@ static int table_evaluate(struct eval_ctx *ctx, struct table *table)
 	struct chain *chain;
 	struct set *set;
 
-	if (table_lookup(&ctx->cmd->handle) == NULL) {
+	if (table_lookup(&ctx->cmd->handle, ctx->cache) == NULL) {
 		if (table == NULL) {
 			table = table_alloc();
 			handle_merge(&table->handle, &ctx->cmd->handle);
-			table_add_hash(table);
+			table_add_hash(table, ctx->cache);
 		} else {
-			table_add_hash(table_get(table));
+			table_add_hash(table_get(table), ctx->cache);
 		}
 	}
 
@@ -2735,13 +3040,15 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_SETELEM:
-		ret = cache_update(cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
 		return setelem_evaluate(ctx, &cmd->expr);
 	case CMD_OBJ_SET:
-		ret = cache_update(cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -2751,13 +3058,19 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 		handle_merge(&cmd->rule->handle, &cmd->handle);
 		return rule_evaluate(ctx, cmd->rule);
 	case CMD_OBJ_CHAIN:
-		ret = cache_update(cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
 		return chain_evaluate(ctx, cmd->chain);
 	case CMD_OBJ_TABLE:
 		return table_evaluate(ctx, cmd->table);
+	case CMD_OBJ_COUNTER:
+	case CMD_OBJ_QUOTA:
+	case CMD_OBJ_CT_HELPER:
+	case CMD_OBJ_LIMIT:
+		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
@@ -2769,7 +3082,8 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_SETELEM:
-		ret = cache_update(cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -2778,10 +3092,32 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_RULE:
 	case CMD_OBJ_CHAIN:
 	case CMD_OBJ_TABLE:
+	case CMD_OBJ_COUNTER:
+	case CMD_OBJ_QUOTA:
+	case CMD_OBJ_CT_HELPER:
+	case CMD_OBJ_LIMIT:
 		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
+}
+
+static int cmd_evaluate_list_obj(struct eval_ctx *ctx, const struct cmd *cmd,
+				 uint32_t obj_type)
+{
+	const struct table *table;
+
+	if (obj_type == NFT_OBJECT_UNSPEC)
+		obj_type = NFT_OBJECT_COUNTER;
+
+	table = table_lookup(&cmd->handle, ctx->cache);
+	if (table == NULL)
+		return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+				 cmd->handle.table);
+	if (obj_lookup(table, cmd->handle.obj, obj_type) == NULL)
+		return cmd_error(ctx, "Could not process rule: Object '%s' does not exist",
+					 cmd->handle.obj);
+	return 0;
 }
 
 static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
@@ -2790,7 +3126,8 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	struct set *set;
 	int ret;
 
-	ret = cache_update(cmd->op, ctx->msgs);
+	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -2799,43 +3136,43 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		if (cmd->handle.table == NULL)
 			return 0;
 
-		table = table_lookup(&cmd->handle);
+		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		return 0;
 	case CMD_OBJ_SET:
-		table = table_lookup(&cmd->handle);
+		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		set = set_lookup(table, cmd->handle.set);
-		if (set == NULL || set->flags & (SET_F_MAP | SET_F_EVAL))
+		if (set == NULL || set->flags & (NFT_SET_MAP | NFT_SET_EVAL))
 			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_FLOWTABLE:
-		table = table_lookup(&cmd->handle);
+		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		set = set_lookup(table, cmd->handle.set);
-		if (set == NULL || !(set->flags & SET_F_EVAL))
+		if (set == NULL || !(set->flags & NFT_SET_EVAL))
 			return cmd_error(ctx, "Could not process rule: Flow table '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_MAP:
-		table = table_lookup(&cmd->handle);
+		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		set = set_lookup(table, cmd->handle.set);
-		if (set == NULL || !(set->flags & SET_F_MAP))
+		if (set == NULL || !(set->flags & NFT_SET_MAP))
 			return cmd_error(ctx, "Could not process rule: Map '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_CHAIN:
-		table = table_lookup(&cmd->handle);
+		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
@@ -2843,8 +3180,26 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 			return cmd_error(ctx, "Could not process rule: Chain '%s' does not exist",
 					 cmd->handle.chain);
 		return 0;
-	case CMD_OBJ_CHAINS:
+	case CMD_OBJ_QUOTA:
+		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_QUOTA);
+	case CMD_OBJ_COUNTER:
+		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_COUNTER);
+	case CMD_OBJ_CT_HELPER:
+		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_CT_HELPER);
+	case CMD_OBJ_LIMIT:
+		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_LIMIT);
+	case CMD_OBJ_COUNTERS:
+	case CMD_OBJ_QUOTAS:
+	case CMD_OBJ_CT_HELPERS:
+	case CMD_OBJ_LIMITS:
 	case CMD_OBJ_SETS:
+		if (cmd->handle.table == NULL)
+			return 0;
+		if (table_lookup(&cmd->handle, ctx->cache) == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		return 0;
+	case CMD_OBJ_CHAINS:
 	case CMD_OBJ_RULESET:
 	case CMD_OBJ_FLOWTABLES:
 	case CMD_OBJ_MAPS:
@@ -2854,17 +3209,45 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	}
 }
 
-static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
+static int cmd_evaluate_reset(struct eval_ctx *ctx, struct cmd *cmd)
 {
 	int ret;
 
-	ret = cache_update(cmd->op, ctx->msgs);
+	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+	if (ret < 0)
+		return ret;
+
+	switch (cmd->obj) {
+	case CMD_OBJ_COUNTER:
+	case CMD_OBJ_QUOTA:
+	case CMD_OBJ_COUNTERS:
+	case CMD_OBJ_QUOTAS:
+		if (cmd->handle.table == NULL)
+			return 0;
+		if (table_lookup(&cmd->handle, ctx->cache) == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		return 0;
+	default:
+		BUG("invalid command object type %u\n", cmd->obj);
+	}
+}
+
+static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	struct table *table;
+	struct set *set;
+	int ret;
+
+	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
 	switch (cmd->obj) {
 	case CMD_OBJ_RULESET:
-		cache_flush();
+		cache_flush(&ctx->cache->list);
 		break;
 	case CMD_OBJ_TABLE:
 		/* Flushing a table does not empty the sets in the table nor remove
@@ -2872,8 +3255,37 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 		 */
 	case CMD_OBJ_CHAIN:
 		/* Chains don't hold sets */
-	case CMD_OBJ_SET:
 		break;
+	case CMD_OBJ_SET:
+		table = table_lookup(&cmd->handle, ctx->cache);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || set->flags & (NFT_SET_MAP | NFT_SET_EVAL))
+			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
+					 cmd->handle.set);
+		return 0;
+	case CMD_OBJ_MAP:
+		table = table_lookup(&cmd->handle, ctx->cache);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || !(set->flags & NFT_SET_MAP))
+			return cmd_error(ctx, "Could not process rule: Map '%s' does not exist",
+					 cmd->handle.set);
+		return 0;
+	case CMD_OBJ_FLOWTABLE:
+		table = table_lookup(&cmd->handle, ctx->cache);
+		if (table == NULL)
+			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
+					 cmd->handle.table);
+		set = set_lookup(table, cmd->handle.set);
+		if (set == NULL || !(set->flags & NFT_SET_EVAL))
+			return cmd_error(ctx, "Could not process rule: Flow table '%s' does not exist",
+					 cmd->handle.set);
+		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
@@ -2887,11 +3299,12 @@ static int cmd_evaluate_rename(struct eval_ctx *ctx, struct cmd *cmd)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_CHAIN:
-		ret = cache_update(cmd->op, ctx->msgs);
+		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
+				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
-		table = table_lookup(&ctx->cmd->handle);
+		table = table_lookup(&ctx->cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 ctx->cmd->handle.table);
@@ -2909,7 +3322,6 @@ enum {
 	CMD_MONITOR_EVENT_ANY,
 	CMD_MONITOR_EVENT_NEW,
 	CMD_MONITOR_EVENT_DEL,
-	CMD_MONITOR_EVENT_TRACE,
 	CMD_MONITOR_EVENT_MAX
 };
 
@@ -2926,6 +3338,19 @@ static uint32_t monitor_flags[CMD_MONITOR_EVENT_MAX][CMD_MONITOR_OBJ_MAX] = {
 						  (1 << NFT_MSG_DELSET),
 		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_NEWSETELEM) |
 						  (1 << NFT_MSG_DELSETELEM),
+		[CMD_MONITOR_OBJ_RULESET]	= (1 << NFT_MSG_NEWTABLE) |
+						  (1 << NFT_MSG_DELTABLE) |
+						  (1 << NFT_MSG_NEWCHAIN) |
+						  (1 << NFT_MSG_DELCHAIN) |
+						  (1 << NFT_MSG_NEWRULE)  |
+						  (1 << NFT_MSG_DELRULE)  |
+						  (1 << NFT_MSG_NEWSET)   |
+						  (1 << NFT_MSG_DELSET)	  |
+						  (1 << NFT_MSG_NEWSETELEM) |
+						  (1 << NFT_MSG_DELSETELEM) |
+						  (1 << NFT_MSG_NEWOBJ)	  |
+						  (1 << NFT_MSG_DELOBJ),
+		[CMD_MONITOR_OBJ_TRACE]		= (1 << NFT_MSG_TRACE),
 	},
 	[CMD_MONITOR_EVENT_NEW] = {
 		[CMD_MONITOR_OBJ_ANY]		= (1 << NFT_MSG_NEWTABLE) |
@@ -2938,6 +3363,13 @@ static uint32_t monitor_flags[CMD_MONITOR_EVENT_MAX][CMD_MONITOR_OBJ_MAX] = {
 		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_NEWRULE),
 		[CMD_MONITOR_OBJ_SETS]		= (1 << NFT_MSG_NEWSET),
 		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_NEWSETELEM),
+		[CMD_MONITOR_OBJ_RULESET]	= (1 << NFT_MSG_NEWTABLE) |
+						  (1 << NFT_MSG_NEWCHAIN) |
+						  (1 << NFT_MSG_NEWRULE)  |
+						  (1 << NFT_MSG_NEWSET)   |
+						  (1 << NFT_MSG_NEWSETELEM) |
+						  (1 << NFT_MSG_NEWOBJ),
+		[CMD_MONITOR_OBJ_TRACE]		= 0,
 	},
 	[CMD_MONITOR_EVENT_DEL] = {
 		[CMD_MONITOR_OBJ_ANY]		= (1 << NFT_MSG_DELTABLE) |
@@ -2950,21 +3382,13 @@ static uint32_t monitor_flags[CMD_MONITOR_EVENT_MAX][CMD_MONITOR_OBJ_MAX] = {
 		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_DELRULE),
 		[CMD_MONITOR_OBJ_SETS]		= (1 << NFT_MSG_DELSET),
 		[CMD_MONITOR_OBJ_ELEMS]		= (1 << NFT_MSG_DELSETELEM),
-	},
-	[CMD_MONITOR_EVENT_TRACE] = {
-		[CMD_MONITOR_OBJ_ANY]		= (1 << NFT_MSG_NEWTABLE) |
-						  (1 << NFT_MSG_NEWCHAIN) |
-						  (1 << NFT_MSG_NEWRULE)  |
-						  (1 << NFT_MSG_DELTABLE) |
+		[CMD_MONITOR_OBJ_RULESET]	= (1 << NFT_MSG_DELTABLE) |
 						  (1 << NFT_MSG_DELCHAIN) |
 						  (1 << NFT_MSG_DELRULE)  |
-						  (1 << NFT_MSG_TRACE),
-		[CMD_MONITOR_OBJ_TABLES]	= (1 << NFT_MSG_NEWTABLE) |
-						  (1 << NFT_MSG_DELTABLE),
-		[CMD_MONITOR_OBJ_CHAINS]	= (1 << NFT_MSG_NEWCHAIN) |
-						  (1 << NFT_MSG_DELCHAIN),
-		[CMD_MONITOR_OBJ_RULES]		= (1 << NFT_MSG_NEWRULE) |
-						  (1 << NFT_MSG_DELRULE),
+						  (1 << NFT_MSG_DELSET)   |
+						  (1 << NFT_MSG_DELSETELEM) |
+						  (1 << NFT_MSG_DELOBJ),
+		[CMD_MONITOR_OBJ_TRACE]		= 0,
 	},
 };
 
@@ -2973,7 +3397,8 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 	uint32_t event;
 	int ret;
 
-	ret = cache_update(cmd->op, ctx->msgs);
+	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -2983,8 +3408,6 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 		event = CMD_MONITOR_EVENT_NEW;
 	else if (strcmp(cmd->monitor->event, "destroy") == 0)
 		event = CMD_MONITOR_EVENT_DEL;
-	else if (strcmp(cmd->monitor->event, "trace") == 0)
-		event = CMD_MONITOR_EVENT_TRACE;
 	else {
 		return monitor_error(ctx, cmd->monitor, "invalid event %s",
 				     cmd->monitor->event);
@@ -2996,11 +3419,11 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 
 static int cmd_evaluate_export(struct eval_ctx *ctx, struct cmd *cmd)
 {
-	return cache_update(cmd->op, ctx->msgs);
+	return cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			    ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
 }
 
-#ifdef DEBUG
-static const char *cmd_op_name[] = {
+static const char * const cmd_op_name[] = {
 	[CMD_INVALID]	= "invalid",
 	[CMD_ADD]	= "add",
 	[CMD_REPLACE]	= "replace",
@@ -3022,18 +3445,18 @@ static const char *cmd_op_to_name(enum cmd_ops op)
 
 	return cmd_op_name[op];
 }
-#endif
 
 int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 {
-#ifdef DEBUG
-	if (debug_level & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & DEBUG_EVALUATION) {
 		struct error_record *erec;
+
 		erec = erec_create(EREC_INFORMATIONAL, &cmd->location,
 				   "Evaluate %s", cmd_op_to_name(cmd->op));
-		erec_print(stdout, erec); printf("\n\n");
+		erec_print(ctx->octx, erec, ctx->debug_mask);
+		nft_print(ctx->octx, "\n\n");
+		erec_destroy(erec);
 	}
-#endif
 
 	ctx->cmd = cmd;
 	switch (cmd->op) {
@@ -3046,6 +3469,8 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 		return cmd_evaluate_delete(ctx, cmd);
 	case CMD_LIST:
 		return cmd_evaluate_list(ctx, cmd);
+	case CMD_RESET:
+		return cmd_evaluate_reset(ctx, cmd);
 	case CMD_FLUSH:
 		return cmd_evaluate_flush(ctx, cmd);
 	case CMD_RENAME:

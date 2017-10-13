@@ -70,9 +70,9 @@ void expr_free(struct expr *expr)
 	xfree(expr);
 }
 
-void expr_print(const struct expr *expr)
+void expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	expr->ops->print(expr);
+	expr->ops->print(expr, octx);
 }
 
 bool expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -86,41 +86,42 @@ bool expr_cmp(const struct expr *e1, const struct expr *e2)
 	return e1->ops->cmp(e1, e2);
 }
 
-void expr_describe(const struct expr *expr)
+void expr_describe(const struct expr *expr, struct output_ctx *octx)
 {
 	const struct datatype *dtype = expr->dtype;
 	const char *delim = "";
 
-	printf("%s expression, datatype %s (%s)",
-		expr->ops->name, dtype->name, dtype->desc);
+	nft_print(octx, "%s expression, datatype %s (%s)",
+		  expr->ops->name, dtype->name, dtype->desc);
 	if (dtype->basetype != NULL) {
-		printf(" (basetype ");
+		nft_print(octx, " (basetype ");
 		for (dtype = dtype->basetype; dtype != NULL;
 		     dtype = dtype->basetype) {
-			printf("%s%s", delim, dtype->desc);
+			nft_print(octx, "%s%s", delim, dtype->desc);
 			delim = ", ";
 		}
-		printf(")");
+		nft_print(octx, ")");
 	}
 
 	if (expr_basetype(expr)->type == TYPE_STRING) {
 		if (expr->len)
-			printf(", %u characters", expr->len / BITS_PER_BYTE);
+			nft_print(octx, ", %u characters",
+				  expr->len / BITS_PER_BYTE);
 		else
-			printf(", dynamic length");
+			nft_print(octx, ", dynamic length");
 	} else
-		printf(", %u bits", expr->len);
+		nft_print(octx, ", %u bits", expr->len);
 
-	printf("\n");
+	nft_print(octx, "\n");
 
 	if (expr->dtype->sym_tbl != NULL) {
-		printf("\npre-defined symbolic constants ");
+		nft_print(octx, "\npre-defined symbolic constants ");
 		if (expr->dtype->sym_tbl->base == BASE_DECIMAL)
-			printf("(in decimal):\n");
+			nft_print(octx, "(in decimal):\n");
 		else
-			printf("(in hexadecimal):\n");
+			nft_print(octx, "(in hexadecimal):\n");
 		symbol_table_print(expr->dtype->sym_tbl, expr->dtype,
-				   expr->byteorder);
+				   expr->byteorder, octx);
 	}
 }
 
@@ -160,9 +161,9 @@ int __fmtstring(4, 5) expr_binary_error(struct list_head *msgs,
 	return -1;
 }
 
-static void verdict_expr_print(const struct expr *expr)
+static void verdict_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	datatype_print(expr);
+	datatype_print(expr, octx);
 }
 
 static bool verdict_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -213,9 +214,10 @@ struct expr *verdict_expr_alloc(const struct location *loc,
 	return expr;
 }
 
-static void symbol_expr_print(const struct expr *expr)
+static void symbol_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	printf("%s%s", expr->scope != NULL ? "$" : "", expr->identifier);
+	nft_print(octx, "%s%s", expr->scope != NULL ? "$" : "",
+		  expr->identifier);
 }
 
 static void symbol_expr_clone(struct expr *new, const struct expr *expr)
@@ -252,9 +254,10 @@ struct expr *symbol_expr_alloc(const struct location *loc,
 	return expr;
 }
 
-static void constant_expr_print(const struct expr *expr)
+static void constant_expr_print(const struct expr *expr,
+				 struct output_ctx *octx)
 {
-	datatype_print(expr);
+	datatype_print(expr, octx);
 }
 
 static bool constant_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -394,10 +397,10 @@ struct expr *bitmask_expr_to_binops(struct expr *expr)
 	return binop;
 }
 
-static void prefix_expr_print(const struct expr *expr)
+static void prefix_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	expr_print(expr->prefix);
-	printf("/%u", expr->prefix_len);
+	expr_print(expr->prefix, octx);
+	nft_print(octx, "/%u", expr->prefix_len);
 }
 
 static void prefix_expr_set_type(const struct expr *expr,
@@ -458,12 +461,9 @@ const char *expr_op_symbols[] = {
 	[OP_LOOKUP]	= NULL,
 };
 
-static void unary_expr_print(const struct expr *expr)
+static void unary_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	if (expr_op_symbols[expr->op] != NULL)
-		printf("%s(", expr_op_symbols[expr->op]);
-	expr_print(expr->arg);
-	printf(")");
+	expr_print(expr->arg, octx);
 }
 
 static void unary_expr_clone(struct expr *new, const struct expr *expr)
@@ -504,7 +504,8 @@ static uint8_t expr_binop_precedence[OP_MAX + 1] = {
 	[OP_OR]		= 4,
 };
 
-static void binop_arg_print(const struct expr *op, const struct expr *arg)
+static void binop_arg_print(const struct expr *op, const struct expr *arg,
+			     struct output_ctx *octx)
 {
 	bool prec = false;
 
@@ -514,10 +515,10 @@ static void binop_arg_print(const struct expr *op, const struct expr *arg)
 		prec = 1;
 
 	if (prec)
-		printf("(");
-	expr_print(arg);
+		nft_print(octx, "(");
+	expr_print(arg, octx);
 	if (prec)
-		printf(")");
+		nft_print(octx, ")");
 }
 
 static bool must_print_eq_op(const struct expr *expr)
@@ -529,17 +530,17 @@ static bool must_print_eq_op(const struct expr *expr)
 	return expr->left->ops->type == EXPR_BINOP;
 }
 
-static void binop_expr_print(const struct expr *expr)
+static void binop_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	binop_arg_print(expr, expr->left);
+	binop_arg_print(expr, expr->left, octx);
 
 	if (expr_op_symbols[expr->op] &&
 	    (expr->op != OP_EQ || must_print_eq_op(expr)))
-		printf(" %s ", expr_op_symbols[expr->op]);
+		nft_print(octx, " %s ", expr_op_symbols[expr->op]);
 	else
-		printf(" ");
+		nft_print(octx, " ");
 
-	binop_arg_print(expr, expr->right);
+	binop_arg_print(expr, expr->right, octx);
 }
 
 static void binop_expr_clone(struct expr *new, const struct expr *expr)
@@ -592,14 +593,20 @@ struct expr *relational_expr_alloc(const struct location *loc, enum ops op,
 	expr->left  = left;
 	expr->op    = op;
 	expr->right = right;
+
+	if (right->dtype == &boolean_type)
+		left->flags |= EXPR_F_BOOLEAN;
+
 	return expr;
 }
 
-static void range_expr_print(const struct expr *expr)
+static void range_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	expr_print(expr->left);
-	printf("-");
-	expr_print(expr->right);
+	octx->numeric += NUMERIC_ALL + 1;
+	expr_print(expr->left, octx);
+	nft_print(octx, "-");
+	expr_print(expr->right, octx);
+	octx->numeric -= NUMERIC_ALL + 1;
 }
 
 static void range_expr_clone(struct expr *new, const struct expr *expr)
@@ -670,14 +677,15 @@ static void compound_expr_destroy(struct expr *expr)
 		expr_free(i);
 }
 
-static void compound_expr_print(const struct expr *expr, const char *delim)
+static void compound_expr_print(const struct expr *expr, const char *delim,
+				 struct output_ctx *octx)
 {
 	const struct expr *i;
 	const char *d = "";
 
 	list_for_each_entry(i, &expr->expressions, list) {
-		printf("%s", d);
-		expr_print(i);
+		nft_print(octx, "%s", d);
+		expr_print(i, octx);
 		d = delim;
 	}
 }
@@ -700,9 +708,9 @@ static void concat_expr_destroy(struct expr *expr)
 	compound_expr_destroy(expr);
 }
 
-static void concat_expr_print(const struct expr *expr)
+static void concat_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	compound_expr_print(expr, " . ");
+	compound_expr_print(expr, " . ", octx);
 }
 
 static const struct expr_ops concat_expr_ops = {
@@ -718,9 +726,9 @@ struct expr *concat_expr_alloc(const struct location *loc)
 	return compound_expr_alloc(loc, &concat_expr_ops);
 }
 
-static void list_expr_print(const struct expr *expr)
+static void list_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	compound_expr_print(expr, ",");
+	compound_expr_print(expr, ",", octx);
 }
 
 static const struct expr_ops list_expr_ops = {
@@ -736,11 +744,67 @@ struct expr *list_expr_alloc(const struct location *loc)
 	return compound_expr_alloc(loc, &list_expr_ops);
 }
 
-static void set_expr_print(const struct expr *expr)
+static const char *calculate_delim(const struct expr *expr, int *count)
 {
-	printf("{ ");
-	compound_expr_print(expr, ", ");
-	printf("}");
+	const char *newline = ",\n\t\t\t     ";
+	const char *singleline = ", ";
+
+	if (expr->set_flags & NFT_SET_ANONYMOUS)
+		return singleline;
+
+	if (!expr->dtype)
+		return newline;
+
+	switch (expr->dtype->type) {
+	case TYPE_NFPROTO:
+	case TYPE_INTEGER:
+	case TYPE_ARPOP:
+	case TYPE_INET_PROTOCOL:
+	case TYPE_INET_SERVICE:
+	case TYPE_TCP_FLAG:
+	case TYPE_DCCP_PKTTYPE:
+	case TYPE_MARK:
+	case TYPE_IFINDEX:
+	case TYPE_CLASSID:
+	case TYPE_UID:
+	case TYPE_GID:
+	case TYPE_CT_DIR:
+		if (*count < 5)
+			return singleline;
+		*count = 0;
+		break;
+	case TYPE_IPADDR:
+	case TYPE_CT_STATE:
+	case TYPE_CT_STATUS:
+	case TYPE_PKTTYPE:
+		if (*count < 2)
+			return singleline;
+		*count = 0;
+		break;
+
+	default:
+		break;
+	}
+
+	return newline;
+}
+
+static void set_expr_print(const struct expr *expr, struct output_ctx *octx)
+{
+	const struct expr *i;
+	const char *d = "";
+	int count = 0;
+
+	nft_print(octx, "{ ");
+
+	list_for_each_entry(i, &expr->expressions, list) {
+		nft_print(octx, "%s", d);
+		expr_print(i, octx);
+		count++;
+		d = calculate_delim(expr, &count);
+	}
+
+	nft_print(octx, " }");
 }
 
 static void set_expr_set_type(const struct expr *expr,
@@ -762,16 +826,24 @@ static const struct expr_ops set_expr_ops = {
 	.destroy	= compound_expr_destroy,
 };
 
-struct expr *set_expr_alloc(const struct location *loc)
+struct expr *set_expr_alloc(const struct location *loc, const struct set *set)
 {
-	return compound_expr_alloc(loc, &set_expr_ops);
+	struct expr *set_expr = compound_expr_alloc(loc, &set_expr_ops);
+
+	if (!set)
+		return set_expr;
+
+	set_expr->set_flags = set->flags;
+	set_expr->dtype = set->key->dtype;
+
+	return set_expr;
 }
 
-static void mapping_expr_print(const struct expr *expr)
+static void mapping_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	expr_print(expr->left);
-	printf(" : ");
-	expr_print(expr->right);
+	expr_print(expr->left, octx);
+	nft_print(octx, " : ");
+	expr_print(expr->right, octx);
 }
 
 static void mapping_expr_set_type(const struct expr *expr,
@@ -814,15 +886,15 @@ struct expr *mapping_expr_alloc(const struct location *loc,
 	return expr;
 }
 
-static void map_expr_print(const struct expr *expr)
+static void map_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	expr_print(expr->map);
+	expr_print(expr->map, octx);
 	if (expr->mappings->ops->type == EXPR_SET_REF &&
 	    expr->mappings->set->datatype->type == TYPE_VERDICT)
-		printf(" vmap ");
+		nft_print(octx, " vmap ");
 	else
-		printf(" map ");
-	expr_print(expr->mappings);
+		nft_print(octx, " map ");
+	expr_print(expr->mappings, octx);
 }
 
 static void map_expr_clone(struct expr *new, const struct expr *expr)
@@ -856,15 +928,15 @@ struct expr *map_expr_alloc(const struct location *loc, struct expr *arg,
 	return expr;
 }
 
-static void set_ref_expr_print(const struct expr *expr)
+static void set_ref_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	if (expr->set->flags & SET_F_ANONYMOUS) {
-		if (expr->set->flags & SET_F_EVAL)
-			printf("table %s", expr->set->handle.set);
+	if (expr->set->flags & NFT_SET_ANONYMOUS) {
+		if (expr->set->flags & NFT_SET_EVAL)
+			nft_print(octx, "table %s", expr->set->handle.set);
 		else
-			expr_print(expr->set->init);
+			expr_print(expr->set->init, octx);
 	} else {
-		printf("@%s", expr->set->handle.set);
+		nft_print(octx, "@%s", expr->set->handle.set);
 	}
 }
 
@@ -890,29 +962,30 @@ struct expr *set_ref_expr_alloc(const struct location *loc, struct set *set)
 {
 	struct expr *expr;
 
-	expr = expr_alloc(loc, &set_ref_expr_ops, set->keytype, 0, 0);
+	expr = expr_alloc(loc, &set_ref_expr_ops, set->key->dtype, 0, 0);
 	expr->set = set_get(set);
 	expr->flags |= EXPR_F_CONSTANT;
 	return expr;
 }
 
-static void set_elem_expr_print(const struct expr *expr)
+static void set_elem_expr_print(const struct expr *expr,
+				 struct output_ctx *octx)
 {
-	expr_print(expr->key);
+	expr_print(expr->key, octx);
 	if (expr->timeout) {
-		printf(" timeout ");
-		time_print(expr->timeout / 1000);
+		nft_print(octx, " timeout ");
+		time_print(expr->timeout / 1000, octx);
 	}
-	if (expr->expiration) {
-		printf(" expires ");
-		time_print(expr->expiration / 1000);
+	if (!octx->stateless && expr->expiration) {
+		nft_print(octx, " expires ");
+		time_print(expr->expiration / 1000, octx);
 	}
 	if (expr->comment)
-		printf(" comment \"%s\"", expr->comment);
+		nft_print(octx, " comment \"%s\"", expr->comment);
 
 	if (expr->stmt) {
-		printf(" : ");
-		stmt_print(expr->stmt);
+		nft_print(octx, " : ");
+		stmt_print(expr->stmt, octx);
 	}
 }
 

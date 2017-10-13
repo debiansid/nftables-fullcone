@@ -40,24 +40,40 @@ static const struct datatype *datatypes[TYPE_MAX + 1] = {
 	[TYPE_IP6ADDR]		= &ip6addr_type,
 	[TYPE_ETHERADDR]	= &etheraddr_type,
 	[TYPE_ETHERTYPE]	= &ethertype_type,
+	[TYPE_ARPOP]		= &arpop_type,
 	[TYPE_INET_PROTOCOL]	= &inet_protocol_type,
 	[TYPE_INET_SERVICE]	= &inet_service_type,
+	[TYPE_ICMP_TYPE]	= &icmp_type_type,
+	[TYPE_TCP_FLAG]		= &tcp_flag_type,
+	[TYPE_DCCP_PKTTYPE]	= &dccp_pkttype_type,
+	[TYPE_MH_TYPE]		= &mh_type_type,
 	[TYPE_TIME]		= &time_type,
 	[TYPE_MARK]		= &mark_type,
+	[TYPE_IFINDEX]		= &ifindex_type,
 	[TYPE_ARPHRD]		= &arphrd_type,
+	[TYPE_REALM]		= &realm_type,
+	[TYPE_CLASSID]		= &tchandle_type,
+	[TYPE_UID]		= &uid_type,
+	[TYPE_GID]		= &gid_type,
+	[TYPE_CT_STATE]		= &ct_state_type,
+	[TYPE_CT_DIR]		= &ct_dir_type,
+	[TYPE_CT_STATUS]	= &ct_status_type,
+	[TYPE_ICMP6_TYPE]	= &icmp6_type_type,
+	[TYPE_PKTTYPE]		= &pkttype_type,
 	[TYPE_ICMP_CODE]	= &icmp_code_type,
 	[TYPE_ICMPV6_CODE]	= &icmpv6_code_type,
 	[TYPE_ICMPX_CODE]	= &icmpx_code_type,
+	[TYPE_DEVGROUP]		= &devgroup_type,
+	[TYPE_DSCP]		= &dscp_type,
+	[TYPE_ECN]		= &ecn_type,
+	[TYPE_FIB_ADDR]         = &fib_addr_type,
+	[TYPE_BOOLEAN]		= &boolean_type,
 };
-
-void datatype_register(const struct datatype *dtype)
-{
-	BUILD_BUG_ON(TYPE_MAX & ~TYPE_MASK);
-	datatypes[dtype->type] = dtype;
-}
 
 const struct datatype *datatype_lookup(enum datatypes type)
 {
+	BUILD_BUG_ON(TYPE_MAX & ~TYPE_MASK);
+
 	if (type > TYPE_MAX)
 		return NULL;
 	return datatypes[type];
@@ -78,16 +94,16 @@ const struct datatype *datatype_lookup_byname(const char *name)
 	return NULL;
 }
 
-void datatype_print(const struct expr *expr)
+void datatype_print(const struct expr *expr, struct output_ctx *octx)
 {
 	const struct datatype *dtype = expr->dtype;
 
 	do {
 		if (dtype->print != NULL)
-			return dtype->print(expr);
+			return dtype->print(expr, octx);
 		if (dtype->sym_tbl != NULL)
 			return symbolic_constant_print(dtype->sym_tbl, expr,
-						       false);
+						       false, octx);
 	} while ((dtype = dtype->basetype));
 
 	BUG("datatype %s has no print method or symbol table\n",
@@ -155,7 +171,8 @@ out:
 }
 
 void symbolic_constant_print(const struct symbol_table *tbl,
-			     const struct expr *expr, bool quotes)
+			     const struct expr *expr, bool quotes,
+			     struct output_ctx *octx)
 {
 	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
 	const struct symbolic_constant *s;
@@ -172,12 +189,18 @@ void symbolic_constant_print(const struct symbol_table *tbl,
 	}
 
 	if (s->identifier == NULL)
-		return expr_basetype(expr)->print(expr);
+		return expr_basetype(expr)->print(expr, octx);
 
 	if (quotes)
-		printf("\"%s\"", s->identifier);
+		nft_print(octx, "\"");
+
+	if (octx->numeric > NUMERIC_ALL)
+		nft_print(octx, "%" PRIu64 "", val);
 	else
-		printf("%s", s->identifier);
+		nft_print(octx, "%s", s->identifier);
+
+	if (quotes)
+		nft_print(octx, "\"");
 }
 
 static void switch_byteorder(void *data, unsigned int len)
@@ -192,7 +215,8 @@ static void switch_byteorder(void *data, unsigned int len)
 
 void symbol_table_print(const struct symbol_table *tbl,
 			const struct datatype *dtype,
-			enum byteorder byteorder)
+			enum byteorder byteorder,
+			struct output_ctx *octx)
 {
 	const struct symbolic_constant *s;
 	unsigned int len = dtype->size / BITS_PER_BYTE;
@@ -205,16 +229,17 @@ void symbol_table_print(const struct symbol_table *tbl,
 			switch_byteorder(&value, len);
 
 		if (tbl->base == BASE_DECIMAL)
-			printf("\t%-30s\t%20lu\n", s->identifier, value);
+			nft_print(octx, "\t%-30s\t%20" PRIu64 "\n",
+				  s->identifier, value);
 		else
-			printf("\t%-30s\t0x%.*" PRIx64 "\n",
-			       s->identifier, 2 * len, value);
+			nft_print(octx, "\t%-30s\t0x%.*" PRIx64 "\n",
+				  s->identifier, 2 * len, value);
 	}
 }
 
-static void invalid_type_print(const struct expr *expr)
+static void invalid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
-	gmp_printf("0x%Zx [invalid type]", expr->value);
+	nft_gmp_print(octx, "0x%Zx [invalid type]", expr->value);
 }
 
 const struct datatype invalid_type = {
@@ -224,34 +249,34 @@ const struct datatype invalid_type = {
 	.print		= invalid_type_print,
 };
 
-static void verdict_type_print(const struct expr *expr)
+static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	switch (expr->verdict) {
 	case NFT_CONTINUE:
-		printf("continue");
+		nft_print(octx, "continue");
 		break;
 	case NFT_BREAK:
-		printf("break");
+		nft_print(octx, "break");
 		break;
 	case NFT_JUMP:
-		printf("jump %s", expr->chain);
+		nft_print(octx, "jump %s", expr->chain);
 		break;
 	case NFT_GOTO:
-		printf("goto %s", expr->chain);
+		nft_print(octx, "goto %s", expr->chain);
 		break;
 	case NFT_RETURN:
-		printf("return");
+		nft_print(octx, "return");
 		break;
 	default:
 		switch (expr->verdict & NF_VERDICT_MASK) {
 		case NF_ACCEPT:
-			printf("accept");
+			nft_print(octx, "accept");
 			break;
 		case NF_DROP:
-			printf("drop");
+			nft_print(octx, "drop");
 			break;
 		case NF_QUEUE:
-			printf("queue");
+			nft_print(octx, "queue");
 			break;
 		default:
 			BUG("invalid verdict value %u\n", expr->verdict);
@@ -292,7 +317,7 @@ const struct datatype bitmask_type = {
 	.basetype	= &integer_type,
 };
 
-static void integer_type_print(const struct expr *expr)
+static void integer_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	const struct datatype *dtype = expr->dtype;
 	const char *fmt = "%Zu";
@@ -304,7 +329,7 @@ static void integer_type_print(const struct expr *expr)
 		}
 	} while ((dtype = dtype->basetype));
 
-	gmp_printf(fmt, expr->value);
+	nft_gmp_print(octx, fmt, expr->value);
 }
 
 static struct error_record *integer_type_parse(const struct expr *sym,
@@ -334,14 +359,14 @@ const struct datatype integer_type = {
 	.parse		= integer_type_parse,
 };
 
-static void string_type_print(const struct expr *expr)
+static void string_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
 	char data[len+1];
 
 	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
 	data[len] = '\0';
-	printf("\"%s\"", data);
+	nft_print(octx, "\"%s\"", data);
 }
 
 static struct error_record *string_type_parse(const struct expr *sym,
@@ -363,7 +388,7 @@ const struct datatype string_type = {
 	.parse		= string_type_parse,
 };
 
-static void lladdr_type_print(const struct expr *expr)
+static void lladdr_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	unsigned int len = div_round_up(expr->len, BITS_PER_BYTE);
 	const char *delim = "";
@@ -373,7 +398,7 @@ static void lladdr_type_print(const struct expr *expr)
 	mpz_export_data(data, expr->value, BYTEORDER_BIG_ENDIAN, len);
 
 	for (i = 0; i < len; i++) {
-		printf("%s%.2x", delim, data[i]);
+		nft_print(octx, "%s%.2x", delim, data[i]);
 		delim = ":";
 	}
 }
@@ -412,7 +437,7 @@ const struct datatype lladdr_type = {
 	.parse		= lladdr_type_parse,
 };
 
-static void ipaddr_type_print(const struct expr *expr)
+static void ipaddr_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct sockaddr_in sin = { .sin_family = AF_INET, };
 	char buf[NI_MAXHOST];
@@ -421,12 +446,12 @@ static void ipaddr_type_print(const struct expr *expr)
 	sin.sin_addr.s_addr = mpz_get_be32(expr->value);
 	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			  sizeof(buf), NULL, 0,
-			  ip2name_output ? 0 : NI_NUMERICHOST);
+			  octx->ip2name ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
 	}
-	printf("%s", buf);
+	nft_print(octx, "%s", buf);
 }
 
 static struct error_record *ipaddr_type_parse(const struct expr *sym,
@@ -468,7 +493,7 @@ const struct datatype ipaddr_type = {
 	.flags		= DTYPE_F_PREFIX,
 };
 
-static void ip6addr_type_print(const struct expr *expr)
+static void ip6addr_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct sockaddr_in6 sin6 = { .sin6_family = AF_INET6 };
 	char buf[NI_MAXHOST];
@@ -479,12 +504,12 @@ static void ip6addr_type_print(const struct expr *expr)
 
 	err = getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			  sizeof(buf), NULL, 0,
-			  ip2name_output ? 0 : NI_NUMERICHOST);
+			  octx->ip2name ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
 	}
-	printf("%s", buf);
+	nft_print(octx, "%s", buf);
 }
 
 static struct error_record *ip6addr_type_parse(const struct expr *sym,
@@ -526,18 +551,19 @@ const struct datatype ip6addr_type = {
 	.flags		= DTYPE_F_PREFIX,
 };
 
-static void inet_protocol_type_print(const struct expr *expr)
+static void inet_protocol_type_print(const struct expr *expr,
+				      struct output_ctx *octx)
 {
 	struct protoent *p;
 
-	if (numeric_output < NUMERIC_ALL) {
+	if (octx->numeric < NUMERIC_ALL) {
 		p = getprotobynumber(mpz_get_uint8(expr->value));
 		if (p != NULL) {
-			printf("%s", p->p_name);
+			nft_print(octx, "%s", p->p_name);
 			return;
 		}
 	}
-	integer_type_print(expr);
+	integer_type_print(expr, octx);
 }
 
 static struct error_record *inet_protocol_type_parse(const struct expr *sym,
@@ -579,22 +605,22 @@ const struct datatype inet_protocol_type = {
 	.parse		= inet_protocol_type_parse,
 };
 
-static void inet_service_type_print(const struct expr *expr)
+static void inet_service_type_print(const struct expr *expr,
+				     struct output_ctx *octx)
 {
-	if (numeric_output >= NUMERIC_PORT) {
-		integer_type_print(expr);
+	if (octx->numeric >= NUMERIC_PORT) {
+		integer_type_print(expr, octx);
 		return;
 	}
-	symbolic_constant_print(&inet_service_tbl, expr, false);
+	symbolic_constant_print(&inet_service_tbl, expr, false, octx);
 }
 
 static struct error_record *inet_service_type_parse(const struct expr *sym,
 						    struct expr **res)
 {
-	struct addrinfo *ai;
+	const struct symbolic_constant *s;
 	uint16_t port;
 	uintmax_t i;
-	int err;
 	char *end;
 
 	errno = 0;
@@ -605,13 +631,16 @@ static struct error_record *inet_service_type_parse(const struct expr *sym,
 
 		port = htons(i);
 	} else {
-		err = getaddrinfo(NULL, sym->identifier, NULL, &ai);
-		if (err != 0)
-			return error(&sym->location, "Could not resolve service: %s",
-				     gai_strerror(err));
+		for (s = inet_service_tbl.symbols; s->identifier != NULL; s++) {
+			if (!strcmp(sym->identifier, s->identifier))
+				break;
+		}
 
-		port = ((struct sockaddr_in *)ai->ai_addr)->sin_port;
-		freeaddrinfo(ai);
+		if (s->identifier == NULL)
+			return error(&sym->location, "Could not resolve service: "
+				     "Servname not found in nft services list");
+
+		port = s->value;
 	}
 
 	*res = constant_expr_alloc(&sym->location, &inet_service_type,
@@ -692,19 +721,19 @@ void rt_symbol_table_free(struct symbol_table *tbl)
 }
 
 static struct symbol_table *mark_tbl;
-static void __init mark_table_init(void)
+void mark_table_init(void)
 {
 	mark_tbl = rt_symbol_table_init("/etc/iproute2/rt_marks");
 }
 
-static void __exit mark_table_exit(void)
+void mark_table_exit(void)
 {
 	rt_symbol_table_free(mark_tbl);
 }
 
-static void mark_type_print(const struct expr *expr)
+static void mark_type_print(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_print(mark_tbl, expr, true);
+	return symbolic_constant_print(mark_tbl, expr, true, octx);
 }
 
 static struct error_record *mark_type_parse(const struct expr *sym,
@@ -794,7 +823,7 @@ const struct datatype icmpx_code_type = {
 	.sym_tbl	= &icmpx_code_tbl,
 };
 
-void time_print(uint64_t seconds)
+void time_print(uint64_t seconds, struct output_ctx *octx)
 {
 	uint64_t days, hours, minutes;
 
@@ -808,13 +837,13 @@ void time_print(uint64_t seconds)
 	seconds %= 60;
 
 	if (days > 0)
-		printf("%"PRIu64"d", days);
+		nft_print(octx, "%" PRIu64 "d", days);
 	if (hours > 0)
-		printf("%"PRIu64"h", hours);
+		nft_print(octx, "%" PRIu64 "h", hours);
 	if (minutes > 0)
-		printf("%"PRIu64"m", minutes);
+		nft_print(octx, "%" PRIu64 "m", minutes);
 	if (seconds > 0)
-		printf("%"PRIu64"s", seconds);
+		nft_print(octx, "%" PRIu64 "s", seconds);
 }
 
 enum {
@@ -904,9 +933,9 @@ struct error_record *time_parse(const struct location *loc, const char *str,
 }
 
 
-static void time_type_print(const struct expr *expr)
+static void time_type_print(const struct expr *expr, struct output_ctx *octx)
 {
-	time_print(mpz_get_uint64(expr->value) / MSEC_PER_SEC);
+	time_print(mpz_get_uint64(expr->value) / MSEC_PER_SEC, octx);
 }
 
 static struct error_record *time_type_parse(const struct expr *sym,
@@ -957,6 +986,28 @@ static struct datatype *dtype_alloc(void)
 	return dtype;
 }
 
+static struct datatype *dtype_clone(const struct datatype *orig_dtype)
+{
+	struct datatype *dtype;
+
+	dtype = xzalloc(sizeof(*dtype));
+	*dtype = *orig_dtype;
+	dtype->name = xstrdup(orig_dtype->name);
+	dtype->desc = xstrdup(orig_dtype->desc);
+	dtype->flags = DTYPE_F_ALLOC | DTYPE_F_CLONE;
+
+	return dtype;
+}
+
+static void dtype_free(const struct datatype *dtype)
+{
+	if (dtype->flags & DTYPE_F_ALLOC) {
+		xfree(dtype->name);
+		xfree(dtype->desc);
+		xfree(dtype);
+	}
+}
+
 const struct datatype *concat_type_alloc(uint32_t type)
 {
 	const struct datatype *i;
@@ -996,11 +1047,28 @@ const struct datatype *concat_type_alloc(uint32_t type)
 
 void concat_type_destroy(const struct datatype *dtype)
 {
-	if (dtype->flags & DTYPE_F_ALLOC) {
-		xfree(dtype->name);
-		xfree(dtype->desc);
-		xfree(dtype);
-	}
+	dtype_free(dtype);
+}
+
+const struct datatype *set_datatype_alloc(const struct datatype *orig_dtype,
+					  unsigned int byteorder)
+{
+	struct datatype *dtype;
+
+	/* Restrict dynamic datatype allocation to generic integer datatype. */
+	if (orig_dtype != &integer_type)
+		return orig_dtype;
+
+	dtype = dtype_clone(orig_dtype);
+	dtype->byteorder = byteorder;
+
+	return dtype;
+}
+
+void set_datatype_destroy(const struct datatype *dtype)
+{
+	if (dtype && dtype->flags & DTYPE_F_CLONE)
+		dtype_free(dtype);
 }
 
 static struct error_record *time_unit_parse(const struct location *loc,
@@ -1057,3 +1125,21 @@ struct error_record *rate_parse(const struct location *loc, const char *str,
 
 	return NULL;
 }
+
+static const struct symbol_table boolean_tbl = {
+	.base		= BASE_DECIMAL,
+	.symbols	= {
+		SYMBOL("exists",	true),
+		SYMBOL("missing",	false),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype boolean_type = {
+	.type		= TYPE_BOOLEAN,
+	.name		= "boolean",
+	.desc		= "boolean type",
+	.size		= 1,
+	.basetype	= &integer_type,
+	.sym_tbl	= &boolean_tbl,
+};

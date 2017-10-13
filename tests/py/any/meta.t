@@ -25,11 +25,6 @@ meta protocol != {ip, arp, ip6, vlan};ok
 meta protocol ip;ok
 meta protocol != ip;ok
 
-meta nfproto ipv4;ok
-meta nfproto ipv6;ok
-meta nfproto {ipv4, ipv6};ok
-meta nfproto != {ipv4, ipv6};ok
-
 meta l4proto 22;ok
 meta l4proto != 233;ok
 meta l4proto 33-45;ok
@@ -38,6 +33,7 @@ meta l4proto { 33, 55, 67, 88};ok;meta l4proto { 33, 55, 67, 88}
 meta l4proto != { 33, 55, 67, 88};ok
 meta l4proto { 33-55};ok
 meta l4proto != { 33-55};ok
+meta l4proto ipv6-icmp icmpv6 type nd-router-advert;ok;icmpv6 type nd-router-advert
 
 meta priority root;ok
 meta priority none;ok
@@ -141,6 +137,9 @@ meta mark set 0xf045ffde or 0x10;ok;mark set 0xf045ffde
 meta mark set 0xffffffde or 0x16;ok;mark set 0xffffffde
 meta mark set 0x32 or 0xfffff;ok;mark set 0x000fffff
 meta mark set 0xfffe xor 0x16;ok;mark set 0x0000ffe8
+
+meta mark set {0xffff, 0xcc};fail
+meta pkttype set {unicast, multicast, broadcast};fail
 
 meta iif "lo";ok;iif "lo"
 meta oif "lo";ok;oif "lo"

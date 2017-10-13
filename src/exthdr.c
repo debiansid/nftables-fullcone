@@ -21,16 +21,40 @@
 #include <utils.h>
 #include <headers.h>
 #include <expression.h>
+#include <statement.h>
 
-static void exthdr_expr_print(const struct expr *expr)
+static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	printf("%s %s", expr->exthdr.desc->name, expr->exthdr.tmpl->token);
+	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT) {
+		/* Offset calcualtion is a bit hacky at this point.
+		 * There might be an tcp option one day with another
+		 * multiplicator
+		 */
+		unsigned int offset = expr->exthdr.offset / 64;
+
+		nft_print(octx, "tcp option %s", expr->exthdr.desc->name);
+		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
+			return;
+		if (offset)
+			nft_print(octx, "%d", offset);
+		nft_print(octx, " %s", expr->exthdr.tmpl->token);
+	} else {
+		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
+			nft_print(octx, "exthdr %s", expr->exthdr.desc->name);
+		else {
+			nft_print(octx, "%s %s",
+				  expr->exthdr.desc ? expr->exthdr.desc->name : "unknown-exthdr",
+				  expr->exthdr.tmpl->token);
+		}
+	}
 }
 
 static bool exthdr_expr_cmp(const struct expr *e1, const struct expr *e2)
 {
 	return e1->exthdr.desc == e2->exthdr.desc &&
-	       e1->exthdr.tmpl == e2->exthdr.tmpl;
+	       e1->exthdr.tmpl == e2->exthdr.tmpl &&
+	       e1->exthdr.op == e2->exthdr.op &&
+	       e1->exthdr.flags == e2->exthdr.flags;
 }
 
 static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
@@ -38,9 +62,11 @@ static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
 	new->exthdr.desc = expr->exthdr.desc;
 	new->exthdr.tmpl = expr->exthdr.tmpl;
 	new->exthdr.offset = expr->exthdr.offset;
+	new->exthdr.op = expr->exthdr.op;
+	new->exthdr.flags = expr->exthdr.flags;
 }
 
-static const struct expr_ops exthdr_expr_ops = {
+const struct expr_ops exthdr_expr_ops = {
 	.type		= EXPR_EXTHDR,
 	.name		= "exthdr",
 	.print		= exthdr_expr_print,
@@ -70,6 +96,30 @@ struct expr *exthdr_expr_alloc(const struct location *loc,
 	return expr;
 }
 
+static void exthdr_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	expr_print(stmt->exthdr.expr, octx);
+	nft_print(octx, " set ");
+	expr_print(stmt->exthdr.val, octx);
+}
+
+static const struct stmt_ops exthdr_stmt_ops = {
+	.type		= STMT_EXTHDR,
+	.name		= "exthdr",
+	.print		= exthdr_stmt_print,
+};
+
+struct stmt *exthdr_stmt_alloc(const struct location *loc,
+				struct expr *expr, struct expr *val)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &exthdr_stmt_ops);
+	stmt->exthdr.expr = expr;
+	stmt->exthdr.val  = val;
+	return stmt;
+}
+
 static const struct exthdr_desc *exthdr_protocols[IPPROTO_MAX] = {
 	[IPPROTO_HOPOPTS]	= &exthdr_hbh,
 	[IPPROTO_ROUTING]	= &exthdr_rt,
@@ -78,28 +128,48 @@ static const struct exthdr_desc *exthdr_protocols[IPPROTO_MAX] = {
 	[IPPROTO_MH]		= &exthdr_mh,
 };
 
-void exthdr_init_raw(struct expr *expr, uint8_t type,
-		     unsigned int offset, unsigned int len)
+const struct exthdr_desc *exthdr_find_proto(uint8_t proto)
 {
-	const struct proto_hdr_template *tmpl;
+	assert(exthdr_protocols[proto]);
+
+	return exthdr_protocols[proto];
+}
+
+void exthdr_init_raw(struct expr *expr, uint8_t type,
+		     unsigned int offset, unsigned int len,
+		     enum nft_exthdr_op op, uint32_t flags)
+{
+	const struct proto_hdr_template *tmpl = &exthdr_unknown_template;
 	unsigned int i;
 
 	assert(expr->ops->type == EXPR_EXTHDR);
+	if (op == NFT_EXTHDR_OP_TCPOPT)
+		return tcpopt_init_raw(expr, type, offset, len, flags);
 
 	expr->len = len;
+	expr->exthdr.flags = flags;
 	expr->exthdr.offset = offset;
-	expr->exthdr.desc = exthdr_protocols[type];
-	assert(expr->exthdr.desc != NULL);
+	expr->exthdr.desc = NULL;
+
+	if (type < array_size(exthdr_protocols))
+		expr->exthdr.desc = exthdr_protocols[type];
+
+	if (expr->exthdr.desc == NULL)
+		goto out;
 
 	for (i = 0; i < array_size(expr->exthdr.desc->templates); i++) {
 		tmpl = &expr->exthdr.desc->templates[i];
-		if (tmpl->offset != offset ||
-		    tmpl->len    != len)
-			continue;
-		expr->dtype	  = tmpl->dtype;
-		expr->exthdr.tmpl = tmpl;
-		return;
+		if (tmpl->offset == offset && tmpl->len == len)
+			goto out;
 	}
+
+	tmpl = &exthdr_unknown_template;
+ out:
+	expr->exthdr.tmpl = tmpl;
+	if (flags & NFT_EXTHDR_F_PRESENT)
+		expr->dtype = &boolean_type;
+	else
+		expr->dtype = tmpl->dtype;
 }
 
 static unsigned int mask_length(const struct expr *mask)
@@ -116,6 +186,12 @@ bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned i
 	if (expr->exthdr.tmpl != &exthdr_unknown_template)
 		return false;
 
+	/* In case we are handling tcp options instead of the default ipv6
+	 * extension headers.
+	 */
+	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT)
+		return tcpopt_find_template(expr, mask, shift);
+
 	mask_offset = mpz_scan1(mask->value, 0);
 	mask_len = mask_length(mask);
 
@@ -123,7 +199,7 @@ bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned i
 	off += round_up(mask->len, BITS_PER_BYTE) - mask_len;
 
 	exthdr_init_raw(expr, expr->exthdr.desc->type,
-			off, mask_len - mask_offset);
+			off, mask_len - mask_offset, NFT_EXTHDR_OP_IPV6, 0);
 
 	/* still failed to find a template... Bug. */
 	if (expr->exthdr.tmpl == &exthdr_unknown_template)
@@ -268,7 +344,7 @@ static const struct symbol_table mh_type_tbl = {
 	},
 };
 
-static const struct datatype mh_type_type = {
+const struct datatype mh_type_type = {
 	.type		= TYPE_MH_TYPE,
 	.name		= "mh_type",
 	.desc		= "Mobility Header Type",
@@ -289,8 +365,3 @@ const struct exthdr_desc exthdr_mh = {
 		[MHHDR_CHECKSUM]	= MH_FIELD("checksum", ip6mh_cksum, &integer_type),
 	},
 };
-
-static void __init exthdr_init(void)
-{
-	datatype_register(&mh_type_type);
-}

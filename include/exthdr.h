@@ -2,6 +2,7 @@
 #define NFTABLES_EXTHDR_H
 
 #include <proto.h>
+#include <tcpopt.h>
 
 /**
  * struct exthdr_desc - extension header description
@@ -20,8 +21,11 @@ extern struct expr *exthdr_expr_alloc(const struct location *loc,
 				      const struct exthdr_desc *desc,
 				      uint8_t type);
 
+extern const struct exthdr_desc *exthdr_find_proto(uint8_t proto);
+
 extern void exthdr_init_raw(struct expr *expr, uint8_t type,
-			    unsigned int offset, unsigned int len);
+			    unsigned int offset, unsigned int len,
+			    enum nft_exthdr_op op, uint32_t flags);
 
 extern bool exthdr_find_template(struct expr *expr, const struct expr *mask,
 				 unsigned int *shift);
@@ -77,6 +81,7 @@ enum mh_hdr_fields {
 	MHHDR_CHECKSUM,
 };
 
+extern const struct expr_ops exthdr_expr_ops;
 extern const struct exthdr_desc exthdr_hbh;
 extern const struct exthdr_desc exthdr_rt;
 extern const struct exthdr_desc exthdr_rt0;
@@ -84,5 +89,6 @@ extern const struct exthdr_desc exthdr_rt2;
 extern const struct exthdr_desc exthdr_frag;
 extern const struct exthdr_desc exthdr_dst;
 extern const struct exthdr_desc exthdr_mh;
+extern const struct datatype mh_type_type;
 
 #endif /* NFTABLES_EXTHDR_H */

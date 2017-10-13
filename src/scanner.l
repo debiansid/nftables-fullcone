@@ -11,6 +11,7 @@
 %{
 
 #include <limits.h>
+#include <glob.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <linux/types.h>
@@ -159,7 +160,8 @@ v63		({v630}|{v631}|{v632}|{v633})
 v620		((:)((:{hex4}){2}))
 v621		((({hex4}:){1})((:{hex4}){1}))
 v622		((({hex4}:){2})(:))
-v62		({v620}|{v621}|{v622})
+v62_rfc4291	((:)(:[fF]{4})(:{ip4addr}))
+v62		({v620}|{v621}|{v622}|{v62_rfc4291})
 v610		((:)(:{hex4}{1}))
 v611		((({hex4}:){1})(:))
 v61		({v610}|{v611})
@@ -249,6 +251,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "maps"			{ return MAPS; }
 "handle"		{ return HANDLE; }
 "ruleset"		{ return RULESET; }
+"trace"			{ return TRACE; }
 
 "accept"		{ return ACCEPT; }
 "drop"			{ return DROP; }
@@ -268,6 +271,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "insert"		{ return INSERT; }
 "delete"		{ return DELETE; }
 "list"			{ return LIST; }
+"reset"			{ return RESET; }
 "flush"			{ return FLUSH; }
 "rename"		{ return RENAME; }
 "export"		{ return EXPORT; }
@@ -290,8 +294,14 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "flow"			{ return FLOW; }
 
 "counter"		{ return COUNTER; }
+"name"			{ return NAME; }
 "packets"		{ return PACKETS; }
 "bytes"			{ return BYTES; }
+"avgpkt"		{ return AVGPKT; }
+
+"counters"		{ return COUNTERS; }
+"quotas"		{ return QUOTAS; }
+"limits"		{ return LIMITS; }
 
 "log"			{ return LOG; }
 "prefix"		{ return PREFIX; }
@@ -312,6 +322,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "over"			{ return OVER; }
 
 "quota"			{ return QUOTA; }
+"used"			{ return USED; }
 
 "nanosecond"		{ return NANOSECOND; }
 "microsecond"		{ return MICROSECOND; }
@@ -368,6 +379,25 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "protocol"		{ return PROTOCOL; }
 "checksum"		{ return CHECKSUM; }
 
+"echo"			{ return ECHO; }
+"eol"			{ return EOL; }
+"maxseg"		{ return MAXSEG; }
+"noop"			{ return NOOP; }
+"sack"			{ return SACK; }
+"sack0"			{ return SACK0; }
+"sack1"			{ return SACK1; }
+"sack2"			{ return SACK2; }
+"sack3"			{ return SACK3; }
+"sack-permitted"	{ return SACK_PERMITTED; }
+"timestamp"		{ return TIMESTAMP; }
+
+"kind"			{ return KIND; }
+"count"			{ return COUNT; }
+"left"			{ return LEFT; }
+"right"			{ return RIGHT; }
+"tsval"			{ return TSVAL; }
+"tsecr"			{ return TSECR; }
+
 "icmp"			{ return ICMP; }
 "code"			{ return CODE; }
 "sequence"		{ return SEQUENCE; }
@@ -404,6 +434,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "doff"			{ return DOFF; }
 "window"		{ return WINDOW; }
 "urgptr"		{ return URGPTR; }
+"option"		{ return OPTION; }
 
 "dccp"			{ return DCCP; }
 
@@ -453,6 +484,16 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "l3proto"		{ return L3PROTOCOL; }
 "proto-src"		{ return PROTO_SRC; }
 "proto-dst"		{ return PROTO_DST; }
+"zone"			{ return ZONE; }
+"original"		{ return ORIGINAL; }
+"reply"			{ return REPLY; }
+"direction"		{ return DIRECTION; }
+"event"			{ return EVENT; }
+"expiration"		{ return EXPIRATION; }
+"helper"		{ return HELPER; }
+"label"			{ return LABEL; }
+"state"			{ return STATE; }
+"status"		{ return STATUS; }
 
 "numgen"		{ return NUMGEN; }
 "inc"			{ return INC; }
@@ -460,6 +501,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "offset"		{ return OFFSET; }
 
 "jhash"			{ return JHASH; }
+"symhash"		{ return SYMHASH; }
 "seed"			{ return SEED; }
 
 "dup"			{ return DUP; }
@@ -474,6 +516,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "xml"			{ return XML; }
 "json"			{ return JSON; }
+
+"exists"		{ return EXISTS; }
+"missing"		{ return MISSING; }
+
+"exthdr"		{ return EXTHDR; }
 
 {addrstring}		{
 				yylval->string = xstrdup(yytext);
@@ -598,13 +645,13 @@ static struct error_record *scanner_push_file(void *scanner, const char *filenam
 		state->indesc->location = *loc;
 	state->indesc->type	= INDESC_FILE;
 	state->indesc->name	= xstrdup(filename);
-	state->indesc->fd	= fileno(f);
+	state->indesc->fp	= f;
 	init_pos(state);
 	return NULL;
 }
 
-int scanner_read_file(void *scanner, const char *filename,
-		      const struct location *loc)
+static int include_file(void *scanner, const char *filename,
+			const struct location *loc)
 {
 	struct parser_state *state = yyget_extra(scanner);
 	struct error_record *erec;
@@ -621,56 +668,172 @@ int scanner_read_file(void *scanner, const char *filename,
 	if (erec != NULL)
 		goto err;
 	return 0;
-
 err:
 	erec_queue(erec, state->msgs);
 	return -1;
 }
 
+static int include_glob(void *scanner, const char *pattern,
+			const struct location *loc)
+{
+	struct parser_state *state = yyget_extra(scanner);
+	struct error_record *erec = NULL;
+	bool wildcard = false;
+	glob_t glob_data;
+	unsigned int i;
+	int flags = 0;
+	int ret;
+	char *p;
+
+	/* This function can return four meaningful values:
+	 *
+	 *  -1 means that there was an error.
+	 *   0 means that a single non-wildcard match was done.
+	 *   1 means that there are no wildcards in the pattern and the
+	 *     search can continue.
+	 *   2 means that there are wildcards in the pattern and the search
+	 *     can continue.
+	 *
+	 * The diffrence is needed, because there is a semantic difference
+	 * between patterns with wildcards and no wildcards. Not finding a
+	 * non-wildcard file is an error but not finding any matches for a
+	 * wildcard pattern is not.
+	 */
+
+	/* There shouldn't be a need to use escape characters in include paths.
+	 */
+	flags |= GLOB_NOESCAPE;
+
+	/* Mark directories so we can filter them out (also links). */
+	flags |= GLOB_MARK;
+
+	/* If there is no match, glob() doesn't set GLOB_MAGCHAR even if there
+	 * are wildcard characters in the pattern. We need to look for (luckily
+	 * well-known and not likely to change) magic characters ourselves. In a
+	 * perfect world, we could use glob() itself to figure out if there are
+	 * wildcards in the pattern.
+	 */
+	p = (char *)pattern;
+	while (*p) {
+		if (*p == '*' || *p == '?' || *p == '[') {
+			wildcard = true;
+			break;
+		}
+		p++;
+	}
+
+	ret = glob(pattern, flags, NULL, &glob_data);
+	if (ret == 0) {
+		char *path;
+		int len;
+
+		/* reverse alphabetical order due to stack */
+		for (i = glob_data.gl_pathc; i > 0; i--) {
+
+			path = glob_data.gl_pathv[i-1];
+
+			/* ignore directories */
+			len = strlen(path);
+			if (len == 0 || path[len - 1] == '/')
+				continue;
+
+			ret = include_file(scanner, path, loc);
+			if (ret != 0)
+				goto err;
+		}
+
+		globfree(&glob_data);
+
+		/* If no wildcards and we found the file, stop the search (with
+		 * 0). In case of wildcards we need to still continue the
+		 * search, because other matches might be in other include
+		 * directories. We handled the case with a non-wildcard pattern
+		 * and no matches already before.
+		 */
+		 return wildcard ? 2 : 0;
+	} else if (ret == GLOB_NOMATCH) {
+		globfree(&glob_data);
+
+		/* We need to tell the caller whether wildcards were used in
+		 * case of no match, because the semantics for handling the
+		 * cases are different.
+		 */
+		return wildcard ? 2 : 1;
+	}
+
+	erec = error(loc, "Failed to glob the pattern %s", pattern);
+
+	/* intentional fall through */
+err:
+	if (erec)
+		erec_queue(erec, state->msgs);
+	globfree(&glob_data);
+	return -1;
+}
+
+int scanner_read_file(void *scanner, const char *filename,
+		      const struct location *loc)
+{
+	return include_file(scanner, filename, loc);
+}
+
 static bool search_in_include_path(const char *filename)
 {
-	return (strncmp(filename, "./", strlen("./") != 0) &&
-		strncmp(filename, "../", strlen("../") != 0) &&
+	return (strncmp(filename, "./", strlen("./")) != 0 &&
+		strncmp(filename, "../", strlen("../")) != 0 &&
 		filename[0] != '/');
 }
 
-int scanner_include_file(void *scanner, const char *filename,
-			 const struct location *loc)
+int scanner_include_file(struct nft_ctx *nft, void *scanner,
+			 const char *filename, const struct location *loc)
 {
 	struct parser_state *state = yyget_extra(scanner);
 	struct error_record *erec;
 	char buf[PATH_MAX];
-	const char *name = buf;
 	unsigned int i;
-	FILE *f;
+	int ret = -1;
 
-	f = NULL;
 	if (search_in_include_path(filename)) {
 		for (i = 0; i < INCLUDE_PATHS_MAX; i++) {
-			if (include_paths[i] == NULL)
+			if (nft->include_paths[i] == NULL)
 				break;
-			snprintf(buf, sizeof(buf), "%s/%s",
-				 include_paths[i], filename);
-			f = fopen(buf, "r");
-			if (f != NULL)
-				break;
+			ret = snprintf(buf, sizeof(buf), "%s/%s",
+				       nft->include_paths[i], filename);
+			if (ret < 0 || ret >= PATH_MAX) {
+				erec = error(loc, "Too long file path \"%s/%s\"\n",
+					     nft->include_paths[i], filename);
+				erec_queue(erec, state->msgs);
+				return -1;
+			}
+
+			ret = include_glob(scanner, buf, loc);
+
+			/* error was already handled */
+			if (ret == -1)
+				return -1;
+			/* no wildcards and file was processed: break early. */
+			if (ret == 0)
+				return 0;
+
+			/* else 1 (no wildcards) or 2 (wildcards): keep
+			 * searching.
+			 */
 		}
 	} else {
-		f = fopen(filename, "r");
-		name = filename;
-	}
-	if (f == NULL) {
-		erec = error(loc, "Could not open file \"%s\": %s",
-			     filename, strerror(errno));
-		goto err;
+		/* an absolute path (starts with '/') */
+		ret = include_glob(scanner, filename, loc);
 	}
 
-	erec = scanner_push_file(scanner, name, f, loc);
-	if (erec != NULL)
-		goto err;
-	return 0;
+	/* handle the case where no file was found */
+	if (ret == -1)
+		return -1;
+	else if (ret == 0 || ret == 2)
+		return 0;
 
-err:
+	/* 1 means an error, because there are no more include directories to
+	 * search, and the pattern does not have wildcard characters.
+	 */
+	erec = error(loc, "File not found: %s", filename);
 	erec_queue(erec, state->msgs);
 	return -1;
 }
@@ -684,6 +847,7 @@ void scanner_push_buffer(void *scanner, const struct input_descriptor *indesc,
 	state->indesc = &state->indescs[state->indesc_idx++];
 	memcpy(state->indesc, indesc, sizeof(*state->indesc));
 	state->indesc->data = buffer;
+	state->indesc->name = NULL;
 
 	b = yy_scan_string(buffer, scanner);
 	assert(b != NULL);
@@ -696,20 +860,26 @@ void *scanner_init(struct parser_state *state)
 
 	state->indesc = state->indescs;
 
-	yylex_init(&scanner);
-	yyset_extra(state, scanner),
+	yylex_init_extra(state, &scanner);
 	yyset_out(NULL, scanner);
 
 	return scanner;
 }
 
-void scanner_destroy(struct parser_state *scanner)
+void scanner_destroy(void *scanner)
 {
 	struct parser_state *state = yyget_extra(scanner);
 
-	/* Can't free indesc name - locations might still be in use */
-	while (state->indesc_idx--)
+	do {
+		struct input_descriptor *inpdesc =
+			&state->indescs[state->indesc_idx];
+		if (inpdesc && inpdesc->name) {
+			xfree(inpdesc->name);
+			inpdesc->name = NULL;
+			fclose(inpdesc->fp);
+		}
 		yypop_buffer_state(scanner);
+	} while (state->indesc_idx--);
 
 	yylex_destroy(scanner);
 }

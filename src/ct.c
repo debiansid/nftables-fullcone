@@ -16,6 +16,8 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include <netinet/ip.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_conntrack_common.h>
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
@@ -44,7 +46,7 @@ static const struct symbol_table ct_state_tbl = {
 	}
 };
 
-static const struct datatype ct_state_type = {
+const struct datatype ct_state_type = {
 	.type		= TYPE_CT_STATE,
 	.name		= "ct_state",
 	.desc		= "conntrack state",
@@ -63,7 +65,7 @@ static const struct symbol_table ct_dir_tbl = {
 	}
 };
 
-static const struct datatype ct_dir_type = {
+const struct datatype ct_dir_type = {
 	.type		= TYPE_CT_DIR,
 	.name		= "ct_dir",
 	.desc		= "conntrack direction",
@@ -90,7 +92,7 @@ static const struct symbol_table ct_status_tbl = {
 	},
 };
 
-static const struct datatype ct_status_type = {
+const struct datatype ct_status_type = {
 	.type		= TYPE_CT_STATUS,
 	.name		= "ct_status",
 	.desc		= "conntrack status",
@@ -100,11 +102,40 @@ static const struct datatype ct_status_type = {
 	.sym_tbl	= &ct_status_tbl,
 };
 
+static const struct symbol_table ct_events_tbl = {
+	.base		= BASE_HEXADECIMAL,
+	.symbols	= {
+		SYMBOL("new",		1 << IPCT_NEW),
+		SYMBOL("related",	1 << IPCT_RELATED),
+		SYMBOL("destroy",	1 << IPCT_DESTROY),
+		SYMBOL("reply",		1 << IPCT_REPLY),
+		SYMBOL("assured",	1 << IPCT_ASSURED),
+		SYMBOL("protoinfo",	1 << IPCT_PROTOINFO),
+		SYMBOL("helper",	1 << IPCT_HELPER),
+		SYMBOL("mark",		1 << IPCT_MARK),
+		SYMBOL("seqadj",	1 << IPCT_SEQADJ),
+		SYMBOL("secmark",	1 << IPCT_SECMARK),
+		SYMBOL("label",		1 << IPCT_LABEL),
+		SYMBOL_LIST_END
+	},
+};
+
+static const struct datatype ct_event_type = {
+	.type		= TYPE_CT_EVENTBIT,
+	.name		= "ct_event",
+	.desc		= "conntrack event bits",
+	.byteorder	= BYTEORDER_HOST_ENDIAN,
+	.size		= 4 * BITS_PER_BYTE,
+	.basetype	= &bitmask_type,
+	.sym_tbl	= &ct_events_tbl,
+};
+
 static struct symbol_table *ct_label_tbl;
 
 #define CT_LABEL_BIT_SIZE 128
 
-static void ct_label_type_print(const struct expr *expr)
+static void ct_label_type_print(const struct expr *expr,
+				 struct output_ctx *octx)
 {
 	unsigned long bit = mpz_scan1(expr->value, 0);
 	const struct symbolic_constant *s;
@@ -112,11 +143,11 @@ static void ct_label_type_print(const struct expr *expr)
 	for (s = ct_label_tbl->symbols; s->identifier != NULL; s++) {
 		if (bit != s->value)
 			continue;
-		printf("\"%s\"", s->identifier);
+		nft_print(octx, "\"%s\"", s->identifier);
 		return;
 	}
 	/* can happen when connlabel.conf is altered after rules were added */
-	printf("%ld\n", (long)mpz_scan1(expr->value, 0));
+	nft_print(octx, "%ld\n", (long)mpz_scan1(expr->value, 0));
 }
 
 static struct error_record *ct_label_type_parse(const struct expr *sym,
@@ -176,12 +207,12 @@ static const struct datatype ct_label_type = {
 	.parse		= ct_label_type_parse,
 };
 
-static void __init ct_label_table_init(void)
+void ct_label_table_init(void)
 {
 	ct_label_tbl = rt_symbol_table_init(CONNLABEL_CONF);
 }
 
-static void __exit ct_label_table_exit(void)
+void ct_label_table_exit(void)
 {
 	rt_symbol_table_free(ct_label_tbl);
 }
@@ -232,24 +263,49 @@ static const struct ct_template ct_templates[] = {
 					      BYTEORDER_HOST_ENDIAN, 64),
 	[NFT_CT_PKTS]		= CT_TEMPLATE("packets", &integer_type,
 					      BYTEORDER_HOST_ENDIAN, 64),
+	[NFT_CT_AVGPKT]		= CT_TEMPLATE("avgpkt", &integer_type,
+					      BYTEORDER_HOST_ENDIAN, 64),
+	[NFT_CT_ZONE]		= CT_TEMPLATE("zone", &integer_type,
+					      BYTEORDER_HOST_ENDIAN, 16),
+	[NFT_CT_EVENTMASK]	= CT_TEMPLATE("event", &ct_event_type,
+					      BYTEORDER_HOST_ENDIAN, 32),
 };
 
-static void ct_expr_print(const struct expr *expr)
+static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,
+		     struct output_ctx *octx)
 {
 	const struct symbolic_constant *s;
+	const struct proto_desc *desc;
 
-	printf("ct ");
-	if (expr->ct.direction < 0)
+	nft_print(octx, "ct ");
+	if (dir < 0)
 		goto done;
 
 	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
-		if (expr->ct.direction == (int) s->value) {
-			printf("%s ", s->identifier);
+		if (dir == (int)s->value) {
+			nft_print(octx, "%s ", s->identifier);
 			break;
 		}
 	}
+
+	switch (key) {
+	case NFT_CT_SRC: /* fallthrough */
+	case NFT_CT_DST:
+		desc = proto_find_upper(&proto_inet, nfproto);
+		if (desc)
+			printf("%s ", desc->name);
+		break;
+	default:
+		break;
+	}
+
  done:
-	printf("%s", ct_templates[expr->ct.key].token);
+	nft_print(octx, "%s", ct_templates[key].token);
+}
+
+static void ct_expr_print(const struct expr *expr, struct output_ctx *octx)
+{
+	ct_print(expr->ct.key, expr->ct.direction, expr->ct.nfproto, octx);
 }
 
 static bool ct_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -268,21 +324,21 @@ static void ct_expr_clone(struct expr *new, const struct expr *expr)
 static void ct_expr_pctx_update(struct proto_ctx *ctx, const struct expr *expr)
 {
 	const struct expr *left = expr->left, *right = expr->right;
-	const struct proto_desc *base, *desc;
+	const struct proto_desc *base = NULL, *desc;
+	uint32_t nhproto;
 
 	assert(expr->op == OP_EQ);
 
-	switch (left->ct.key) {
-	case NFT_CT_PROTOCOL:
-		base = ctx->protocol[PROTO_BASE_NETWORK_HDR].desc;
-		desc = proto_find_upper(base, mpz_get_uint32(right->value));
+	nhproto = mpz_get_uint32(right->value);
 
-		proto_ctx_update(ctx, PROTO_BASE_TRANSPORT_HDR,
-				 &expr->location, desc);
-		break;
-	default:
-		break;
-	}
+	base = ctx->protocol[left->ct.base].desc;
+	if (!base)
+		return;
+	desc = proto_find_upper(base, nhproto);
+	if (!desc)
+		return;
+
+	proto_ctx_update(ctx, left->ct.base + 1, &expr->location, desc);
 }
 
 static const struct expr_ops ct_expr_ops = {
@@ -294,58 +350,8 @@ static const struct expr_ops ct_expr_ops = {
 	.pctx_update	= ct_expr_pctx_update,
 };
 
-struct error_record *ct_dir_parse(const struct location *loc, const char *str,
-				  int8_t *direction)
-{
-	const struct symbolic_constant *s;
-
-	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
-		if (!strcmp(str, s->identifier)) {
-			*direction = s->value;
-			return NULL;
-		}
-	}
-
-	return error(loc, "Could not parse direction %s", str);
-}
-
-struct error_record *ct_key_parse(const struct location *loc, const char *str,
-				  unsigned int *key)
-{
-	int ret, len, offset = 0;
-	const char *sep = "";
-	unsigned int i;
-	char buf[1024];
-	size_t size;
-
-	for (i = 0; i < array_size(ct_templates); i++) {
-		if (!ct_templates[i].token || strcmp(ct_templates[i].token, str))
-			continue;
-
-		*key = i;
-		return NULL;
-	}
-
-	len = (int)sizeof(buf);
-	size = sizeof(buf);
-
-	for (i = 0; i < array_size(ct_templates); i++) {
-		if (!ct_templates[i].token)
-			continue;
-
-		if (offset)
-			sep = ", ";
-
-		ret = snprintf(buf+offset, len, "%s%s", sep, ct_templates[i].token);
-		SNPRINTF_BUFFER_SIZE(ret, size, len, offset);
-		assert(offset < (int)sizeof(buf));
-	}
-
-	return error(loc, "syntax error, unexpected %s, known keys are %s", str, buf);
-}
-
 struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,
-			   int8_t direction)
+			   int8_t direction, uint8_t nfproto)
 {
 	const struct ct_template *tmpl = &ct_templates[key];
 	struct expr *expr;
@@ -354,10 +360,24 @@ struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,
 			  tmpl->byteorder, tmpl->len);
 	expr->ct.key = key;
 	expr->ct.direction = direction;
+	expr->ct.nfproto = nfproto;
 
 	switch (key) {
+	case NFT_CT_SRC:
+	case NFT_CT_DST:
+		expr->ct.base = PROTO_BASE_NETWORK_HDR;
+		break;
+	case NFT_CT_PROTO_SRC:
+	case NFT_CT_PROTO_DST:
+		expr->ct.base = PROTO_BASE_TRANSPORT_HDR;
+		break;
 	case NFT_CT_PROTOCOL:
 		expr->flags = EXPR_F_PROTOCOL;
+		expr->ct.base = PROTO_BASE_NETWORK_HDR;
+		break;
+	case NFT_CT_L3PROTOCOL:
+		expr->flags = EXPR_F_PROTOCOL;
+		expr->ct.base = PROTO_BASE_LL_HDR;
 		break;
 	default:
 		break;
@@ -370,20 +390,23 @@ void ct_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 {
 	const struct proto_desc *desc;
 
+	desc = ctx->protocol[expr->ct.base].desc;
+
 	switch (expr->ct.key) {
 	case NFT_CT_SRC:
 	case NFT_CT_DST:
-		desc = ctx->protocol[PROTO_BASE_NETWORK_HDR].desc;
-		if (desc == &proto_ip)
+		if (desc == &proto_ip) {
 			expr->dtype = &ipaddr_type;
-		else if (desc == &proto_ip6)
+			expr->ct.nfproto = NFPROTO_IPV4;
+		} else if (desc == &proto_ip6) {
 			expr->dtype = &ip6addr_type;
+			expr->ct.nfproto = NFPROTO_IPV6;
+		}
 
 		expr->len = expr->dtype->size;
 		break;
 	case NFT_CT_PROTO_SRC:
 	case NFT_CT_PROTO_DST:
-		desc = ctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc;
 		if (desc == NULL)
 			break;
 		expr->dtype = &inet_service_type;
@@ -393,10 +416,11 @@ void ct_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 	}
 }
 
-static void ct_stmt_print(const struct stmt *stmt)
+static void ct_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	printf("ct %s set ", ct_templates[stmt->ct.key].token);
-	expr_print(stmt->ct.expr);
+	ct_print(stmt->ct.key, stmt->ct.direction, 0, octx);
+	nft_print(octx, " set ");
+	expr_print(stmt->ct.expr, octx);
 }
 
 static const struct stmt_ops ct_stmt_ops = {
@@ -406,7 +430,7 @@ static const struct stmt_ops ct_stmt_ops = {
 };
 
 struct stmt *ct_stmt_alloc(const struct location *loc, enum nft_ct_keys key,
-			     struct expr *expr)
+			   int8_t direction, struct expr *expr)
 {
 	struct stmt *stmt;
 
@@ -414,12 +438,14 @@ struct stmt *ct_stmt_alloc(const struct location *loc, enum nft_ct_keys key,
 	stmt->ct.key	= key;
 	stmt->ct.tmpl	= &ct_templates[key];
 	stmt->ct.expr	= expr;
+	stmt->ct.direction = direction;
+
 	return stmt;
 }
 
-static void notrack_stmt_print(const struct stmt *stmt)
+static void notrack_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	printf("notrack");
+	nft_print(octx, "notrack");
 }
 
 static const struct stmt_ops notrack_stmt_ops = {
@@ -431,11 +457,4 @@ static const struct stmt_ops notrack_stmt_ops = {
 struct stmt *notrack_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &notrack_stmt_ops);
-}
-
-static void __init ct_init(void)
-{
-	datatype_register(&ct_state_type);
-	datatype_register(&ct_dir_type);
-	datatype_register(&ct_status_type);
 }

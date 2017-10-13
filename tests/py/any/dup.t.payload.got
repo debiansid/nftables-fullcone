@@ -1,9 +1,0 @@
-# dup to mark map { 0x00000001 : lo, 0x00000002 : lo}
-__map%d test-netdev b
-__map%d test-netdev 0
-	element 00000001  : 00000001 0 [end]	element 00000002  : 00000001 0 [end]
-netdev test-netdev ingress 
-  [ meta load mark => reg 1 ]
-  [ lookup reg 1 set __map%d dreg 1 0x0 ]
-  [ dup sreg_dev 1 ]
-

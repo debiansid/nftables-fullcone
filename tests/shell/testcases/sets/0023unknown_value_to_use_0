@@ -1,0 +1,33 @@
+#!/bin/bash
+
+	# This test checks bug identified and fixed in the commit Id "986dea8".
+	# i.e, If in a statement there are  multiple src data then it would be totally ambiguous to decide which value to set.
+
+	# Before this commit 986dea8, nft returns 134 which indicates the bug but after this commit it returns 1.
+	# We don't add this test in python testsuite, because there we can't detect 134 != 1 (returns code stating failure)
+
+declare -a rules=(
+"tcp dport set {1, 2, 3}" "udp dport set {1, 2, 3}"
+"meta pkttype set {unicast, multicast, broadcast}"
+"meta mark set {0xffff, 0xcc}"
+"ct mark set {0x11333, 0x11}" "ct zone set {123, 127}"
+"ct label set {123, 127}"
+"ct event set {new, related, destroy, label}"
+"ether daddr set {01:00:5e:00:01:01, 01:00:5e:00:02:02}"
+"ip saddr set {192.19.1.2, 191.1.22.1}"
+)
+
+$NFT add table t
+$NFT add chain t c
+
+for (( i = 0 ; i < ${#rules[@]} ; i++ ))
+do
+	$NFT add rule t c ${rules[$i]}
+	ret=$?
+	if [ $ret -ne 1 ];
+	then
+		echo "E: failed test: returned $ret instead of 1" >&2
+		exit 1
+	fi
+done
+

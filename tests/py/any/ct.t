@@ -58,6 +58,11 @@ ct mark set 0x11;ok;ct mark set 0x00000011
 ct mark set mark;ok;ct mark set mark
 ct mark set mark map { 1 : 10, 2 : 20, 3 : 30 };ok;ct mark set mark map { 0x00000003 : 0x0000001e, 0x00000002 : 0x00000014, 0x00000001 : 0x0000000a}
 
+ct mark set {0x11333, 0x11};fail
+ct zone set {123, 127};fail
+ct label set {123, 127};fail
+ct event set {new, related, destroy, label};fail
+
 ct expiration 30;ok;ct expiration 30s
 ct expiration 22;ok;ct expiration 22s
 ct expiration != 233;ok;ct expiration != 3m53s
@@ -80,6 +85,9 @@ ct original bytes \> 100000;ok;ct original bytes > 100000
 ct reply packets \< 100;ok;ct reply packets < 100
 ct bytes \> 100000;ok;ct bytes > 100000
 
+ct avgpkt \> 200;ok;ct avgpkt > 200
+ct original avgpkt \< 500;ok;ct original avgpkt < 500
+
 # bogus direction
 ct both bytes gt 1;fail
 # nonsensical
@@ -88,14 +96,38 @@ ct bytes original reply;fail
 # missing direction
 ct saddr 1.2.3.4;fail
 
+# wrong base (ip6 but ipv4 address given)
+meta nfproto ipv6 ct original saddr 1.2.3.4;fail
+
 # direction, but must be used without
 ct original mark 42;fail
 # swapped key and direction
 ct mark original;fail
 
+ct event set new;ok
+ct event set new or related or destroy or foobar;fail
+ct event set 'new | related | destroy | label';ok;ct event set new,related,destroy,label
+ct event set new,related,destroy,label;ok
+ct event set new,destroy;ok
+ct event set 1;ok;ct event set new
+ct event set 0x0;ok
+
 ct label 127;ok
 ct label set 127;ok
 ct label 128;fail
+
+ct zone 0;ok
+ct zone 23;ok
+ct zone 65536;fail
+ct both zone 1;fail
+ct original zone 1;ok
+ct reply zone 1;ok
+
+ct zone set 1;ok
+ct original zone set 1;ok
+ct reply zone set 1;ok
+ct zone set mark map { 1 : 1,  2 : 2 };ok;ct zone set mark map { 0x00000001 : 1, 0x00000002 : 2}
+ct both zone set 1;fail
 
 ct invalid;fail
 ct invalid original;fail

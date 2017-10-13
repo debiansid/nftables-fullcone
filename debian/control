@@ -26,14 +26,16 @@ Architecture: linux-any
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Program to control packet filtering rules by Netfilter project
- These are the user-space administration tools for the Linux
- kernel's netfilter and nftables. netfilter and nftables provide
- a framework for stateful and stateless packet filtering, network
- and port address translation, and other IP packet manipulation.
- The framework is the successor to iptables.
+ This software provides an in-kernel packet classification framework that is
+ based on a network-specific Virtual Machine (VM) and the nft userspace
+ command line tool. The nftables framework reuses the existing Netfilter
+ subsystems such as the existing hook infrastructure, the connection tracking
+ system, NAT, userspace queueing and logging subsystem.
  .
- Netfilter and nftables are used in applications such as Internet
- connection sharing, firewalls, IP accounting, transparent proxying,
- advanced routing and traffic control.
+ nftables replaces the old popular iptables, ip6tables, arptables and ebtables.
  .
- A Linux kernel >= 3.13 is required. However, >= 4.10 is recommended.
+ Netfilter software and nftables in particular are used in applications such
+ as Internet connection sharing, firewalls, IP accounting, transparent
+ proxying, advanced routing and traffic control.
+ .
+ A Linux kernel >= 3.13 is required. However, >= 4.14 is recommended.

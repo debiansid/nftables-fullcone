@@ -307,8 +307,8 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 		return netlink_error(ctx, loc,
 				     "Lookup expression has no left hand side");
 
-	if (left->len < set->keylen) {
-		left = netlink_parse_concat_expr(ctx, loc, sreg, set->keylen);
+	if (left->len < set->key->len) {
+		left = netlink_parse_concat_expr(ctx, loc, sreg, set->key->len);
 		if (left == NULL)
 			return;
 	}
@@ -498,20 +498,40 @@ static void netlink_parse_exthdr(struct netlink_parse_ctx *ctx,
 				 const struct location *loc,
 				 const struct nftnl_expr *nle)
 {
+	uint32_t offset, len, flags;
 	enum nft_registers dreg;
-	uint32_t offset, len;
+	enum nft_exthdr_op op;
 	uint8_t type;
 	struct expr *expr;
 
 	type   = nftnl_expr_get_u8(nle, NFTNL_EXPR_EXTHDR_TYPE);
 	offset = nftnl_expr_get_u32(nle, NFTNL_EXPR_EXTHDR_OFFSET) * BITS_PER_BYTE;
 	len    = nftnl_expr_get_u32(nle, NFTNL_EXPR_EXTHDR_LEN) * BITS_PER_BYTE;
+	op     = nftnl_expr_get_u32(nle, NFTNL_EXPR_EXTHDR_OP);
+	flags  = nftnl_expr_get_u32(nle, NFTNL_EXPR_EXTHDR_FLAGS);
 
 	expr = exthdr_expr_alloc(loc, NULL, 0);
-	exthdr_init_raw(expr, type, offset, len);
+	exthdr_init_raw(expr, type, offset, len, op, flags);
 
-	dreg = netlink_parse_register(nle, NFTNL_EXPR_EXTHDR_DREG);
-	netlink_set_register(ctx, dreg, expr);
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_EXTHDR_DREG)) {
+		dreg = netlink_parse_register(nle, NFTNL_EXPR_EXTHDR_DREG);
+		netlink_set_register(ctx, dreg, expr);
+	} else if (nftnl_expr_is_set(nle, NFTNL_EXPR_EXTHDR_SREG)) {
+		enum nft_registers sreg;
+		struct stmt *stmt;
+		struct expr *val;
+
+		sreg = netlink_parse_register(nle, NFTNL_EXPR_EXTHDR_SREG);
+		val = netlink_get_register(ctx, loc, sreg);
+		if (val == NULL)
+			return netlink_error(ctx, loc,
+					     "exthdr statement has no expression");
+
+		expr_set_type(val, expr->dtype, expr->byteorder);
+
+		stmt = exthdr_stmt_alloc(loc, expr, val);
+		list_add_tail(&stmt->list, &ctx->rule->stmts);
+	}
 }
 
 static void netlink_parse_hash(struct netlink_parse_ctx *ctx,
@@ -521,26 +541,34 @@ static void netlink_parse_hash(struct netlink_parse_ctx *ctx,
 	enum nft_registers sreg, dreg;
 	struct expr *expr, *hexpr;
 	uint32_t mod, seed, len, offset;
+	enum nft_hash_types type;
+	bool seed_set;
 
-	sreg = netlink_parse_register(nle, NFTNL_EXPR_HASH_SREG);
-	hexpr = netlink_get_register(ctx, loc, sreg);
-	if (hexpr == NULL)
-		return netlink_error(ctx, loc,
-				     "hash statement has no expression");
-
+	type = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_TYPE);
 	offset = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_OFFSET);
+	seed_set = nftnl_expr_is_set(nle, NFTNL_EXPR_HASH_SEED);
 	seed = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_SEED);
 	mod  = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_MODULUS);
-	len = nftnl_expr_get_u32(nle, NFTNL_EXPR_HASH_LEN) * BITS_PER_BYTE;
 
-	if (hexpr->len < len) {
-		hexpr = netlink_parse_concat_expr(ctx, loc, sreg, len);
+	expr = hash_expr_alloc(loc, mod, seed_set, seed, offset, type);
+
+	if (type != NFT_HASH_SYM) {
+		sreg = netlink_parse_register(nle, NFTNL_EXPR_HASH_SREG);
+		hexpr = netlink_get_register(ctx, loc, sreg);
+
 		if (hexpr == NULL)
-			return;
+			return
+			netlink_error(ctx, loc,
+				      "hash statement has no expression");
+		len = nftnl_expr_get_u32(nle,
+					 NFTNL_EXPR_HASH_LEN) * BITS_PER_BYTE;
+		if (hexpr->len < len) {
+			hexpr = netlink_parse_concat_expr(ctx, loc, sreg, len);
+			if (hexpr == NULL)
+				return;
+		}
+		expr->hash.expr = hexpr;
 	}
-
-	expr = hash_expr_alloc(loc, mod, seed, offset);
-	expr->hash.expr = hexpr;
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_HASH_DREG);
 	netlink_set_register(ctx, dreg, expr);
@@ -657,6 +685,7 @@ static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 	uint32_t key;
 	struct stmt *stmt;
 	struct expr *expr;
+	int8_t dir = -1;
 
 	sreg = netlink_parse_register(nle, NFTNL_EXPR_CT_SREG);
 	expr = netlink_get_register(ctx, loc, sreg);
@@ -664,8 +693,11 @@ static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 		return netlink_error(ctx, loc,
 				     "ct statement has no expression");
 
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_CT_DIR))
+		dir = nftnl_expr_get_u8(nle, NFTNL_EXPR_CT_DIR);
+
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_CT_KEY);
-	stmt = ct_stmt_alloc(loc, key, expr);
+	stmt = ct_stmt_alloc(loc, key, dir, expr);
 	expr_set_type(expr, stmt->ct.tmpl->dtype, stmt->ct.tmpl->byteorder);
 
 	ctx->stmt = stmt;
@@ -684,7 +716,7 @@ static void netlink_parse_ct_expr(struct netlink_parse_ctx *ctx,
 		dir = nftnl_expr_get_u8(nle, NFTNL_EXPR_CT_DIR);
 
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_CT_KEY);
-	expr = ct_expr_alloc(loc, key, dir);
+	expr = ct_expr_alloc(loc, key, dir, NFPROTO_UNSPEC);
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_CT_DREG);
 	netlink_set_register(ctx, dreg, expr);
@@ -777,6 +809,8 @@ static void netlink_parse_quota(struct netlink_parse_ctx *ctx,
 
 	stmt = quota_stmt_alloc(loc);
 	stmt->quota.bytes = nftnl_expr_get_u64(nle, NFTNL_EXPR_QUOTA_BYTES);
+	stmt->quota.used =
+		nftnl_expr_get_u64(nle, NFTNL_EXPR_QUOTA_CONSUMED);
 	stmt->quota.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_QUOTA_FLAGS);
 
 	ctx->stmt = stmt;
@@ -1088,8 +1122,8 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 		return netlink_error(ctx, loc,
 				     "Dynset statement has no key expression");
 
-	if (expr->len < set->keylen) {
-		expr = netlink_parse_concat_expr(ctx, loc, sreg, set->keylen);
+	if (expr->len < set->key->len) {
+		expr = netlink_parse_concat_expr(ctx, loc, sreg, set->key->len);
 		if (expr == NULL)
 			return;
 	}
@@ -1120,6 +1154,64 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 		stmt->set.key   = expr;
 	}
 
+	ctx->stmt = stmt;
+}
+
+static void netlink_parse_objref(struct netlink_parse_ctx *ctx,
+				 const struct location *loc,
+				 const struct nftnl_expr *nle)
+{
+	uint32_t type = nftnl_expr_get_u32(nle, NFTNL_EXPR_OBJREF_IMM_TYPE);
+	struct expr *expr;
+	struct stmt *stmt;
+
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_OBJREF_IMM_NAME)) {
+		struct nft_data_delinearize nld;
+
+		type = nftnl_expr_get_u32(nle, NFTNL_EXPR_OBJREF_IMM_TYPE);
+		nld.value = nftnl_expr_get(nle, NFTNL_EXPR_OBJREF_IMM_NAME,
+					   &nld.len);
+		expr = netlink_alloc_value(&netlink_location, &nld);
+		expr->dtype = &string_type;
+		expr->byteorder = BYTEORDER_HOST_ENDIAN;
+	} else if (nftnl_expr_is_set(nle, NFTNL_EXPR_OBJREF_SET_SREG)) {
+		struct expr *left, *right;
+		enum nft_registers sreg;
+		const char *name;
+		struct set *set;
+
+		name = nftnl_expr_get_str(nle, NFTNL_EXPR_OBJREF_SET_NAME);
+		set  = set_lookup(ctx->table, name);
+		if (set == NULL)
+			return netlink_error(ctx, loc,
+					     "Unknown set '%s' in objref expression",
+					     name);
+
+		sreg = netlink_parse_register(nle, NFTNL_EXPR_OBJREF_SET_SREG);
+		left = netlink_get_register(ctx, loc, sreg);
+		if (left == NULL)
+			return netlink_error(ctx, loc,
+					     "objref expression has no left hand side");
+
+		if (left->len < set->key->len) {
+			left = netlink_parse_concat_expr(ctx, loc, sreg, set->key->len);
+			if (left == NULL)
+				return;
+		}
+
+		right = set_ref_expr_alloc(loc, set);
+		expr = map_expr_alloc(loc, left, right);
+		expr_set_type(expr, &string_type, BYTEORDER_HOST_ENDIAN);
+		type = set->objtype;
+	} else {
+		netlink_error(ctx, loc, "unknown objref expression type %u",
+			      type);
+		return;
+	}
+
+	stmt = objref_stmt_alloc(loc);
+	stmt->objref.type = type;
+	stmt->objref.expr = expr;
 	ctx->stmt = stmt;
 }
 
@@ -1154,10 +1246,12 @@ static const struct {
 	{ .name = "fwd",	.parse = netlink_parse_fwd },
 	{ .name = "target",	.parse = netlink_parse_target },
 	{ .name = "match",	.parse = netlink_parse_match },
+	{ .name = "objref",	.parse = netlink_parse_objref },
 	{ .name = "quota",	.parse = netlink_parse_quota },
 	{ .name = "numgen",	.parse = netlink_parse_numgen },
 	{ .name = "hash",	.parse = netlink_parse_hash },
 	{ .name = "fib",	.parse = netlink_parse_fib },
+	{ .name = "tcpopt",	.parse = netlink_parse_exthdr },
 };
 
 static int netlink_parse_expr(const struct nftnl_expr *nle,
@@ -1198,12 +1292,13 @@ static int netlink_parse_rule_expr(struct nftnl_expr *nle, void *arg)
 }
 
 struct stmt *netlink_parse_set_expr(const struct set *set,
+				    const struct nft_cache *cache,
 				    const struct nftnl_expr *nle)
 {
 	struct netlink_parse_ctx ctx, *pctx = &ctx;
 
 	pctx->rule = rule_alloc(&netlink_location, &set->handle);
-	pctx->table = table_lookup(&set->handle);
+	pctx->table = table_lookup(&set->handle, cache);
 	assert(pctx->table != NULL);
 
 	if (netlink_parse_expr(nle, pctx) < 0)
@@ -1212,33 +1307,6 @@ struct stmt *netlink_parse_set_expr(const struct set *set,
 }
 
 static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp);
-
-static void integer_type_postprocess(struct expr *expr)
-{
-	struct expr *i;
-
-	switch (expr->ops->type) {
-	case EXPR_VALUE:
-		if (expr->byteorder == BYTEORDER_HOST_ENDIAN) {
-			uint32_t len = div_round_up(expr->len, BITS_PER_BYTE);
-
-			mpz_switch_byteorder(expr->value, len);
-		}
-		break;
-	case EXPR_SET_REF:
-		list_for_each_entry(i, &expr->set->init->expressions, list) {
-			expr_set_type(i, expr->dtype, expr->byteorder);
-			integer_type_postprocess(i);
-		}
-		break;
-	case EXPR_SET_ELEM:
-		expr_set_type(expr->key, expr->dtype, expr->byteorder);
-		integer_type_postprocess(expr->key);
-		break;
-	default:
-		break;
-	}
-}
 
 static void payload_match_expand(struct rule_pp_ctx *ctx,
 				 struct expr *expr,
@@ -1282,7 +1350,7 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 			payload_dependency_store(&ctx->pdctx, nstmt, base - stacked);
 		} else {
 			payload_dependency_kill(&ctx->pdctx, nexpr->left);
-			if (left->flags & EXPR_F_PROTOCOL)
+			if (expr->op == OP_EQ && left->flags & EXPR_F_PROTOCOL)
 				payload_dependency_store(&ctx->pdctx, nstmt, base - stacked);
 		}
 	}
@@ -1317,19 +1385,34 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 	}
 }
 
-static void ct_meta_common_postprocess(const struct expr *expr)
+static void ct_meta_common_postprocess(struct rule_pp_ctx *ctx,
+				       const struct expr *expr,
+				       enum proto_bases base)
 {
 	const struct expr *left = expr->left;
 	struct expr *right = expr->right;
 
 	switch (expr->op) {
+	case OP_EQ:
+		if (expr->right->ops->type == EXPR_RANGE)
+			break;
+
+		expr->left->ops->pctx_update(&ctx->pctx, expr);
+
+		if (ctx->pdctx.pbase == PROTO_BASE_INVALID &&
+		    left->flags & EXPR_F_PROTOCOL) {
+			payload_dependency_store(&ctx->pdctx, ctx->stmt, base);
+		} else if (ctx->pdctx.pbase < PROTO_BASE_TRANSPORT_HDR) {
+			__payload_dependency_kill(&ctx->pdctx, base);
+			if (left->flags & EXPR_F_PROTOCOL)
+				payload_dependency_store(&ctx->pdctx, ctx->stmt, base);
+		}
+		break;
 	case OP_NEQ:
 		if (right->ops->type != EXPR_SET && right->ops->type != EXPR_SET_REF)
 			break;
 	case OP_LOOKUP:
 		expr_set_type(right, left->dtype, left->byteorder);
-		if (right->dtype == &integer_type)
-			integer_type_postprocess(right);
 		break;
 
 	default:
@@ -1340,40 +1423,17 @@ static void ct_meta_common_postprocess(const struct expr *expr)
 static void meta_match_postprocess(struct rule_pp_ctx *ctx,
 				   const struct expr *expr)
 {
-	struct expr *left = expr->left;
+	const struct expr *left = expr->left;
 
-	switch (expr->op) {
-	case OP_EQ:
-		if (expr->right->ops->type == EXPR_RANGE)
-			break;
-
-		expr->left->ops->pctx_update(&ctx->pctx, expr);
-
-		if (ctx->pdctx.pbase == PROTO_BASE_INVALID &&
-		    left->flags & EXPR_F_PROTOCOL)
-			payload_dependency_store(&ctx->pdctx, ctx->stmt,
-						 left->meta.base);
-		break;
-	default:
-		ct_meta_common_postprocess(expr);
-		break;
-	}
+	ct_meta_common_postprocess(ctx, expr, left->meta.base);
 }
 
 static void ct_match_postprocess(struct rule_pp_ctx *ctx,
 				 const struct expr *expr)
 {
-	switch (expr->op) {
-	case OP_EQ:
-		if (expr->right->ops->type == EXPR_RANGE)
-			break;
+	const struct expr *left = expr->left;
 
-		expr->left->ops->pctx_update(&ctx->pctx, expr);
-		break;
-	default:
-		ct_meta_common_postprocess(expr);
-		break;
-	}
+	ct_meta_common_postprocess(ctx, expr, left->ct.base);
 }
 
 /* Convert a bitmask to a prefix length */
@@ -1711,10 +1771,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	}
 	case EXPR_UNARY:
 		expr_postprocess(ctx, &expr->arg);
-		expr_set_type(expr->arg, expr->arg->dtype, !expr->arg->byteorder);
-
-		*exprp = expr_get(expr->arg);
-		expr_free(expr);
+		expr_set_type(expr, expr->arg->dtype, !expr->arg->byteorder);
 		break;
 	case EXPR_BINOP:
 		expr_postprocess(ctx, &expr->left);
@@ -1777,7 +1834,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		expr_postprocess(ctx, &expr->key);
 		break;
 	case EXPR_EXTHDR:
-		__payload_dependency_kill(&ctx->pdctx, PROTO_BASE_NETWORK_HDR);
+		exthdr_dependency_kill(&ctx->pdctx, expr);
 		break;
 	case EXPR_SET_REF:
 	case EXPR_META:
@@ -1787,7 +1844,8 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_FIB:
 		break;
 	case EXPR_HASH:
-		expr_postprocess(ctx, &expr->hash.expr);
+		if (expr->hash.expr)
+			expr_postprocess(ctx, &expr->hash.expr);
 		break;
 	case EXPR_CT:
 		ct_expr_update_type(&ctx->pctx, expr);
@@ -1807,10 +1865,16 @@ static void stmt_reject_postprocess(struct rule_pp_ctx *rctx)
 	case NFPROTO_IPV4:
 		stmt->reject.family = rctx->pctx.family;
 		stmt->reject.expr->dtype = &icmp_code_type;
+		if (stmt->reject.type == NFT_REJECT_TCP_RST)
+			__payload_dependency_kill(&rctx->pdctx,
+						  PROTO_BASE_TRANSPORT_HDR);
 		break;
 	case NFPROTO_IPV6:
 		stmt->reject.family = rctx->pctx.family;
 		stmt->reject.expr->dtype = &icmpv6_code_type;
+		if (stmt->reject.type == NFT_REJECT_TCP_RST)
+			__payload_dependency_kill(&rctx->pdctx,
+						  PROTO_BASE_TRANSPORT_HDR);
 		break;
 	case NFPROTO_INET:
 		if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH) {
@@ -2104,18 +2168,41 @@ static void stmt_payload_postprocess(struct rule_pp_ctx *ctx)
 	expr_postprocess(ctx, &stmt->payload.val);
 }
 
+/*
+ * We can only remove payload dependencies if they occur without
+ * a statment with side effects in between.
+ *
+ * For instance:
+ * 'ip protocol tcp tcp dport 22 counter' is same as
+ * 'tcp dport 22 counter'.
+ *
+ * 'ip protocol tcp counter tcp dport 22' cannot be written as
+ * 'counter tcp dport 22' (that would be counter ip protocol tcp, but
+ * that counts every packet, not just ip/tcp).
+ */
+static void
+rule_maybe_reset_payload_deps(struct payload_dep_ctx *pdctx, enum stmt_types t)
+{
+	if (t == STMT_EXPRESSION)
+		return;
+
+	payload_dependency_reset(pdctx);
+}
+
 static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *rule)
 {
 	struct rule_pp_ctx rctx;
 	struct stmt *stmt, *next;
 
 	memset(&rctx, 0, sizeof(rctx));
-	proto_ctx_init(&rctx.pctx, rule->handle.family);
+	proto_ctx_init(&rctx.pctx, rule->handle.family, ctx->debug_mask);
 
 	list_for_each_entry_safe(stmt, next, &rule->stmts, list) {
+		enum stmt_types type = stmt->ops->type;
+
 		rctx.stmt = stmt;
 
-		switch (stmt->ops->type) {
+		switch (type) {
 		case STMT_EXPRESSION:
 			stmt_expr_postprocess(&rctx);
 			break;
@@ -2130,8 +2217,13 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 				expr_postprocess(&rctx, &stmt->meta.expr);
 			break;
 		case STMT_CT:
-			if (stmt->ct.expr != NULL)
+			if (stmt->ct.expr != NULL) {
 				expr_postprocess(&rctx, &stmt->ct.expr);
+
+				if (stmt->ct.expr->ops->type == EXPR_BINOP)
+					stmt->ct.expr = binop_tree_to_list(NULL,
+									   stmt->ct.expr);
+			}
 			break;
 		case STMT_NAT:
 			if (stmt->nat.addr != NULL)
@@ -2162,10 +2254,16 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 		case STMT_XT:
 			stmt_xt_postprocess(&rctx, stmt, rule);
 			break;
+		case STMT_OBJREF:
+			expr_postprocess(&rctx, &stmt->objref.expr);
+			break;
 		default:
 			break;
 		}
+
 		rctx.pdctx.prev = rctx.stmt;
+
+		rule_maybe_reset_payload_deps(&rctx.pdctx, type);
 	}
 }
 
@@ -2209,6 +2307,7 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 
 	memset(&_ctx, 0, sizeof(_ctx));
 	_ctx.msgs = ctx->msgs;
+	_ctx.debug_mask = ctx->debug_mask;
 
 	memset(&h, 0, sizeof(h));
 	h.family = nftnl_rule_get_u32(nlr, NFTNL_RULE_FAMILY);
@@ -2220,7 +2319,7 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 		h.position.id = nftnl_rule_get_u64(nlr, NFTNL_RULE_POSITION);
 
 	pctx->rule = rule_alloc(&netlink_location, &h);
-	pctx->table = table_lookup(&h);
+	pctx->table = table_lookup(&h, ctx->cache);
 	assert(pctx->table != NULL);
 
 	if (nftnl_rule_is_set(nlr, NFTNL_RULE_USERDATA)) {

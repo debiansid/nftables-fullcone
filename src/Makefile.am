@@ -16,7 +16,7 @@ AM_CFLAGS = -Wall								\
 	    -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations	\
 	    -Wdeclaration-after-statement -Wsign-compare -Winit-self		\
 	    -Wformat-nonliteral -Wformat-security -Wmissing-format-attribute	\
-	    -Wcast-align -Wundef -Wbad-function-cast
+	    -Wcast-align -Wundef -Wbad-function-cast				\
 	    -Waggregate-return -Wunused -Wwrite-strings
 
 
@@ -53,7 +53,9 @@ nft_SOURCES =	main.c				\
 		mnl.c				\
 		iface.c				\
 		services.c			\
+		mergesort.c			\
 		scanner.l			\
+		tcpopt.c			\
 		parser_bison.y
 
 if BUILD_CLI

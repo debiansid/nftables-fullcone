@@ -85,6 +85,8 @@ ip checksum != { 33, 55, 67, 88};ok
 ip checksum { 33-55};ok
 ip checksum != { 33-55};ok
 
+ip saddr set {192.19.1.2, 191.1.22.1};fail
+
 ip saddr 192.168.2.0/24;ok
 ip saddr != 192.168.2.0/24;ok
 ip saddr 192.168.3.1 ip daddr 192.168.3.100;ok
@@ -125,6 +127,8 @@ iif "lo" ip checksum set 0;ok
 iif "lo" ip id set 0;ok
 iif "lo" ip ecn set 1;ok;iif "lo" ip ecn set ect1
 iif "lo" ip ecn set ce;ok
+iif "lo" ip ttl set 23;ok
+iif "lo" ip protocol set 1;ok
 
 iif "lo" ip dscp set af23;ok
 iif "lo" ip dscp set cs0;ok

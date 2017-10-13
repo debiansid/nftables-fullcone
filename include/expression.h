@@ -157,7 +157,8 @@ struct expr_ops {
 	void			(*set_type)(const struct expr *expr,
 					    const struct datatype *dtype,
 					    enum byteorder byteorder);
-	void			(*print)(const struct expr *expr);
+	void			(*print)(const struct expr *expr,
+					 struct output_ctx *octx);
 	bool			(*cmp)(const struct expr *e1,
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
@@ -171,12 +172,14 @@ struct expr_ops {
  * @EXPR_F_SINGLETON:		singleton (implies primary and constant)
  * @EXPR_F_PROTOCOL:		expressions describes upper layer protocol
  * @EXPR_F_INTERVAL_END:	set member ends an open interval
+ * @EXPR_F_BOOLEAN:		expression is boolean (set by relational expr on LHS)
  */
 enum expr_flags {
 	EXPR_F_CONSTANT		= 0x1,
 	EXPR_F_SINGLETON	= 0x2,
 	EXPR_F_PROTOCOL		= 0x4,
 	EXPR_F_INTERVAL_END	= 0x8,
+	EXPR_F_BOOLEAN		= 0x10,
 };
 
 #include <payload.h>
@@ -253,6 +256,7 @@ struct expr {
 			uint64_t		expiration;
 			const char		*comment;
 			struct stmt		*stmt;
+			uint32_t		elem_flags;
 		};
 		struct {
 			/* EXPR_UNARY */
@@ -281,6 +285,8 @@ struct expr {
 			const struct exthdr_desc	*desc;
 			const struct proto_hdr_template	*tmpl;
 			unsigned int			offset;
+			enum nft_exthdr_op		op;
+			unsigned int			flags;
 		} exthdr;
 		struct {
 			/* EXPR_META */
@@ -294,7 +300,9 @@ struct expr {
 		struct {
 			/* EXPR_CT */
 			enum nft_ct_keys	key;
+			enum proto_bases	base;
 			int8_t			direction;
+			uint8_t			nfproto;
 		} ct;
 		struct {
 			/* EXPR_NUMGEN */
@@ -306,8 +314,10 @@ struct expr {
 			/* EXPR_HASH */
 			struct expr		*expr;
 			uint32_t		mod;
+			bool			seed_set;
 			uint32_t		seed;
 			uint32_t		offset;
+			enum nft_hash_types	type;
 		} hash;
 		struct {
 			/* EXPR_FIB */
@@ -324,9 +334,9 @@ extern struct expr *expr_alloc(const struct location *loc,
 extern struct expr *expr_clone(const struct expr *expr);
 extern struct expr *expr_get(struct expr *expr);
 extern void expr_free(struct expr *expr);
-extern void expr_print(const struct expr *expr);
+extern void expr_print(const struct expr *expr, struct output_ctx *octx);
 extern bool expr_cmp(const struct expr *e1, const struct expr *e2);
-extern void expr_describe(const struct expr *expr);
+extern void expr_describe(const struct expr *expr, struct output_ctx *octx);
 
 extern const struct datatype *expr_basetype(const struct expr *expr);
 extern void expr_set_type(struct expr *expr, const struct datatype *dtype,
@@ -396,14 +406,17 @@ extern struct expr *range_expr_alloc(const struct location *loc,
 
 extern void compound_expr_add(struct expr *compound, struct expr *expr);
 extern void compound_expr_remove(struct expr *compound, struct expr *expr);
+extern void list_expr_sort(struct list_head *head);
 
 extern struct expr *concat_expr_alloc(const struct location *loc);
 
 extern struct expr *list_expr_alloc(const struct location *loc);
 
-extern struct expr *set_expr_alloc(const struct location *loc);
+extern struct expr *set_expr_alloc(const struct location *loc,
+				   const struct set *set);
 extern int set_to_intervals(struct list_head *msgs, struct set *set,
-			    struct expr *init, bool add);
+			    struct expr *init, bool add,
+			    unsigned int debug_mask);
 extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,

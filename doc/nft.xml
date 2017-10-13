@@ -45,34 +45,66 @@ vi:ts=4 sw=4
 	<refsynopsisdiv>
 		<cmdsynopsis>
 			<command>nft</command>
-			<arg choice="opt">
-				<option>-n | --numeric</option>
-			</arg>
-			<arg choice="opt">
-				<option>[-I | --includepath]</option>
+			<group>
+				<arg><option>-n</option></arg>
+				<arg><option>--numeric</option></arg>
+			</group>
+			<group>
+				<arg><option>-N</option></arg>
+				<arg><option>--reversedns</option></arg>
+			</group>
+			<group>
+				<arg><option>-s</option></arg>
+				<arg><option>--stateless</option></arg>
+			</group>
+			<group>
+				<arg><option>-c</option></arg>
+				<arg><option>--check</option></arg>
+			</group>
+			<group>
+				<arg><option>-a</option></arg>
+				<arg><option>--handle</option></arg>
+			</group>
+			<group>
+				<arg><option>-e</option></arg>
+				<arg><option>--echo</option></arg>
+			</group>
+			<arg>
+				<group choice="req">
+					<arg><option>-I</option></arg>
+					<arg><option>--includepath</option></arg>
+				</group>
 				<replaceable>directory</replaceable>
 			</arg>
 			<group>
-				<arg choice="opt">
-					<option>[-f | --file]</option>
+				<arg>
+					<group choice="req">
+						<arg><option>-f</option></arg>
+						<arg><option>--file</option></arg>
+					</group>
 					<replaceable>filename</replaceable>
 				</arg>
-				<arg choice="opt">
-					<option>[-i | --interactive]</option>
+				<arg>
+					<group choice="req">
+						<arg><option>-i</option></arg>
+						<arg><option>--interactive</option></arg>
+					</group>
 				</arg>
-				<arg choice="opt" rep="repeat">
+				<arg rep="repeat">
 					<replaceable>cmd</replaceable>
 				</arg>
 			</group>
 		</cmdsynopsis>
 		<cmdsynopsis>
 			<command>nft</command>
-			<arg choice="opt">
-				<option>-h | --help</option>
-			</arg>
-			<arg choice="opt">
-				<option>-v | --version</option>
-			</arg>
+			<group>
+				<arg><option>-h</option></arg>
+				<arg><option>--help</option></arg>
+			</group>
+			<group>
+				<arg><option>-v</option></arg>
+				<arg><option>--version</option></arg>
+			</group>
 		</cmdsynopsis>
 	</refsynopsisdiv>
 
@@ -119,7 +151,23 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
-				<term><option>-N</option></term>
+				<term><option>-s, --stateless</option></term>
+				<listitem>
+					<para>
+						Omit stateful information of rules and stateful objects.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>-c, --check</option></term>
+				<listitem>
+					<para>
+						Check commands validity without actually applying the changes.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>-N, --reversedns</option></term>
 				<listitem>
 					<para>
 						Translate IP addresses to names. Usually requires network traffic for DNS lookup.
@@ -135,10 +183,20 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
+				<term><option>-e, --echo</option></term>
+				<listitem>
+					<para>
+						When inserting items into the ruleset using <command>add</command>,
+						<command>insert</command> or <command>replace</command> commands,
+						print notifications just like <command>nft monitor</command>.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
 				<term><option>-I, --includepath <replaceable>directory</replaceable></option></term>
 				<listitem>
 					<para>
-						Add the directory <replaceable>directory</replaceable> to the list of directories to be searched for included files.
+						Add the directory <replaceable>directory</replaceable> to the list of directories to be searched for included files. This option may be specified multiple times.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -196,7 +254,24 @@ vi:ts=4 sw=4
 			<para>
 				Other files can be included by using the <command>include</command> statement.
 				The directories to be searched for include files can be specified using
-				the <option>-I/--includepath</option> option.
+				the <option>-I/--includepath</option> option. You can override this behaviour
+				either by prepending ./ to your path to force inclusion of files located in the
+				current working directory (ie. relative path) or / for file location expressed
+				as an absolute path.
+			</para>
+			<para>
+				If -I/--includepath is not specified, then nft relies on the default directory
+				that is specified at compile time. You can retrieve this default directory via
+				-h/--help option.
+			</para>
+			<para>
+				Include statements support the usual shell wildcard symbols
+				(<literal>*,?,[]</literal>). Having no matches for an include statement is not
+				an error, if wildcard symbols are used in the include statement. This allows having
+				potentially empty include directories for statements like
+				<literal>include "/etc/firewall/rules/*"</literal>. The wildcard matches are
+				loaded in alphabetical order. Files beginning with dot (<literal>.</literal>) are
+				not matched by include statements.
 			</para>
 		</refsect2>
 		<refsect2>
@@ -265,7 +340,7 @@ filter input iif $int_ifs accept
 					<term><option>arp</option></term>
 					<listitem>
 						<para>
-							ARP address family, handling packets vi 
+							ARP address family, handling IPv4 ARP packets.
 						</para>
 					</listitem>
 				</varlistentry>
@@ -390,6 +465,9 @@ filter input iif $int_ifs accept
 			<para>
 				The bridge address family handles ethernet packets traversing bridge devices.
 			</para>
+			<para>
+				The list of supported hooks is identical to IPv4/IPv6/Inet address families above.
+			</para>
 		</refsect2>
 		<refsect2>
 			<title>Netdev address family</title>
@@ -426,6 +504,78 @@ filter input iif $int_ifs accept
 	</refsect1>
 
 	<refsect1>
+		<title>Ruleset</title>
+		<para>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>list</arg>
+					<arg>flush</arg>
+				</group>
+				<command>ruleset</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<arg choice="req">export</arg>
+				<arg choice="opt"><command>ruleset</command></arg>
+				<arg choice="req"><replaceable>format</replaceable></arg>
+			</cmdsynopsis>
+		</para>
+
+		<para>
+			The <command>ruleset</command> keyword is used to identify the whole
+			set of tables, chains, etc. currently in place in kernel. The
+			following <command>ruleset</command> commands exist:
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>list</option></term>
+				<listitem>
+					<para>
+						Print the ruleset in human-readable format.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>flush</option></term>
+				<listitem>
+					<para>
+						Clear the whole ruleset. Note that unlike iptables, this
+						will remove all tables and whatever they contain,
+						effectively leading to an empty ruleset - no packet
+						filtering will happen anymore, so the kernel accepts any
+						valid packet it receives.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>export</option></term>
+				<listitem>
+					<para>
+						Print the ruleset in machine readable format. The
+						mandatory <replaceable>format</replaceable> parameter
+						may be either <literal>xml</literal> or
+						<literal>json</literal>.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<para>
+			It is possible to limit <command>list</command> and
+			<command>flush</command> to a specific address family only. For a
+			list of valid family names, see <literal>ADDRESS FAMILIES</literal> above.
+		</para>
+
+		<para>
+			Note that contrary to what one might assume, the output generated
+			by <command>export</command> is not parseable by
+			<command>nft -f</command>. Instead, the output of
+			<command>list</command> command serves well for that purpose.
+		</para>
+	</refsect1>
+
+	<refsect1>
 		<title>Tables</title>
 		<para>
 			<cmdsynopsis>
@@ -442,7 +592,7 @@ filter input iif $int_ifs accept
 		</para>
 
 		<para>
-			Tables are containers for chains and sets. They are identified by their address family
+			Tables are containers for chains, sets and stateful objects. They are identified by their address family
 			and their name. The address family must be one of
 
 			<simplelist type="inline">
@@ -455,7 +605,8 @@ filter input iif $int_ifs accept
 			</simplelist>.
 
 			The <literal>inet</literal> address family is a dummy family which is used to create
-			hybrid IPv4/IPv6 tables.
+			hybrid IPv4/IPv6 tables.  The <literal>meta</literal> expression <literal>nfproto</literal>
+			keyword can be used to test which family (ipv4 or ipv6) context the packet is being processed in.
 
 			When no address family is specified, <literal>ip</literal> is used by default.
 		</para>
@@ -500,20 +651,26 @@ filter input iif $int_ifs accept
 		<title>Chains</title>
 		<para>
 			<cmdsynopsis>
-				<arg choice="req">add</arg>
-				<command>chain</command>
-				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
-				<arg choice="req"><replaceable>hook</replaceable></arg>
-				<arg choice="req"><replaceable>priority</replaceable></arg>
-				<arg choice="req"><replaceable>policy</replaceable></arg>
-				<arg choice="req"><replaceable>device</replaceable></arg>
-			</cmdsynopsis>
-			<cmdsynopsis>
 				<group choice="req">
 					<arg>add</arg>
 					<arg>create</arg>
+				</group>
+				<command>chain</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="plain"><replaceable>table</replaceable></arg>
+				<arg choice="plain"><replaceable>chain</replaceable></arg>
+				<arg choice="opt">
+					<arg choice="req">
+						<arg choice="req"><replaceable>type</replaceable></arg>
+						<arg choice="req"><replaceable>hook</replaceable></arg>
+						<arg choice="opt"><replaceable>device</replaceable></arg>
+						<arg choice="req"><replaceable>priority</replaceable> ;</arg>
+						<arg choice="opt"><replaceable>policy</replaceable> ;</arg>
+					</arg>
+				</arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
 					<arg>delete</arg>
 					<arg>list</arg>
 					<arg>flush</arg>
@@ -555,7 +712,7 @@ filter input iif $int_ifs accept
 				<term><option>create</option></term>
 				<listitem>
 					<para>
-						Simlar to the <command>add</command> command, but returns an error if the
+						Similar to the <command>add</command> command, but returns an error if the
 						chain already exists.
 					</para>
 				</listitem>
@@ -594,6 +751,76 @@ filter input iif $int_ifs accept
 				</listitem>
 			</varlistentry>
 		</variablelist>
+
+		<para>
+			For base chains, <command>type</command>, <command>hook</command> and <command>priority</command> parameters are mandatory.
+		</para>
+		<para>
+			<table frame="all">
+				<title>Supported chain types</title>
+				<tgroup cols="4" align="left" colsep="1" rowsep="1">
+					<colspec colname="c1"/>
+					<colspec colname="c2"/>
+					<colspec colname="c3"/>
+					<colspec colname="c4"/>
+					<thead>
+						<row>
+							<entry>Type</entry>
+							<entry>Families</entry>
+							<entry>Hooks</entry>
+							<entry>Description</entry>
+						</row>
+					</thead>
+					<tbody>
+						<row>
+							<entry>filter</entry>
+							<entry>all</entry>
+							<entry>all</entry>
+							<entry>Standard chain type to use in doubt.</entry>
+						</row>
+						<row>
+							<entry>nat</entry>
+							<entry>ip, ip6</entry>
+							<entry>prerouting, input, output, postrouting</entry>
+							<entry>Chains of this type perform Native Address Translation based on conntrack entries. Only the first packet of a connection actually traverses this chain - its rules usually define details of the created conntrack entry (NAT statements for instance).</entry>
+						</row>
+						<row>
+							<entry>route</entry>
+							<entry>ip, ip6</entry>
+							<entry>output</entry>
+							<entry>If a packet has traversed a chain of this
+								type and is about to be accepted, a new route
+								lookup is performed if relevant parts of the IP
+								header have changed. This allows to e.g.
+								implement policy routing selectors in
+								nftables.</entry>
+						</row>
+					</tbody>
+				</tgroup>
+			</table>
+		</para>
+		<para>
+			Apart from the special cases illustrated above (e.g. <literal>nat</literal> type not supporting <literal>forward</literal> hook or <literal>route</literal> type only supporting <literal>output</literal> hook), there are two further quirks worth noticing:
+			<itemizedlist>
+				<listitem>
+					<literal>netdev</literal> family supports merely a single
+					combination, namely <literal>filter</literal> type and
+					<literal>ingress</literal> hook. Base chains in this family also require the <literal>device</literal> parameter to be present since they exist per incoming interface only.
+				</listitem>
+				<listitem>
+					<literal>arp</literal> family supports only
+					<literal>input</literal> and <literal>output</literal>
+					hooks, both in chains of type
+					<literal>filter</literal>.
+				</listitem>
+			</itemizedlist>
+		</para>
+		<para>
+			The <literal>priority</literal> parameter accepts a signed integer value which specifies the order in which chains with same <literal>hook</literal> value are traversed. The ordering is ascending, i.e. lower priority values have precedence over higher ones.
+		</para>
+		<para>
+			Base chains also allow to set the chain's <literal>policy</literal>, i.e. what happens to packets not explicitly accepted or refused in contained rules. Supported policy values are <literal>accept</literal> (which is the default) or <literal>drop</literal>.
+		</para>
 	</refsect1>
 
 	<refsect1>
@@ -609,6 +836,15 @@ filter input iif $int_ifs accept
 				<arg choice="req"><replaceable>table</replaceable></arg>
 				<arg choice="req"><replaceable>chain</replaceable></arg>
 				<arg choice="opt">position <replaceable>position</replaceable></arg>
+				<arg choice="req" rep="repeat"><replaceable>statement</replaceable></arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<arg choice="req">replace</arg>
+				<command>rule</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>chain</replaceable></arg>
+				<arg choice="req">handle <replaceable>handle</replaceable></arg>
 				<arg choice="req" rep="repeat"><replaceable>statement</replaceable></arg>
 			</cmdsynopsis>
 			<cmdsynopsis>
@@ -646,6 +882,14 @@ filter input iif $int_ifs accept
 				</listitem>
 			</varlistentry>
 			<varlistentry>
+				<term><option>replace</option></term>
+				<listitem>
+					<para>
+						Similar to the <command>add</command> command, but the rule replaces the specified rule.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
 				<term><option>delete</option></term>
 				<listitem>
 					<para>
@@ -654,6 +898,505 @@ filter input iif $int_ifs accept
 				</listitem>
 			</varlistentry>
 		</variablelist>
+	</refsect1>
+
+	<refsect1>
+		<title>Sets</title>
+		<para>
+			<cmdsynopsis>
+				<arg choice="req">add</arg>
+				<command> set</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>set</replaceable></arg>
+				{
+				<arg choice="req"><replaceable>type</replaceable></arg>
+				<arg choice="opt"><replaceable>flags</replaceable></arg>
+				<arg choice="opt"><replaceable>timeout</replaceable></arg>
+				<arg choice="opt"><replaceable>gc-interval</replaceable></arg>
+				<arg choice="opt"><replaceable>elements</replaceable></arg>
+				<arg choice="opt"><replaceable>size</replaceable></arg>
+				<arg choice="opt"><replaceable>policy</replaceable></arg>
+				}
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>delete</arg>
+					<arg>list</arg>
+					<arg>flush</arg>
+				</group>
+				<command> set</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>set</replaceable></arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>add</arg>
+					<arg>delete</arg>
+				</group>
+				<command> element</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>set</replaceable></arg>
+				{
+				<arg choice="req"><replaceable>elements</replaceable></arg>
+				}
+			</cmdsynopsis>
+		</para>
+		<para>
+			Sets are elements containers of an user-defined data type, they are uniquely identified by an user-defined name and attached to tables.
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>add</option></term>
+				<listitem>
+					<para>
+						Add a new set in the specified table.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete</option></term>
+				<listitem>
+					<para>
+						Delete the specified set.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>list</option></term>
+				<listitem>
+					<para>
+						Display the elements in the specified set.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>flush</option></term>
+				<listitem>
+					<para>
+						Remove all elements from the specified set.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>add element</option></term>
+				<listitem>
+					<para>
+						Comma-separated list of elements to add into the specified set.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete element</option></term>
+				<listitem>
+					<para>
+						Comma-separated list of elements to delete from the specified set.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<table frame="all">
+			<title>Set specifications</title>
+			<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+				<colspec colname='c1'/>
+				<colspec colname='c2'/>
+				<colspec colname='c3'/>
+				<thead>
+					<row>
+						<entry>Keyword</entry>
+						<entry>Description</entry>
+						<entry>Type</entry>
+					</row>
+				</thead>
+				<tbody>
+					<row>
+						<entry>type</entry>
+						<entry>data type of set elements</entry>
+						<entry>string:  ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark</entry>
+					</row>
+					<row>
+						<entry>flags</entry>
+						<entry>set flags</entry>
+						<entry>string: constant, interval, timeout</entry>
+					</row>
+					<row>
+						<entry>timeout</entry>
+						<entry>time an element stays in the set</entry>
+						<entry>string, decimal followed by unit. Units are: d, h, m, s</entry>
+					</row>
+					<row>
+						<entry>gc-interval</entry>
+						<entry>garbage collection interval, only available when timeout or flag timeout are active</entry>
+						<entry>string, decimal followed by unit. Units are: d, h, m, s</entry>
+					</row>
+					<row>
+						<entry>elements</entry>
+						<entry>elements contained by the set</entry>
+						<entry>set data type</entry>
+					</row>
+					<row>
+						<entry>size</entry>
+						<entry>maximun number of elements in the set</entry>
+						<entry>unsigned integer (64 bit)</entry>
+					</row>
+					<row>
+						<entry>policy</entry>
+						<entry>set policy</entry>
+						<entry>string: performance [default], memory</entry>
+					</row>
+				</tbody>
+			</tgroup>
+		</table>
+	</refsect1>
+
+	<refsect1>
+		<title>Maps</title>
+		<para>
+			<cmdsynopsis>
+				<arg choice="req">add</arg>
+				<command> map</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>map</replaceable></arg>
+				{
+				<arg choice="req"><replaceable>type</replaceable></arg>
+				<arg choice="opt"><replaceable>flags</replaceable></arg>
+				<arg choice="opt"><replaceable>elements</replaceable></arg>
+				<arg choice="opt"><replaceable>size</replaceable></arg>
+				<arg choice="opt"><replaceable>policy</replaceable></arg>
+				}
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>delete</arg>
+					<arg>list</arg>
+					<arg>flush</arg>
+				</group>
+				<command> map</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>map</replaceable></arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>add</arg>
+					<arg>delete</arg>
+				</group>
+				<command> element</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>map</replaceable></arg>
+				{
+				<arg choice="req"><replaceable>elements</replaceable></arg>
+				}
+			</cmdsynopsis>
+		</para>
+		<para>
+			Maps store data based on some specific key used as input, they are uniquely identified by an user-defined name and attached to tables.
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>add</option></term>
+				<listitem>
+					<para>
+						Add a new map in the specified table.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete</option></term>
+				<listitem>
+					<para>
+						Delete the specified map.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>list</option></term>
+				<listitem>
+					<para>
+						Display the elements in the specified map.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>flush</option></term>
+				<listitem>
+					<para>
+						Remove all elements from the specified map.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>add element</option></term>
+				<listitem>
+					<para>
+						Comma-separated list of elements to add into the specified map.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete element</option></term>
+				<listitem>
+					<para>
+						Comma-separated list of element keys to delete from the specified map.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<table frame="all">
+			<title>Map specifications</title>
+			<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+				<colspec colname='c1'/>
+				<colspec colname='c2'/>
+				<colspec colname='c3'/>
+				<thead>
+					<row>
+						<entry>Keyword</entry>
+						<entry>Description</entry>
+						<entry>Type</entry>
+					</row>
+				</thead>
+				<tbody>
+					<row>
+						<entry>type</entry>
+						<entry>data type of map elements</entry>
+						<entry>string ':' string:  ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark, counter, quota. Counter and quota can't be used as keys</entry>
+					</row>
+					<row>
+						<entry>flags</entry>
+						<entry>map flags</entry>
+						<entry>string: constant, interval</entry>
+					</row>
+					<row>
+						<entry>elements</entry>
+						<entry>elements contained by the map</entry>
+						<entry>map data type</entry>
+					</row>
+					<row>
+						<entry>size</entry>
+						<entry>maximun number of elements in the map</entry>
+						<entry>unsigned integer (64 bit)</entry>
+					</row>
+					<row>
+						<entry>policy</entry>
+						<entry>map policy</entry>
+						<entry>string: performance [default], memory</entry>
+					</row>
+				</tbody>
+			</tgroup>
+		</table>
+	</refsect1>
+
+	<refsect1>
+		<title>Stateful objects</title>
+		<para>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>add</arg>
+					<arg>delete</arg>
+					<arg>list</arg>
+					<arg>reset</arg>
+				</group>
+				<command> type</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="req"><replaceable>table</replaceable></arg>
+				<arg choice="req"><replaceable>object</replaceable></arg>
+			</cmdsynopsis>
+		</para>
+		<para>
+			Stateful objects are attached to tables and are identified by an unique name. They group stateful information from rules, to reference them in rules the keywords "type name" are used e.g. "counter name".
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>add</option></term>
+				<listitem>
+					<para>
+						Add a new stateful object in the specified table.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete</option></term>
+				<listitem>
+					<para>
+						Delete the specified object.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>list</option></term>
+				<listitem>
+					<para>
+						Display stateful information the object holds.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>reset</option></term>
+				<listitem>
+					<para>
+						List-and-reset stateful object.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<refsect2>
+			<title>Ct</title>
+			<para>
+				<cmdsynopsis>
+					<command>ct</command>
+					<arg choice="req">helper</arg>
+					<arg choice="req">type</arg>
+					<arg choice="req"><replaceable>type</replaceable></arg>
+					<arg choice="req">protocol</arg>
+					<arg choice="req"><replaceable>protocol</replaceable></arg>
+					<arg choice="opt">l3proto</arg>
+					<arg choice="opt"><replaceable>family</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+			<para>
+				Ct helper is used to define connection tracking helpers that can then be used in combination with the <literal>"ct helper set"</literal> statement.
+				type and protocol are mandatory, l3proto is derived from the table family by default, i.e. in the inet table the kernel will
+				try to load both the ipv4 and ipv6 helper backends, if they are supported by the kernel.
+			</para>
+			<table frame="all">
+				<title>conntrack helper specifications</title>
+				<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+					<colspec colname='c1'/>
+					<colspec colname='c2'/>
+					<colspec colname='c3'/>
+					<thead>
+						<row>
+							<entry>Keyword</entry>
+							<entry>Description</entry>
+							<entry>Type</entry>
+						</row>
+					</thead>
+					<tbody>
+						<row>
+							<entry>type</entry>
+							<entry>name of helper type</entry>
+							<entry>quoted string (e.g. "ftp")</entry>
+						</row>
+						<row>
+							<entry>protocol</entry>
+							<entry>layer 4 protocol of the helper</entry>
+							<entry>string (e.g. tcp)</entry>
+						</row>
+						<row>
+							<entry>l3proto</entry>
+							<entry>layer 3 protocol of the helper</entry>
+							<entry>address family (e.g. ip)</entry>
+						</row>
+					</tbody>
+				</tgroup>
+			</table>
+			<example>
+				<title>defining and assigning ftp helper</title>
+				<para>
+				Unlike iptables, helper assignment needs to be performed after the conntrack lookup has completed, for example
+				with the default 0 hook priority.
+				</para>
+				<programlisting>
+table inet myhelpers {
+  ct helper ftp-standard {
+     type "ftp" protocol tcp
+  }
+  chain prerouting {
+      type filter hook prerouting priority 0;
+      tcp dport 21 ct helper set "ftp-standard"
+  }
+}
+				</programlisting>
+			</example>
+		</refsect2>
+
+		<refsect2>
+			<title>Counter</title>
+			<para>
+				<cmdsynopsis>
+					<command>counter</command>
+					<arg choice="opt">packets bytes</arg>
+				</cmdsynopsis>
+			</para>
+			<table frame="all">
+				<title>Counter specifications</title>
+				<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+					<colspec colname='c1'/>
+					<colspec colname='c2'/>
+					<colspec colname='c3'/>
+					<thead>
+						<row>
+							<entry>Keyword</entry>
+							<entry>Description</entry>
+							<entry>Type</entry>
+						</row>
+					</thead>
+					<tbody>
+						<row>
+							<entry>packets</entry>
+							<entry>initial count of packets</entry>
+							<entry>unsigned integer (64 bit)</entry>
+						</row>
+						<row>
+							<entry>bytes</entry>
+							<entry>initial count of bytes</entry>
+							<entry>unsigned integer (64 bit)</entry>
+						</row>
+					</tbody>
+				</tgroup>
+			</table>
+		</refsect2>
+
+		<refsect2>
+			<title>Quota</title>
+			<para>
+				<cmdsynopsis>
+					<command>quota</command>
+					<group choice="opt">
+						<arg>over</arg>
+						<arg>until</arg>
+					</group>
+					<arg choice="opt">used</arg>
+				</cmdsynopsis>
+			</para>
+			<table frame="all">
+				<title>Quota specifications</title>
+				<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+					<colspec colname='c1'/>
+					<colspec colname='c2'/>
+					<colspec colname='c3'/>
+					<thead>
+						<row>
+							<entry>Keyword</entry>
+							<entry>Description</entry>
+							<entry>Type</entry>
+						</row>
+					</thead>
+					<tbody>
+						<row>
+							<entry>quota</entry>
+							<entry>quota limit, used as the quota name</entry>
+							<entry>Two arguments, unsigned interger (64 bit) and string: bytes, kbytes, mbytes. "over" and "until" go before these arguments</entry>
+						</row>
+						<row>
+							<entry>used</entry>
+							<entry>initial value of used quota</entry>
+							<entry>Two arguments, unsigned interger (64 bit) and string: bytes, kbytes, mbytes</entry>
+						</row>
+					</tbody>
+				</tgroup>
+			</table>
+		</refsect2>
 	</refsect1>
 
 	<refsect1>
@@ -957,6 +1700,801 @@ filter output ip6 daddr ::1
 				</programlisting>
 			</example>
 		</refsect2>
+
+		<refsect2>
+			<title>Boolean type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols='4' align='left' colsep='1' rowsep='1'>
+						<colspec colname='c1'/>
+						<colspec colname='c2'/>
+						<colspec colname='c3'/>
+						<colspec colname='c4'/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>Boolean</entry>
+								<entry>boolean</entry>
+								<entry>1 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The boolean type is a syntactical helper type in user space.
+				It's use is in the right-hand side of a (typically implicit)
+				relational expression to change the expression on the left-hand
+				side into a boolean check (usually for existence).
+			</para>
+			<para>
+				The following keywords will automatically resolve into a boolean
+				type with given value:
+				<table frame="all">
+					<tgroup cols='2' align='left' colsep='1' rowsep='1'>
+						<colspec colname='c1'/>
+						<colspec colname='c2'/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>exists</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>missing</entry>
+								<entry>0</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<example>
+				<title>Boolean specification</title>
+				<para>
+					The following expressions support a boolean comparison:
+					<table frame="all">
+						<tgroup cols='2' align='left' colsep='1' rowsep='1'>
+							<colspec colname='c1'/>
+							<colspec colname='c2'/>
+							<thead>
+								<row>
+									<entry>Expression</entry>
+									<entry>Behaviour</entry>
+								</row>
+							</thead>
+							<tbody>
+								<row>
+									<entry>fib</entry>
+									<entry>Check route existence.</entry>
+								</row>
+								<row>
+									<entry>exthdr</entry>
+									<entry>Check IPv6 extension header existence.</entry>
+								</row>
+								<row>
+									<entry>tcp option</entry>
+									<entry>Check TCP option header existence.</entry>
+								</row>
+							</tbody>
+						</tgroup>
+					</table>
+				</para>
+				<programlisting>
+# match if route exists
+filter input fib daddr . iif oif exists
+
+# match only non-fragmented packets in IPv6 traffic
+filter input exthdr frag missing
+
+# match if TCP timestamp option is present
+filter input tcp option timestamp exists
+				</programlisting>
+			</example>
+		</refsect2>
+		<refsect2>
+			<title>ICMP Type type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>ICMP Type</entry>
+								<entry>icmp_type</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The ICMP Type type is used to conveniently specify the ICMP header's type field.
+			</para>
+			<para>
+				The following keywords may be used when specifying the ICMP type:
+				<table frame="all">
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>echo-reply</entry>
+								<entry>0</entry>
+							</row>
+							<row>
+								<entry>destination-unreachable</entry>
+								<entry>3</entry>
+							</row>
+							<row>
+								<entry>source-quench</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>redirect</entry>
+								<entry>5</entry>
+							</row>
+							<row>
+								<entry>echo-request</entry>
+								<entry>8</entry>
+							</row>
+							<row>
+								<entry>router-advertisement</entry>
+								<entry>9</entry>
+							</row>
+							<row>
+								<entry>router-solicitation</entry>
+								<entry>10</entry>
+							</row>
+							<row>
+								<entry>time-exceeded</entry>
+								<entry>11</entry>
+							</row>
+							<row>
+								<entry>parameter-problem</entry>
+								<entry>12</entry>
+							</row>
+							<row>
+								<entry>timestamp-request</entry>
+								<entry>13</entry>
+							</row>
+							<row>
+								<entry>timestamp-reply</entry>
+								<entry>14</entry>
+							</row>
+							<row>
+								<entry>info-request</entry>
+								<entry>15</entry>
+							</row>
+							<row>
+								<entry>info-reply</entry>
+								<entry>16</entry>
+							</row>
+							<row>
+								<entry>address-mask-request</entry>
+								<entry>17</entry>
+							</row>
+							<row>
+								<entry>address-mask-reply</entry>
+								<entry>18</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<example>
+				<title>ICMP Type specification</title>
+				<programlisting>
+# match ping packets
+filter output icmp type { echo-request, echo-reply }
+				</programlisting>
+			</example>
+		</refsect2>
+		<refsect2>
+			<title>ICMP Code type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>ICMP Code</entry>
+								<entry>icmp_code</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The ICMP Code type is used to conveniently specify the ICMP header's code field.
+			</para>
+			<para>
+				The following keywords may be used when specifying the ICMP code:
+				<table frame="all">
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>net-unreachable</entry>
+								<entry>0</entry>
+							</row>
+							<row>
+								<entry>host-unreachable</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>prot-unreachable</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>port-unreachable</entry>
+								<entry>3</entry>
+							</row>
+							<row>
+								<entry>net-prohibited</entry>
+								<entry>9</entry>
+							</row>
+							<row>
+								<entry>host-prohibited</entry>
+								<entry>10</entry>
+							</row>
+							<row>
+								<entry>admin-prohibited</entry>
+								<entry>13</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</refsect2>
+		<refsect2>
+			<title>ICMPv6 Type type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>ICMPv6 Type</entry>
+								<entry>icmpv6_type</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The ICMPv6 Type type is used to conveniently specify the ICMPv6 header's type field.
+			</para>
+			<para>
+				The following keywords may be used when specifying the ICMPv6 type:
+				<table frame="all">
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>destination-unreachable</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>packet-too-big</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>time-exceeded</entry>
+								<entry>3</entry>
+							</row>
+							<row>
+								<entry>parameter-problem</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>echo-request</entry>
+								<entry>128</entry>
+							</row>
+							<row>
+								<entry>echo-reply</entry>
+								<entry>129</entry>
+							</row>
+							<row>
+								<entry>mld-listener-query</entry>
+								<entry>130</entry>
+							</row>
+							<row>
+								<entry>mld-listener-report</entry>
+								<entry>131</entry>
+							</row>
+							<row>
+								<entry>mld-listener-done</entry>
+								<entry>132</entry>
+							</row>
+							<row>
+								<entry>mld-listener-reduction</entry>
+								<entry>132</entry>
+							</row>
+							<row>
+								<entry>nd-router-solicit</entry>
+								<entry>133</entry>
+							</row>
+							<row>
+								<entry>nd-router-advert</entry>
+								<entry>134</entry>
+							</row>
+							<row>
+								<entry>nd-neighbor-solicit</entry>
+								<entry>135</entry>
+							</row>
+							<row>
+								<entry>nd-neighbor-advert</entry>
+								<entry>136</entry>
+							</row>
+							<row>
+								<entry>nd-redirect</entry>
+								<entry>137</entry>
+							</row>
+							<row>
+								<entry>router-renumbering</entry>
+								<entry>138</entry>
+							</row>
+							<row>
+								<entry>ind-neighbor-solicit</entry>
+								<entry>141</entry>
+							</row>
+							<row>
+								<entry>ind-neighbor-advert</entry>
+								<entry>142</entry>
+							</row>
+							<row>
+								<entry>mld2-listener-report</entry>
+								<entry>143</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<example>
+				<title>ICMPv6 Type specification</title>
+				<programlisting>
+# match ICMPv6 ping packets
+filter output icmpv6 type { echo-request, echo-reply }
+				</programlisting>
+			</example>
+		</refsect2>
+		<refsect2>
+			<title>ICMPv6 Code type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>ICMPv6 Code</entry>
+								<entry>icmpv6_code</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The ICMPv6 Code type is used to conveniently specify the ICMPv6 header's code field.
+			</para>
+			<para>
+				The following keywords may be used when specifying the ICMPv6 code:
+				<table frame="all">
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>no-route</entry>
+								<entry>0</entry>
+							</row>
+							<row>
+								<entry>admin-prohibited</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>addr-unreachable</entry>
+								<entry>3</entry>
+							</row>
+							<row>
+								<entry>port-unreachable</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>policy-fail</entry>
+								<entry>5</entry>
+							</row>
+							<row>
+								<entry>reject-route</entry>
+								<entry>6</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</refsect2>
+		<refsect2>
+			<title>ICMPvX Code type</title>
+			<para>
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>ICMPvX Code</entry>
+								<entry>icmpx_code</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				The ICMPvX Code type abstraction is a set of values which
+				overlap between ICMP and ICMPv6 Code types to be used from the
+				inet family.
+			</para>
+			<para>
+				The following keywords may be used when specifying the ICMPvX code:
+				<table frame="all">
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>no-route</entry>
+								<entry>0</entry>
+							</row>
+							<row>
+								<entry>port-unreachable</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>host-unreachable</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>admin-prohibited</entry>
+								<entry>3</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</refsect2>
+		<refsect2>
+			<title>Conntrack types</title>
+			<para>
+				This is an overview of types used in <command>ct</command>
+				expression and statement:
+				<table frame="all">
+					<tgroup cols="4" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<colspec colname="c4"/>
+						<thead>
+							<row>
+								<entry>Name</entry>
+								<entry>Keyword</entry>
+								<entry>Size</entry>
+								<entry>Base type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>conntrack state</entry>
+								<entry>ct_state</entry>
+								<entry>4 byte</entry>
+								<entry>bitmask</entry>
+							</row>
+							<row>
+								<entry>conntrack direction</entry>
+								<entry>ct_dir</entry>
+								<entry>8 bit</entry>
+								<entry>integer</entry>
+							</row>
+							<row>
+								<entry>conntrack status</entry>
+								<entry>ct_status</entry>
+								<entry>4 byte</entry>
+								<entry>bitmask</entry>
+							</row>
+							<row>
+								<entry>conntrack event bits</entry>
+								<entry>ct_event</entry>
+								<entry>4 byte</entry>
+								<entry>bitmask</entry>
+							</row>
+							<row>
+								<entry>conntrack label</entry>
+								<entry>ct_label</entry>
+								<entry>128 bit</entry>
+								<entry>bitmask</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				For each of the types above, keywords are available for convenience:
+				<table frame="all">
+					<title>conntrack state (ct_state)</title>
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>invalid</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>established</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>related</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>new</entry>
+								<entry>8</entry>
+							</row>
+							<row>
+								<entry>untracked</entry>
+								<entry>64</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+
+				<table frame="all">
+					<title>conntrack direction (ct_dir)</title>
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>original</entry>
+								<entry>0</entry>
+							</row>
+							<row>
+								<entry>reply</entry>
+								<entry>1</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+
+				<table frame="all">
+					<title>conntrack status (ct_status)</title>
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>expected</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>seen-reply</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>assured</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>confirmed</entry>
+								<entry>8</entry>
+							</row>
+							<row>
+								<entry>snat</entry>
+								<entry>16</entry>
+							</row>
+							<row>
+								<entry>dnat</entry>
+								<entry>32</entry>
+							</row>
+							<row>
+								<entry>dying</entry>
+								<entry>512</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+
+				<table frame="all">
+					<title>conntrack event bits (ct_event)</title>
+					<tgroup cols="2" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Value</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>new</entry>
+								<entry>1</entry>
+							</row>
+							<row>
+								<entry>related</entry>
+								<entry>2</entry>
+							</row>
+							<row>
+								<entry>destroy</entry>
+								<entry>4</entry>
+							</row>
+							<row>
+								<entry>reply</entry>
+								<entry>8</entry>
+							</row>
+							<row>
+								<entry>assured</entry>
+								<entry>16</entry>
+							</row>
+							<row>
+								<entry>protoinfo</entry>
+								<entry>32</entry>
+							</row>
+							<row>
+								<entry>helper</entry>
+								<entry>64</entry>
+							</row>
+							<row>
+								<entry>mark</entry>
+								<entry>128</entry>
+							</row>
+							<row>
+								<entry>seqadj</entry>
+								<entry>256</entry>
+							</row>
+							<row>
+								<entry>secmark</entry>
+								<entry>512</entry>
+							</row>
+							<row>
+								<entry>label</entry>
+								<entry>1024</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+				<para>
+					Possible keywords for conntrack label type
+					(<command>ct_label</command>) are read at runtime from
+					<literal>/etc/connlabel.conf</literal>.
+				</para>
+			</para>
+		</refsect2>
 	</refsect1>
 
 	<refsect1>
@@ -1030,6 +2568,11 @@ filter output ip6 daddr ::1
 							<row>
 								<entry>length</entry>
 								<entry>Length of the packet in bytes</entry>
+								<entry>integer (32 bit)</entry>
+							</row>
+							<row>
+								<entry>nfproto</entry>
+								<entry>real hook protocol family, useful only in inet table</entry>
 								<entry>integer (32 bit)</entry>
 							</row>
 							<row>
@@ -1285,13 +2828,13 @@ filter output oif eth0
 					<title>Using fib expressions</title>
 					<programlisting>
 # drop packets without a reverse path
-filter prerouting fib saddr . iif oif eq 0 drop
+filter prerouting fib saddr . iif oif missing drop
 
 # drop packets to address not configured on ininterface
-filter input fib daddr . iif type not { local, broadcast, multicast } drop
+filter prerouting fib daddr . iif type != { local, broadcast, multicast } drop
 
 # perform lookup in a specific 'blackhole' table (0xdead, needs ip appropriate ip rule)
-filter prerouting meta mark set 0xdead fib daddr . mark type vmap { backhole : drop, prohibit : jump prohibited, unreachable : drop }
+filter prerouting meta mark set 0xdead fib daddr . mark type vmap { blackhole : drop, prohibit : jump prohibited, unreachable : drop }
 					</programlisting>
 				</example>
 			</para>
@@ -1335,6 +2878,11 @@ filter prerouting meta mark set 0xdead fib daddr . mark type vmap { backhole : d
 								<entry>Routing nexthop</entry>
 								<entry>ipv4_addr/ipv6_addr</entry>
 							</row>
+							<row>
+								<entry>mtu</entry>
+								<entry>TCP maximum segment size of route</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
 						</tbody>
 					</tgroup>
 				</table>
@@ -1373,8 +2921,8 @@ filter output rt classid 10
 # IP family dependent rt expressions
 ip filter output rt nexthop 192.168.0.1
 ip6 filter output rt nexthop fd00::1
-inet filter meta nfproto ipv4 output rt nexthop 192.168.0.1
-inet filter meta nfproto ipv6 output rt nexthop fd00::1
+inet filter output rt ip nexthop 192.168.0.1
+inet filter output rt ip6 nexthop fd00::1
 					</programlisting>
 				</example>
 			</para>
@@ -1624,6 +3172,70 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 		</refsect2>
 
 		<refsect2>
+			<title>ICMP header expression</title>
+			<para>
+				<cmdsynopsis>
+					<command>icmp</command>
+					<arg opt="req"><replaceable>ICMP header field</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+			<para>
+				<table frame="all">
+					<title>ICMP header expression</title>
+					<tgroup cols="3" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Description</entry>
+								<entry>Type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>type</entry>
+								<entry>ICMP type field</entry>
+								<entry>icmp_type</entry>
+							</row>
+							<row>
+								<entry>code</entry>
+								<entry>ICMP code field</entry>
+								<entry>integer (8 bit)</entry>
+							</row>
+							<row>
+								<entry>checksum</entry>
+								<entry>ICMP checksum field</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>id</entry>
+								<entry>ID of echo request/response</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>sequence</entry>
+								<entry>sequence number of echo request/response</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>gateway</entry>
+								<entry>gateway of redirects</entry>
+								<entry>integer (32 bit)</entry>
+							</row>
+							<row>
+								<entry>mtu</entry>
+								<entry>MTU of path MTU discovery</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</refsect2>
+
+		<refsect2>
 			<title>IPv6 header expression</title>
 			<para>
 				<cmdsynopsis>
@@ -1697,6 +3309,74 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 			</para>
 		</refsect2>
 
+		<refsect2>
+			<title>ICMPv6 header expression</title>
+			<para>
+				<cmdsynopsis>
+					<command>icmpv6</command>
+					<arg opt="req"><replaceable>ICMPv6 header field</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+			<para>
+				<table frame="all">
+					<title>ICMPv6 header expression</title>
+					<tgroup cols="3" align="left" colsep="1" rowsep="1">
+						<colspec colname="c1"/>
+						<colspec colname="c2"/>
+						<colspec colname="c3"/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Description</entry>
+								<entry>Type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>type</entry>
+								<entry>ICMPv6 type field</entry>
+								<entry>icmpv6_type</entry>
+							</row>
+							<row>
+								<entry>code</entry>
+								<entry>ICMPv6 code field</entry>
+								<entry>integer (8 bit)</entry>
+							</row>
+							<row>
+								<entry>checksum</entry>
+								<entry>ICMPv6 checksum field</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>parameter-problem</entry>
+								<entry>pointer to problem</entry>
+								<entry>integer (32 bit)</entry>
+							</row>
+							<row>
+								<entry>packet-too-big</entry>
+								<entry>oversized MTU</entry>
+								<entry>integer (32 bit)</entry>
+							</row>
+							<row>
+								<entry>id</entry>
+								<entry>ID of echo request/response</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>sequence</entry>
+								<entry>sequence number of echo request/response</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+							<row>
+								<entry>max-delay</entry>
+								<entry>maximum response delay of MLD queries</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+		</refsect2>
 		<refsect2>
 			<title>TCP header expression</title>
 			<para>
@@ -2094,14 +3774,229 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 				</table>
 			</para>
 		</refsect2>
-	</refsect1>
 
-	<refsect1>
-		<title>bla</title>
 		<refsect2>
-			<title>IPv6 extension header expressions</title>
+			<title>Extension header expressions</title>
 			<para>
-				IPv6 extension header expressions refer to data from an IPv6 packet's extension headers.
+				Extension header expressions refer to data from variable-sized protocol headers, such as IPv6 extension headers and
+				TCPs options.
+			</para>
+			<para>
+				nftables currently supports matching (finding) a given ipv6 extension header or TCP option.
+			</para>
+			<cmdsynopsis>
+				<command>hbh</command>
+				<group choice="req">
+					<arg>nexthdr</arg>
+					<arg>hdrlength</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>frag</command>
+				<group choice="req">
+					<arg>nexthdr</arg>
+					<arg>frag-off</arg>
+					<arg>more-fragments</arg>
+					<arg>id</arg>
+				</group>
+			</cmdsynopsis>
+
+			<cmdsynopsis>
+				<command>rt</command>
+				<group choice="req">
+					<arg>nexthdr</arg>
+					<arg>hdrlength</arg>
+					<arg>type</arg>
+					<arg>seg-left</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>dst</command>
+				<group choice="req">
+					<arg>nexthdr</arg>
+					<arg>hdrlength</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>mh</command>
+				<group choice="req">
+					<arg>nexthdr</arg>
+					<arg>hdrlength</arg>
+					<arg>checksum</arg>
+					<arg>type</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>tcp option</command>
+				<group choice="req">
+					<arg>eol</arg>
+					<arg>noop</arg>
+					<arg>maxseg</arg>
+					<arg>window</arg>
+					<arg>sack-permitted</arg>
+					<arg>sack</arg>
+					<arg>sack0</arg>
+					<arg>sack1</arg>
+					<arg>sack2</arg>
+					<arg>sack3</arg>
+					<arg>timestamp</arg>
+				</group>
+				<arg choice="none"><replaceable>tcp_option_field</replaceable></arg>
+			</cmdsynopsis>
+			<para>
+				The following syntaxes are valid only in a relational expression
+				with boolean type on right-hand side for checking header existence only:
+			</para>
+			<cmdsynopsis>
+				<command>exthdr</command>
+				<group choice="req">
+					<arg>hbh</arg>
+					<arg>frag</arg>
+					<arg>rt</arg>
+					<arg>dst</arg>
+					<arg>mh</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>tcp option</command>
+				<group choice="req">
+					<arg>eol</arg>
+					<arg>noop</arg>
+					<arg>maxseg</arg>
+					<arg>window</arg>
+					<arg>sack-permitted</arg>
+					<arg>sack</arg>
+					<arg>sack0</arg>
+					<arg>sack1</arg>
+					<arg>sack2</arg>
+					<arg>sack3</arg>
+					<arg>timestamp</arg>
+				</group>
+			</cmdsynopsis>
+			<para>
+				<table frame="all">
+					<title>IPv6 extension headers</title>
+					<tgroup cols='2' align='left' colsep='1' rowsep='1'>
+						<colspec colname='c1'/>
+						<colspec colname='c2'/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Description</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>hbh</entry>
+								<entry>Hop by Hop</entry>
+							</row>
+							<row>
+								<entry>rt</entry>
+								<entry>Routing Header</entry>
+							</row>
+							<row>
+								<entry>frag</entry>
+								<entry>Fragmentation header</entry>
+							</row>
+							<row>
+								<entry>dst</entry>
+								<entry>dst options</entry>
+							</row>
+							<row>
+								<entry>mh</entry>
+								<entry>Mobility Header</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+
+				<table frame="all">
+					<title>TCP Options</title>
+					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+						<colspec colname='c1'/>
+						<colspec colname='c2'/>
+						<colspec colname='c3'/>
+						<thead>
+							<row>
+								<entry>Keyword</entry>
+								<entry>Description</entry>
+								<entry>TCP option fields</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>eol</entry>
+								<entry>End of option list</entry>
+								<entry>kind</entry>
+							</row>
+							<row>
+								<entry>noop</entry>
+								<entry>1 Byte TCP No-op options</entry>
+								<entry>kind</entry>
+							</row>
+							<row>
+								<entry>maxseg</entry>
+								<entry>TCP Maximum Segment Size</entry>
+								<entry>kind, length, size</entry>
+							</row>
+							<row>
+								<entry>window</entry>
+								<entry>TCP Window Scaling</entry>
+								<entry>kind, length, count</entry>
+							</row>
+							<row>
+								<entry>sack-permitted</entry>
+								<entry>TCP SACK permitted</entry>
+								<entry>kind, length</entry>
+							</row>
+							<row>
+								<entry>sack</entry>
+								<entry>TCP Selective Acknowledgement (alias of block 0)</entry>
+								<entry>kind, length, left, right</entry>
+							</row>
+							<row>
+								<entry>sack0</entry>
+								<entry>TCP Selective Acknowledgement (block 0)</entry>
+								<entry>kind, length, left, right</entry>
+							</row>
+							<row>
+								<entry>sack1</entry>
+								<entry>TCP Selective Acknowledgement (block 1)</entry>
+								<entry>kind, length, left, right</entry>
+							</row>
+							<row>
+								<entry>sack2</entry>
+								<entry>TCP Selective Acknowledgement (block 2)</entry>
+								<entry>kind, length, left, right</entry>
+							</row>
+							<row>
+								<entry>sack3</entry>
+								<entry>TCP Selective Acknowledgement (block 3)</entry>
+								<entry>kind, length, left, right</entry>
+							</row>
+							<row>
+								<entry>timestamp</entry>
+								<entry>TCP Timestamps</entry>
+								<entry>kind, length, tsval, tsecr</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+
+			<para>
+				<example>
+					<title>finding TCP options</title>
+					<programlisting>
+filter input tcp option sack-permitted kind 1 counter
+					</programlisting>
+				</example>
+				<example>
+				<title>matching IPv6 exthdr</title>
+					<programlisting>
+ip6 filter input frag more-fragments 1 counter
+					</programlisting>
+				</example>
 			</para>
 		</refsect2>
 
@@ -2112,10 +4007,11 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 			</para>
 			<para>
 				There are three types of conntrack expressions. Some conntrack expressions require the flow
-				direction before the conntrack key, others must be used directly because they are
-				direction agnostic.  The <command>packets<command> and </command>bytes</command> keywords can be used
-				with or without a direction.  If the direction is omitted, the sum of the original and the reply
-				direction is returned.
+				direction before the conntrack key, others must be used directly because they are direction agnostic.
+				The <command>packets</command>, <command>bytes</command> and <command>avgpkt</command> keywords can be
+				used with or without a direction. If the direction is omitted, the sum of the original and the reply
+				direction is returned.  The same is true for the <command>zone</command>, if a direction is given, the zone
+				is only matched if the zone id is tied to the given direction.
 			</para>
 			<para>
 				<cmdsynopsis>
@@ -2132,6 +4028,8 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 						<arg>protocol</arg>
 						<arg>bytes</arg>
 						<arg>packets</arg>
+						<arg>avgpkt</arg>
+						<arg>zone</arg>
 					</group>
 				</cmdsynopsis>
 				<cmdsynopsis>
@@ -2143,14 +4041,30 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 					<group choice="req">
 						<arg>l3proto</arg>
 						<arg>protocol</arg>
-						<arg>saddr</arg>
-						<arg>daddr</arg>
 						<arg>proto-src</arg>
 						<arg>proto-dst</arg>
 						<arg>bytes</arg>
 						<arg>packets</arg>
+						<arg>avgpkt</arg>
+						<arg>zone</arg>
 					</group>
 				</cmdsynopsis>
+				<cmdsynopsis>
+					<command>ct</command>
+					<group choice="req">
+						<arg>original</arg>
+						<arg>reply</arg>
+					</group>
+					<group choice="req">
+						<arg>ip</arg>
+						<arg>ip6</arg>
+					</group>
+					<group choice="req">
+						<arg>saddr</arg>
+						<arg>daddr</arg>
+					</group>
+				</cmdsynopsis>
+
 			</para>
 			<para>
 				<table frame="all">
@@ -2242,9 +4156,23 @@ inet filter meta nfproto ipv6 output rt nexthop fd00::1
 								<entry>bytecount seen, see description for <command>packets</command> keyword</entry>
 								<entry>integer (64 bit)</entry>
 							</row>
+							<row>
+								<entry>avgpkt</entry>
+								<entry>average bytes per packet, see description for <command>packets</command> keyword</entry>
+								<entry>integer (64 bit)</entry>
+							</row>
+							<row>
+								<entry>zone</entry>
+								<entry>conntrack zone</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
 						</tbody>
 					</tgroup>
 				</table>
+			</para>
+			<para>
+				A description of conntrack-specific types listed above can be
+				found sub-section <literal>CONNTRACK TYPES</literal> above.
 			</para>
 		</refsect2>
 	</refsect1>
@@ -2392,6 +4320,24 @@ ip forward ip dscp set 42
 			</para>
 		</refsect2>
 		<refsect2>
+			<title>Extension header statement</title>
+			<para>
+				The extension header statement alters packet content in variable-sized headers.
+				This can currently be used to alter the TCP Maximum segment size of packets,
+				similar to TCPMSS.
+			</para>
+			<para>
+				<example>
+					<title>change tcp mss</title>
+					<programlisting>
+tcp flags syn tcp option maxseg size set 1360
+# set a size based on route information:
+tcp flags syn tcp option maxseg size set rt mtu
+					</programlisting>
+				</example>
+			</para>
+		</refsect2>
+		<refsect2>
 			<title>Log statement</title>
 			<para>
 				<cmdsynopsis>
@@ -2522,94 +4468,72 @@ ip6 filter output log flags all
 			<para>
 				<cmdsynopsis>
 					<command>reject</command>
-					<arg choice="none">with</arg>
-					<group choice="req">
-						<arg>icmp</arg>
-						<arg>icmp6</arg>
-						<arg>icmpx</arg>
-					</group>
-					<arg choice="none">type</arg>
-					<group choice="req">
-						<arg>icmp_type</arg>
-						<arg>icmp6_type</arg>
-						<arg>icmpx_type</arg>
-					</group>
+					<arg choice="opt">
+						<arg choice="none">with</arg>
+						<group choice="req">
+							<arg>icmp</arg>
+							<arg>icmp6</arg>
+							<arg>icmpx</arg>
+						</group>
+						<arg choice="none">type</arg>
+						<group choice="req">
+							<arg>icmp_type</arg>
+							<arg>icmp6_type</arg>
+							<arg>icmpx_type</arg>
+						</group>
+					</arg>
 				</cmdsynopsis>
 				<cmdsynopsis>
 					<command>reject</command>
-					<arg choice="none">with</arg>
-					<arg choice="req">tcp</arg>
-					<arg choice="req">reset</arg>
+					<arg choice="opt">
+						<arg choice="none">with</arg>
+						<arg choice="req">tcp</arg>
+						<arg choice="req">reset</arg>
+					</arg>
 				</cmdsynopsis>
 			</para>
 			<para>
 				A reject statement is used to send back an error packet in response to the matched packet otherwise it is equivalent to drop so it is a terminating statement, ending rule traversal. This statement is only valid in the input, forward and output chains, and user-defined chains which are only called from those chains.
+			</para>
+			<para>
+				The different ICMP reject variants are meant for use in different table families:
 				<table frame="all">
-					<title>reject statement type (ip)</title>
 					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
 						<colspec colname='c1'/>
 						<colspec colname='c2'/>
 						<colspec colname='c3'/>
 						<thead>
 							<row>
-								<entry>Value</entry>
-								<entry>Description</entry>
+								<entry>Variant</entry>
+								<entry>Family</entry>
 								<entry>Type</entry>
 							</row>
 						</thead>
 						<tbody>
 							<row>
-								<entry>icmp_type</entry>
-								<entry>ICMP type response to be sent to the host</entry>
-								<entry>net-unreachable, host-unreachable, prot-unreachable, port-unreachable [default], net-prohibited, host-prohibited, admin-prohibited</entry>
+								<entry>icmp</entry>
+								<entry>ip</entry>
+								<entry>icmp_code</entry>
+							</row>
+							<row>
+								<entry>icmp6</entry>
+								<entry>ip6</entry>
+								<entry>icmpv6_code</entry>
+							</row>
+							<row>
+								<entry>icmpx</entry>
+								<entry>inet</entry>
+								<entry>icmpx_code</entry>
 							</row>
 						</tbody>
 					</tgroup>
 				</table>
-				<table frame="all">
-					<title>reject statement type (ip6)</title>
-					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
-						<colspec colname='c1'/>
-						<colspec colname='c2'/>
-						<colspec colname='c3'/>
-						<thead>
-							<row>
-								<entry>Value</entry>
-								<entry>Description</entry>
-								<entry>Type</entry>
-							</row>
-						</thead>
-						<tbody>
-							<row>
-								<entry>icmp6_type</entry>
-								<entry>ICMPv6 type response to be sent to the host</entry>
-								<entry>no-route, admin-prohibited, addr-unreachable, port-unreachable [default], policy-fail, reject-route</entry>
-							</row>
-						</tbody>
-					</tgroup>
-				</table>
-				<table frame="all">
-					<title>reject statement type (inet)</title>
-					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
-						<colspec colname='c1'/>
-						<colspec colname='c2'/>
-						<colspec colname='c3'/>
-						<thead>
-							<row>
-								<entry>Value</entry>
-								<entry>Description</entry>
-								<entry>Type</entry>
-							</row>
-						</thead>
-						<tbody>
-							<row>
-								<entry>icmpx_type</entry>
-								<entry>ICMPvXtype abstraction response to be sent to the host, this is a set of types that overlap in IPv4 and IPv6 to be used from the inet family.</entry>
-								<entry>port-unreachable [default], admin-prohibited, no-route, host-unreachable</entry>
-							</row>
-						</tbody>
-					</tgroup>
-				</table>
+			</para>
+			<para>
+				For a description of the different types and a list of supported
+				keywords refer to <literal>DATA TYPES</literal> section above.
+				The common default reject value is
+				<command>port-unreachable</command>.
 			</para>
 		</refsect2>
 		<refsect2>
@@ -2640,7 +4564,9 @@ ip6 filter output log flags all
 					<command>ct</command>
 					<group choice="req">
 						<arg>mark</arg>
+						<arg>event</arg>
 						<arg>label</arg>
+						<arg>zone</arg>
 					</group>
 					<arg choice="none">set</arg>
 					<replaceable>value</replaceable>
@@ -2648,10 +4574,14 @@ ip6 filter output log flags all
 			</para>
 			<para>
 				The ct statement sets meta data associated with a connection.
+				The zone id has to be assigned before a conntrack lookup takes place,
+				i.e. this has to be done in prerouting and possibly output (if locally
+				generated packets need to be placed in a distinct zone), with a hook
+				priority of -300.
 			</para>
 			<para>
 				<table frame="all">
-					<title>Meta statement types</title>
+					<title>Conntrack statement types</title>
 					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
 						<colspec colname='c1'/>
 						<colspec colname='c2'/>
@@ -2665,6 +4595,17 @@ ip6 filter output log flags all
 						</thead>
 						<tbody>
 							<row>
+								<entry>event</entry>
+								<entry>conntrack event bits</entry>
+								<entry>bitmask, integer (32 bit)</entry>
+							</row>
+
+							<row>
+								<entry>helper</entry>
+								<entry>name of ct helper object to assign to the connection</entry>
+								<entry>quoted string</entry>
+							</row>
+							<row>
 								<entry>mark</entry>
 								<entry>Connection tracking mark</entry>
 								<entry>mark</entry>
@@ -2674,6 +4615,12 @@ ip6 filter output log flags all
 								<entry>Connection tracking label</entry>
 								<entry>label</entry>
 							</row>
+							<row>
+								<entry>zone</entry>
+								<entry>conntrack zone</entry>
+								<entry>integer (16 bit)</entry>
+							</row>
+
 						</tbody>
 					</tgroup>
 				</table>
@@ -2682,9 +4629,32 @@ ip6 filter output log flags all
 				<example>
 					<title>save packet nfmark in conntrack</title>
 					<programlisting>
-ct set mark meta mark
+ct mark set meta mark
 					</programlisting>
 				</example>
+				<example>
+					<title>set zone mapped via interface</title>
+				<programlisting>
+table inet raw {
+  chain prerouting {
+      type filter hook prerouting priority -300;
+      ct zone set iif map { "eth1" : 1, "veth1" : 2 }
+  }
+  chain output {
+      type filter hook output priority -300;
+      ct zone set oif map { "eth1" : 1, "veth1" : 2 }
+  }
+}
+				</programlisting>
+			</example>
+			<example>
+					<title>restrict events reported by ctnetlink</title>
+				<programlisting>
+ct event set new,related,destroy
+				</programlisting>
+			</example>
+
+
 			</para>
 		</refsect2>
 		<refsect2>
@@ -2851,12 +4821,45 @@ ct set mark meta mark
 						<arg choice="opt">:<replaceable>port</replaceable> - <replaceable>port</replaceable></arg></arg>
 						<arg choice="opt">persistent, random, fully-random</arg>
 				</cmdsynopsis>
+				<cmdsynopsis>
+						<command>masquerade</command>
+						<arg choice="none">to
+						<arg choice="opt">:<replaceable>port</replaceable></arg></arg>
+						<arg choice="opt">persistent, random, fully-random</arg>
+				</cmdsynopsis>
+				<cmdsynopsis>
+						<command>masquerade</command>
+						<arg choice="none">to
+						<arg choice="opt">:<replaceable>port</replaceable> - <replaceable>port</replaceable></arg></arg>
+						<arg choice="opt">persistent, random, fully-random</arg>
+				</cmdsynopsis>
+				<cmdsynopsis>
+						<command>redirect</command>
+						<arg choice="none">to
+						<arg choice="opt">:<replaceable>port</replaceable></arg></arg>
+						<arg choice="opt">persistent, random, fully-random</arg>
+				</cmdsynopsis>
+				<cmdsynopsis>
+						<command>redirect</command>
+						<arg choice="none">to
+						<arg choice="opt">:<replaceable>port</replaceable> - <replaceable>port</replaceable></arg></arg>
+						<arg choice="opt">persistent, random, fully-random</arg>
+				</cmdsynopsis>
 			</para>
 			<para>
 				The nat statements are only valid from nat chain types.
 			</para>
 			<para>
-				The <command>snat</command> statement is only valid in the postrouting and input hooks, it specifies that the source address of the packet should be modified. The <command>dnat</command> statement is only valid in the prerouting and output chains, it specifies that the destination address of the packet should be modified. You can use non-base chains which are called from base chains of nat chain type too. All future packets in this connection will also be mangled, and rules should cease being examined.
+				The <command>snat</command> and <command>masquerade</command> statements specify that the source address of the packet should be modified. While <command>snat</command> is only valid in the postrouting and input chains, <command>masquerade</command> makes sense only in postrouting. The <command>dnat</command> and <command>redirect</command> statements are only valid in the prerouting and output chains, they specify that the destination address of the packet should be modified. You can use non-base chains which are called from base chains of nat chain type too. All future packets in this connection will also be mangled, and rules should cease being examined.
+			</para>
+			<para>
+				The <command>masquerade</command> statement is a special form of <command>snat</command> which always uses the outgoing interface's IP address to translate to. It is particularly useful on gateways with dynamic (public) IP addresses.
+			</para>
+			<para>
+				The <command>redirect</command> statement is a special form of <command>dnat</command> which always translates the destination address to the local host's one. It comes in handy if one only wants to alter the destination port of incoming traffic on different interfaces.
+			</para>
+			<para>
+				Note that all nat statements require both prerouting and postrouting base chains to be present since otherwise packets on the return path won't be seen by netfilter and therefore no reverse translation will take place.
 			</para>
 			<para>
 				<table frame="all">
@@ -2913,7 +4916,30 @@ ct set mark meta mark
 						</tbody>
 					</tgroup>
 				</table>
+			</para>
+			<para>
+				<example>
+					<title>Using NAT statements</title>
+					<programlisting>
+# create a suitable table/chain setup for all further examples
+add table nat
+add chain nat prerouting { type nat hook prerouting priority 0; }
+add chain nat postrouting { type nat hook postrouting priority 100; }
 
+# translate source addresses of all packets leaving via eth0 to address 1.2.3.4
+add rule nat postrouting oif eth0 snat to 1.2.3.4
+
+# redirect all traffic entering via eth0 to destination address 192.168.1.120
+add rule nat prerouting iif eth0 dnat to 192.168.1.120
+
+# translate source addresses of all packets leaving via eth0 to whatever
+# locally generated packets would use as source to reach the same destination
+add rule nat postrouting oif eth0 masquerade
+
+# redirect incoming TCP traffic for port 22 to port 2222
+add rule nat prerouting tcp dport 22 redirect to :2222
+					</programlisting>
+				</example>
 			</para>
 		</refsect2>
 		<refsect2>
@@ -3001,30 +5027,15 @@ ct set mark meta mark
 			These are some additional commands included in nft.
 		</para>
 		<refsect2>
-			<title>export</title>
-			<para>
-				Export your current ruleset in XML or JSON format to stdout.
-			</para>
-			<para>
-				Examples:
-				<programlisting>
-% nft export xml
-[...]
-% nft export json
-[...]
-				</programlisting>
-			</para>
-		</refsect2>
-		<refsect2>
 			<title>monitor</title>
 			<para>
 				The monitor command allows you to listen to Netlink events produced
 				by the nf_tables subsystem, related to creation and deletion of objects.
-				When they ocurr, nft will print to stdout the monitored events in either
+				When they occur, nft will print to stdout the monitored events in either
 				XML, JSON or native nft format.
 			</para>
 			<para>
-				To filter events related to a concrete object, use one of the keywords 'tables', 'chains', 'sets', 'rules', 'elements'.
+				To filter events related to a concrete object, use one of the keywords 'tables', 'chains', 'sets', 'rules', 'elements'				      , 'ruleset'.
 			</para>
 			<para>
 				To filter events related to a concrete action, use keyword 'new' or 'destroy'.
@@ -3054,6 +5065,12 @@ ct set mark meta mark
 				<title>Listen to both new and destroyed chains, in native nft format</title>
 				<programlisting>
 % nft monitor chains
+				</programlisting>
+			</example>
+			<example>
+				<title>Listen to ruleset events such as table, chain, rule, set, counters and quotas, in native nft format</title>
+				<programlisting>
+% nft monitor ruleset
 				</programlisting>
 			</example>
 		</refsect2>
@@ -3121,7 +5138,7 @@ filter output oif wlan0
 			</simplelist>
 		</para>
 		<para>
-			There is an official wiki at: http://wiki.nftables.org
+			There is an official wiki at: https://wiki.nftables.org
 		</para>
 	</refsect1>
 

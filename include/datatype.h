@@ -82,6 +82,8 @@ enum datatypes {
 	TYPE_DSCP,
 	TYPE_ECN,
 	TYPE_FIB_ADDR,
+	TYPE_BOOLEAN,
+	TYPE_CT_EVENTBIT,
 	__TYPE_MAX
 };
 #define TYPE_MAX		(__TYPE_MAX - 1)
@@ -109,10 +111,12 @@ struct expr;
  *
  * @DTYPE_F_ALLOC:		datatype is dynamically allocated
  * @DTYPE_F_PREFIX:		preferred representation for ranges is a prefix
+ * @DTYPE_F_CLONE:		this is an instance from original datatype
  */
 enum datatype_flags {
 	DTYPE_F_ALLOC		= (1 << 0),
 	DTYPE_F_PREFIX		= (1 << 1),
+	DTYPE_F_CLONE		= (1 << 2),
 };
 
 /**
@@ -141,19 +145,19 @@ struct datatype {
 	const char			*desc;
 	const struct datatype		*basetype;
 	const char			*basefmt;
-	void				(*print)(const struct expr *expr);
+	void				(*print)(const struct expr *expr,
+						 struct output_ctx *octx);
 	struct error_record		*(*parse)(const struct expr *sym,
 						  struct expr **res);
 	const struct symbol_table	*sym_tbl;
 };
 
-extern void datatype_register(const struct datatype *dtype);
 extern const struct datatype *datatype_lookup(enum datatypes type);
 extern const struct datatype *datatype_lookup_byname(const char *name);
 
 extern struct error_record *symbol_parse(const struct expr *sym,
 					 struct expr **res);
-extern void datatype_print(const struct expr *expr);
+extern void datatype_print(const struct expr *expr, struct output_ctx *octx);
 
 static inline bool datatype_equal(const struct datatype *d1,
 				  const struct datatype *d2)
@@ -201,10 +205,12 @@ extern struct error_record *symbolic_constant_parse(const struct expr *sym,
 						    const struct symbol_table *tbl,
 						    struct expr **res);
 extern void symbolic_constant_print(const struct symbol_table *tbl,
-				    const struct expr *expr, bool quotes);
+				    const struct expr *expr, bool quotes,
+				    struct output_ctx *octx);
 extern void symbol_table_print(const struct symbol_table *tbl,
 			       const struct datatype *dtype,
-			       enum byteorder byteorder);
+			       enum byteorder byteorder,
+			       struct output_ctx *octx);
 
 extern struct symbol_table *rt_symbol_table_init(const char *filename);
 extern void rt_symbol_table_free(struct symbol_table *tbl);
@@ -231,6 +237,7 @@ extern const struct datatype icmp_code_type;
 extern const struct datatype icmpv6_code_type;
 extern const struct datatype icmpx_code_type;
 extern const struct datatype time_type;
+extern const struct datatype boolean_type;
 
 extern const struct datatype *concat_type_alloc(uint32_t type);
 extern void concat_type_destroy(const struct datatype *dtype);
@@ -251,7 +258,11 @@ concat_subtype_lookup(uint32_t type, unsigned int n)
 	return datatype_lookup(concat_subtype_id(type, n));
 }
 
-extern void time_print(uint64_t seconds);
+extern const struct datatype *
+set_datatype_alloc(const struct datatype *orig_dtype, unsigned int byteorder);
+extern void set_datatype_destroy(const struct datatype *dtype);
+
+extern void time_print(uint64_t seconds, struct output_ctx *octx);
 extern struct error_record *time_parse(const struct location *loc,
 				       const char *c, uint64_t *res);
 

@@ -38,7 +38,7 @@ bool payload_is_known(const struct expr *expr)
 	       tmpl != &proto_unknown_template;
 }
 
-static void payload_expr_print(const struct expr *expr)
+static void payload_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	const struct proto_desc *desc;
 	const struct proto_hdr_template *tmpl;
@@ -46,11 +46,11 @@ static void payload_expr_print(const struct expr *expr)
 	desc = expr->payload.desc;
 	tmpl = expr->payload.tmpl;
 	if (payload_is_known(expr))
-		printf("%s %s", desc->name, tmpl->token);
+		nft_print(octx, "%s %s", desc->name, tmpl->token);
 	else
-		printf("payload @%s,%u,%u",
-		       proto_base_tokens[expr->payload.base],
-		       expr->payload.offset, expr->len);
+		nft_print(octx, "payload @%s,%u,%u",
+			  proto_base_tokens[expr->payload.base],
+			  expr->payload.offset, expr->len);
 }
 
 static bool payload_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -117,6 +117,28 @@ static const struct expr_ops payload_expr_ops = {
 	.pctx_update	= payload_expr_pctx_update,
 };
 
+/*
+ * We normally use 'meta l4proto' to fetch the last l4 header of the
+ * ipv6 extension header chain so we will also match
+ * tcp after a fragmentation header, for instance.
+ * For consistency we also use meta l4proto for ipv4.
+ *
+ * If user specifically asks for nexthdr x, don't add another (useless)
+ * meta dependency.
+ */
+static bool proto_key_is_protocol(const struct proto_desc *desc, unsigned int type)
+{
+	if (type == desc->protocol_key)
+		return true;
+
+	if (desc == &proto_ip6 && type == IP6HDR_NEXTHDR)
+		return true;
+	if (desc == &proto_ip && type == IPHDR_PROTOCOL)
+		return true;
+
+	return false;
+}
+
 struct expr *payload_expr_alloc(const struct location *loc,
 				const struct proto_desc *desc,
 				unsigned int type)
@@ -129,7 +151,7 @@ struct expr *payload_expr_alloc(const struct location *loc,
 	if (desc != NULL) {
 		tmpl = &desc->templates[type];
 		base = desc->base;
-		if (type == desc->protocol_key)
+		if (proto_key_is_protocol(desc, type))
 			flags = EXPR_F_PROTOCOL;
 	} else {
 		tmpl = &proto_unknown_template;
@@ -162,11 +184,11 @@ unsigned int payload_hdr_field(const struct expr *expr)
 	return expr->payload.tmpl - expr->payload.desc->templates;
 }
 
-static void payload_stmt_print(const struct stmt *stmt)
+static void payload_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	expr_print(stmt->payload.expr);
-	printf(" set ");
-	expr_print(stmt->payload.val);
+	expr_print(stmt->payload.expr, octx);
+	nft_print(octx, " set ");
+	expr_print(stmt->payload.val, octx);
 }
 
 static const struct stmt_ops payload_stmt_ops = {
@@ -223,6 +245,60 @@ static int payload_add_dependency(struct eval_ctx *ctx,
 	return 0;
 }
 
+static const struct proto_desc *
+payload_get_get_ll_hdr(const struct eval_ctx *ctx)
+{
+	switch (ctx->pctx.family) {
+	case NFPROTO_INET:
+		return &proto_inet;
+	case NFPROTO_BRIDGE:
+		return &proto_eth;
+	case NFPROTO_NETDEV:
+		return &proto_netdev;
+	default:
+		break;
+	}
+
+	return NULL;
+}
+
+static const struct proto_desc *
+payload_gen_special_dependency(struct eval_ctx *ctx, const struct expr *expr)
+{
+	switch (expr->payload.base) {
+	case PROTO_BASE_LL_HDR:
+		return payload_get_get_ll_hdr(ctx);
+	case PROTO_BASE_TRANSPORT_HDR:
+		if (expr->payload.desc == &proto_icmp ||
+		    expr->payload.desc == &proto_icmp6) {
+			const struct proto_desc *desc, *desc_upper;
+			struct stmt *nstmt;
+
+			desc = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
+			if (!desc) {
+				desc = payload_get_get_ll_hdr(ctx);
+				if (!desc)
+					break;
+			}
+
+			desc_upper = &proto_ip6;
+			if (expr->payload.desc == &proto_icmp)
+				desc_upper = &proto_ip;
+
+			if (payload_add_dependency(ctx, desc, desc_upper,
+						   expr, &nstmt) < 0)
+				return NULL;
+
+			list_add_tail(&nstmt->list, &ctx->stmt->list);
+			return desc_upper;
+		}
+		return &proto_inet_service;
+	default:
+		break;
+	}
+	return NULL;
+}
+
 /**
  * payload_gen_dependency - generate match expression on payload dependency
  *
@@ -276,46 +352,8 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 
 	desc = ctx->pctx.protocol[expr->payload.base - 1].desc;
 	/* Special case for mixed IPv4/IPv6 and bridge tables */
-	if (desc == NULL) {
-		switch (ctx->pctx.family) {
-		case NFPROTO_INET:
-			switch (expr->payload.base) {
-			case PROTO_BASE_LL_HDR:
-				desc = &proto_inet;
-				break;
-			case PROTO_BASE_TRANSPORT_HDR:
-				desc = &proto_inet_service;
-				break;
-			default:
-				break;
-			}
-			break;
-		case NFPROTO_BRIDGE:
-			switch (expr->payload.base) {
-			case PROTO_BASE_LL_HDR:
-				desc = &proto_eth;
-				break;
-			case PROTO_BASE_TRANSPORT_HDR:
-				desc = &proto_inet_service;
-				break;
-			default:
-				break;
-			}
-			break;
-		case NFPROTO_NETDEV:
-			switch (expr->payload.base) {
-			case PROTO_BASE_LL_HDR:
-				desc = &proto_netdev;
-				break;
-			case PROTO_BASE_TRANSPORT_HDR:
-				desc = &proto_inet_service;
-				break;
-			default:
-				break;
-			}
-			break;
-		}
-	}
+	if (desc == NULL)
+		desc = payload_gen_special_dependency(ctx, expr);
 
 	if (desc == NULL)
 		return expr_error(ctx->msgs, expr,
@@ -327,18 +365,33 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 }
 
 int exthdr_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
-			  struct stmt **res)
+			  const struct proto_desc *dependency,
+			  enum proto_bases pb, struct stmt **res)
 {
 	const struct proto_desc *desc;
 
-	desc = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
-	if (desc == NULL)
+	desc = ctx->pctx.protocol[pb].desc;
+	if (desc == NULL) {
+		if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT) {
+			switch (ctx->pctx.family) {
+			case NFPROTO_NETDEV:
+			case NFPROTO_BRIDGE:
+			case NFPROTO_INET:
+				desc = &proto_inet_service;
+				goto found;
+			default:
+				break;
+			}
+		}
+
 		return expr_error(ctx->msgs, expr,
 				  "Cannot generate dependency: "
 				  "no %s protocol specified",
-				  proto_base_names[PROTO_BASE_LL_HDR]);
+				  proto_base_names[pb]);
+	}
 
-	return payload_add_dependency(ctx, desc, &proto_ip6, expr, res);
+ found:
+	return payload_add_dependency(ctx, desc, dependency, expr, res);
 }
 
 /**
@@ -359,6 +412,11 @@ bool payload_is_stacked(const struct proto_desc *desc, const struct expr *expr)
 
 	next = proto_find_upper(desc, mpz_get_be16(expr->right->value));
 	return next && next->base == desc->base;
+}
+
+void payload_dependency_reset(struct payload_dep_ctx *ctx)
+{
+	memset(ctx, 0, sizeof(*ctx));
 }
 
 /**
@@ -403,6 +461,20 @@ void __payload_dependency_kill(struct payload_dep_ctx *ctx,
 void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
 {
 	__payload_dependency_kill(ctx, expr->payload.base);
+}
+
+void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
+{
+	switch (expr->exthdr.op) {
+	case NFT_EXTHDR_OP_TCPOPT:
+		__payload_dependency_kill(ctx, PROTO_BASE_TRANSPORT_HDR);
+		break;
+	case NFT_EXTHDR_OP_IPV6:
+		__payload_dependency_kill(ctx, PROTO_BASE_NETWORK_HDR);
+		break;
+	default:
+		break;
+	}
 }
 
 /**

@@ -16,7 +16,8 @@ struct stmt;
 extern int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 				  struct stmt **res);
 extern int exthdr_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
-				  struct stmt **res);
+				 const struct proto_desc *dependency,
+				 enum proto_bases pb, struct stmt **res);
 
 /**
  * struct payload_dep_ctx - payload protocol dependency tracking
@@ -34,6 +35,8 @@ struct payload_dep_ctx {
 extern bool payload_is_known(const struct expr *expr);
 extern bool payload_is_stacked(const struct proto_desc *desc,
 			       const struct expr *expr);
+
+void payload_dependency_reset(struct payload_dep_ctx *ctx);
 extern void payload_dependency_store(struct payload_dep_ctx *ctx,
 				     struct stmt *stmt,
 				     enum proto_bases base);
@@ -41,6 +44,8 @@ extern void __payload_dependency_kill(struct payload_dep_ctx *ctx,
 				      enum proto_bases base);
 extern void payload_dependency_kill(struct payload_dep_ctx *ctx,
 				    struct expr *expr);
+extern void exthdr_dependency_kill(struct payload_dep_ctx *ctx,
+				   struct expr *expr);
 
 extern bool payload_can_merge(const struct expr *e1, const struct expr *e2);
 extern struct expr *payload_expr_join(const struct expr *e1,

@@ -34,6 +34,7 @@ struct position_spec {
  * @table:	table name
  * @chain:	chain name (chains and rules only)
  * @set:	set name (sets only)
+ * @obj:	stateful object name (stateful object only)
  * @handle:	rule handle (rules only)
  * @position:	rule position (rules only)
  * @set_id:	set ID (sets only)
@@ -43,6 +44,7 @@ struct handle {
 	const char		*table;
 	const char		*chain;
 	const char		*set;
+	const char		*obj;
 	struct handle_spec	handle;
 	struct position_spec	position;
 	uint32_t		set_id;
@@ -95,6 +97,7 @@ enum table_flags {
  * @location:	location the table was defined at
  * @chains:	chains contained in the table
  * @sets:	sets contained in the table
+ * @objs:	stateful objects contained in the table
  * @flags:	table flags
  * @refcnt:	table reference counter
  */
@@ -105,6 +108,7 @@ struct table {
 	struct scope		scope;
 	struct list_head	chains;
 	struct list_head	sets;
+	struct list_head	objs;
 	enum table_flags 	flags;
 	unsigned int		refcnt;
 };
@@ -112,8 +116,9 @@ struct table {
 extern struct table *table_alloc(void);
 extern struct table *table_get(struct table *table);
 extern void table_free(struct table *table);
-extern void table_add_hash(struct table *table);
-extern struct table *table_lookup(const struct handle *h);
+extern void table_add_hash(struct table *table, struct nft_cache *cache);
+extern struct table *table_lookup(const struct handle *h,
+				  const struct nft_cache *cache);
 
 /**
  * enum chain_flags - chain flags
@@ -167,7 +172,8 @@ extern struct chain *chain_lookup(const struct table *table,
 
 extern const char *family2str(unsigned int family);
 extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
-extern void chain_print_plain(const struct chain *chain);
+extern void chain_print_plain(const struct chain *chain,
+			      struct output_ctx *octx);
 
 /**
  * struct rule - nftables rule
@@ -178,6 +184,7 @@ extern void chain_print_plain(const struct chain *chain);
  * @stmt:	list of statements
  * @num_stmts:	number of statements in stmts list
  * @comment:	comment
+ * @refcnt:	rule reference counter
  */
 struct rule {
 	struct list_head	list;
@@ -186,28 +193,15 @@ struct rule {
 	struct list_head	stmts;
 	unsigned int		num_stmts;
 	const char		*comment;
+	unsigned int		refcnt;
 };
 
 extern struct rule *rule_alloc(const struct location *loc,
 			       const struct handle *h);
+extern struct rule *rule_get(struct rule *rule);
 extern void rule_free(struct rule *rule);
-extern void rule_print(const struct rule *rule);
+extern void rule_print(const struct rule *rule, struct output_ctx *octx);
 extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
-
-/**
- * enum set_flags
- *
- * @SET_F_CONSTANT:		Set content is constant
- * @SET_F_INTERVAL:		set includes ranges and/or prefix expressions
- */
-enum set_flags {
-	SET_F_ANONYMOUS		= 0x1,
-	SET_F_CONSTANT		= 0x2,
-	SET_F_INTERVAL		= 0x4,
-	SET_F_MAP		= 0x8,
-	SET_F_TIMEOUT		= 0x10,
-	SET_F_EVAL		= 0x20,
-};
 
 /**
  * struct set - nftables set
@@ -219,11 +213,12 @@ enum set_flags {
  * @flags:	bitmask of set flags
  * @gc_int:	garbage collection interval
  * @timeout:	default timeout value
- * @keytype:	key data type
- * @keylen:	key length
+ * @key:	key expression (data type, length))
  * @datatype:	mapping data type
  * @datalen:	mapping data len
+ * @objtype:	mapping object type
  * @init:	initializer
+ * @rg_cache:	cached range element (left)
  * @policy:	set mechanism policy
  * @desc:	set mechanism desc
  */
@@ -235,11 +230,12 @@ struct set {
 	uint32_t		flags;
 	uint32_t		gc_int;
 	uint64_t		timeout;
-	const struct datatype	*keytype;
-	unsigned int		keylen;
+	struct expr		*key;
 	const struct datatype	*datatype;
 	unsigned int		datalen;
+	uint32_t		objtype;
 	struct expr		*init;
+	struct expr		*rg_cache;
 	uint32_t		policy;
 	struct {
 		uint32_t	size;
@@ -252,9 +248,70 @@ extern void set_free(struct set *set);
 extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
-				     const char *name);
-extern void set_print(const struct set *set);
-extern void set_print_plain(const struct set *s);
+				     const char *name, struct nft_cache *cache);
+extern void set_print(const struct set *set, struct output_ctx *octx);
+extern void set_print_plain(const struct set *s, struct output_ctx *octx);
+
+#include <statement.h>
+
+struct counter {
+	uint64_t	packets;
+	uint64_t	bytes;
+};
+
+struct quota {
+	uint64_t	bytes;
+	uint64_t	used;
+	uint32_t	flags;
+};
+
+struct ct_helper {
+	char name[16];
+	uint16_t l3proto;
+	uint8_t l4proto;
+};
+
+struct limit {
+	uint64_t	rate;
+	uint64_t	unit;
+	uint32_t	burst;
+	uint32_t	type;
+	uint32_t	flags;
+};
+
+/**
+ * struct obj - nftables stateful object statement
+ *
+ * @list:	table set list node
+ * @location:	location the stateful object was defined/declared at
+ * @handle:	counter handle
+ * @type:	type of stateful object
+ * @refcnt:	object reference counter
+ */
+struct obj {
+	struct list_head		list;
+	struct location			location;
+	struct handle			handle;
+	uint32_t			type;
+	unsigned int			refcnt;
+	union {
+		struct counter		counter;
+		struct quota		quota;
+		struct ct_helper	ct_helper;
+		struct limit		limit;
+	};
+};
+
+struct obj *obj_alloc(const struct location *loc);
+extern struct obj *obj_get(struct obj *obj);
+void obj_free(struct obj *obj);
+void obj_add_hash(struct obj *obj, struct table *table);
+struct obj *obj_lookup(const struct table *table, const char *name,
+		       uint32_t type);
+void obj_print(const struct obj *n, struct output_ctx *octx);
+void obj_print_plain(const struct obj *obj, struct output_ctx *octx);
+const char *obj_type_name(uint32_t type);
+uint32_t obj_type_to_cmd(uint32_t type);
 
 /**
  * enum cmd_ops - command operations
@@ -266,6 +323,7 @@ extern void set_print_plain(const struct set *s);
  * @CMD_INSERT:		insert object
  * @CMD_DELETE:		delete object
  * @CMD_LIST:		list container
+ * @CMD_RESET:		reset container
  * @CMD_FLUSH:		flush container
  * @CMD_RENAME:		rename object
  * @CMD_EXPORT:		export the ruleset in a given format
@@ -280,6 +338,7 @@ enum cmd_ops {
 	CMD_INSERT,
 	CMD_DELETE,
 	CMD_LIST,
+	CMD_RESET,
 	CMD_FLUSH,
 	CMD_RENAME,
 	CMD_EXPORT,
@@ -302,6 +361,12 @@ enum cmd_ops {
  * @CMD_OBJ_EXPR:	expression
  * @CMD_OBJ_MONITOR:	monitor
  * @CMD_OBJ_EXPORT:	export
+ * @CMD_OBJ_COUNTER:	counter
+ * @CMD_OBJ_COUNTERS:	multiple counters
+ * @CMD_OBJ_QUOTA:	quota
+ * @CMD_OBJ_QUOTAS:	multiple quotas
+ * @CMD_OBJ_LIMIT:	limit
+ * @CMD_OBJ_LIMITS:	multiple limits
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
@@ -320,6 +385,14 @@ enum cmd_obj {
 	CMD_OBJ_FLOWTABLES,
 	CMD_OBJ_MAP,
 	CMD_OBJ_MAPS,
+	CMD_OBJ_COUNTER,
+	CMD_OBJ_COUNTERS,
+	CMD_OBJ_QUOTA,
+	CMD_OBJ_QUOTAS,
+	CMD_OBJ_CT_HELPER,
+	CMD_OBJ_CT_HELPERS,
+	CMD_OBJ_LIMIT,
+	CMD_OBJ_LIMITS,
 };
 
 struct export {
@@ -336,6 +409,8 @@ enum {
 	CMD_MONITOR_OBJ_RULES,
 	CMD_MONITOR_OBJ_SETS,
 	CMD_MONITOR_OBJ_ELEMS,
+	CMD_MONITOR_OBJ_RULESET,
+	CMD_MONITOR_OBJ_TRACE,
 	CMD_MONITOR_OBJ_MAX
 };
 
@@ -361,7 +436,6 @@ void monitor_free(struct monitor *m);
  * @seqnum:	sequence number to match netlink errors
  * @union:	object
  * @arg:	argument data
- * @format:	info about the export/import format
  */
 struct cmd {
 	struct list_head	list;
@@ -379,6 +453,7 @@ struct cmd {
 		struct table	*table;
 		struct monitor	*monitor;
 		struct export	*export;
+		struct obj	*object;
 	};
 	const void		*arg;
 };
@@ -386,6 +461,10 @@ struct cmd {
 extern struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 			     const struct handle *h, const struct location *loc,
 			     void *data);
+extern void nft_cmd_expand(struct cmd *cmd);
+extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
+				    const struct handle *h,
+				    const struct location *loc, struct obj *obj);
 extern void cmd_free(struct cmd *cmd);
 
 #include <payload.h>
@@ -394,22 +473,29 @@ extern void cmd_free(struct cmd *cmd);
 /**
  * struct eval_ctx - evaluation context
  *
+ * @nf_sock:	netlink socket (for caching)
  * @msgs:	message queue
  * @cmd:	current command
  * @table:	current table
  * @rule:	current rule
  * @set:	current set
  * @stmt:	current statement
+ * @cache:	cache context
+ * @debug_mask: debugging bitmask
  * @ectx:	expression context
  * @pctx:	payload context
  */
 struct eval_ctx {
+	struct mnl_socket	*nf_sock;
 	struct list_head	*msgs;
 	struct cmd		*cmd;
 	struct table		*table;
 	struct rule		*rule;
 	struct set		*set;
 	struct stmt		*stmt;
+	struct nft_cache	*cache;
+	struct output_ctx	*octx;
+	unsigned int		debug_mask;
 	struct expr_ctx		ectx;
 	struct proto_ctx	pctx;
 };
@@ -421,9 +507,11 @@ extern struct error_record *rule_postprocess(struct rule *rule);
 struct netlink_ctx;
 extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 
-extern int cache_update(enum cmd_ops cmd, struct list_head *msgs);
-extern void cache_flush(void);
-extern void cache_release(void);
+extern int cache_update(struct mnl_socket *nf_sock, struct nft_cache *cache,
+			enum cmd_ops cmd, struct list_head *msgs, bool debug,
+			struct output_ctx *octx);
+extern void cache_flush(struct list_head *table_list);
+extern void cache_release(struct nft_cache *cache);
 
 enum udata_type {
 	UDATA_TYPE_COMMENT,
@@ -432,5 +520,28 @@ enum udata_type {
 #define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
 
 #define UDATA_COMMENT_MAXLEN 128
+
+enum udata_set_type {
+	UDATA_SET_KEYBYTEORDER,
+	UDATA_SET_DATABYTEORDER,
+	__UDATA_SET_MAX,
+};
+#define UDATA_SET_MAX (__UDATA_SET_MAX - 1)
+
+enum udata_set_elem_type {
+	UDATA_SET_ELEM_COMMENT,
+	UDATA_SET_ELEM_FLAGS,
+	__UDATA_SET_ELEM_MAX,
+};
+#define UDATA_SET_ELEM_MAX (__UDATA_SET_ELEM_MAX - 1)
+
+/**
+ * enum udata_set_elem_flags - meaning of bits in UDATA_SET_ELEM_FLAGS
+ *
+ * @SET_ELEM_F_INTERVAL_OPEN:	set element denotes a half-open range
+ */
+enum udata_set_elem_flags {
+	SET_ELEM_F_INTERVAL_OPEN	= 0x1,
+};
 
 #endif /* NFTABLES_RULE_H */

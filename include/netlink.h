@@ -6,6 +6,7 @@
 #include <libnftnl/rule.h>
 #include <libnftnl/expr.h>
 #include <libnftnl/set.h>
+#include <libnftnl/object.h>
 
 #include <linux/netlink.h>
 #include <linux/netfilter/nf_tables.h>
@@ -18,6 +19,7 @@ struct netlink_parse_ctx {
 	struct rule		*rule;
 	struct stmt		*stmt;
 	struct expr		*registers[1 + NFT_REG32_15 - NFT_REG32_00 + 1];
+	unsigned int		debug_mask;
 };
 
 struct rule_pp_ctx {
@@ -37,14 +39,22 @@ extern const struct location netlink_location;
  * @set:	current set
  * @data:	pointer to pass data to callback
  * @seqnum:	sequence number
+ * @octx:	output context
+ * @debug_mask:	display debugging information
+ * @cache:	cache context
  */
 struct netlink_ctx {
+	struct mnl_socket	*nf_sock;
 	struct list_head	*msgs;
 	struct list_head	list;
 	struct set		*set;
 	const void		*data;
 	uint32_t		seqnum;
+	struct nftnl_batch	*batch;
 	bool			batch_supported;
+	unsigned int		debug_mask;
+	struct output_ctx	*octx;
+	struct nft_cache	*cache;
 };
 
 extern struct nftnl_table *alloc_nftnl_table(const struct handle *h);
@@ -104,8 +114,6 @@ extern int netlink_add_rule(struct netlink_ctx *ctx, const struct handle *h,
 			    const struct rule *rule, uint32_t flags);
 extern int netlink_delete_rule(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
-extern int netlink_add_rule_list(struct netlink_ctx *ctx, const struct handle *h,
-				 const struct list_head *rule_list);
 extern int netlink_add_rule_batch(struct netlink_ctx *ctx,
 				  const struct handle *h,
 				  const struct rule *rule, uint32_t flags);
@@ -119,48 +127,41 @@ extern int netlink_replace_rule_batch(struct netlink_ctx *ctx,
 
 extern int netlink_add_chain(struct netlink_ctx *ctx, const struct handle *h,
 			     const struct location *loc,
-			     const struct chain *chain, bool excl);
+			     const struct chain *chain, uint32_t flags);
 extern int netlink_rename_chain(struct netlink_ctx *ctx, const struct handle *h,
 				const struct location *loc, const char *name);
 extern int netlink_delete_chain(struct netlink_ctx *ctx, const struct handle *h,
 				const struct location *loc);
 extern int netlink_list_chains(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
-extern int netlink_get_chain(struct netlink_ctx *ctx, const struct handle *h,
-			     const struct location *loc);
-extern int netlink_list_chain(struct netlink_ctx *ctx, const struct handle *h,
-			      const struct location *loc);
 extern int netlink_flush_chain(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
 
 extern int netlink_add_table(struct netlink_ctx *ctx, const struct handle *h,
 			     const struct location *loc,
-			     const struct table *table, bool excl);
+			     const struct table *table, uint32_t flags);
 extern int netlink_delete_table(struct netlink_ctx *ctx, const struct handle *h,
 				const struct location *loc);
 extern int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
-extern int netlink_get_table(struct netlink_ctx *ctx, const struct handle *h,
-			     const struct location *loc, struct table *table);
 extern int netlink_list_table(struct netlink_ctx *ctx, const struct handle *h,
 			      const struct location *loc);
 extern int netlink_flush_table(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc);
 
 extern int netlink_add_set(struct netlink_ctx *ctx, const struct handle *h,
-			   struct set *set, bool excl);
+			   struct set *set, uint32_t flags);
 extern int netlink_delete_set(struct netlink_ctx *ctx, const struct handle *h,
 			      const struct location *loc);
 extern int netlink_list_sets(struct netlink_ctx *ctx, const struct handle *h,
 			     const struct location *loc);
-extern int netlink_get_set(struct netlink_ctx *ctx, const struct handle *h,
-			   const struct location *loc);
 
 extern struct stmt *netlink_parse_set_expr(const struct set *set,
+					   const struct nft_cache *cache,
 					   const struct nftnl_expr *nle);
 
 extern int netlink_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
-				const struct expr *expr, bool excl);
+				const struct expr *expr, uint32_t flags);
 extern int netlink_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
 				   const struct expr *expr);
 extern int netlink_get_setelems(struct netlink_ctx *ctx, const struct handle *h,
@@ -168,16 +169,30 @@ extern int netlink_get_setelems(struct netlink_ctx *ctx, const struct handle *h,
 extern int netlink_flush_setelems(struct netlink_ctx *ctx, const struct handle *h,
 				  const struct location *loc);
 
-extern void netlink_dump_table(const struct nftnl_table *nlt);
-extern void netlink_dump_chain(const struct nftnl_chain *nlc);
-extern void netlink_dump_rule(const struct nftnl_rule *nlr);
-extern void netlink_dump_expr(const struct nftnl_expr *nle);
-extern void netlink_dump_set(const struct nftnl_set *nls);
+extern int netlink_list_objs(struct netlink_ctx *ctx, const struct handle *h,
+			     const struct location *loc);
+extern int netlink_reset_objs(struct netlink_ctx *ctx, const struct handle *h,
+			      const struct location *loc, uint32_t type,
+			      bool dump);
+extern int netlink_add_obj(struct netlink_ctx *ctx, const struct handle *h,
+			   struct obj *obj, uint32_t flags);
+extern int netlink_delete_obj(struct netlink_ctx *ctx, const struct handle *h,
+			      struct location *loc, uint32_t type);
 
-extern int netlink_batch_send(struct list_head *err_list);
+extern void netlink_dump_chain(const struct nftnl_chain *nlc,
+			       struct netlink_ctx *ctx);
+extern void netlink_dump_rule(const struct nftnl_rule *nlr,
+			      struct netlink_ctx *ctx);
+extern void netlink_dump_expr(const struct nftnl_expr *nle,
+			      FILE *fp, unsigned int debug_mask);
+extern void netlink_dump_set(const struct nftnl_set *nls,
+			     struct netlink_ctx *ctx);
+extern void netlink_dump_obj(struct nftnl_obj *nlo, struct netlink_ctx *ctx);
 
-extern void netlink_genid_get(void);
-extern void netlink_restart(void);
+extern int netlink_batch_send(struct netlink_ctx *ctx, struct list_head *err_list);
+
+extern void netlink_genid_get(struct mnl_socket *nf_sock, uint32_t seqnum);
+extern void netlink_restart(struct mnl_socket *nf_sock);
 #define netlink_abi_error()	\
 	__netlink_abi_error(__FILE__, __LINE__, strerror(errno));
 extern void __noreturn __netlink_abi_error(const char *file, int line, const char *reason);
@@ -199,10 +214,15 @@ struct netlink_mon_handler {
 	uint32_t		format;
 	struct netlink_ctx	*ctx;
 	const struct location	*loc;
+	unsigned int		debug_mask;
 	bool			cache_needed;
+	struct nft_cache	*cache;
 };
 
-extern int netlink_monitor(struct netlink_mon_handler *monhandler);
-bool netlink_batch_supported(void);
+extern int netlink_monitor(struct netlink_mon_handler *monhandler,
+			    struct mnl_socket *nf_sock);
+bool netlink_batch_supported(struct mnl_socket *nf_sock, uint32_t *seqnum);
+
+int netlink_echo_callback(const struct nlmsghdr *nlh, void *data);
 
 #endif /* NFTABLES_NETLINK_H */

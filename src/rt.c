@@ -24,19 +24,19 @@
 #include <rule.h>
 
 static struct symbol_table *realm_tbl;
-static void __init realm_table_init(void)
+void realm_table_rt_init(void)
 {
 	realm_tbl = rt_symbol_table_init("/etc/iproute2/rt_realms");
 }
 
-static void __exit realm_table_exit(void)
+void realm_table_rt_exit(void)
 {
 	rt_symbol_table_free(realm_tbl);
 }
 
-static void realm_type_print(const struct expr *expr)
+static void realm_type_print(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_print(realm_tbl, expr, true);
+	return symbolic_constant_print(realm_tbl, expr, true, octx);
 }
 
 static struct error_record *realm_type_parse(const struct expr *sym,
@@ -45,7 +45,7 @@ static struct error_record *realm_type_parse(const struct expr *sym,
 	return symbolic_constant_parse(sym, realm_tbl, res);
 }
 
-static const struct datatype realm_type = {
+const struct datatype realm_type = {
 	.type		= TYPE_REALM,
 	.name		= "realm",
 	.desc		= "routing realm",
@@ -73,11 +73,29 @@ static const struct rt_template rt_templates[] = {
 					      16 * BITS_PER_BYTE,
 					      BYTEORDER_BIG_ENDIAN,
 					      true),
+	[NFT_RT_TCPMSS]		= RT_TEMPLATE("mtu",
+					      &integer_type,
+					      2 * BITS_PER_BYTE,
+					      BYTEORDER_HOST_ENDIAN,
+					      false),
 };
 
-static void rt_expr_print(const struct expr *expr)
+static void rt_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	printf("rt %s", rt_templates[expr->rt.key].token);
+	const char *ip = "";
+
+	switch (expr->rt.key) {
+	case NFT_RT_NEXTHOP4:
+		ip = "ip ";
+		break;
+	case NFT_RT_NEXTHOP6:
+		ip = "ip6 ";
+		break;
+	default:
+		break;
+	}
+
+	nft_print(octx, "rt %s%s", ip, rt_templates[expr->rt.key].token);
 }
 
 static bool rt_expr_cmp(const struct expr *e1, const struct expr *e2)
@@ -133,9 +151,4 @@ void rt_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 	default:
 		break;
 	}
-}
-
-static void __init rt_init(void)
-{
-	datatype_register(&realm_type);
 }

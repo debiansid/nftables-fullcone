@@ -4,8 +4,8 @@
 AC_PREREQ(2.61)
 
 AC_COPYRIGHT([Copyright (c) 2008 Patrick McHardy <kaber@trash.net>, (c) 2013-2016 Pablo Neira Ayuso <pablo@netfilter.org>])
-AC_INIT([nftables], [0.7], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Scrooge McDuck"], [Release name])
+AC_INIT([nftables], [0.8], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Joe Btfsplk"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CANONICAL_HOST
@@ -23,7 +23,7 @@ AC_DEFINE([_GNU_SOURCE], [], [Enable various GNU extensions])
 AC_DEFINE([_STDC_FORMAT_MACROS], [], [printf-style format macros])
 
 AC_ARG_ENABLE([debug],
-	      AS_HELP_STRING([--enable-debug], [Disable debugging]),
+	      AS_HELP_STRING([--enable-debug], [Disable debugging symbols]),
 	      AS_IF([test "x$enable_debug" = "xno"], [with_debug=no], [with_debug=yes]),
 	      [with_debug=yes])
 AC_SUBST(with_debug)
@@ -77,7 +77,7 @@ AM_COND_IF([BUILD_PDF], [
 
 # Checks for libraries.
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.7])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.8])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])], [],
@@ -102,7 +102,7 @@ AC_ARG_WITH([xtables], [AS_HELP_STRING([--with-xtables],
             [Use libxtables for iptables interaction)])],
 	    [with_libxtables=yes], [with_libxtables=no])
 AS_IF([test "x$with_libxtables" != xno], [
-PKG_CHECK_MODULES([XTABLES], [xtables >= 1.6.0])
+PKG_CHECK_MODULES([XTABLES], [xtables >= 1.6.1])
 AC_DEFINE([HAVE_LIBXTABLES], [1], [0])
 ])
 AC_SUBST(with_libxtables)
@@ -155,7 +155,7 @@ AC_OUTPUT
 echo "
 nft configuration:
   cli support:			${with_cli}
-  enable debugging:		${with_debug}
+  enable debugging symbols:	${with_debug}
   use mini-gmp:			${with_mini_gmp}
   enable pdf documentation:	${enable_pdf_doc}
   libxtables support:		${with_libxtables}"

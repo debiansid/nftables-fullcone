@@ -138,12 +138,12 @@ const struct hook_proto_desc hook_proto_desc[] = {
 	[NFPROTO_ARP]		= HOOK_PROTO_DESC(PROTO_BASE_NETWORK_HDR, &proto_arp),
 };
 
-static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base)
+static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base,
+			    unsigned int debug_mask)
 {
-#ifdef DEBUG
 	unsigned int i;
 
-	if (!(debug_level & DEBUG_PROTO_CTX))
+	if (!(debug_mask & DEBUG_PROTO_CTX))
 		return;
 
 	pr_debug("update %s protocol context:\n", proto_base_names[base]);
@@ -159,7 +159,6 @@ static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base)
 		pr_debug("\n");
 	}
 	pr_debug("\n");
-#endif
 }
 
 /**
@@ -167,16 +166,19 @@ static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base)
  *
  * @ctx:	protocol context
  * @family:	hook family
+ * @debug_mask:	display debugging information
  */
-void proto_ctx_init(struct proto_ctx *ctx, unsigned int family)
+void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,
+		    unsigned int debug_mask)
 {
 	const struct hook_proto_desc *h = &hook_proto_desc[family];
 
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->family = family;
 	ctx->protocol[h->base].desc = h->desc;
+	ctx->debug_mask = debug_mask;
 
-	proto_ctx_debug(ctx, h->base);
+	proto_ctx_debug(ctx, h->base, debug_mask);
 }
 
 /**
@@ -194,7 +196,7 @@ void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 	ctx->protocol[base].location	= *loc;
 	ctx->protocol[base].desc	= desc;
 
-	proto_ctx_debug(ctx, base);
+	proto_ctx_debug(ctx, base, ctx->debug_mask);
 }
 
 #define HDR_TEMPLATE(__name, __dtype, __type, __member)			\
@@ -406,7 +408,7 @@ static const struct symbol_table tcp_flag_tbl = {
 	},
 };
 
-static const struct datatype tcp_flag_type = {
+const struct datatype tcp_flag_type = {
 	.type		= TYPE_TCP_FLAG,
 	.name		= "tcp_flag",
 	.desc		= "TCP flag",
@@ -467,7 +469,7 @@ static const struct symbol_table dccp_pkttype_tbl = {
 	},
 };
 
-static const struct datatype dccp_pkttype_type = {
+const struct datatype dccp_pkttype_type = {
 	.type		= TYPE_DCCP_PKTTYPE,
 	.name		= "dccp_pkttype",
 	.desc		= "DCCP packet type",
@@ -545,7 +547,7 @@ static const struct symbol_table dscp_type_tbl = {
 	},
 };
 
-static const struct datatype dscp_type = {
+const struct datatype dscp_type = {
 	.type		= TYPE_DSCP,
 	.name		= "dscp",
 	.desc		= "Differentiated Services Code Point",
@@ -567,7 +569,7 @@ static const struct symbol_table ecn_type_tbl = {
 	},
 };
 
-static const struct datatype ecn_type = {
+const struct datatype ecn_type = {
 	.type		= TYPE_ECN,
 	.name		= "ecn",
 	.desc		= "Explicit Congestion Notification",
@@ -587,7 +589,6 @@ const struct proto_desc proto_ip = {
 	.name		= "ip",
 	.base		= PROTO_BASE_NETWORK_HDR,
 	.checksum_key	= IPHDR_CHECKSUM,
-	.protocol_key	= IPHDR_PROTOCOL,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
 		PROTO_LINK(IPPROTO_ESP,		&proto_esp),
@@ -600,6 +601,7 @@ const struct proto_desc proto_ip = {
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
 	},
 	.templates	= {
+		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
 		[IPHDR_VERSION]		= HDR_BITFIELD("version", &integer_type, 0, 4),
 		[IPHDR_HDRLENGTH]	= HDR_BITFIELD("hdrlength", &integer_type, 4, 4),
 		[IPHDR_DSCP]            = HDR_BITFIELD("dscp", &dscp_type, 8, 6),
@@ -632,6 +634,10 @@ const struct proto_desc proto_ip = {
 
 #include <netinet/icmp6.h>
 
+#define IND_NEIGHBOR_SOLICIT	141
+#define IND_NEIGHBOR_ADVERT	142
+#define ICMPV6_MLD2_REPORT	143
+
 static const struct symbol_table icmp6_type_tbl = {
 	.base		= BASE_DECIMAL,
 	.symbols	= {
@@ -643,6 +649,7 @@ static const struct symbol_table icmp6_type_tbl = {
 		SYMBOL("echo-reply",			ICMP6_ECHO_REPLY),
 		SYMBOL("mld-listener-query",		MLD_LISTENER_QUERY),
 		SYMBOL("mld-listener-report",		MLD_LISTENER_REPORT),
+		SYMBOL("mld-listener-done",		MLD_LISTENER_REDUCTION),
 		SYMBOL("mld-listener-reduction",	MLD_LISTENER_REDUCTION),
 		SYMBOL("nd-router-solicit",		ND_ROUTER_SOLICIT),
 		SYMBOL("nd-router-advert",		ND_ROUTER_ADVERT),
@@ -650,11 +657,14 @@ static const struct symbol_table icmp6_type_tbl = {
 		SYMBOL("nd-neighbor-advert",		ND_NEIGHBOR_ADVERT),
 		SYMBOL("nd-redirect",			ND_REDIRECT),
 		SYMBOL("router-renumbering",		ICMP6_ROUTER_RENUMBERING),
+		SYMBOL("ind-neighbor-solicit",		IND_NEIGHBOR_SOLICIT),
+		SYMBOL("ind-neighbor-advert",		IND_NEIGHBOR_ADVERT),
+		SYMBOL("mld2-listener-report",		ICMPV6_MLD2_REPORT),
 		SYMBOL_LIST_END
 	},
 };
 
-static const struct datatype icmp6_type_type = {
+const struct datatype icmp6_type_type = {
 	.type		= TYPE_ICMP6_TYPE,
 	.name		= "icmpv6_type",
 	.desc		= "ICMPv6 type",
@@ -699,7 +709,6 @@ const struct proto_desc proto_icmp6 = {
 const struct proto_desc proto_ip6 = {
 	.name		= "ip6",
 	.base		= PROTO_BASE_NETWORK_HDR,
-	.protocol_key	= IP6HDR_NEXTHDR,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ESP,		&proto_esp),
 		PROTO_LINK(IPPROTO_AH,		&proto_ah),
@@ -712,6 +721,7 @@ const struct proto_desc proto_ip6 = {
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 	},
 	.templates	= {
+		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
 		[IP6HDR_VERSION]	= HDR_BITFIELD("version", &integer_type, 0, 4),
 		[IP6HDR_DSCP]		= HDR_BITFIELD("dscp", &dscp_type, 4, 6),
 		[IP6HDR_ECN]		= HDR_BITFIELD("ecn", &ecn_type, 10, 2),
@@ -771,6 +781,8 @@ const struct proto_desc proto_inet_service = {
 		PROTO_LINK(IPPROTO_TCP,		&proto_tcp),
 		PROTO_LINK(IPPROTO_DCCP,	&proto_dccp),
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
+		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
+		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 	},
 	.templates	= {
 		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
@@ -797,7 +809,7 @@ static const struct symbol_table arpop_tbl = {
 	},
 };
 
-static const struct datatype arpop_type = {
+const struct datatype arpop_type = {
 	.type		= TYPE_ARPOP,
 	.name		= "arp_op",
 	.desc		= "ARP operation",
@@ -883,9 +895,9 @@ static const struct symbol_table ethertype_tbl = {
 	},
 };
 
-static void ethertype_print(const struct expr *expr)
+static void ethertype_print(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_print(&ethertype_tbl, expr, false);
+	return symbolic_constant_print(&ethertype_tbl, expr, false, octx);
 }
 
 const struct datatype ethertype_type = {
@@ -950,15 +962,3 @@ const struct proto_desc proto_netdev = {
 		[0]	= PROTO_META_TEMPLATE("protocol", &ethertype_type, NFT_META_PROTOCOL, 16),
 	},
 };
-
-static void __init proto_init(void)
-{
-	datatype_register(&icmp_type_type);
-	datatype_register(&tcp_flag_type);
-	datatype_register(&dccp_pkttype_type);
-	datatype_register(&arpop_type);
-	datatype_register(&ethertype_type);
-	datatype_register(&icmp6_type_type);
-	datatype_register(&dscp_type);
-	datatype_register(&ecn_type);
-}

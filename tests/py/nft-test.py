@@ -27,6 +27,7 @@ log_file = None
 table_list = []
 chain_list = []
 all_set = dict()
+obj_list = []
 signal_received = 0
 
 
@@ -78,6 +79,20 @@ class Set:
         self.name = name
         self.type = type
         self.flags = flags
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
+class Obj:
+    """Class that represents an object"""
+
+    def __init__(self, table, family, name, type, spcf):
+        self.table = table
+        self.family = family
+        self.name = name
+        self.type = type
+        self.spcf = spcf
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -472,6 +487,102 @@ def set_check_element(rule1, rule2):
 
     return cmp(rule1[end1:], rule2[end2:])
 
+
+def obj_add(o, test_result, filename, lineno):
+    '''
+    Adds an object.
+    '''
+    if not table_list:
+        reason = "Missing table to add rule"
+        print_error(reason, filename, lineno)
+        return -1
+
+    for table in table_list:
+        o.table = table.name
+        o.family = table.family
+        obj_handle = o.type + " " + o.name
+        if _obj_exist(o, filename, lineno):
+            reason = "The " + obj_handle + " already exists in " + table.name
+            print_error(reason, filename, lineno)
+            return -1
+
+        table_handle = " " + table.family + " " + table.name + " "
+
+        cmd = NFT_BIN + " add " + o.type + table_handle + o.name + " " + o.spcf
+        ret = execute_cmd(cmd, filename, lineno)
+
+        if (ret == 0 and test_result == "fail") or \
+                (ret != 0 and test_result == "ok"):
+            reason = cmd + ": " + "I cannot add the " + obj_handle
+            print_error(reason, filename, lineno)
+            return -1
+
+        exist = _obj_exist(o, filename, lineno)
+
+        if exist:
+            if test_result == "ok":
+                 return 0
+            reason = "I added the " + obj_handle + \
+                     " to the table " + table.name + " but it should have failed"
+            print_error(reason, filename, lineno)
+            return -1
+
+        if test_result == "fail":
+            return 0
+
+        reason = "I have just added the " + obj_handle + \
+                 " to the table " + table.name + " but it does not exist"
+        print_error(reason, filename, lineno)
+        return -1
+
+def obj_delete(table, filename=None, lineno=None):
+    '''
+    Deletes object.
+    '''
+    for o in obj_list:
+        obj_handle = o.type + " " + o.name
+        # Check if exists the obj
+        if not obj_exist(o, table, filename, lineno):
+            reason = "The " + obj_handle + " does not exist, I cannot delete it"
+            print_error(reason, filename, lineno)
+            return -1
+
+        # We delete the object.
+        table_info = " " + table.family + " " + table.name + " "
+        cmd = NFT_BIN + " delete " + o.type + table_info + " " + o.name
+        ret = execute_cmd(cmd, filename, lineno)
+
+        # Check if the object still exists after I deleted it.
+        if ret != 0 or obj_exist(o, table, filename, lineno):
+            reason = "Cannot remove the " + obj_handle
+            print_error(reason, filename, lineno)
+            return -1
+
+    return 0
+
+
+def obj_exist(o, table, filename, lineno):
+    '''
+    Check if the object exists.
+    '''
+    table_handle = " " + table.family + " " + table.name + " "
+    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
+    ret = execute_cmd(cmd, filename, lineno)
+
+    return True if (ret == 0) else False
+
+
+def _obj_exist(o, filename, lineno):
+    '''
+    Check if the object exists.
+    '''
+    table_handle = " " + o.family + " " + o.table + " "
+    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
+    ret = execute_cmd(cmd, filename, lineno)
+
+    return True if (ret == 0) else False
+
+
 def output_clean(pre_output, chain):
     pos_chain = pre_output.find(chain.name)
     if pos_chain == -1:
@@ -591,7 +702,7 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
             ret = execute_cmd(cmd, filename, lineno, payload_log)
 
             state = rule[1].rstrip()
-            if (ret == 0 and state == "fail") or (ret != 0 and state == "ok"):
+            if (ret in [0,134] and state == "fail") or (ret != 0 and state == "ok"):
                 if state == "fail":
                     test_state = "This rule should have failed."
                 else:
@@ -625,7 +736,7 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                                   gotf.name, 1)
 
                 # Check output of nft
-                process = subprocess.Popen([NFT_BIN, '-nnn', 'list', 'table',
+                process = subprocess.Popen([NFT_BIN, '-nnns', 'list', 'table',
                                             table.family, table.name],
                                            shell=False,
                                            stdout=subprocess.PIPE,
@@ -684,6 +795,8 @@ def cleanup_on_exit():
             chain_delete(chain, table, "", "")
         if all_set:
             set_delete(table)
+        if obj_list:
+            obj_delete(table)
         table_delete(table)
 
 
@@ -753,8 +866,13 @@ def set_process(set_line, filename, lineno):
     set_name = tokens[0]
     set_type = tokens[2]
 
-    if len(tokens) == 5 and tokens[3] == "flags":
-        set_flags = tokens[4]
+    i = 3
+    while len(tokens) > i and tokens[i] == ".":
+        set_type += " . " + tokens[i+1]
+        i += 2
+
+    if len(tokens) == i+2 and tokens[i] == "flags":
+        set_flags = tokens[i+1]
     else:
         set_flags = ""
 
@@ -773,6 +891,30 @@ def set_element_process(element_line, filename, lineno):
     set_element = element_line[0].split(" ")
     set_element.remove(set_name)
     return set_add_elements(set_element, set_name, rule_state, filename, lineno)
+
+
+def obj_process(obj_line, filename, lineno):
+    test_result = obj_line[1]
+
+    tokens = obj_line[0].split(" ")
+    obj_name = tokens[0]
+    obj_type = tokens[2]
+    obj_spcf = ""
+
+    if obj_type == "ct" and tokens[3] == "helper":
+       obj_type = "ct helper"
+       tokens[3] = ""
+
+    if len(tokens) > 3:
+        obj_spcf = " ".join(tokens[3:])
+
+    o = Obj("", "", obj_name, obj_type, obj_spcf)
+
+    ret = obj_add(o, test_result, filename, lineno)
+    if ret == 0:
+        obj_list.append(o)
+
+    return ret
 
 
 def payload_find_expected(payload_log, rule):
@@ -818,6 +960,8 @@ def run_test_file(filename, force_all_family_option, specific_file):
     tests = passed = total_unit_run = total_warning = total_error = 0
 
     for lineno, line in enumerate(f):
+        sys.stdout.flush()
+
         if signal_received == 1:
             print "\nSignal received. Cleaning up and Exitting..."
             cleanup_on_exit()
@@ -859,6 +1003,20 @@ def run_test_file(filename, force_all_family_option, specific_file):
             if ret == -1:
                 continue
 
+            passed += 1
+            continue
+
+        if line[0] == "%":  # Adds this object
+            brace = line.rfind("}")
+            if brace < 0:
+                obj_line = line.rstrip()[1:].split(";")
+            else:
+                obj_line = (line[1:brace+1], line[brace+2:].rstrip())
+
+            ret = obj_process(obj_line, filename, lineno)
+            tests += 1
+            if ret == -1:
+                continue
             passed += 1
             continue
 

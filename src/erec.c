@@ -27,21 +27,56 @@ const struct location internal_location = {
 	.indesc	= &internal_indesc,
 };
 
-static const char *error_record_names[] = {
+static const char * const error_record_names[] = {
 	[EREC_INFORMATIONAL]	= NULL,
 	[EREC_WARNING]		= "Warning",
 	[EREC_ERROR]		= "Error"
 };
 
+static void input_descriptor_destroy(const struct input_descriptor *indesc)
+{
+	if (indesc->location.indesc &&
+	    indesc->location.indesc->type != INDESC_INTERNAL) {
+		input_descriptor_destroy(indesc->location.indesc);
+	}
+	if (indesc->name)
+		xfree(indesc->name);
+	xfree(indesc);
+}
+
+static struct input_descriptor *input_descriptor_dup(const struct input_descriptor *indesc)
+{
+	struct input_descriptor *dup_indesc;
+
+	dup_indesc = xmalloc(sizeof(struct input_descriptor));
+	*dup_indesc = *indesc;
+
+	if (indesc->location.indesc &&
+	    indesc->location.indesc->type != INDESC_INTERNAL)
+		dup_indesc->location.indesc = input_descriptor_dup(indesc->location.indesc);
+
+	if (indesc->name)
+		dup_indesc->name = xstrdup(indesc->name);
+
+	return dup_indesc;
+}
+
 void erec_add_location(struct error_record *erec, const struct location *loc)
 {
 	assert(erec->num_locations < EREC_LOCATIONS_MAX);
-	erec->locations[erec->num_locations++] = *loc;
+	erec->locations[erec->num_locations] = *loc;
+	erec->locations[erec->num_locations].indesc = input_descriptor_dup(loc->indesc);
+	erec->num_locations++;
 }
 
-static void erec_destroy(struct error_record *erec)
+void erec_destroy(struct error_record *erec)
 {
+	unsigned int i;
+
 	xfree(erec->msg);
+	for (i = 0; i < erec->num_locations; i++) {
+		input_descriptor_destroy(erec->locations[i].indesc);
+	}
 	xfree(erec);
 }
 
@@ -77,16 +112,21 @@ struct error_record *erec_create(enum error_record_types type,
 	return erec;
 }
 
-void erec_print(FILE *f, const struct error_record *erec)
+void erec_print(struct output_ctx *octx, const struct error_record *erec,
+		unsigned int debug_mask)
 {
 	const struct location *loc = erec->locations, *iloc;
 	const struct input_descriptor *indesc = loc->indesc, *tmp;
 	const char *line = NULL; /* silence gcc */
-	char buf[1024];
+	char buf[1024] = {};
 	char *pbuf = NULL;
 	unsigned int i, end;
 	int l, ret;
 	off_t orig_offset = 0;
+	FILE *f = octx->output_fp;
+
+	if (!f)
+		return;
 
 	switch (indesc->type) {
 	case INDESC_BUFFER:
@@ -95,14 +135,13 @@ void erec_print(FILE *f, const struct error_record *erec)
 		*strchrnul(line, '\n') = '\0';
 		break;
 	case INDESC_FILE:
-		memset(buf, 0, sizeof(buf));
-		orig_offset = lseek(indesc->fd, 0, SEEK_CUR);
-		lseek(indesc->fd, loc->line_offset, SEEK_SET);
-		ret = read(indesc->fd, buf, sizeof(buf) - 1);
+		orig_offset = ftell(indesc->fp);
+		fseek(indesc->fp, loc->line_offset, SEEK_SET);
+		ret = fread(buf, 1, sizeof(buf) - 1, indesc->fp);
 		if (ret > 0)
 			*strchrnul(buf, '\n') = '\0';
 		line = buf;
-		lseek(indesc->fd, orig_offset, SEEK_SET);
+		fseek(indesc->fp, orig_offset, SEEK_SET);
 		break;
 	case INDESC_INTERNAL:
 	case INDESC_NETLINK:
@@ -118,7 +157,7 @@ void erec_print(FILE *f, const struct error_record *erec)
 		fprintf(f, "%s\n", erec->msg);
 		for (l = 0; l < (int)erec->num_locations; l++) {
 			loc = &erec->locations[l];
-			netlink_dump_expr(loc->nle);
+			netlink_dump_expr(loc->nle, f, debug_mask);
 		}
 		fprintf(f, "\n");
 	} else {
@@ -167,13 +206,14 @@ void erec_print(FILE *f, const struct error_record *erec)
 	fprintf(f, "\n");
 }
 
-void erec_print_list(FILE *f, struct list_head *list)
+void erec_print_list(struct output_ctx *octx, struct list_head *list,
+		     unsigned int debug_mask)
 {
 	struct error_record *erec, *next;
 
 	list_for_each_entry_safe(erec, next, list, list) {
 		list_del(&erec->list);
-		erec_print(f, erec);
+		erec_print(octx, erec, debug_mask);
 		erec_destroy(erec);
 	}
 }

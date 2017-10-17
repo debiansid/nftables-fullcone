@@ -41,11 +41,11 @@ Files: src/mergesort.c
 Copyright: 2017 Elise Lennion <elise.lennion@gmail.com>
 License: GPL-2
 
-File: src/rt.c
+Files: src/rt.c
 Copyright: 2016 Anders K. Pedersen <akp@cohaesio.com>
 License: GPL-2
 
-File: src/fib.c
+Files: src/fib.c
 Copyright: Red Hat GmbH
 License: GPL-2
 

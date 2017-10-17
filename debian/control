@@ -6,8 +6,6 @@ Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
                bison,
                debhelper (>= 10),
-               dh-autoreconf,
-               dh-systemd,
                docbook2x,
                flex,
                libgmp-dev,

@@ -1,3 +1,21 @@
+nftables (0.8-1) unstable; urgency=medium
+
+  [ Alexander Greiner-Bär ]
+  * [4157de9] nftables.service: use correct order in systemd unit file
+    (Closes: #873856)
+
+  [ Arturo Borrero Gonzalez ]
+  * [311b618] New upstream version 0.8
+  * [b38f21a] d/control: bump libnftnl dependency to 1.0.8
+  * [19f5962] d/control: bump std-version to 4.1.1
+  * [7d95221] d/watch: ignore nftables upstream version 0.100 and 0.099
+  * [da499c0] d/control: update package description
+  * [734076e] nftables: update package documentation
+  * [8883735] d/copyright: refresh file
+  * [c5af3f3] d/control: drop old depends of dh- packages
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 18 Oct 2017 01:00:05 +0200
+
 nftables (0.7-2) unstable; urgency=medium
 
   [ Arturo Borrero Gonzalez ]

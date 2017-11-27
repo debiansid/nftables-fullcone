@@ -1,3 +1,11 @@
+nftables (0.8-2) unstable; urgency=medium
+
+  * [95b5638] d/t/internaltest-py.sh: enable test, dummy module not required
+  * [a5f037d] d/control: bump build-dep version on libxtables to 1.6.1.
+    Thanks to James Clarke for the report.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 27 Nov 2017 13:07:24 +0100
+
 nftables (0.8-1) unstable; urgency=medium
 
   [ Alexander Greiner-Bär ]

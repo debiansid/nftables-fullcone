@@ -12,7 +12,7 @@ Build-Depends: automake,
                libmnl-dev (>= 1.0.3),
                libnftnl-dev (>= 1.0.8),
                libreadline-dev,
-	       libxtables-dev (>= 1.6.0+snapshot20161117-4),
+	       libxtables-dev (>= 1.6.1),
                libtool (>=2.2.6)
 Standards-Version: 4.1.1
 Homepage: http://www.netfilter.org/

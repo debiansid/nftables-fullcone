@@ -4,7 +4,7 @@
 AC_PREREQ(2.61)
 
 AC_COPYRIGHT([Copyright (c) 2008 Patrick McHardy <kaber@trash.net>, (c) 2013-2016 Pablo Neira Ayuso <pablo@netfilter.org>])
-AC_INIT([nftables], [0.8], [netfilter-devel@vger.kernel.org])
+AC_INIT([nftables], [0.8.1], [netfilter-devel@vger.kernel.org])
 AC_DEFINE([RELEASE_NAME], ["Joe Btfsplk"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
@@ -56,6 +56,9 @@ then
         exit 1
 fi
 
+AM_PROG_AR
+AM_PROG_LIBTOOL
+
 AC_CHECK_PROG(DOCBOOK2X_MAN, [docbook2x-man], [docbook2x-man], [no])
 AC_CHECK_PROG(DOCBOOK2MAN, [docbook2man], [docbook2man], [no])
 AC_CHECK_PROG(DB2X_DOCBOOK2MAN, [db2x_docbook2man], [db2x_docbook2man], [no])
@@ -77,7 +80,7 @@ AM_COND_IF([BUILD_PDF], [
 
 # Checks for libraries.
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.8])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.9])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])], [],
@@ -138,8 +141,10 @@ AC_CHECK_FUNCS([memmove memset strchr strdup strerror strtoull])
 
 AC_CONFIG_FILES([					\
 		Makefile				\
+		libnftables.pc				\
 		src/Makefile				\
 		include/Makefile			\
+		include/nftables/Makefile		\
 		include/linux/Makefile			\
 		include/linux/netfilter/Makefile	\
 		include/linux/netfilter_arp/Makefile	\

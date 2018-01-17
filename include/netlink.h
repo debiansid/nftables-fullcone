@@ -42,6 +42,7 @@ extern const struct location netlink_location;
  * @octx:	output context
  * @debug_mask:	display debugging information
  * @cache:	cache context
+ * @range_merge: merge adjacent/overlapping ranges in new set elements
  */
 struct netlink_ctx {
 	struct mnl_socket	*nf_sock;
@@ -55,6 +56,7 @@ struct netlink_ctx {
 	unsigned int		debug_mask;
 	struct output_ctx	*octx;
 	struct nft_cache	*cache;
+	bool			range_merge;
 };
 
 extern struct nftnl_table *alloc_nftnl_table(const struct handle *h);
@@ -191,7 +193,7 @@ extern void netlink_dump_obj(struct nftnl_obj *nlo, struct netlink_ctx *ctx);
 
 extern int netlink_batch_send(struct netlink_ctx *ctx, struct list_head *err_list);
 
-extern void netlink_genid_get(struct mnl_socket *nf_sock, uint32_t seqnum);
+extern uint16_t netlink_genid_get(struct netlink_ctx *ctx);
 extern void netlink_restart(struct mnl_socket *nf_sock);
 #define netlink_abi_error()	\
 	__netlink_abi_error(__FILE__, __LINE__, strerror(errno));

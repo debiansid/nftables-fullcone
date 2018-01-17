@@ -4,25 +4,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <utils.h>
-
-enum numeric_level {
-	NUMERIC_NONE,
-	NUMERIC_ADDR,
-	NUMERIC_PORT,
-	NUMERIC_ALL,
-};
-
-enum debug_level {
-	DEBUG_SCANNER		= 0x1,
-	DEBUG_PARSER		= 0x2,
-	DEBUG_EVALUATION	= 0x4,
-	DEBUG_NETLINK		= 0x8,
-	DEBUG_MNL		= 0x10,
-	DEBUG_PROTO_CTX		= 0x20,
-	DEBUG_SEGTREE		= 0x40,
-};
-
-#define INCLUDE_PATHS_MAX	16
+#include <nftables/nftables.h>
 
 struct output_ctx {
 	unsigned int numeric;
@@ -34,7 +16,7 @@ struct output_ctx {
 };
 
 struct nft_cache {
-	bool			initialized;
+	uint16_t		genid;
 	struct list_head	list;
 	uint32_t		seqnum;
 };
@@ -43,17 +25,16 @@ struct mnl_socket;
 
 struct nft_ctx {
 	struct mnl_socket	*nf_sock;
-	const char		*include_paths[INCLUDE_PATHS_MAX];
+	char			**include_paths;
 	unsigned int		num_include_paths;
 	unsigned int		parser_max_errors;
 	unsigned int		debug_mask;
 	struct output_ctx	output;
 	bool			check;
+	bool			range_merge;
 	struct nft_cache	cache;
 	uint32_t		flags;
 };
-
-#define NFT_CTX_DEFAULT		0
 
 enum nftables_exit_codes {
 	NFT_EXIT_SUCCESS	= 0,
@@ -127,13 +108,6 @@ struct input_descriptor {
 	off_t				token_offset;
 	off_t				line_offset;
 };
-
-struct parser_state;
-struct mnl_socket;
-
-int nft_run(struct nft_ctx *nft, struct mnl_socket *nf_sock,
-	    void *scanner, struct parser_state *state,
-	    struct list_head *msgs);
 
 void ct_label_table_init(void);
 void mark_table_init(void);

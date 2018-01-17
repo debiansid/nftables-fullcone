@@ -206,7 +206,7 @@ static void uid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct passwd *pw;
 
-	if (octx->numeric < NUMERIC_ALL) {
+	if (octx->numeric < NFT_NUMERIC_ALL) {
 		uint32_t uid = mpz_get_uint32(expr->value);
 
 		pw = getpwuid(uid);
@@ -258,7 +258,7 @@ static void gid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct group *gr;
 
-	if (octx->numeric < NUMERIC_ALL) {
+	if (octx->numeric < NFT_NUMERIC_ALL) {
 		uint32_t gid = mpz_get_uint32(expr->value);
 
 		gr = getgrgid(gid);
@@ -481,8 +481,6 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 	const struct expr *left = expr->left, *right = expr->right;
 	const struct proto_desc *desc;
 	uint8_t protonum;
-
-	assert(expr->op == OP_EQ);
 
 	switch (left->meta.key) {
 	case NFT_META_IIFTYPE:

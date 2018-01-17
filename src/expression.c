@@ -600,13 +600,26 @@ struct expr *relational_expr_alloc(const struct location *loc, enum ops op,
 	return expr;
 }
 
+void relational_expr_pctx_update(struct proto_ctx *ctx,
+				 const struct expr *expr)
+{
+	const struct expr *left = expr->left;
+
+	assert(expr->ops->type == EXPR_RELATIONAL);
+	assert(expr->op == OP_EQ);
+
+	if (left->ops->pctx_update &&
+	    (left->flags & EXPR_F_PROTOCOL))
+		left->ops->pctx_update(ctx, expr);
+}
+
 static void range_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	octx->numeric += NUMERIC_ALL + 1;
+	octx->numeric += NFT_NUMERIC_ALL + 1;
 	expr_print(expr->left, octx);
 	nft_print(octx, "-");
 	expr_print(expr->right, octx);
-	octx->numeric -= NUMERIC_ALL + 1;
+	octx->numeric -= NFT_NUMERIC_ALL + 1;
 }
 
 static void range_expr_clone(struct expr *new, const struct expr *expr)
@@ -932,7 +945,7 @@ static void set_ref_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	if (expr->set->flags & NFT_SET_ANONYMOUS) {
 		if (expr->set->flags & NFT_SET_EVAL)
-			nft_print(octx, "table %s", expr->set->handle.set);
+			nft_print(octx, "%s", expr->set->handle.set);
 		else
 			expr_print(expr->set->init, octx);
 	} else {

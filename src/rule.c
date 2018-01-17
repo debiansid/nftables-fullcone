@@ -121,28 +121,17 @@ static int cache_init_objects(struct netlink_ctx *ctx, enum cmd_ops cmd)
 	return 0;
 }
 
-static int cache_init(struct mnl_socket *nf_sock, struct nft_cache *cache,
-		      enum cmd_ops cmd, struct list_head *msgs,
-		      unsigned int debug_mask, struct output_ctx *octx)
+static int cache_init(struct netlink_ctx *ctx, enum cmd_ops cmd)
 {
 	struct handle handle = {
 		.family = NFPROTO_UNSPEC,
 	};
-	struct netlink_ctx ctx = {
-		.list		= LIST_HEAD_INIT(ctx.list),
-		.nf_sock	= nf_sock,
-		.cache		= cache,
-		.msgs		= msgs,
-		.seqnum		= cache->seqnum++,
-		.debug_mask	= debug_mask,
-		.octx		= octx,
-	};
 	int ret;
 
-	ret = cache_init_tables(&ctx, &handle, cache);
+	ret = cache_init_tables(ctx, &handle, ctx->cache);
 	if (ret < 0)
 		return ret;
-	ret = cache_init_objects(&ctx, cmd);
+	ret = cache_init_objects(ctx, cmd);
 	if (ret < 0)
 		return ret;
 
@@ -153,13 +142,24 @@ int cache_update(struct mnl_socket *nf_sock, struct nft_cache *cache,
 		 enum cmd_ops cmd, struct list_head *msgs, bool debug,
 		 struct output_ctx *octx)
 {
+	uint16_t genid;
 	int ret;
+	struct netlink_ctx ctx = {
+		.list		= LIST_HEAD_INIT(ctx.list),
+		.nf_sock	= nf_sock,
+		.cache		= cache,
+		.msgs		= msgs,
+		.debug_mask	= debug ? NFT_DEBUG_NETLINK : 0,
+		.octx		= octx,
+	};
 
-	if (cache->initialized)
-		return 0;
 replay:
-	netlink_genid_get(nf_sock, cache->seqnum++);
-	ret = cache_init(nf_sock, cache, cmd, msgs, debug, octx);
+	ctx.seqnum = cache->seqnum++;
+	genid = netlink_genid_get(&ctx);
+	if (genid && genid == cache->genid)
+		return 0;
+	cache_release(cache);
+	ret = cache_init(&ctx, cmd);
 	if (ret < 0) {
 		cache_release(cache);
 		if (errno == EINTR) {
@@ -168,7 +168,7 @@ replay:
 		}
 		return -1;
 	}
-	cache->initialized = true;
+	cache->genid = genid;
 	return 0;
 }
 
@@ -185,7 +185,7 @@ void cache_flush(struct list_head *table_list)
 void cache_release(struct nft_cache *cache)
 {
 	cache_flush(&cache->list);
-	cache->initialized = false;
+	cache->genid = 0;
 }
 
 /* internal ID to uniquely identify a set in the batch */
@@ -284,7 +284,7 @@ static void set_print_declaration(const struct set *set,
 	if (set->flags & (NFT_SET_MAP | NFT_SET_OBJECT))
 		type = "map";
 	else if (set->flags & NFT_SET_EVAL)
-		type = "flow table";
+		type = "meter";
 	else
 		type = "set";
 
@@ -997,7 +997,8 @@ static int do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
 	set = set_lookup(table, h->set);
 
 	if (set->flags & NFT_SET_INTERVAL &&
-	    set_to_intervals(ctx->msgs, set, init, true, ctx->debug_mask) < 0)
+	    set_to_intervals(ctx->msgs, set, init, true,
+			     ctx->debug_mask, ctx->range_merge) < 0)
 		return -1;
 
 	return __do_add_setelems(ctx, h, set, init, flags);
@@ -1009,7 +1010,7 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 	if (set->init != NULL) {
 		if (set->flags & NFT_SET_INTERVAL &&
 		    set_to_intervals(ctx->msgs, set, set->init, true,
-				     ctx->debug_mask) < 0)
+				     ctx->debug_mask, ctx->range_merge) < 0)
 			return -1;
 	}
 	if (netlink_add_set(ctx, h, set, flags) < 0)
@@ -1108,7 +1109,8 @@ static int do_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
 	set = set_lookup(table, h->set);
 
 	if (set->flags & NFT_SET_INTERVAL &&
-	    set_to_intervals(ctx->msgs, set, expr, false, ctx->debug_mask) < 0)
+	    set_to_intervals(ctx->msgs, set, expr, false,
+			     ctx->debug_mask, ctx->range_merge) < 0)
 		return -1;
 
 	if (netlink_delete_setelems(ctx, h, expr) < 0)
@@ -1151,6 +1153,7 @@ static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 static int do_command_export(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	struct nftnl_ruleset *rs;
+	FILE *fp = ctx->octx->output_fp;
 
 	do {
 		rs = netlink_dump_ruleset(ctx, &cmd->handle, &cmd->location);
@@ -1158,8 +1161,8 @@ static int do_command_export(struct netlink_ctx *ctx, struct cmd *cmd)
 			return -1;
 	} while (rs == NULL);
 
-	nftnl_ruleset_fprintf(stdout, rs, cmd->export->format, 0);
-	fprintf(stdout, "\n");
+	nftnl_ruleset_fprintf(fp, rs, cmd->export->format, 0);
+	nft_print(ctx->octx, "\n");
 
 	nftnl_ruleset_free(rs);
 	return 0;
@@ -1196,7 +1199,7 @@ static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 			    (set->flags & NFT_SET_ANONYMOUS ||
 			    set->flags & NFT_SET_MAP))
 				continue;
-			if (cmd->obj == CMD_OBJ_FLOWTABLES &&
+			if (cmd->obj == CMD_OBJ_METERS &&
 			    !(set->flags & NFT_SET_EVAL))
 				continue;
 			if (cmd->obj == CMD_OBJ_MAPS &&
@@ -1315,7 +1318,7 @@ static void obj_print_data(const struct obj *obj,
 			  opts->nl, opts->tab, opts->tab);
 		switch (obj->limit.type) {
 		case NFT_LIMIT_PKTS:
-			nft_print(octx, "limit rate %s%" PRIu64 "/%s",
+			nft_print(octx, "rate %s%" PRIu64 "/%s",
 				  inv ? "over " : "", obj->limit.rate,
 				  get_unit(obj->limit.unit));
 			if (obj->limit.burst > 0)
@@ -1325,7 +1328,7 @@ static void obj_print_data(const struct obj *obj,
 		case NFT_LIMIT_PKT_BYTES:
 			data_unit = get_rate(obj->limit.rate, &rate);
 
-			nft_print(octx, "limit rate %s%" PRIu64 " %s/%s",
+			nft_print(octx, "rate %s%" PRIu64 " %s/%s",
 				  inv ? "over " : "", rate, data_unit,
 				  get_unit(obj->limit.unit));
 			if (obj->limit.burst > 0) {
@@ -1579,9 +1582,9 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_list_set(ctx, cmd, table);
 	case CMD_OBJ_RULESET:
 		return do_list_ruleset(ctx, cmd);
-	case CMD_OBJ_FLOWTABLES:
+	case CMD_OBJ_METERS:
 		return do_list_sets(ctx, cmd);
-	case CMD_OBJ_FLOWTABLE:
+	case CMD_OBJ_METER:
 		return do_list_set(ctx, cmd, table);
 	case CMD_OBJ_MAPS:
 		return do_list_sets(ctx, cmd);
@@ -1649,7 +1652,7 @@ static int do_command_flush(struct netlink_ctx *ctx, struct cmd *cmd)
 		return netlink_flush_chain(ctx, &cmd->handle, &cmd->location);
 	case CMD_OBJ_SET:
 	case CMD_OBJ_MAP:
-	case CMD_OBJ_FLOWTABLE:
+	case CMD_OBJ_METER:
 		return netlink_flush_setelems(ctx, &cmd->handle,
 					      &cmd->location);
 	case CMD_OBJ_RULESET:

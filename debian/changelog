@@ -1,3 +1,14 @@
+nftables (0.8.1-1) unstable; urgency=medium
+
+  * [46be8e1] d/control: update git URLs
+  * [77d8cc2] New upstream version 0.8.1
+  * [57c711b] d/control: bump build-dep on libnftnl
+  * [517ecd2] d/control: bump std-version to 4.1.3
+  * [bc590c4] d/compat: bump dh compat to 11
+  * [68fbe65] d/copyright: use HTTPS in the URL
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 17 Jan 2018 14:55:14 +0100
+
 nftables (0.8-2) unstable; urgency=medium
 
   * [95b5638] d/t/internaltest-py.sh: enable test, dummy module not required

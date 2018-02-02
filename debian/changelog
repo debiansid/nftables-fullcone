@@ -1,3 +1,13 @@
+nftables (0.8.2-1) unstable; urgency=medium
+
+  [ Helmut Grohne ]
+  * [159958f] d/rules: use dh_auto_configure (Closes: #888715)
+
+  [ Arturo Borrero Gonzalez ]
+  * [66b45dd] New upstream version 0.8.2
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Fri, 02 Feb 2018 19:57:44 +0100
+
 nftables (0.8.1-1) unstable; urgency=medium
 
   * [46be8e1] d/control: update git URLs

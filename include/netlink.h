@@ -42,7 +42,6 @@ extern const struct location netlink_location;
  * @octx:	output context
  * @debug_mask:	display debugging information
  * @cache:	cache context
- * @range_merge: merge adjacent/overlapping ranges in new set elements
  */
 struct netlink_ctx {
 	struct mnl_socket	*nf_sock;
@@ -56,7 +55,6 @@ struct netlink_ctx {
 	unsigned int		debug_mask;
 	struct output_ctx	*octx;
 	struct nft_cache	*cache;
-	bool			range_merge;
 };
 
 extern struct nftnl_table *alloc_nftnl_table(const struct handle *h);
@@ -226,5 +224,14 @@ extern int netlink_monitor(struct netlink_mon_handler *monhandler,
 bool netlink_batch_supported(struct mnl_socket *nf_sock, uint32_t *seqnum);
 
 int netlink_echo_callback(const struct nlmsghdr *nlh, void *data);
+
+struct ruleset_parse {
+	struct netlink_ctx      *nl_ctx;
+	struct cmd              *cmd;
+};
+
+struct nftnl_parse_ctx;
+
+int netlink_markup_parse_cb(const struct nftnl_parse_ctx *ctx);
 
 #endif /* NFTABLES_NETLINK_H */

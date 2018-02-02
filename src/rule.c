@@ -344,6 +344,9 @@ static void set_print_declaration(const struct set *set,
 		}
 		nft_print(octx, "%s", opts->stmt_separator);
 	}
+	if (set->automerge)
+		nft_print(octx, "%s%sauto-merge%s", opts->tab, opts->tab,
+			  opts->stmt_separator);
 
 	if (set->timeout) {
 		nft_print(octx, "%s%stimeout ", opts->tab, opts->tab);
@@ -898,19 +901,19 @@ void nft_cmd_expand(struct cmd *cmd)
 	}
 }
 
-struct export *export_alloc(uint32_t format)
+struct markup *markup_alloc(uint32_t format)
 {
-	struct export *export;
+	struct markup *markup;
 
-	export = xmalloc(sizeof(struct export));
-	export->format = format;
+	markup = xmalloc(sizeof(struct markup));
+	markup->format = format;
 
-	return export;
+	return markup;
 }
 
-void export_free(struct export *e)
+void markup_free(struct markup *m)
 {
-	xfree(e);
+	xfree(m);
 }
 
 struct monitor *monitor_alloc(uint32_t format, uint32_t type, const char *event)
@@ -958,8 +961,8 @@ void cmd_free(struct cmd *cmd)
 		case CMD_OBJ_MONITOR:
 			monitor_free(cmd->monitor);
 			break;
-		case CMD_OBJ_EXPORT:
-			export_free(cmd->export);
+		case CMD_OBJ_MARKUP:
+			markup_free(cmd->markup);
 			break;
 		case CMD_OBJ_COUNTER:
 		case CMD_OBJ_QUOTA:
@@ -998,7 +1001,7 @@ static int do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
 
 	if (set->flags & NFT_SET_INTERVAL &&
 	    set_to_intervals(ctx->msgs, set, init, true,
-			     ctx->debug_mask, ctx->range_merge) < 0)
+			     ctx->debug_mask, set->automerge) < 0)
 		return -1;
 
 	return __do_add_setelems(ctx, h, set, init, flags);
@@ -1010,7 +1013,7 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 	if (set->init != NULL) {
 		if (set->flags & NFT_SET_INTERVAL &&
 		    set_to_intervals(ctx->msgs, set, set->init, true,
-				     ctx->debug_mask, ctx->range_merge) < 0)
+				     ctx->debug_mask, set->automerge) < 0)
 			return -1;
 	}
 	if (netlink_add_set(ctx, h, set, flags) < 0)
@@ -1110,7 +1113,7 @@ static int do_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
 
 	if (set->flags & NFT_SET_INTERVAL &&
 	    set_to_intervals(ctx->msgs, set, expr, false,
-			     ctx->debug_mask, ctx->range_merge) < 0)
+			     ctx->debug_mask, set->automerge) < 0)
 		return -1;
 
 	if (netlink_delete_setelems(ctx, h, expr) < 0)
@@ -1161,11 +1164,34 @@ static int do_command_export(struct netlink_ctx *ctx, struct cmd *cmd)
 			return -1;
 	} while (rs == NULL);
 
-	nftnl_ruleset_fprintf(fp, rs, cmd->export->format, 0);
+	nftnl_ruleset_fprintf(fp, rs, cmd->markup->format, NFTNL_OF_EVENT_NEW);
+
 	nft_print(ctx->octx, "\n");
 
 	nftnl_ruleset_free(rs);
 	return 0;
+}
+
+static int do_command_import(struct netlink_ctx *ctx, struct cmd *cmd)
+{
+	int ret;
+	struct nftnl_parse_err *err;
+	struct ruleset_parse rp = {
+		.nl_ctx = ctx,
+		.cmd    = cmd
+	};
+
+	err = nftnl_parse_err_alloc();
+	if (err == NULL)
+		return -1;
+
+	ret = nftnl_ruleset_parse_file_cb(cmd->markup->format, stdin, err, &rp,
+					  netlink_markup_parse_cb);
+	if (ret < 0)
+		nftnl_parse_perror("unable to import: parsing failed", err);
+
+	nftnl_parse_err_free(err);
+	return ret;
 }
 
 static int do_list_table(struct netlink_ctx *ctx, struct cmd *cmd,
@@ -1793,6 +1819,8 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_command_flush(ctx, cmd);
 	case CMD_RENAME:
 		return do_command_rename(ctx, cmd);
+	case CMD_IMPORT:
+		return do_command_import(ctx, cmd);
 	case CMD_EXPORT:
 		return do_command_export(ctx, cmd);
 	case CMD_MONITOR:

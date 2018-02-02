@@ -2846,6 +2846,9 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 		return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 				 ctx->cmd->handle.table);
 
+	if (!(set->flags & NFT_SET_INTERVAL) && set->automerge)
+		return set_error(ctx, set, "auto-merge only works with interval sets");
+
 	type = set->flags & NFT_SET_MAP ? "map" : "set";
 
 	if (set->key == NULL)
@@ -3481,6 +3484,8 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 		return 0;
 	case CMD_MONITOR:
 		return cmd_evaluate_monitor(ctx, cmd);
+	case CMD_IMPORT:
+		return 0;
 	default:
 		BUG("invalid command operation %u\n", cmd->op);
 	};

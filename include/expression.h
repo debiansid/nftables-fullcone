@@ -369,6 +369,9 @@ extern struct expr *binop_expr_alloc(const struct location *loc, enum ops op,
 extern struct expr *relational_expr_alloc(const struct location *loc, enum ops op,
 					  struct expr *left, struct expr *right);
 
+extern void relational_expr_pctx_update(struct proto_ctx *ctx,
+					const struct expr *expr);
+
 extern struct expr *verdict_expr_alloc(const struct location *loc,
 				       int verdict, const char *chain);
 
@@ -416,7 +419,7 @@ extern struct expr *set_expr_alloc(const struct location *loc,
 				   const struct set *set);
 extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add,
-			    unsigned int debug_mask);
+			    unsigned int debug_mask, bool merge);
 extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,

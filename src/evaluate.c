@@ -192,7 +192,7 @@ static int expr_evaluate_symbol(struct eval_ctx *ctx, struct expr **expr)
 		break;
 	case SYMBOL_SET:
 		ret = cache_update(ctx->nf_sock, ctx->cache, ctx->cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -235,7 +235,10 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 	memset(data + len, 0, data_len - len);
 	mpz_export_data(data, expr->value, BYTEORDER_HOST_ENDIAN, len);
 
-	assert(strlen(data) > 0);
+	if (strlen(data) == 0)
+		return expr_error(ctx->msgs, expr,
+				  "Empty string is not allowed");
+
 	datalen = strlen(data) - 1;
 	if (data[datalen] != '*') {
 		/* We need to reallocate the constant expression with the right
@@ -743,7 +746,7 @@ static int ct_gen_nh_dependency(struct eval_ctx *ctx, struct expr *ct)
 				    constant_data_ptr(ct->ct.nfproto, left->len));
 	dep = relational_expr_alloc(&ct->location, OP_EQ, left, right);
 
-	left->ops->pctx_update(&ctx->pctx, dep);
+	relational_expr_pctx_update(&ctx->pctx, dep);
 
 	nstmt = expr_stmt_alloc(&dep->location, dep);
 
@@ -1632,9 +1635,7 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 		 * Update protocol context for payload and meta iiftype
 		 * equality expressions.
 		 */
-		if (left->flags & EXPR_F_PROTOCOL &&
-		    left->ops->pctx_update)
-			left->ops->pctx_update(&ctx->pctx, rel);
+		relational_expr_pctx_update(&ctx->pctx, rel);
 
 		if (left->ops->type == EXPR_CONCAT)
 			return 0;
@@ -1772,7 +1773,7 @@ static int expr_evaluate_meta(struct eval_ctx *ctx, struct expr **exprp)
 
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 {
-	if (ctx->debug_mask & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & NFT_DEBUG_EVALUATION) {
 		struct error_record *erec;
 		erec = erec_create(EREC_INFORMATIONAL, &(*expr)->location,
 				   "Evaluate %s", (*expr)->ops->name);
@@ -2021,37 +2022,36 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	return expr_evaluate(ctx, &stmt->payload.val);
 }
 
-static int stmt_evaluate_flow(struct eval_ctx *ctx, struct stmt *stmt)
+static int stmt_evaluate_meter(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	struct expr *key, *set, *setref;
 
 	expr_set_context(&ctx->ectx, NULL, 0);
-	if (expr_evaluate(ctx, &stmt->flow.key) < 0)
+	if (expr_evaluate(ctx, &stmt->meter.key) < 0)
 		return -1;
-	if (expr_is_constant(stmt->flow.key))
-		return expr_error(ctx->msgs, stmt->flow.key,
-				  "Flow key expression can not be constant");
-	if (stmt->flow.key->comment)
-		return expr_error(ctx->msgs, stmt->flow.key,
-				  "Flow key expression can not contain comments");
+	if (expr_is_constant(stmt->meter.key))
+		return expr_error(ctx->msgs, stmt->meter.key,
+				  "Meter key expression can not be constant");
+	if (stmt->meter.key->comment)
+		return expr_error(ctx->msgs, stmt->meter.key,
+				  "Meter key expression can not contain comments");
 
 	/* Declare an empty set */
-	key = stmt->flow.key;
+	key = stmt->meter.key;
 	set = set_expr_alloc(&key->location, NULL);
 	set->set_flags |= NFT_SET_EVAL;
 	if (key->timeout)
 		set->set_flags |= NFT_SET_TIMEOUT;
 
-	setref = implicit_set_declaration(ctx, stmt->flow.table ?: "__ft%d",
-					  key, set);
+	setref = implicit_set_declaration(ctx, stmt->meter.name, key, set);
 
-	stmt->flow.set = setref;
+	stmt->meter.set = setref;
 
-	if (stmt_evaluate(ctx, stmt->flow.stmt) < 0)
+	if (stmt_evaluate(ctx, stmt->meter.stmt) < 0)
 		return -1;
-	if (!(stmt->flow.stmt->flags & STMT_F_STATEFUL))
-		return stmt_binary_error(ctx, stmt->flow.stmt, stmt,
-					 "Per-flow statement must be stateful");
+	if (!(stmt->meter.stmt->flags & STMT_F_STATEFUL))
+		return stmt_binary_error(ctx, stmt->meter.stmt, stmt,
+					 "meter statement must be stateful");
 
 	return 0;
 }
@@ -2758,7 +2758,7 @@ static int stmt_evaluate_objref(struct eval_ctx *ctx, struct stmt *stmt)
 
 int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	if (ctx->debug_mask & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & NFT_DEBUG_EVALUATION) {
 		struct error_record *erec;
 		erec = erec_create(EREC_INFORMATIONAL, &stmt->location,
 				   "Evaluate %s", stmt->ops->name);
@@ -2782,8 +2782,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_payload(ctx, stmt);
 	case STMT_EXTHDR:
 		return stmt_evaluate_exthdr(ctx, stmt);
-	case STMT_FLOW:
-		return stmt_evaluate_flow(ctx, stmt);
+	case STMT_METER:
+		return stmt_evaluate_meter(ctx, stmt);
 	case STMT_META:
 		return stmt_evaluate_meta(ctx, stmt);
 	case STMT_CT:
@@ -2845,6 +2845,9 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	if (table == NULL)
 		return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 				 ctx->cmd->handle.table);
+
+	if (!(set->flags & NFT_SET_INTERVAL) && set->automerge)
+		return set_error(ctx, set, "auto-merge only works with interval sets");
 
 	type = set->flags & NFT_SET_MAP ? "map" : "set";
 
@@ -3041,14 +3044,14 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 	switch (cmd->obj) {
 	case CMD_OBJ_SETELEM:
 		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
 		return setelem_evaluate(ctx, &cmd->expr);
 	case CMD_OBJ_SET:
 		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -3059,7 +3062,7 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 		return rule_evaluate(ctx, cmd->rule);
 	case CMD_OBJ_CHAIN:
 		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -3083,7 +3086,7 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 	switch (cmd->obj) {
 	case CMD_OBJ_SETELEM:
 		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -3127,7 +3130,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	int ret;
 
 	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
-			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+			   ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -3151,14 +3154,14 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 			return cmd_error(ctx, "Could not process rule: Set '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
-	case CMD_OBJ_FLOWTABLE:
+	case CMD_OBJ_METER:
 		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		set = set_lookup(table, cmd->handle.set);
 		if (set == NULL || !(set->flags & NFT_SET_EVAL))
-			return cmd_error(ctx, "Could not process rule: Flow table '%s' does not exist",
+			return cmd_error(ctx, "Could not process rule: Meter '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	case CMD_OBJ_MAP:
@@ -3201,7 +3204,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		return 0;
 	case CMD_OBJ_CHAINS:
 	case CMD_OBJ_RULESET:
-	case CMD_OBJ_FLOWTABLES:
+	case CMD_OBJ_METERS:
 	case CMD_OBJ_MAPS:
 		return 0;
 	default:
@@ -3214,7 +3217,7 @@ static int cmd_evaluate_reset(struct eval_ctx *ctx, struct cmd *cmd)
 	int ret;
 
 	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
-			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+			   ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -3241,7 +3244,7 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 	int ret;
 
 	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
-			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+			   ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -3276,14 +3279,14 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 			return cmd_error(ctx, "Could not process rule: Map '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
-	case CMD_OBJ_FLOWTABLE:
+	case CMD_OBJ_METER:
 		table = table_lookup(&cmd->handle, ctx->cache);
 		if (table == NULL)
 			return cmd_error(ctx, "Could not process rule: Table '%s' does not exist",
 					 cmd->handle.table);
 		set = set_lookup(table, cmd->handle.set);
 		if (set == NULL || !(set->flags & NFT_SET_EVAL))
-			return cmd_error(ctx, "Could not process rule: Flow table '%s' does not exist",
+			return cmd_error(ctx, "Could not process rule: Meter '%s' does not exist",
 					 cmd->handle.set);
 		return 0;
 	default:
@@ -3300,7 +3303,7 @@ static int cmd_evaluate_rename(struct eval_ctx *ctx, struct cmd *cmd)
 	switch (cmd->obj) {
 	case CMD_OBJ_CHAIN:
 		ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op,
-				   ctx->msgs, ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->msgs, ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (ret < 0)
 			return ret;
 
@@ -3398,7 +3401,7 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 	int ret;
 
 	ret = cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
-			   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+			   ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 	if (ret < 0)
 		return ret;
 
@@ -3420,7 +3423,7 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 static int cmd_evaluate_export(struct eval_ctx *ctx, struct cmd *cmd)
 {
 	return cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
-			    ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+			    ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 }
 
 static const char * const cmd_op_name[] = {
@@ -3448,7 +3451,7 @@ static const char *cmd_op_to_name(enum cmd_ops op)
 
 int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 {
-	if (ctx->debug_mask & DEBUG_EVALUATION) {
+	if (ctx->debug_mask & NFT_DEBUG_EVALUATION) {
 		struct error_record *erec;
 
 		erec = erec_create(EREC_INFORMATIONAL, &cmd->location,
@@ -3481,6 +3484,8 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 		return 0;
 	case CMD_MONITOR:
 		return cmd_evaluate_monitor(ctx, cmd);
+	case CMD_IMPORT:
+		return 0;
 	default:
 		BUG("invalid command operation %u\n", cmd->op);
 	};

@@ -24,6 +24,7 @@
 #include <libnftnl/object.h>
 #include <libnftnl/set.h>
 #include <libnftnl/udata.h>
+#include <libnftnl/ruleset.h>
 #include <libnftnl/common.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
@@ -75,9 +76,9 @@ void netlink_restart(struct mnl_socket *nf_sock)
 	nf_sock = netlink_open_sock();
 }
 
-void netlink_genid_get(struct mnl_socket *nf_sock, uint32_t seqnum)
+uint16_t netlink_genid_get(struct netlink_ctx *ctx)
 {
-	mnl_genid_get(nf_sock, seqnum);
+	return mnl_genid_get(ctx);
 }
 
 void __noreturn __netlink_abi_error(const char *file, int line,
@@ -261,7 +262,7 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 			break;
 		}
 	}
-	if (set->set_flags & NFT_SET_OBJECT) {
+	if (set->set_flags & NFT_SET_OBJECT && data != NULL) {
 		netlink_gen_data(data, &nld);
 		nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_OBJREF,
 				   nld.value, nld.len);
@@ -472,7 +473,7 @@ int netlink_replace_rule_batch(struct netlink_ctx *ctx, const struct handle *h,
 	if (ctx->octx->echo) {
 		err = cache_update(ctx->nf_sock, ctx->cache,
 				   CMD_INVALID, ctx->msgs,
-				   ctx->debug_mask & DEBUG_NETLINK, ctx->octx);
+				   ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
 		if (err < 0)
 			return err;
 
@@ -510,7 +511,7 @@ void netlink_dump_rule(const struct nftnl_rule *nlr, struct netlink_ctx *ctx)
 {
 	FILE *fp = ctx->octx->output_fp;
 
-	if (!(ctx->debug_mask & DEBUG_NETLINK) || !fp)
+	if (!(ctx->debug_mask & NFT_DEBUG_NETLINK) || !fp)
 		return;
 
 	nftnl_rule_fprintf(fp, nlr, 0, 0);
@@ -520,13 +521,11 @@ void netlink_dump_rule(const struct nftnl_rule *nlr, struct netlink_ctx *ctx)
 void netlink_dump_expr(const struct nftnl_expr *nle,
 		       FILE *fp, unsigned int debug_mask)
 {
-	char buf[4096];
-
-	if (!(debug_mask & DEBUG_NETLINK))
+	if (!(debug_mask & NFT_DEBUG_NETLINK))
 		return;
 
-	nftnl_expr_snprintf(buf, sizeof(buf), nle, 0, 0);
-	fprintf(fp, "%s\n", buf);
+	nftnl_expr_fprintf(fp, nle, 0, 0);
+	fprintf(fp, "\n");
 }
 
 static int list_rule_cb(struct nftnl_rule *nlr, void *arg)
@@ -558,7 +557,7 @@ static int netlink_list_rules(struct netlink_ctx *ctx, const struct handle *h,
 {
 	struct nftnl_rule_list *rule_cache;
 
-	rule_cache = mnl_nft_rule_dump(ctx->nf_sock, h->family, ctx->seqnum);
+	rule_cache = mnl_nft_rule_dump(ctx, h->family);
 	if (rule_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -582,7 +581,7 @@ void netlink_dump_chain(const struct nftnl_chain *nlc, struct netlink_ctx *ctx)
 {
 	FILE *fp = ctx->octx->output_fp;
 
-	if (!(ctx->debug_mask & DEBUG_NETLINK) || !fp)
+	if (!(ctx->debug_mask & NFT_DEBUG_NETLINK) || !fp)
 		return;
 
 	nftnl_chain_fprintf(fp, nlc, 0, 0);
@@ -613,7 +612,7 @@ static int netlink_add_chain_compat(struct netlink_ctx *ctx,
 	}
 
 	netlink_dump_chain(nlc, ctx);
-	err = mnl_nft_chain_add(ctx->nf_sock, nlc, flags, ctx->seqnum);
+	err = mnl_nft_chain_add(ctx, nlc, flags);
 	nftnl_chain_free(nlc);
 
 	if (err < 0)
@@ -679,7 +678,7 @@ static int netlink_rename_chain_compat(struct netlink_ctx *ctx,
 	nlc = alloc_nftnl_chain(h);
 	nftnl_chain_set_str(nlc, NFTNL_CHAIN_NAME, name);
 	netlink_dump_chain(nlc, ctx);
-	err = mnl_nft_chain_add(ctx->nf_sock, nlc, 0, ctx->seqnum);
+	err = mnl_nft_chain_add(ctx, nlc, 0);
 	nftnl_chain_free(nlc);
 
 	if (err < 0)
@@ -726,7 +725,7 @@ static int netlink_del_chain_compat(struct netlink_ctx *ctx,
 
 	nlc = alloc_nftnl_chain(h);
 	netlink_dump_chain(nlc, ctx);
-	err = mnl_nft_chain_delete(ctx->nf_sock, nlc, 0, ctx->seqnum);
+	err = mnl_nft_chain_delete(ctx, nlc, 0);
 	nftnl_chain_free(nlc);
 
 	if (err < 0)
@@ -829,7 +828,7 @@ int netlink_list_chains(struct netlink_ctx *ctx, const struct handle *h,
 	struct nftnl_chain_list *chain_cache;
 	struct chain *chain;
 
-	chain_cache = mnl_nft_chain_dump(ctx->nf_sock, h->family, ctx->seqnum);
+	chain_cache = mnl_nft_chain_dump(ctx, h->family);
 	if (chain_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -872,7 +871,7 @@ static int netlink_add_table_compat(struct netlink_ctx *ctx,
 	int err;
 
 	nlt = alloc_nftnl_table(h);
-	err = mnl_nft_table_add(ctx->nf_sock, nlt, flags, ctx->seqnum);
+	err = mnl_nft_table_add(ctx, nlt, flags);
 	nftnl_table_free(nlt);
 
 	if (err < 0)
@@ -922,7 +921,7 @@ static int netlink_del_table_compat(struct netlink_ctx *ctx,
 	int err;
 
 	nlt = alloc_nftnl_table(h);
-	err = mnl_nft_table_delete(ctx->nf_sock, nlt, 0, ctx->seqnum);
+	err = mnl_nft_table_delete(ctx, nlt, 0);
 	nftnl_table_free(nlt);
 
 	if (err < 0)
@@ -986,7 +985,7 @@ int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
 {
 	struct nftnl_table_list *table_cache;
 
-	table_cache = mnl_nft_table_dump(ctx->nf_sock, h->family, ctx->seqnum);
+	table_cache = mnl_nft_table_dump(ctx, h->family);
 	if (table_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -1037,7 +1036,7 @@ void netlink_dump_set(const struct nftnl_set *nls, struct netlink_ctx *ctx)
 {
 	FILE *fp = ctx->octx->output_fp;
 
-	if (!(ctx->debug_mask & DEBUG_NETLINK) || !fp)
+	if (!(ctx->debug_mask & NFT_DEBUG_NETLINK) || !fp)
 		return;
 
 	nftnl_set_fprintf(fp, nls, 0, 0);
@@ -1053,6 +1052,7 @@ static int set_parse_udata_cb(const struct nftnl_udata *attr, void *data)
 	switch (type) {
 	case UDATA_SET_KEYBYTEORDER:
 	case UDATA_SET_DATABYTEORDER:
+	case UDATA_SET_MERGE_ELEMENTS:
 		if (len != sizeof(uint32_t))
 			return -1;
 		break;
@@ -1071,6 +1071,7 @@ static struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	enum byteorder keybyteorder = BYTEORDER_INVALID;
 	enum byteorder databyteorder = BYTEORDER_INVALID;
 	const struct datatype *keytype, *datatype;
+	bool automerge = false;
 	const char *udata;
 	struct set *set;
 	uint32_t ulen;
@@ -1088,6 +1089,9 @@ static struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 		if (ud[UDATA_SET_DATABYTEORDER])
 			databyteorder =
 				nftnl_udata_get_u32(ud[UDATA_SET_DATABYTEORDER]);
+		if (ud[UDATA_SET_MERGE_ELEMENTS])
+			automerge =
+				nftnl_udata_get_u32(ud[UDATA_SET_MERGE_ELEMENTS]);
 	}
 
 	key = nftnl_set_get_u32(nls, NFTNL_SET_KEY_TYPE);
@@ -1120,6 +1124,7 @@ static struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	set->handle.family = nftnl_set_get_u32(nls, NFTNL_SET_FAMILY);
 	set->handle.table  = xstrdup(nftnl_set_get_str(nls, NFTNL_SET_TABLE));
 	set->handle.set    = xstrdup(nftnl_set_get_str(nls, NFTNL_SET_NAME));
+	set->automerge	   = automerge;
 
 	set->key     = constant_expr_alloc(&netlink_location,
 					   set_datatype_alloc(keytype, keybyteorder),
@@ -1175,8 +1180,7 @@ static int netlink_add_set_compat(struct netlink_ctx *ctx,
 	}
 	netlink_dump_set(nls, ctx);
 
-	err = mnl_nft_set_add(ctx->nf_sock, nls, NLM_F_ECHO | flags,
-			      ctx->seqnum);
+	err = mnl_nft_set_add(ctx, nls, NLM_F_ECHO | flags);
 	if (err < 0)
 		netlink_io_error(ctx, &set->location, "Could not add set: %s",
 				 strerror(errno));
@@ -1240,6 +1244,11 @@ static int netlink_add_set_batch(struct netlink_ctx *ctx,
 				 set->datatype->byteorder))
 		memory_allocation_error();
 
+	if (set->automerge &&
+	    !nftnl_udata_put_u32(udbuf, UDATA_SET_MERGE_ELEMENTS,
+				 set->automerge))
+		memory_allocation_error();
+
 	nftnl_set_set_data(nls, NFTNL_SET_USERDATA, nftnl_udata_buf_data(udbuf),
 			   nftnl_udata_buf_len(udbuf));
 	nftnl_udata_buf_free(udbuf);
@@ -1272,7 +1281,7 @@ static int netlink_del_set_compat(struct netlink_ctx *ctx,
 	int err;
 
 	nls = alloc_nftnl_set(h);
-	err = mnl_nft_set_delete(ctx->nf_sock, nls, 0, ctx->seqnum);
+	err = mnl_nft_set_delete(ctx, nls, 0);
 	nftnl_set_free(nls);
 
 	if (err < 0)
@@ -1325,8 +1334,7 @@ int netlink_list_sets(struct netlink_ctx *ctx, const struct handle *h,
 	struct nftnl_set_list *set_cache;
 	int err;
 
-	set_cache = mnl_nft_set_dump(ctx->nf_sock, h->family, h->table,
-				     ctx->seqnum);
+	set_cache = mnl_nft_set_dump(ctx, h->family, h->table);
 	if (set_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -1381,7 +1389,7 @@ static int netlink_add_setelems_compat(struct netlink_ctx *ctx,
 	alloc_setelem_cache(expr, nls);
 	netlink_dump_set(nls, ctx);
 
-	err = mnl_nft_setelem_add(ctx->nf_sock, nls, flags, ctx->seqnum);
+	err = mnl_nft_setelem_add(ctx, nls, flags);
 	nftnl_set_free(nls);
 	if (err < 0)
 		netlink_io_error(ctx, &expr->location,
@@ -1431,7 +1439,7 @@ static int netlink_del_setelems_compat(struct netlink_ctx *ctx,
 	alloc_setelem_cache(expr, nls);
 	netlink_dump_set(nls, ctx);
 
-	err = mnl_nft_setelem_delete(ctx->nf_sock, nls, 0, ctx->seqnum);
+	err = mnl_nft_setelem_delete(ctx, nls, 0);
 	nftnl_set_free(nls);
 	if (err < 0)
 		netlink_io_error(ctx, &expr->location,
@@ -1595,8 +1603,13 @@ static int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
 		expr = mapping_expr_alloc(&netlink_location, expr, data);
 	}
 	if (set->flags & NFT_SET_OBJECT) {
-		nld.value = nftnl_set_elem_get(nlse, NFTNL_SET_ELEM_OBJREF,
-					       &nld.len);
+		if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_OBJREF)) {
+			nld.value = nftnl_set_elem_get(nlse,
+						       NFTNL_SET_ELEM_OBJREF,
+						       &nld.len);
+		} else
+			goto out;
+
 		data = netlink_alloc_value(&netlink_location, &nld);
 		data->dtype = &string_type;
 		data->byteorder = BYTEORDER_HOST_ENDIAN;
@@ -1631,7 +1644,7 @@ int netlink_get_setelems(struct netlink_ctx *ctx, const struct handle *h,
 
 	nls = alloc_nftnl_set(h);
 
-	err = mnl_nft_setelem_get(ctx->nf_sock, nls, ctx->seqnum);
+	err = mnl_nft_setelem_get(ctx, nls);
 	if (err < 0) {
 		nftnl_set_free(nls);
 		if (errno == EINTR)
@@ -1663,7 +1676,7 @@ void netlink_dump_obj(struct nftnl_obj *nln, struct netlink_ctx *ctx)
 {
 	FILE *fp = ctx->octx->output_fp;
 
-	if (!(ctx->debug_mask & DEBUG_NETLINK) || !fp)
+	if (!(ctx->debug_mask & NFT_DEBUG_NETLINK) || !fp)
 		return;
 
 	nftnl_obj_fprintf(fp, nln, 0, 0);
@@ -1777,7 +1790,7 @@ int netlink_list_objs(struct netlink_ctx *ctx, const struct handle *h,
 	struct nftnl_obj_list *obj_cache;
 	int err;
 
-	obj_cache = mnl_nft_obj_dump(ctx->nf_sock, h->family, ctx->seqnum,
+	obj_cache = mnl_nft_obj_dump(ctx, h->family,
 				     h->table, NULL, 0, true, false);
 	if (obj_cache == NULL) {
 		if (errno == EINTR)
@@ -1797,7 +1810,7 @@ int netlink_reset_objs(struct netlink_ctx *ctx, const struct handle *h,
 	struct nftnl_obj_list *obj_cache;
 	int err;
 
-	obj_cache = mnl_nft_obj_dump(ctx->nf_sock, h->family, ctx->seqnum,
+	obj_cache = mnl_nft_obj_dump(ctx, h->family,
 				     h->table, h->obj, type, dump, true);
 	if (obj_cache == NULL) {
 		if (errno == EINTR)
@@ -1843,7 +1856,7 @@ struct nftnl_ruleset *netlink_dump_ruleset(struct netlink_ctx *ctx,
 {
 	struct nftnl_ruleset *rs;
 
-	rs = mnl_nft_ruleset_dump(ctx->nf_sock, h->family, ctx->seqnum);
+	rs = mnl_nft_ruleset_dump(ctx, h->family);
 	if (rs == NULL) {
 		if (errno == EINTR)
 			return NULL;
@@ -2729,7 +2742,7 @@ restart:
 		list_add_tail(&stmt->list, &unordered);
 
 		desc = ctx->protocol[base].desc;
-		lhs->ops->pctx_update(ctx, rel);
+		relational_expr_pctx_update(ctx, rel);
 	}
 
 	expr_free(rhs);
@@ -2892,7 +2905,7 @@ static const char *nftnl_msgtype2str(uint16_t type)
 
 static void netlink_events_debug(uint16_t type, unsigned int debug_mask)
 {
-	if (!(debug_mask & DEBUG_NETLINK))
+	if (!(debug_mask & NFT_DEBUG_NETLINK))
 		return;
 
 	printf("netlink event: %s\n", nftnl_msgtype2str(type));
@@ -2917,7 +2930,7 @@ static int netlink_events_newgen_cb(const struct nlmsghdr *nlh, int type,
 				break;
 			strncpy(name, mnl_attr_get_str(attr), sizeof(name));
 			break;
-		case NFTA_GEN_PROC_ID:
+		case NFTA_GEN_PROC_PID:
 			if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0)
 				break;
 			pid = ntohl(mnl_attr_get_u32(attr));
@@ -3008,10 +3021,6 @@ int netlink_echo_callback(const struct nlmsghdr *nlh, void *data)
 int netlink_monitor(struct netlink_mon_handler *monhandler,
 		    struct mnl_socket *nf_sock)
 {
-	struct mnl_ctx ctx = {
-		.nf_sock	= nf_sock,
-		.debug_mask	= monhandler->debug_mask,
-	};
 	int group;
 
 	if (monhandler->monitor_flags & (1 << NFT_MSG_TRACE)) {
@@ -3033,7 +3042,293 @@ int netlink_monitor(struct netlink_mon_handler *monhandler,
 						strerror(errno));
 	}
 
-	return mnl_nft_event_listener(&ctx, netlink_events_cb, monhandler);
+	return mnl_nft_event_listener(nf_sock, monhandler->debug_mask,
+				      monhandler->ctx->octx, netlink_events_cb,
+				      monhandler);
+}
+
+static int netlink_markup_setelems(const struct nftnl_parse_ctx *ctx)
+{
+	const struct ruleset_parse *rp;
+	struct nftnl_set *set;
+	uint32_t cmd;
+	int ret = -1;
+
+	set = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_SET);
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	cmd = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_CMD);
+	switch (cmd) {
+	case NFTNL_CMD_ADD:
+		ret = mnl_nft_setelem_batch_add(set, rp->nl_ctx->batch,
+						0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_DELETE:
+		ret = mnl_nft_setelem_batch_del(set, rp->nl_ctx->batch,
+						0, rp->nl_ctx->seqnum);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	return ret;
+}
+
+static int netlink_markup_set(const struct nftnl_parse_ctx *ctx)
+{
+	const struct ruleset_parse *rp;
+	struct nftnl_set *set;
+	uint32_t cmd;
+	int ret = -1;
+
+	set = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_SET);
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	cmd = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_CMD);
+	switch (cmd) {
+	case NFTNL_CMD_ADD:
+		ret = mnl_nft_set_batch_add(set, rp->nl_ctx->batch, NLM_F_EXCL,
+					    rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_DELETE:
+		ret = mnl_nft_set_batch_del(set, rp->nl_ctx->batch,
+					    0, rp->nl_ctx->seqnum);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	if (ret < 0)
+		return ret;
+
+	return netlink_markup_setelems(ctx);
+}
+
+static int netlink_markup_build_rule(const struct nftnl_parse_ctx *ctx,
+				      uint32_t cmd, struct nftnl_rule *rule)
+{
+	const struct ruleset_parse *rp;
+	uint32_t nl_flags;
+	int ret = -1;
+
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	switch (cmd) {
+	case NFTNL_CMD_ADD:
+		nl_flags = NLM_F_APPEND | NLM_F_CREATE;
+		nftnl_rule_unset(rule, NFTNL_RULE_HANDLE);
+		ret = mnl_nft_rule_batch_add(rule, rp->nl_ctx->batch, nl_flags,
+					     rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_DELETE:
+		ret = mnl_nft_rule_batch_del(rule, rp->nl_ctx->batch,
+					     0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_REPLACE:
+		nl_flags = NLM_F_REPLACE;
+		ret = mnl_nft_rule_batch_add(rule, rp->nl_ctx->batch, nl_flags,
+					     rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_INSERT:
+		nl_flags = NLM_F_CREATE;
+		nftnl_rule_unset(rule, NFTNL_RULE_HANDLE);
+		ret = mnl_nft_rule_batch_add(rule, rp->nl_ctx->batch, nl_flags,
+					     rp->nl_ctx->seqnum);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	return ret;
+
+}
+
+static int netlink_markup_rule(const struct nftnl_parse_ctx *ctx)
+{
+	struct nftnl_rule *rule;
+	uint32_t cmd;
+
+	cmd = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_CMD);
+	rule = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_RULE);
+
+	return netlink_markup_build_rule(ctx, cmd, rule);
+}
+
+static int netlink_markup_build_flush(const struct nftnl_parse_ctx *ctx)
+{
+	struct nftnl_rule *rule;
+	struct nftnl_table *table;
+	struct nftnl_chain *chain;
+	const char  *table_get_name, *table_get_family;
+	const char *chain_get_table, *chain_get_name, *chain_get_family;
+	uint32_t type;
+	int ret = -1;
+
+	rule = nftnl_rule_alloc();
+	if (rule == NULL)
+		return -1;
+
+	type = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_TYPE);
+	switch (type) {
+	case NFTNL_RULESET_TABLE:
+		table = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_TABLE);
+		table_get_name = nftnl_table_get(table, NFTNL_TABLE_NAME);
+		table_get_family = nftnl_table_get(table, NFTNL_TABLE_FAMILY);
+
+		nftnl_rule_set(rule, NFTNL_RULE_TABLE, table_get_name);
+		nftnl_rule_set(rule, NFTNL_RULE_FAMILY, table_get_family);
+		break;
+	case NFTNL_RULESET_CHAIN:
+		chain = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_CHAIN);
+		chain_get_table = nftnl_chain_get(chain, NFTNL_CHAIN_TABLE);
+		chain_get_name = nftnl_chain_get(chain, NFTNL_CHAIN_NAME);
+		chain_get_family = nftnl_chain_get(chain, NFTNL_TABLE_FAMILY);
+
+		nftnl_rule_set(rule, NFTNL_RULE_TABLE, chain_get_table);
+		nftnl_rule_set(rule, NFTNL_RULE_CHAIN, chain_get_name);
+		nftnl_rule_set(rule, NFTNL_RULE_FAMILY, chain_get_family);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		goto err;
+	}
+
+	ret = netlink_markup_build_rule(ctx, NFTNL_CMD_DELETE, rule);
+err:
+	nftnl_rule_free(rule);
+	return ret;
+}
+
+static int netlink_markup_chain(const struct nftnl_parse_ctx *ctx)
+{
+	const struct ruleset_parse *rp;
+	struct nftnl_chain *chain;
+	uint32_t cmd;
+	int ret = -1;
+
+	chain = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_CHAIN);
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	nftnl_chain_unset(chain, NFTNL_CHAIN_HANDLE);
+
+	cmd = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_CMD);
+	switch (cmd) {
+	case NFTNL_CMD_ADD:
+		ret = mnl_nft_chain_batch_add(chain, rp->nl_ctx->batch,
+					      0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_DELETE:
+		ret = mnl_nft_chain_batch_del(chain, rp->nl_ctx->batch,
+					      0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_FLUSH:
+		ret = netlink_markup_build_flush(ctx);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	return ret;
+}
+
+
+static int netlink_markup_build_table(const struct nftnl_parse_ctx *ctx,
+				       uint32_t cmd, struct nftnl_table *table)
+{
+	struct ruleset_parse *rp;
+	int ret = -1;
+
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	switch (cmd) {
+	case NFTNL_CMD_ADD:
+		ret = mnl_nft_table_batch_add(table, rp->nl_ctx->batch,
+					      0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_DELETE:
+		ret = mnl_nft_table_batch_del(table, rp->nl_ctx->batch,
+					      0, rp->nl_ctx->seqnum);
+		break;
+	case NFTNL_CMD_FLUSH:
+		ret = netlink_markup_build_flush(ctx);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	return ret;
+}
+
+static int netlink_markup_table(const struct nftnl_parse_ctx *ctx)
+{
+	struct nftnl_table *table;
+	uint32_t cmd;
+
+	cmd = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_CMD);
+	table = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_TABLE);
+
+	return netlink_markup_build_table(ctx, cmd, table);
+}
+
+static int netlink_markup_flush(const struct nftnl_parse_ctx *ctx)
+{
+	struct nftnl_table *table;
+	int ret;
+
+	table = nftnl_table_alloc();
+	if (table == NULL)
+		return -1;
+
+	ret = netlink_markup_build_table(ctx, NFTNL_CMD_DELETE, table);
+	nftnl_table_free(table);
+
+	return ret;
+}
+
+int netlink_markup_parse_cb(const struct nftnl_parse_ctx *ctx)
+{
+	struct ruleset_parse *rp;
+	uint32_t type;
+	int ret = -1;
+
+	rp = nftnl_ruleset_ctx_get(ctx, NFTNL_RULESET_CTX_DATA);
+
+	type = nftnl_ruleset_ctx_get_u32(ctx, NFTNL_RULESET_CTX_TYPE);
+	switch (type) {
+	case NFTNL_RULESET_TABLE:
+		ret = netlink_markup_table(ctx);
+		break;
+	case NFTNL_RULESET_CHAIN:
+		ret = netlink_markup_chain(ctx);
+		break;
+	case NFTNL_RULESET_RULE:
+		ret = netlink_markup_rule(ctx);
+		break;
+	case NFTNL_RULESET_SET:
+		ret = netlink_markup_set(ctx);
+		break;
+	case NFTNL_RULESET_SET_ELEMS:
+		ret = netlink_markup_setelems(ctx);
+		break;
+	case NFTNL_RULESET_RULESET:
+		ret = netlink_markup_flush(ctx);
+		break;
+	default:
+		errno = EOPNOTSUPP;
+		break;
+	}
+
+	nftnl_ruleset_ctx_free(ctx);
+	if (ret < 0)
+		netlink_io_error(rp->nl_ctx, &rp->cmd->location,
+				 "Could not import: %s", strerror(errno));
+
+	return 0;
 }
 
 bool netlink_batch_supported(struct mnl_socket *nf_sock, uint32_t *seqnum)

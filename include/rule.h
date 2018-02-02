@@ -220,6 +220,7 @@ extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
  * @init:	initializer
  * @rg_cache:	cached range element (left)
  * @policy:	set mechanism policy
+ * @automerge:	merge adjacents and overlapping elements, if possible
  * @desc:	set mechanism desc
  */
 struct set {
@@ -237,6 +238,7 @@ struct set {
 	struct expr		*init;
 	struct expr		*rg_cache;
 	uint32_t		policy;
+	bool			automerge;
 	struct {
 		uint32_t	size;
 	} desc;
@@ -326,6 +328,7 @@ uint32_t obj_type_to_cmd(uint32_t type);
  * @CMD_RESET:		reset container
  * @CMD_FLUSH:		flush container
  * @CMD_RENAME:		rename object
+ * @CMD_IMPORT:		import a ruleset in a given format
  * @CMD_EXPORT:		export the ruleset in a given format
  * @CMD_MONITOR:	event listener
  * @CMD_DESCRIBE:	describe an expression
@@ -341,6 +344,7 @@ enum cmd_ops {
 	CMD_RESET,
 	CMD_FLUSH,
 	CMD_RENAME,
+	CMD_IMPORT,
 	CMD_EXPORT,
 	CMD_MONITOR,
 	CMD_DESCRIBE,
@@ -360,7 +364,9 @@ enum cmd_ops {
  * @CMD_OBJ_RULESET:	ruleset
  * @CMD_OBJ_EXPR:	expression
  * @CMD_OBJ_MONITOR:	monitor
- * @CMD_OBJ_EXPORT:	export
+ * @CMD_OBJ_MARKUP:    import/export
+ * @CMD_OBJ_METER:	meter
+ * @CMD_OBJ_METERS:	meters
  * @CMD_OBJ_COUNTER:	counter
  * @CMD_OBJ_COUNTERS:	multiple counters
  * @CMD_OBJ_QUOTA:	quota
@@ -380,9 +386,9 @@ enum cmd_obj {
 	CMD_OBJ_RULESET,
 	CMD_OBJ_EXPR,
 	CMD_OBJ_MONITOR,
-	CMD_OBJ_EXPORT,
-	CMD_OBJ_FLOWTABLE,
-	CMD_OBJ_FLOWTABLES,
+	CMD_OBJ_MARKUP,
+	CMD_OBJ_METER,
+	CMD_OBJ_METERS,
 	CMD_OBJ_MAP,
 	CMD_OBJ_MAPS,
 	CMD_OBJ_COUNTER,
@@ -395,12 +401,12 @@ enum cmd_obj {
 	CMD_OBJ_LIMITS,
 };
 
-struct export {
+struct markup {
 	uint32_t	format;
 };
 
-struct export *export_alloc(uint32_t format);
-void export_free(struct export *e);
+struct markup *markup_alloc(uint32_t format);
+void markup_free(struct markup *m);
 
 enum {
 	CMD_MONITOR_OBJ_ANY,
@@ -452,7 +458,7 @@ struct cmd {
 		struct chain	*chain;
 		struct table	*table;
 		struct monitor	*monitor;
-		struct export	*export;
+		struct markup	*markup;
 		struct obj	*object;
 	};
 	const void		*arg;
@@ -524,6 +530,7 @@ enum udata_type {
 enum udata_set_type {
 	UDATA_SET_KEYBYTEORDER,
 	UDATA_SET_DATABYTEORDER,
+	UDATA_SET_MERGE_ELEMENTS,
 	__UDATA_SET_MAX,
 };
 #define UDATA_SET_MAX (__UDATA_SET_MAX - 1)

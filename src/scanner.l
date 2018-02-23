@@ -274,6 +274,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "reset"			{ return RESET; }
 "flush"			{ return FLUSH; }
 "rename"		{ return RENAME; }
+"import"                { return IMPORT; }
 "export"		{ return EXPORT; }
 "monitor"		{ return MONITOR; }
 
@@ -282,6 +283,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "constant"		{ return CONSTANT; }
 "interval"		{ return INTERVAL; }
+"auto-merge"		{ return AUTOMERGE; }
 "timeout"		{ return TIMEOUT; }
 "gc-interval"		{ return GC_INTERVAL; }
 "elements"		{ return ELEMENTS; }
@@ -292,6 +294,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "memory"		{ return MEMORY; }
 
 "flow"			{ return FLOW; }
+"meter"			{ return METER; }
+"meters"		{ return METERS; }
 
 "counter"		{ return COUNTER; }
 "name"			{ return NAME; }
@@ -516,6 +520,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "xml"			{ return XML; }
 "json"			{ return JSON; }
+"vm"                    { return VM; }
 
 "exists"		{ return EXISTS; }
 "missing"		{ return MISSING; }
@@ -794,9 +799,7 @@ int scanner_include_file(struct nft_ctx *nft, void *scanner,
 	int ret = -1;
 
 	if (search_in_include_path(filename)) {
-		for (i = 0; i < INCLUDE_PATHS_MAX; i++) {
-			if (nft->include_paths[i] == NULL)
-				break;
+		for (i = 0; i < nft->num_include_paths; i++) {
 			ret = snprintf(buf, sizeof(buf), "%s/%s",
 				       nft->include_paths[i], filename);
 			if (ret < 0 || ret >= PATH_MAX) {

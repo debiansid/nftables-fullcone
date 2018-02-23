@@ -14,6 +14,7 @@
 
 @SET_MAKE@
 
+
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -91,13 +92,17 @@ host_triplet = @host@
 sbin_PROGRAMS = nft$(EXEEXT)
 @BUILD_DEBUG_TRUE@am__append_1 = -g -DDEBUG
 @BUILD_XTABLES_TRUE@am__append_2 = ${XTABLES_CFLAGS}
-@BUILD_CLI_TRUE@am__append_3 = cli.c
-@BUILD_MINIGMP_TRUE@am__append_4 = mini-gmp.c
+@BUILD_MINIGMP_TRUE@am__append_3 = libminigmp.la
+@BUILD_MINIGMP_TRUE@am__append_4 = libminigmp.la
 @BUILD_XTABLES_TRUE@am__append_5 = xt.c
 @BUILD_XTABLES_TRUE@am__append_6 = ${XTABLES_LIBS}
+@BUILD_CLI_TRUE@am__append_7 = cli.c
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -105,33 +110,54 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(sbindir)"
-PROGRAMS = $(sbin_PROGRAMS)
-am__nft_SOURCES_DIST = main.c rule.c statement.c datatype.c \
+LTLIBRARIES = $(noinst_LTLIBRARIES)
+libminigmp_la_LIBADD =
+am__libminigmp_la_SOURCES_DIST = mini-gmp.c
+@BUILD_MINIGMP_TRUE@am_libminigmp_la_OBJECTS =  \
+@BUILD_MINIGMP_TRUE@	libminigmp_la-mini-gmp.lo
+libminigmp_la_OBJECTS = $(am_libminigmp_la_OBJECTS)
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
+libminigmp_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libminigmp_la_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+@BUILD_MINIGMP_TRUE@am_libminigmp_la_rpath =
+am__DEPENDENCIES_1 =
+@BUILD_XTABLES_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+libnftables_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) libparser.la $(am__append_4) \
+	$(am__DEPENDENCIES_2)
+am__libnftables_la_SOURCES_DIST = rule.c statement.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c fib.c \
 	hash.c meta.c rt.c numgen.c ct.c netlink.c netlink_linearize.c \
 	netlink_delinearize.c segtree.c rbtree.c gmputil.c utils.c \
-	erec.c mnl.c iface.c services.c mergesort.c scanner.l tcpopt.c \
-	parser_bison.y cli.c mini-gmp.c xt.c
-@BUILD_CLI_TRUE@am__objects_1 = cli.$(OBJEXT)
-@BUILD_MINIGMP_TRUE@am__objects_2 = mini-gmp.$(OBJEXT)
-@BUILD_XTABLES_TRUE@am__objects_3 = xt.$(OBJEXT)
-am_nft_OBJECTS = main.$(OBJEXT) rule.$(OBJEXT) statement.$(OBJEXT) \
-	datatype.$(OBJEXT) expression.$(OBJEXT) evaluate.$(OBJEXT) \
-	proto.$(OBJEXT) payload.$(OBJEXT) exthdr.$(OBJEXT) \
-	fib.$(OBJEXT) hash.$(OBJEXT) meta.$(OBJEXT) rt.$(OBJEXT) \
-	numgen.$(OBJEXT) ct.$(OBJEXT) netlink.$(OBJEXT) \
-	netlink_linearize.$(OBJEXT) netlink_delinearize.$(OBJEXT) \
-	segtree.$(OBJEXT) rbtree.$(OBJEXT) gmputil.$(OBJEXT) \
-	utils.$(OBJEXT) erec.$(OBJEXT) mnl.$(OBJEXT) iface.$(OBJEXT) \
-	services.$(OBJEXT) mergesort.$(OBJEXT) scanner.$(OBJEXT) \
-	tcpopt.$(OBJEXT) parser_bison.$(OBJEXT) $(am__objects_1) \
-	$(am__objects_2) $(am__objects_3)
+	erec.c mnl.c iface.c services.c mergesort.c tcpopt.c \
+	libnftables.c xt.c
+@BUILD_XTABLES_TRUE@am__objects_1 = xt.lo
+am_libnftables_la_OBJECTS = rule.lo statement.lo datatype.lo \
+	expression.lo evaluate.lo proto.lo payload.lo exthdr.lo fib.lo \
+	hash.lo meta.lo rt.lo numgen.lo ct.lo netlink.lo \
+	netlink_linearize.lo netlink_delinearize.lo segtree.lo \
+	rbtree.lo gmputil.lo utils.lo erec.lo mnl.lo iface.lo \
+	services.lo mergesort.lo tcpopt.lo libnftables.lo \
+	$(am__objects_1)
+libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
+libparser_la_LIBADD =
+am_libparser_la_OBJECTS = libparser_la-parser_bison.lo \
+	libparser_la-scanner.lo
+libparser_la_OBJECTS = $(am_libparser_la_OBJECTS)
+libparser_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libparser_la_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am__installdirs = "$(DESTDIR)$(sbindir)"
+PROGRAMS = $(sbin_PROGRAMS)
+am__nft_SOURCES_DIST = main.c cli.c
+@BUILD_CLI_TRUE@am__objects_2 = cli.$(OBJEXT)
+am_nft_OBJECTS = main.$(OBJEXT) $(am__objects_2)
 nft_OBJECTS = $(am_nft_OBJECTS)
-am__DEPENDENCIES_1 =
-@BUILD_XTABLES_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
-nft_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_2)
+nft_DEPENDENCIES = libnftables.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -150,17 +176,25 @@ am__depfiles_maybe = depfiles
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
 AM_V_CC = $(am__v_CC_@AM_V@)
 am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
 am__v_CC_0 = @echo "  CC      " $@;
 am__v_CC_1 = 
 CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 LEXCOMPILE = $(LEX) $(AM_LFLAGS) $(LFLAGS)
+LTLEXCOMPILE = $(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(LEX) $(AM_LFLAGS) $(LFLAGS)
 AM_V_LEX = $(am__v_LEX_@AM_V@)
 am__v_LEX_ = $(am__v_LEX_@AM_DEFAULT_V@)
 am__v_LEX_0 = @echo "  LEX     " $@;
@@ -169,12 +203,17 @@ YLWRAP = $(top_srcdir)/build-aux/ylwrap
 am__yacc_c2h = sed -e s/cc$$/hh/ -e s/cpp$$/hpp/ -e s/cxx$$/hxx/ \
 		   -e s/c++$$/h++/ -e s/c$$/h/
 YACCCOMPILE = $(YACC) $(AM_YFLAGS) $(YFLAGS)
+LTYACCCOMPILE = $(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(YACC) $(AM_YFLAGS) $(YFLAGS)
 AM_V_YACC = $(am__v_YACC_@AM_V@)
 am__v_YACC_ = $(am__v_YACC_@AM_DEFAULT_V@)
 am__v_YACC_0 = @echo "  YACC    " $@;
 am__v_YACC_1 = 
-SOURCES = $(nft_SOURCES)
-DIST_SOURCES = $(am__nft_SOURCES_DIST)
+SOURCES = $(libminigmp_la_SOURCES) $(libnftables_la_SOURCES) \
+	$(libparser_la_SOURCES) $(nft_SOURCES)
+DIST_SOURCES = $(am__libminigmp_la_SOURCES_DIST) \
+	$(am__libnftables_la_SOURCES_DIST) $(libparser_la_SOURCES) \
+	$(am__nft_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -206,6 +245,7 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -221,19 +261,24 @@ DB2X_DOCBOOK2MAN = @DB2X_DOCBOOK2MAN@
 DBLATEX = @DBLATEX@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DLLTOOL = @DLLTOOL@
 DOCBOOK2MAN = @DOCBOOK2MAN@
 DOCBOOK2X_MAN = @DOCBOOK2X_MAN@
+DSYMUTIL = @DSYMUTIL@
+DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FGREP = @FGREP@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+LD = @LD@
 LDFLAGS = @LDFLAGS@
 LEX = @LEX@
 LEXLIB = @LEXLIB@
@@ -244,10 +289,20 @@ LIBNFTNL_CFLAGS = @LIBNFTNL_CFLAGS@
 LIBNFTNL_LIBS = @LIBNFTNL_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBTOOL = @LIBTOOL@
+LIPO = @LIPO@
+LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
+MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
+NM = @NM@
+NMEDIT = @NMEDIT@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OTOOL = @OTOOL@
+OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -259,6 +314,7 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -272,7 +328,9 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
+ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -335,18 +393,35 @@ AM_CFLAGS = -Wall								\
 
 AM_YFLAGS = -d
 BUILT_SOURCES = parser_bison.h
-nft_SOURCES = main.c rule.c statement.c datatype.c expression.c \
+
+# yacc and lex generate dirty code
+noinst_LTLIBRARIES = libnftables.la libparser.la $(am__append_3)
+libnftables_la_SOURCES = rule.c statement.c datatype.c expression.c \
 	evaluate.c proto.c payload.c exthdr.c fib.c hash.c meta.c rt.c \
 	numgen.c ct.c netlink.c netlink_linearize.c \
 	netlink_delinearize.c segtree.c rbtree.c gmputil.c utils.c \
-	erec.c mnl.c iface.c services.c mergesort.c scanner.l tcpopt.c \
-	parser_bison.y $(am__append_3) $(am__append_4) $(am__append_5)
-nft_LDADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} $(am__append_6)
+	erec.c mnl.c iface.c services.c mergesort.c tcpopt.c \
+	libnftables.c $(am__append_5)
+libparser_la_SOURCES = parser_bison.y scanner.l
+libparser_la_CFLAGS = ${AM_CFLAGS} \
+		      -Wno-missing-prototypes \
+		      -Wno-missing-declarations \
+		      -Wno-implicit-function-declaration \
+		      -Wno-nested-externs \
+		      -Wno-undef \
+		      -Wno-redundant-decls
+
+libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la \
+	$(am__append_4) $(am__append_6)
+@BUILD_MINIGMP_TRUE@libminigmp_la_SOURCES = mini-gmp.c
+@BUILD_MINIGMP_TRUE@libminigmp_la_CFLAGS = ${AM_CFLAGS} -Wno-sign-compare
+nft_SOURCES = main.c $(am__append_7)
+nft_LDADD = libnftables.la
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .l .o .obj .y
+.SUFFIXES: .c .l .lo .o .obj .y
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -376,6 +451,29 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; \
+	locs=`for p in $$list; do echo $$p; done | \
+	      sed 's|^[^/]*$$|.|; s|/[^/]*$$||; s|$$|/so_locations|' | \
+	      sort -u`; \
+	test -z "$$locs" || { \
+	  echo rm -f $${locs}; \
+	  rm -f $${locs}; \
+	}
+
+libminigmp.la: $(libminigmp_la_OBJECTS) $(libminigmp_la_DEPENDENCIES) $(EXTRA_libminigmp_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libminigmp_la_LINK) $(am_libminigmp_la_rpath) $(libminigmp_la_OBJECTS) $(libminigmp_la_LIBADD) $(LIBS)
+
+libnftables.la: $(libnftables_la_OBJECTS) $(libnftables_la_DEPENDENCIES) $(EXTRA_libnftables_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK)  $(libnftables_la_OBJECTS) $(libnftables_la_LIBADD) $(LIBS)
+parser_bison.h: parser_bison.c
+	@if test ! -f $@; then rm -f parser_bison.c; else :; fi
+	@if test ! -f $@; then $(MAKE) $(AM_MAKEFLAGS) parser_bison.c; else :; fi
+
+libparser.la: $(libparser_la_OBJECTS) $(libparser_la_DEPENDENCIES) $(EXTRA_libparser_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libparser_la_LINK)  $(libparser_la_OBJECTS) $(libparser_la_LIBADD) $(LIBS)
 install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	@list='$(sbin_PROGRAMS)'; test -n "$(sbindir)" || list=; \
@@ -386,6 +484,7 @@ install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	for p in $$list; do echo "$$p $$p"; done | \
 	sed 's/$(EXEEXT)$$//' | \
 	while read p p1; do if test -f $$p \
+	 || test -f $$p1 \
 	  ; then echo "$$p"; echo "$$p"; else :; fi; \
 	done | \
 	sed -e 'p;s,.*/,,;n;h' \
@@ -400,8 +499,8 @@ install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	while read type dir files; do \
 	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
 	    test -z "$$files" || { \
-	      echo " $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(sbindir)$$dir'"; \
-	      $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(sbindir)$$dir" || exit $$?; \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(sbindir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(sbindir)$$dir" || exit $$?; \
 	    } \
 	; done
 
@@ -417,10 +516,13 @@ uninstall-sbinPROGRAMS:
 	cd "$(DESTDIR)$(sbindir)" && rm -f $$files
 
 clean-sbinPROGRAMS:
-	-test -z "$(sbin_PROGRAMS)" || rm -f $(sbin_PROGRAMS)
-parser_bison.h: parser_bison.c
-	@if test ! -f $@; then rm -f parser_bison.c; else :; fi
-	@if test ! -f $@; then $(MAKE) $(AM_MAKEFLAGS) parser_bison.c; else :; fi
+	@list='$(sbin_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
 
 nft$(EXEEXT): $(nft_OBJECTS) $(nft_DEPENDENCIES) $(EXTRA_nft_DEPENDENCIES) 
 	@rm -f nft$(EXEEXT)
@@ -433,38 +535,39 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cli.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ct.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/datatype.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erec.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evaluate.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/expression.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exthdr.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fib.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ct.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/datatype.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erec.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evaluate.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/expression.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exthdr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libminigmp_la-mini-gmp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnftables.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libparser_la-parser_bison.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libparser_la-scanner.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mergesort.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/meta.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mini-gmp.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mnl.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_delinearize.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_linearize.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/numgen.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parser_bison.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/payload.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rbtree.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rule.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scanner.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/segtree.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/services.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statement.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpopt.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xt.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mergesort.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/meta.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mnl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_delinearize.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_linearize.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/numgen.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/payload.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rbtree.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rule.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/segtree.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/services.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statement.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpopt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xt.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -482,11 +585,46 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
+.c.lo:
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+libminigmp_la-mini-gmp.lo: mini-gmp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libminigmp_la_CFLAGS) $(CFLAGS) -MT libminigmp_la-mini-gmp.lo -MD -MP -MF $(DEPDIR)/libminigmp_la-mini-gmp.Tpo -c -o libminigmp_la-mini-gmp.lo `test -f 'mini-gmp.c' || echo '$(srcdir)/'`mini-gmp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libminigmp_la-mini-gmp.Tpo $(DEPDIR)/libminigmp_la-mini-gmp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mini-gmp.c' object='libminigmp_la-mini-gmp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libminigmp_la_CFLAGS) $(CFLAGS) -c -o libminigmp_la-mini-gmp.lo `test -f 'mini-gmp.c' || echo '$(srcdir)/'`mini-gmp.c
+
+libparser_la-parser_bison.lo: parser_bison.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libparser_la_CFLAGS) $(CFLAGS) -MT libparser_la-parser_bison.lo -MD -MP -MF $(DEPDIR)/libparser_la-parser_bison.Tpo -c -o libparser_la-parser_bison.lo `test -f 'parser_bison.c' || echo '$(srcdir)/'`parser_bison.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libparser_la-parser_bison.Tpo $(DEPDIR)/libparser_la-parser_bison.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='parser_bison.c' object='libparser_la-parser_bison.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libparser_la_CFLAGS) $(CFLAGS) -c -o libparser_la-parser_bison.lo `test -f 'parser_bison.c' || echo '$(srcdir)/'`parser_bison.c
+
+libparser_la-scanner.lo: scanner.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libparser_la_CFLAGS) $(CFLAGS) -MT libparser_la-scanner.lo -MD -MP -MF $(DEPDIR)/libparser_la-scanner.Tpo -c -o libparser_la-scanner.lo `test -f 'scanner.c' || echo '$(srcdir)/'`scanner.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libparser_la-scanner.Tpo $(DEPDIR)/libparser_la-scanner.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scanner.c' object='libparser_la-scanner.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libparser_la_CFLAGS) $(CFLAGS) -c -o libparser_la-scanner.lo `test -f 'scanner.c' || echo '$(srcdir)/'`scanner.c
+
 .l.c:
 	$(AM_V_LEX)$(am__skiplex) $(SHELL) $(YLWRAP) $< $(LEX_OUTPUT_ROOT).c $@ -- $(LEXCOMPILE)
 
 .y.c:
 	$(AM_V_YACC)$(am__skipyacc) $(SHELL) $(YLWRAP) $< y.tab.c $@ y.tab.h `echo $@ | $(am__yacc_c2h)` y.output $*.output -- $(YACCCOMPILE)
+
+mostlyclean-libtool:
+	-rm -f *.lo
+
+clean-libtool:
+	-rm -rf .libs _libs
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -573,7 +711,7 @@ distdir: $(DISTFILES)
 check-am: all-am
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS)
 installdirs:
 	for dir in "$(DESTDIR)$(sbindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
@@ -616,7 +754,8 @@ maintainer-clean-generic:
 	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-am
 
-clean-am: clean-generic clean-sbinPROGRAMS mostlyclean-am
+clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
+	clean-sbinPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -671,7 +810,8 @@ maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-compile mostlyclean-generic
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
 pdf: pdf-am
 
@@ -686,8 +826,9 @@ uninstall-am: uninstall-sbinPROGRAMS
 .MAKE: all check install install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-sbinPROGRAMS cscopelist-am ctags ctags-am distclean \
-	distclean-compile distclean-generic distclean-tags distdir dvi \
+	clean-libtool clean-noinstLTLIBRARIES clean-sbinPROGRAMS \
+	cscopelist-am ctags ctags-am distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
 	install-data install-data-am install-dvi install-dvi-am \
 	install-exec install-exec-am install-html install-html-am \
@@ -695,16 +836,12 @@ uninstall-am: uninstall-sbinPROGRAMS
 	install-pdf-am install-ps install-ps-am install-sbinPROGRAMS \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-sbinPROGRAMS
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-sbinPROGRAMS
 
 .PRECIOUS: Makefile
 
-
-# yacc and lex generate dirty code
-parser_bison.o scanner.o: AM_CFLAGS += -Wno-missing-prototypes -Wno-missing-declarations -Wno-implicit-function-declaration -Wno-nested-externs -Wno-undef -Wno-redundant-decls
-
-@BUILD_MINIGMP_TRUE@mini-gmp.o: AM_CFLAGS += -Wno-sign-compare
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -4,7 +4,7 @@
 AC_PREREQ(2.61)
 
 AC_COPYRIGHT([Copyright (c) 2008 Patrick McHardy <kaber@trash.net>, (c) 2013-2016 Pablo Neira Ayuso <pablo@netfilter.org>])
-AC_INIT([nftables], [0.8], [netfilter-devel@vger.kernel.org])
+AC_INIT([nftables], [0.8.2], [netfilter-devel@vger.kernel.org])
 AC_DEFINE([RELEASE_NAME], ["Joe Btfsplk"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
@@ -23,11 +23,17 @@ AC_DEFINE([_GNU_SOURCE], [], [Enable various GNU extensions])
 AC_DEFINE([_STDC_FORMAT_MACROS], [], [printf-style format macros])
 
 AC_ARG_ENABLE([debug],
-	      AS_HELP_STRING([--enable-debug], [Disable debugging symbols]),
+	      AS_HELP_STRING([--disable-debug], [Disable debugging symbols]),
 	      AS_IF([test "x$enable_debug" = "xno"], [with_debug=no], [with_debug=yes]),
 	      [with_debug=yes])
 AC_SUBST(with_debug)
 AM_CONDITIONAL([BUILD_DEBUG], [test "x$with_debug" != xno])
+
+AC_ARG_ENABLE([man-doc],
+	      AS_HELP_STRING([--disable-man-doc], [Disable man page documentation]),
+	      AS_IF([test "x$enable_man_doc" = "xno"], [enable_man_doc=no],
+	      [enable_man_doc=yes]), [enable_man_doc=yes])
+AM_CONDITIONAL([BUILD_MAN], [test "x$enable_man_doc" == "xyes" ])
 
 AC_ARG_ENABLE([pdf-doc],
 	      AS_HELP_STRING([--enable-pdf-doc], [Enable PDF documentation]),
@@ -56,18 +62,23 @@ then
         exit 1
 fi
 
-AC_CHECK_PROG(DOCBOOK2X_MAN, [docbook2x-man], [docbook2x-man], [no])
-AC_CHECK_PROG(DOCBOOK2MAN, [docbook2man], [docbook2man], [no])
-AC_CHECK_PROG(DB2X_DOCBOOK2MAN, [db2x_docbook2man], [db2x_docbook2man], [no])
-AS_IF([test "$DOCBOOK2X_MAN" != "no"], [DB2MAN="$DOCBOOK2X_MAN"],
-	[AS_IF([test "$DOCBOOK2MAN" != "no"], [DB2MAN="$DOCBOOK2MAN"],
-		[AS_IF([test "$DB2X_DOCBOOK2MAN" != "no"], [DB2MAN="$DB2X_DOCBOOK2MAN"],
-			[AC_MSG_WARN([docbookx2-man/db2x_docbook2man not found, no manpages will be built])]
-		)]
-	)]
-)
-AC_SUBST(DB2MAN)
-AM_CONDITIONAL([BUILD_MAN], [test -n "$DB2MAN"])
+AM_PROG_AR
+AM_PROG_LIBTOOL
+
+AM_COND_IF([BUILD_MAN], [
+	AC_CHECK_PROG(DOCBOOK2X_MAN, [docbook2x-man], [docbook2x-man], [no])
+	AC_CHECK_PROG(DOCBOOK2MAN, [docbook2man], [docbook2man], [no])
+	AC_CHECK_PROG(DB2X_DOCBOOK2MAN, [db2x_docbook2man], [db2x_docbook2man], [no])
+	AS_IF([test "$DOCBOOK2X_MAN" != "no"], [DB2MAN="$DOCBOOK2X_MAN"],
+	      [AS_IF([test "$DOCBOOK2MAN" != "no"], [DB2MAN="$DOCBOOK2MAN"],
+		     [AS_IF([test "$DB2X_DOCBOOK2MAN" != "no"],
+			    [DB2MAN="$DB2X_DOCBOOK2MAN"],
+			    [AC_MSG_WARN([docbookx2-man/db2x_docbook2man not found, no manpages will be built])]
+		     )]
+	     )]
+	)
+	AC_SUBST(DB2MAN)
+])
 
 AM_COND_IF([BUILD_PDF], [
 	AC_CHECK_PROG(DBLATEX, [dblatex], [found], [no])
@@ -77,7 +88,7 @@ AM_COND_IF([BUILD_PDF], [
 
 # Checks for libraries.
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.8])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.9])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])], [],
@@ -117,29 +128,11 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h limits.h malloc.h \
 		  stddef.h stdint.h stdlib.h string.h unistd.h], ,
 		 AC_MSG_ERROR([Header file not found]))
 
-# Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
-AC_C_CONST
-AC_C_INLINE
-AC_TYPE_OFF_T
-AC_TYPE_SIZE_T
-AC_TYPE_UID_T
-AC_TYPE_INT8_T
-AC_TYPE_INT16_T
-AC_TYPE_INT32_T
-AC_TYPE_INT64_T
-AC_TYPE_UINT8_T
-AC_TYPE_UINT16_T
-AC_TYPE_UINT32_T
-AC_TYPE_UINT64_T
-
-# Checks for library functions.
-AC_CHECK_FUNCS([memmove memset strchr strdup strerror strtoull])
-
 AC_CONFIG_FILES([					\
 		Makefile				\
 		src/Makefile				\
 		include/Makefile			\
+		include/nftables/Makefile		\
 		include/linux/Makefile			\
 		include/linux/netfilter/Makefile	\
 		include/linux/netfilter_arp/Makefile	\
@@ -157,5 +150,6 @@ nft configuration:
   cli support:			${with_cli}
   enable debugging symbols:	${with_debug}
   use mini-gmp:			${with_mini_gmp}
+  enable man page:              ${enable_man_doc}
   enable pdf documentation:	${enable_pdf_doc}
   libxtables support:		${with_libxtables}"

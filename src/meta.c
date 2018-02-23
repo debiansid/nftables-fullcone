@@ -206,7 +206,7 @@ static void uid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct passwd *pw;
 
-	if (octx->numeric < NUMERIC_ALL) {
+	if (octx->numeric < NFT_NUMERIC_ALL) {
 		uint32_t uid = mpz_get_uint32(expr->value);
 
 		pw = getpwuid(uid);
@@ -258,7 +258,7 @@ static void gid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct group *gr;
 
-	if (octx->numeric < NUMERIC_ALL) {
+	if (octx->numeric < NFT_NUMERIC_ALL) {
 		uint32_t gid = mpz_get_uint32(expr->value);
 
 		gr = getgrgid(gid);
@@ -428,6 +428,8 @@ static const struct meta_template meta_templates[] = {
 	[NFT_META_PRANDOM]	= META_TEMPLATE("random",    &integer_type,
 						4 * BITS_PER_BYTE,
 						BYTEORDER_BIG_ENDIAN), /* avoid conversion; doesn't have endianess */
+	[NFT_META_SECPATH]	= META_TEMPLATE("secpath", &boolean_type,
+						BITS_PER_BYTE, BYTEORDER_HOST_ENDIAN),
 };
 
 static bool meta_key_is_qualified(enum nft_meta_keys key)
@@ -439,6 +441,7 @@ static bool meta_key_is_qualified(enum nft_meta_keys key)
 	case NFT_META_PROTOCOL:
 	case NFT_META_PRIORITY:
 	case NFT_META_PRANDOM:
+	case NFT_META_SECPATH:
 		return true;
 	default:
 		return false;
@@ -481,8 +484,6 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 	const struct expr *left = expr->left, *right = expr->right;
 	const struct proto_desc *desc;
 	uint8_t protonum;
-
-	assert(expr->op == OP_EQ);
 
 	switch (left->meta.key) {
 	case NFT_META_IIFTYPE:

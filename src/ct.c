@@ -147,7 +147,7 @@ static void ct_label_type_print(const struct expr *expr,
 		return;
 	}
 	/* can happen when connlabel.conf is altered after rules were added */
-	nft_print(octx, "%ld\n", (long)mpz_scan1(expr->value, 0));
+	nft_print(octx, "%ld", (long)mpz_scan1(expr->value, 0));
 }
 
 static struct error_record *ct_label_type_parse(const struct expr *sym,
@@ -326,8 +326,6 @@ static void ct_expr_pctx_update(struct proto_ctx *ctx, const struct expr *expr)
 	const struct expr *left = expr->left, *right = expr->right;
 	const struct proto_desc *base = NULL, *desc;
 	uint32_t nhproto;
-
-	assert(expr->op == OP_EQ);
 
 	nhproto = mpz_get_uint32(right->value);
 

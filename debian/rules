@@ -5,13 +5,13 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-configure_opts	:= --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man --disable-silent-rules --with-xtables
+configure_opts	:= --with-xtables
 
 override_dh_auto_configure:
-	./configure $(configure_opts) --
+	dh_auto_configure -- $(configure_opts) --
 
 %:
-	dh $@ --with autoreconf,systemd
+	dh $@ --with autoreconf
 
 override_dh_fixperms:
 	dh_fixperms

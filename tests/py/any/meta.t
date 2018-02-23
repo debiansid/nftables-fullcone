@@ -15,7 +15,7 @@ meta length 33-45;ok
 meta length != 33-45;ok
 meta length { 33, 55, 67, 88};ok
 meta length { 33-55, 67-88};ok
-meta length { 33-55, 55-88, 100-120};ok;meta length { 33-88, 100-120}
+meta length { 33-55, 56-88, 100-120};ok;meta length { 33-55, 56-88, 100-120}
 meta length != { 33, 55, 67, 88};ok
 meta length { 33-55};ok
 meta length != { 33-55};ok
@@ -71,6 +71,7 @@ meta iifname {"dummy0", "lo"};ok
 meta iifname != {"dummy0", "lo"};ok
 meta iifname "dummy*";ok;iifname "dummy*"
 meta iifname "dummy\*";ok;iifname "dummy\*"
+meta iifname '""';fail
 
 meta iiftype {ether, ppp, ipip, ipip6, loopback, sit, ipgre};ok
 meta iiftype != {ether, ppp, ipip, ipip6, loopback, sit, ipgre};ok
@@ -89,6 +90,7 @@ meta oifname != "dummy0";ok;oifname != "dummy0"
 meta oifname { "dummy0", "lo"};ok
 meta oifname "dummy*";ok;oifname "dummy*"
 meta oifname "dummy\*";ok;oifname "dummy\*"
+meta oifname '""';fail
 
 meta oiftype {ether, ppp, ipip, ipip6, loopback, sit, ipgre};ok
 meta oiftype != {ether, ppp, ipip, ipip6, loopback, sit, ipgre};ok

@@ -38,7 +38,7 @@ vi:ts=4 sw=4
 	<refnamediv>
 		<refname>nft</refname>
 		<refpurpose>
-			Administration tool for packet filtering and classification
+			Administration tool of the nftables framework for packet filtering and classification
 		</refpurpose>
 	</refnamediv>
 
@@ -46,49 +46,16 @@ vi:ts=4 sw=4
 		<cmdsynopsis>
 			<command>nft</command>
 			<group>
-				<arg><option>-n</option></arg>
-				<arg><option>--numeric</option></arg>
+				<arg><option> -nNscae </option></arg>
 			</group>
-			<group>
-				<arg><option>-N</option></arg>
-				<arg><option>--reversedns</option></arg>
-			</group>
-			<group>
-				<arg><option>-s</option></arg>
-				<arg><option>--stateless</option></arg>
-			</group>
-			<group>
-				<arg><option>-c</option></arg>
-				<arg><option>--check</option></arg>
-			</group>
-			<group>
-				<arg><option>-a</option></arg>
-				<arg><option>--handle</option></arg>
-			</group>
-			<group>
-				<arg><option>-e</option></arg>
-				<arg><option>--echo</option></arg>
-			</group>
-			<arg>
-				<group choice="req">
-					<arg><option>-I</option></arg>
-					<arg><option>--includepath</option></arg>
-				</group>
+			<arg> -I
 				<replaceable>directory</replaceable>
 			</arg>
 			<group>
-				<arg>
-					<group choice="req">
-						<arg><option>-f</option></arg>
-						<arg><option>--file</option></arg>
-					</group>
+				<arg> -f
 					<replaceable>filename</replaceable>
 				</arg>
-				<arg>
-					<group choice="req">
-						<arg><option>-i</option></arg>
-						<arg><option>--interactive</option></arg>
-					</group>
+				<arg> -i
 				</arg>
 				<arg rep="repeat">
 					<replaceable>cmd</replaceable>
@@ -96,23 +63,19 @@ vi:ts=4 sw=4
 			</group>
 		</cmdsynopsis>
 		<cmdsynopsis>
-			<command>nft</command>
-			<group>
-				<arg><option>-h</option></arg>
-				<arg><option>--help</option></arg>
-			</group>
-			<group>
-				<arg><option>-v</option></arg>
-				<arg><option>--version</option></arg>
-			</group>
+			<command>nft -h</command>
+		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>nft -v</command>
 		</cmdsynopsis>
 	</refsynopsisdiv>
 
 	<refsect1>
 		<title>Description</title>
 		<para>
-			nft is used to set up, maintain and inspect packet
-			filtering and classification rules in the Linux kernel.
+			nft is the command line tool used to set up, maintain and inspect packet
+			filtering and classification rules in the Linux kernel, in the nftables framework.
+			The Linux kernel subsystem is known as nf_tables, and 'nf' stands for Netfilter.
 		</para>
 	</refsect1>
 
@@ -151,6 +114,14 @@ vi:ts=4 sw=4
 				</listitem>
 			</varlistentry>
 			<varlistentry>
+				<term><option>-N, --reversedns</option></term>
+				<listitem>
+					<para>
+						Translate IP addresses to names. Usually requires network traffic for DNS lookup.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
 				<term><option>-s, --stateless</option></term>
 				<listitem>
 					<para>
@@ -163,14 +134,6 @@ vi:ts=4 sw=4
 				<listitem>
 					<para>
 						Check commands validity without actually applying the changes.
-					</para>
-				</listitem>
-			</varlistentry>
-			<varlistentry>
-				<term><option>-N, --reversedns</option></term>
-				<listitem>
-					<para>
-						Translate IP addresses to names. Usually requires network traffic for DNS lookup.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -205,6 +168,9 @@ vi:ts=4 sw=4
 				<listitem>
 					<para>
 						Read input from <replaceable>filename</replaceable>.
+					</para>
+					<para>
+						nft scripts must start <command>#!/usr/sbin/nft -f</command>
 					</para>
 				</listitem>
 			</varlistentry>
@@ -587,7 +553,7 @@ filter input iif $int_ifs accept
 				</group>
 				<command>table</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
+				<replaceable>table</replaceable>
 			</cmdsynopsis>
 		</para>
 
@@ -661,11 +627,11 @@ filter input iif $int_ifs accept
 				<arg choice="plain"><replaceable>chain</replaceable></arg>
 				<arg choice="opt">
 					<arg choice="req">
-						<arg choice="req"><replaceable>type</replaceable></arg>
-						<arg choice="req"><replaceable>hook</replaceable></arg>
-						<arg choice="opt"><replaceable>device</replaceable></arg>
-						<arg choice="req"><replaceable>priority</replaceable> ;</arg>
-						<arg choice="opt"><replaceable>policy</replaceable> ;</arg>
+						type <replaceable>type</replaceable>
+						hook <replaceable>hook</replaceable>
+						<arg choice="opt">device <replaceable>device</replaceable></arg>
+						priority <replaceable>priority</replaceable> ;
+						<arg choice="opt">policy <replaceable>policy</replaceable> ;</arg>
 					</arg>
 				</arg>
 			</cmdsynopsis>
@@ -677,16 +643,16 @@ filter input iif $int_ifs accept
 				</group>
 				<command>chain</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>chain</replaceable>
 			</cmdsynopsis>
 			<cmdsynopsis>
-				<arg choice="req">rename</arg>
+				<literal>rename</literal>
 				<command>chain</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
-				<arg choice="req"><replaceable>newname</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>chain</replaceable>
+				<replaceable>newname</replaceable>
 			</cmdsynopsis>
 		</para>
 
@@ -782,7 +748,7 @@ filter input iif $int_ifs accept
 							<entry>nat</entry>
 							<entry>ip, ip6</entry>
 							<entry>prerouting, input, output, postrouting</entry>
-							<entry>Chains of this type perform Native Address Translation based on conntrack entries. Only the first packet of a connection actually traverses this chain - its rules usually define details of the created conntrack entry (NAT statements for instance).</entry>
+							<entry>Chains of this type perform Network Address Translation based on conntrack entries. Only the first packet of a connection actually traverses this chain - its rules usually define details of the created conntrack entry (NAT statements for instance).</entry>
 						</row>
 						<row>
 							<entry>route</entry>
@@ -833,27 +799,27 @@ filter input iif $int_ifs accept
 				</group>
 				<command>rule</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>chain</replaceable>
 				<arg choice="opt">position <replaceable>position</replaceable></arg>
-				<arg choice="req" rep="repeat"><replaceable>statement</replaceable></arg>
+				<replaceable>statement</replaceable>...
 			</cmdsynopsis>
 			<cmdsynopsis>
-				<arg choice="req">replace</arg>
-				<command>rule</command>
+
+				<literal>replace </literal><command>rule</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
-				<arg choice="req">handle <replaceable>handle</replaceable></arg>
-				<arg choice="req" rep="repeat"><replaceable>statement</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>chain</replaceable>
+				<literal> handle </literal><replaceable>handle</replaceable>
+				<replaceable>statement</replaceable>...
 			</cmdsynopsis>
 			<cmdsynopsis>
-				<arg choice="req">delete</arg>
+				<literal>delete</literal>
 				<command>rule</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>chain</replaceable></arg>
-				<arg choice="req">handle <replaceable>handle</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>chain</replaceable>
+				<literal> handle </literal><replaceable>handle</replaceable>
 			</cmdsynopsis>
 		</para>
 		<para>
@@ -904,19 +870,20 @@ filter input iif $int_ifs accept
 		<title>Sets</title>
 		<para>
 			<cmdsynopsis>
-				<arg choice="req">add</arg>
+				<literal>add</literal>
 				<command> set</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>set</replaceable></arg>
-				{
-				<arg choice="req"><replaceable>type</replaceable></arg>
-				<arg choice="opt"><replaceable>flags</replaceable></arg>
-				<arg choice="opt"><replaceable>timeout</replaceable></arg>
-				<arg choice="opt"><replaceable>gc-interval</replaceable></arg>
-				<arg choice="opt"><replaceable>elements</replaceable></arg>
-				<arg choice="opt"><replaceable>size</replaceable></arg>
-				<arg choice="opt"><replaceable>policy</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>set</replaceable>
+				{ type
+				<replaceable>type</replaceable> ;
+				<arg choice="opt">flags <replaceable>flags</replaceable> ;</arg>
+				<arg choice="opt">timeout <replaceable>timeout</replaceable> ;</arg>
+				<arg choice="opt">gc-interval <replaceable>gc-interval</replaceable> ;</arg>
+				<arg choice="opt">elements = { <replaceable>element</replaceable>[,...] } ;</arg>
+				<arg choice="opt">size <replaceable>size</replaceable> ;</arg>
+				<arg choice="opt">policy <replaceable>policy</replaceable> ;</arg>
+				<arg choice="opt">auto-merge <replaceable>auto-merge</replaceable> ;</arg>
 				}
 			</cmdsynopsis>
 			<cmdsynopsis>
@@ -927,8 +894,8 @@ filter input iif $int_ifs accept
 				</group>
 				<command> set</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>set</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>set</replaceable>
 			</cmdsynopsis>
 			<cmdsynopsis>
 				<group choice="req">
@@ -937,11 +904,10 @@ filter input iif $int_ifs accept
 				</group>
 				<command> element</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>set</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>set</replaceable>
 				{
-				<arg choice="req"><replaceable>elements</replaceable></arg>
-				}
+				<replaceable>element</replaceable>[,...] }
 			</cmdsynopsis>
 		</para>
 		<para>
@@ -1048,6 +1014,11 @@ filter input iif $int_ifs accept
 						<entry>set policy</entry>
 						<entry>string: performance [default], memory</entry>
 					</row>
+					<row>
+						<entry>auto-merge</entry>
+						<entry>automatic merge of adjacent/overlapping set elements (only for interval sets)</entry>
+						<entry></entry>
+					</row>
 				</tbody>
 			</tgroup>
 		</table>
@@ -1057,17 +1028,17 @@ filter input iif $int_ifs accept
 		<title>Maps</title>
 		<para>
 			<cmdsynopsis>
-				<arg choice="req">add</arg>
+				<literal>add</literal>
 				<command> map</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>map</replaceable></arg>
-				{
-				<arg choice="req"><replaceable>type</replaceable></arg>
-				<arg choice="opt"><replaceable>flags</replaceable></arg>
-				<arg choice="opt"><replaceable>elements</replaceable></arg>
-				<arg choice="opt"><replaceable>size</replaceable></arg>
-				<arg choice="opt"><replaceable>policy</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>map</replaceable>
+				{ type
+				<replaceable>type</replaceable>
+				<arg choice="opt">flags <replaceable>flags</replaceable> ;</arg>
+				<arg choice="opt">elements = { <replaceable>element</replaceable>[,...] } ;</arg>
+				<arg choice="opt">size <replaceable>size</replaceable> ;</arg>
+				<arg choice="opt">policy <replaceable>policy</replaceable> ;</arg>
 				}
 			</cmdsynopsis>
 			<cmdsynopsis>
@@ -1078,8 +1049,8 @@ filter input iif $int_ifs accept
 				</group>
 				<command> map</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>map</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>map</replaceable>
 			</cmdsynopsis>
 			<cmdsynopsis>
 				<group choice="req">
@@ -1088,10 +1059,10 @@ filter input iif $int_ifs accept
 				</group>
 				<command> element</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>map</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>map</replaceable>
 				{
-				<arg choice="req"><replaceable>elements</replaceable></arg>
+				elements = { <replaceable>element</replaceable>[,...] } ;
 				}
 			</cmdsynopsis>
 		</para>
@@ -1206,8 +1177,8 @@ filter input iif $int_ifs accept
 				</group>
 				<command> type</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
-				<arg choice="req"><replaceable>table</replaceable></arg>
-				<arg choice="req"><replaceable>object</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>object</replaceable>
 			</cmdsynopsis>
 		</para>
 		<para>
@@ -1254,13 +1225,15 @@ filter input iif $int_ifs accept
 			<para>
 				<cmdsynopsis>
 					<command>ct</command>
-					<arg choice="req">helper</arg>
-					<arg choice="req">type</arg>
-					<arg choice="req"><replaceable>type</replaceable></arg>
-					<arg choice="req">protocol</arg>
-					<arg choice="req"><replaceable>protocol</replaceable></arg>
-					<arg choice="opt">l3proto</arg>
-					<arg choice="opt"><replaceable>family</replaceable></arg>
+					<literal>helper</literal>
+					<replaceable>helper</replaceable>
+					<literal> { type </literal>
+					<replaceable>type</replaceable>
+					<literal> protocol </literal>
+					<replaceable>protocol</replaceable>
+					<literal> ;</literal>
+					<arg choice="opt"><literal>l3proto </literal><replaceable>family</replaceable><literal> ;</literal></arg>
+					<literal> }</literal>
 				</cmdsynopsis>
 			</para>
 			<para>
@@ -1417,7 +1390,7 @@ table inet myhelpers {
 			<para>
 				<cmdsynopsis>
 					<command>describe</command>
-					<arg choice="req"><replaceable>expression</replaceable></arg>
+					<replaceable>expression</replaceable>
 				</cmdsynopsis>
 			</para>
 			<para>
@@ -2538,6 +2511,7 @@ filter output icmpv6 type { echo-request, echo-reply }
 						<arg>oifgroup</arg>
 						<arg>cgroup</arg>
 						<arg>random</arg>
+						<arg>secpath</arg>
 					</group>
 				</cmdsynopsis>
 			</para>
@@ -2675,6 +2649,12 @@ filter output icmpv6 type { echo-request, echo-reply }
 								<entry>pseudo-random number</entry>
 								<entry>integer (32 bits)</entry>
 							</row>
+							<row>
+								<entry>secpath</entry>
+								<entry>boolean</entry>
+								<entry>boolean (1 bit)</entry>
+							</row>
+
 						</tbody>
 					</tgroup>
 				</table>
@@ -2759,6 +2739,9 @@ filter output meta oif eth0
 
 # unqualified meta expression
 filter output oif eth0
+
+# packed was subject to ipsec processing
+raw prerouting meta secpath exists accept
 					</programlisting>
 				</example>
 			</para>
@@ -2771,7 +2754,7 @@ filter output oif eth0
 					<group choice="req">
 						<arg>saddr</arg>
 						<arg>daddr</arg>
-					<group choice="opt">
+					<group choice="req">
 						<arg>mark</arg>
 						<arg>iif</arg>
 						<arg>oif</arg>
@@ -4213,7 +4196,7 @@ ip6 filter input frag more-fragments 1 counter
 						<arg>jump</arg>
 						<arg>goto</arg>
 					</group>
-					<arg choice="req"><replaceable>chain</replaceable></arg>
+					<replaceable>chain</replaceable>
 				</cmdsynopsis>
 			</para>
 			<para>
@@ -4385,7 +4368,7 @@ tcp flags syn tcp option maxseg size set rt mtu
 								<entry>quoted string</entry>
 							</row>
 							<row>
-								<entry>syslog-level</entry>
+								<entry>level</entry>
 								<entry>Syslog level of logging</entry>
 								<entry>string: emerg, alert, crit, err, warn [default], notice, info, debug</entry>
 							</row>
@@ -4486,9 +4469,7 @@ ip6 filter output log flags all
 				<cmdsynopsis>
 					<command>reject</command>
 					<arg choice="opt">
-						<arg choice="none">with</arg>
-						<arg choice="req">tcp</arg>
-						<arg choice="req">reset</arg>
+						<literal> with tcp reset </literal>
 					</arg>
 				</cmdsynopsis>
 			</para>
@@ -4544,10 +4525,10 @@ ip6 filter output log flags all
 			<para>
 				<cmdsynopsis>
 					<command>counter</command>
-					<arg choice="req">packets
+					<arg choice="opt">
+					<literal>packets</literal>
 					<replaceable>number</replaceable>
-					</arg>
-					<arg choice="req">bytes
+					<literal>bytes</literal>
 					<replaceable>number</replaceable>
 					</arg>
 				</cmdsynopsis>
@@ -5019,6 +5000,86 @@ add rule nat prerouting tcp dport 22 redirect to :2222
 				</table>
 			</para>
 		</refsect2>
+		<refsect2>
+			<title>Dup statement</title>
+			<para>
+				The dup statement is used to duplicate a packet and send the copy to a different destination.
+			</para>
+			<para>
+				<cmdsynopsis>
+						<command>dup</command>
+						<arg choice="none">to
+						<replaceable>device</replaceable></arg>
+				</cmdsynopsis>
+				<cmdsynopsis>
+						<command>dup</command>
+						<arg choice="none">to
+						<replaceable>address</replaceable>
+						<arg choice="none">device</arg>
+						<replaceable>device</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+			<para>
+				<table frame="all">
+				<title>Dup statement values</title>
+					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
+						<colspec colname='c1'/>
+						<colspec colname='c2'/>
+						<colspec colname='c3'/>
+						<thead>
+							<row>
+								<entry>Expression</entry>
+								<entry>Description</entry>
+								<entry>Type</entry>
+							</row>
+						</thead>
+						<tbody>
+							<row>
+								<entry>address</entry>
+								<entry>Specifies that the copy of the packet should be sent to a new gateway.</entry>
+								<entry>ipv4_addr, ipv6_addr, eg. abcd::1234, or you can use a mapping, eg. ip saddr map { 192.168.1.2 : 10.1.1.1 }</entry>
+							</row>
+							<row>
+								<entry>device</entry>
+								<entry>Specifies that the copy should be transmitted via device.</entry>
+								<entry>string</entry>
+							</row>
+						</tbody>
+					</tgroup>
+				</table>
+			</para>
+			<para>
+				<example>
+					<title>Using the dup statement</title>
+					<programlisting>
+# send to machine with ip address 10.2.3.4 on eth0
+ip filter forward dup to 10.2.3.4 device "eth0"
+
+# copy raw frame to another interface
+netdetv ingress dup to "eth0"
+dup to "eth0"
+
+# combine with map dst addr to gateways
+dup to ip daddr map { 192.168.7.1 : "eth0", 192.168.7.2 : "eth1" }
+					</programlisting>
+				</example>
+			</para>
+		</refsect2>
+		<refsect2>
+			<title>Fwd statement</title>
+			<para>
+				The fwd statement is used to redirect a raw packet to another interface.  Its is only available in the netdev family ingress hook.
+				It is similar to the dup statement except that no copy is made.
+			</para>
+			<para>
+				<cmdsynopsis>
+						<command>fwd</command>
+						<arg choice="none">to
+						<replaceable>device</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+		</refsect2>
+
 	</refsect1>
 
 	<refsect1>

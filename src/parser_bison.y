@@ -105,6 +105,10 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 #define symbol_value(loc, str) \
 	symbol_expr_alloc(loc, SYMBOL_VALUE, current_scope(state), str)
+
+/* Declare those here to avoid compiler warnings */
+void nft_set_debug(int, void *);
+int nft_lex(void *, void *, void *);
 %}
 
 /* Declaration section */
@@ -121,9 +125,9 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %initial-action {
 	location_init(scanner, state, &yylloc);
-	if (nft->debug_mask & DEBUG_SCANNER)
+	if (nft->debug_mask & NFT_DEBUG_SCANNER)
 		nft_set_debug(1, scanner);
-	if (nft->debug_mask & DEBUG_PARSER)
+	if (nft->debug_mask & NFT_DEBUG_PARSER)
 		yydebug = 1;
 }
 
@@ -214,6 +218,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token FLUSH			"flush"
 %token RENAME			"rename"
 %token DESCRIBE			"describe"
+%token IMPORT			"import"
 %token EXPORT			"export"
 %token MONITOR			"monitor"
 
@@ -229,6 +234,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token CONSTANT			"constant"
 %token INTERVAL			"interval"
+%token AUTOMERGE		"auto-merge"
 %token TIMEOUT			"timeout"
 %token GC_INTERVAL		"gc-interval"
 %token ELEMENTS			"elements"
@@ -239,6 +245,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %token SIZE			"size"
 
 %token FLOW			"flow"
+%token METER			"meter"
+%token METERS			"meters"
 
 %token <val> NUM		"number"
 %token <string> STRING		"string"
@@ -467,6 +475,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 
 %token XML			"xml"
 %token JSON			"json"
+%token VM			"vm"
 
 %token NOTRACK			"notrack"
 
@@ -486,8 +495,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd
+%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
 
 %type <handle>			table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
 %destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
@@ -551,8 +560,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <stmt>			set_stmt
 %destructor { stmt_free($$); }	set_stmt
 %type <val>			set_stmt_op
-%type <stmt>			flow_stmt flow_stmt_alloc
-%destructor { stmt_free($$); }	flow_stmt flow_stmt_alloc
+%type <stmt>			meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
+%destructor { stmt_free($$); }	meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
 
 %type <expr>			symbol_expr verdict_expr integer_expr variable_expr
 %destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr variable_expr
@@ -602,8 +611,8 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %type <expr>			set_elem_expr_stmt set_elem_expr_stmt_alloc
 %destructor { expr_free($$); }	set_elem_expr_stmt set_elem_expr_stmt_alloc
 
-%type <expr>			flow_key_expr flow_key_expr_alloc
-%destructor { expr_free($$); }	flow_key_expr flow_key_expr_alloc
+%type <expr>			meter_key_expr meter_key_expr_alloc
+%destructor { expr_free($$); }	meter_key_expr meter_key_expr_alloc
 
 %type <expr>			expr initializer_expr keyword_expr
 %destructor { expr_free($$); }	expr initializer_expr keyword_expr
@@ -675,7 +684,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
 %destructor { expr_free($$); }	fib_expr
 %type <val>			fib_tuple	fib_result	fib_flag
 
-%type <val>			export_format
+%type <val>			markup_format
 %type <string>			monitor_event
 %destructor { xfree($$); }	monitor_event
 %type <val>			monitor_object	monitor_format
@@ -806,6 +815,7 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	RESET		reset_cmd	{ $$ = $2; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
 			|	RENAME		rename_cmd	{ $$ = $2; }
+			|       IMPORT          import_cmd      { $$ = $2; }
 			|	EXPORT		export_cmd	{ $$ = $2; }
 			|	MONITOR		monitor_cmd	{ $$ = $2; }
 			|	DESCRIBE	describe_cmd	{ $$ = $2; }
@@ -1080,11 +1090,19 @@ list_cmd		:	TABLE		table_spec
 			}
 			|	FLOW TABLES	ruleset_spec
 			{
-				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_FLOWTABLES, &$3, &@$, NULL);
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_METERS, &$3, &@$, NULL);
 			}
 			|	FLOW TABLE	set_spec
 			{
-				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_FLOWTABLE, &$3, &@$, NULL);
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_METER, &$3, &@$, NULL);
+			}
+			|	METERS		ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_METERS, &$2, &@$, NULL);
+			}
+			|	METER		set_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_METER, &$2, &@$, NULL);
 			}
 			|	MAPS		ruleset_spec
 			{
@@ -1148,7 +1166,11 @@ flush_cmd		:	TABLE		table_spec
 			}
 			|	FLOW TABLE	set_spec
 			{
-				$$ = cmd_alloc(CMD_FLUSH, CMD_OBJ_FLOWTABLE, &$3, &@$, NULL);
+				$$ = cmd_alloc(CMD_FLUSH, CMD_OBJ_METER, &$3, &@$, NULL);
+			}
+			|	METER		set_spec
+			{
+				$$ = cmd_alloc(CMD_FLUSH, CMD_OBJ_METER, &$2, &@$, NULL);
 			}
 			|	RULESET		ruleset_spec
 			{
@@ -1163,18 +1185,34 @@ rename_cmd		:	CHAIN		chain_spec	identifier
 			}
 			;
 
-export_cmd		:	RULESET		export_format
+import_cmd			:       RULESET         markup_format
 			{
 				struct handle h = { .family = NFPROTO_UNSPEC };
-				struct export *export = export_alloc($2);
-				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_EXPORT, &h, &@$, export);
+				struct markup *markup = markup_alloc($2);
+				$$ = cmd_alloc(CMD_IMPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
 			}
-			|	export_format
+			|	markup_format
 			{
 				struct handle h = { .family = NFPROTO_UNSPEC };
-				struct export *export = export_alloc($1);
-				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_EXPORT, &h, &@$, export);
+				struct markup *markup = markup_alloc($1);
+				$$ = cmd_alloc(CMD_IMPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
 			}
+			|	JSON		{ $$ = NULL; }
+			;
+
+export_cmd		:	RULESET		markup_format
+			{
+				struct handle h = { .family = NFPROTO_UNSPEC };
+				struct markup *markup = markup_alloc($2);
+				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
+			}
+			|	markup_format
+			{
+				struct handle h = { .family = NFPROTO_UNSPEC };
+				struct markup *markup = markup_alloc($1);
+				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
+			}
+			|	JSON		{ $$ = NULL; }
 			;
 
 monitor_cmd		:	monitor_event	monitor_object	monitor_format
@@ -1201,11 +1239,12 @@ monitor_object		:	/* empty */	{ $$ = CMD_MONITOR_OBJ_ANY; }
 			;
 
 monitor_format		:	/* empty */	{ $$ = NFTNL_OUTPUT_DEFAULT; }
-			|	export_format
+			|	markup_format
+			|	JSON		{ $$ = NFTNL_OUTPUT_JSON; }
 			;
 
-export_format		: 	XML 		{ $$ = NFTNL_OUTPUT_XML; }
-			|	JSON		{ $$ = NFTNL_OUTPUT_JSON; }
+markup_format		: 	XML 		{ $$ = NFTNL_OUTPUT_XML; }
+			|	VM JSON		{ $$ = NFTNL_OUTPUT_JSON; }
 			;
 
 describe_cmd		:	primary_expr
@@ -1367,6 +1406,11 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	set_block	ELEMENTS	'='		set_block_expr
 			{
 				$1->init = $4;
+				$$ = $1;
+			}
+			|	set_block	AUTOMERGE
+			{
+				$1->automerge = true;
 				$$ = $1;
 			}
 			|	set_block	set_mechanism	stmt_separator
@@ -1545,6 +1589,7 @@ type_identifier		:	STRING	{ $$ = $1; }
 			|	MARK	{ $$ = xstrdup("mark"); }
 			|	DSCP	{ $$ = xstrdup("dscp"); }
 			|	ECN	{ $$ = xstrdup("ecn"); }
+			|	CLASSID { $$ = xstrdup("classid"); }
 			;
 
 hook_spec		:	TYPE		STRING		HOOK		STRING		dev_spec	PRIORITY	prio_spec
@@ -1777,7 +1822,7 @@ stmt_list		:	stmt
 
 stmt			:	verdict_stmt
 			|	match_stmt
-			|	flow_stmt
+			|	meter_stmt
 			|	counter_stmt
 			|	payload_stmt
 			|	meta_stmt
@@ -2463,25 +2508,19 @@ set_stmt_op		:	ADD	{ $$ = NFT_DYNSET_OP_ADD; }
 			|	UPDATE	{ $$ = NFT_DYNSET_OP_UPDATE; }
 			;
 
-flow_stmt		:	flow_stmt_alloc		flow_stmt_opts	'{' flow_key_expr stmt '}'
+meter_stmt		:	flow_stmt_legacy_alloc		flow_stmt_opts	'{' meter_key_expr stmt '}'
 			{
-				$1->flow.key  = $4;
-				$1->flow.stmt = $5;
+				$1->meter.key  = $4;
+				$1->meter.stmt = $5;
 				$$->location  = @$;
 				$$ = $1;
 			}
-			|	flow_stmt_alloc		'{' flow_key_expr stmt '}'
-			{
-				$1->flow.key  = $3;
-				$1->flow.stmt = $4;
-				$$->location  = @$;
-				$$ = $1;
-			}
+			|	meter_stmt_alloc		{ $$ = $1; }
 			;
 
-flow_stmt_alloc		:	FLOW
+flow_stmt_legacy_alloc	:	FLOW
 			{
-				$$ = flow_stmt_alloc(&@$);
+				$$ = meter_stmt_alloc(&@$);
 			}
 			;
 
@@ -2494,7 +2533,17 @@ flow_stmt_opts		:	flow_stmt_opt
 
 flow_stmt_opt		:	TABLE			identifier
 			{
-				$<stmt>0->flow.table = $2;
+				$<stmt>0->meter.name = $2;
+			}
+			;
+
+meter_stmt_alloc	:	METER	identifier		'{' meter_key_expr stmt '}'
+			{
+				$$ = meter_stmt_alloc(&@$);
+				$$->meter.name = $2;
+				$$->meter.key  = $4;
+				$$->meter.stmt = $5;
+				$$->location  = @$;
 			}
 			;
 
@@ -2733,15 +2782,15 @@ set_list_member_expr	:	opt_newline	set_expr	opt_newline
 			}
 			;
 
-flow_key_expr		:	flow_key_expr_alloc
-			|	flow_key_expr_alloc		set_elem_options
+meter_key_expr		:	meter_key_expr_alloc
+			|	meter_key_expr_alloc		set_elem_options
 			{
 				$$->location = @$;
 				$$ = $1;
 			}
 			;
 
-flow_key_expr_alloc	:	concat_expr
+meter_key_expr_alloc	:	concat_expr
 			{
 				$$ = set_elem_expr_alloc(&@1, $1);
 			}

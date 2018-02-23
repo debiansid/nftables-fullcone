@@ -108,6 +108,7 @@ static struct expr *netlink_parse_concat_expr(struct netlink_parse_ctx *ctx,
 					      unsigned int len)
 {
 	struct expr *concat, *expr;
+	unsigned int consumed;
 
 	concat = concat_expr_alloc(loc);
 	while (len > 0) {
@@ -119,7 +120,9 @@ static struct expr *netlink_parse_concat_expr(struct netlink_parse_ctx *ctx,
 		}
 		compound_expr_add(concat, expr);
 
-		len -= netlink_padded_len(expr->len);
+		consumed = netlink_padded_len(expr->len);
+		assert(consumed > 0);
+		len -= consumed;
 		reg += netlink_register_space(expr->len);
 	}
 	return concat;
@@ -1143,10 +1146,10 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 	}
 
 	if (dstmt != NULL) {
-		stmt = flow_stmt_alloc(loc);
-		stmt->flow.set  = set_ref_expr_alloc(loc, set);
-		stmt->flow.key  = expr;
-		stmt->flow.stmt = dstmt;
+		stmt = meter_stmt_alloc(loc);
+		stmt->meter.set  = set_ref_expr_alloc(loc, set);
+		stmt->meter.key  = expr;
+		stmt->meter.stmt = dstmt;
 	} else {
 		stmt = set_stmt_alloc(loc);
 		stmt->set.set   = set_ref_expr_alloc(loc, set);
@@ -1329,7 +1332,7 @@ static void payload_match_expand(struct rule_pp_ctx *ctx,
 		nexpr = relational_expr_alloc(&expr->location, expr->op,
 					      left, tmp);
 		if (expr->op == OP_EQ)
-			left->ops->pctx_update(&ctx->pctx, nexpr);
+			relational_expr_pctx_update(&ctx->pctx, nexpr);
 
 		nstmt = expr_stmt_alloc(&ctx->stmt->location, nexpr);
 		list_add_tail(&nstmt->list, &ctx->stmt->list);
@@ -1397,7 +1400,7 @@ static void ct_meta_common_postprocess(struct rule_pp_ctx *ctx,
 		if (expr->right->ops->type == EXPR_RANGE)
 			break;
 
-		expr->left->ops->pctx_update(&ctx->pctx, expr);
+		relational_expr_pctx_update(&ctx->pctx, expr);
 
 		if (ctx->pdctx.pbase == PROTO_BASE_INVALID &&
 		    left->flags & EXPR_F_PROTOCOL) {
@@ -2209,8 +2212,8 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 		case STMT_PAYLOAD:
 			stmt_payload_postprocess(&rctx);
 			break;
-		case STMT_FLOW:
-			expr_postprocess(&rctx, &stmt->flow.key);
+		case STMT_METER:
+			expr_postprocess(&rctx, &stmt->meter.key);
 			break;
 		case STMT_META:
 			if (stmt->meta.expr != NULL)

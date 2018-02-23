@@ -5,12 +5,12 @@ Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.deb
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: automake,
                bison,
-               debhelper (>= 11),
+               debhelper (>= 11~),
                docbook2x,
                flex,
                libgmp-dev,
                libmnl-dev (>= 1.0.3),
-               libnftnl-dev (>= 1.0.9),
+               libnftnl-dev (>= 1.0.9~),
                libreadline-dev,
 	       libxtables-dev (>= 1.6.1),
                libtool (>=2.2.6)

@@ -41,6 +41,7 @@
  * @TYPE_ICMPX_CODE:	icmpx code (integer subtype)
  * @TYPE_DEVGROUP:	devgroup code (integer subtype)
  * @TYPE_DSCP:		Differentiated Services Code Point (integer subtype)
+ * @TYPE_IFNAME:	interface name (string subtype)
  */
 enum datatypes {
 	TYPE_INVALID,
@@ -84,6 +85,7 @@ enum datatypes {
 	TYPE_FIB_ADDR,
 	TYPE_BOOLEAN,
 	TYPE_CT_EVENTBIT,
+	TYPE_IFNAME,
 	__TYPE_MAX
 };
 #define TYPE_MAX		(__TYPE_MAX - 1)
@@ -129,7 +131,7 @@ enum datatype_flags {
  * @subtypes:	number of subtypes (concat type)
  * @name:	type name
  * @desc:	type description
- * @basetype:	basetype for subtypes, determines type compatibilty
+ * @basetype:	basetype for subtypes, determines type compatibility
  * @basefmt:	format string for basetype
  * @print:	function to print a constant of this type
  * @parse:	function to parse a symbol and return an expression

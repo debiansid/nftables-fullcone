@@ -87,6 +87,7 @@ static struct expr *implicit_set_declaration(struct eval_ctx *ctx,
 	set->handle.set = xstrdup(name);
 	set->key	= key;
 	set->init	= expr;
+	set->automerge	= set->flags & NFT_SET_INTERVAL;
 
 	if (ctx->table != NULL)
 		list_add_tail(&set->list, &ctx->table->sets);
@@ -244,7 +245,7 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 		/* We need to reallocate the constant expression with the right
 		 * expression length to avoid problems on big endian.
 		 */
-		value = constant_expr_alloc(&expr->location, &string_type,
+		value = constant_expr_alloc(&expr->location, ctx->ectx.dtype,
 					    BYTEORDER_HOST_ENDIAN,
 					    expr->len, data);
 		expr_free(expr);
@@ -259,20 +260,20 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 		memset(unescaped_str, 0, sizeof(unescaped_str));
 		xstrunescape(data, unescaped_str);
 
-		value = constant_expr_alloc(&expr->location, &string_type,
+		value = constant_expr_alloc(&expr->location, ctx->ectx.dtype,
 					    BYTEORDER_HOST_ENDIAN,
 					    expr->len, unescaped_str);
 		expr_free(expr);
 		*exprp = value;
 		return 0;
 	}
-	value = constant_expr_alloc(&expr->location, &string_type,
+	value = constant_expr_alloc(&expr->location, ctx->ectx.dtype,
 				    BYTEORDER_HOST_ENDIAN,
 				    datalen * BITS_PER_BYTE, data);
 
 	prefix = prefix_expr_alloc(&expr->location, value,
 				   datalen * BITS_PER_BYTE);
-	prefix->dtype = &string_type;
+	prefix->dtype = ctx->ectx.dtype;
 	prefix->flags |= EXPR_F_CONSTANT;
 	prefix->byteorder = BYTEORDER_HOST_ENDIAN;
 
@@ -607,6 +608,9 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 	const struct proto_desc *desc;
 	struct stmt *nstmt;
 	int err;
+
+	if (expr->ops->type == EXPR_PAYLOAD && expr->payload.is_raw)
+		return 0;
 
 	desc = ctx->pctx.protocol[base].desc;
 	if (desc == NULL) {
@@ -1768,6 +1772,7 @@ static int expr_evaluate_meta(struct eval_ctx *ctx, struct expr **exprp)
 	    meta->meta.key == NFT_META_NFPROTO)
 		return expr_error(ctx->msgs, meta,
 					  "meta nfproto is only useful in the inet family");
+
 	return expr_evaluate_primary(ctx, exprp);
 }
 
@@ -2138,8 +2143,10 @@ static int stmt_reject_gen_dependency(struct eval_ctx *ctx, struct stmt *stmt,
 	if (ret <= 0)
 		return ret;
 
-	if (payload_gen_dependency(ctx, payload, &nstmt) < 0)
-		return -1;
+	if (payload_gen_dependency(ctx, payload, &nstmt) < 0) {
+		ret = -1;
+		goto out;
+	}
 
 	/*
 	 * Unlike payload deps this adds the dependency at the beginning, i.e.
@@ -2150,7 +2157,9 @@ static int stmt_reject_gen_dependency(struct eval_ctx *ctx, struct stmt *stmt,
 	 * Otherwise we'd log things that won't be rejected.
 	 */
 	list_add(&nstmt->list, &ctx->rule->stmts);
-	return 0;
+out:
+	xfree(payload);
+	return ret;
 }
 
 static int stmt_evaluate_reject_inet_family(struct eval_ctx *ctx,
@@ -2707,6 +2716,7 @@ static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
 
 		map->mappings->set->flags |=
 			map->mappings->set->init->set_flags;
+		/* fall through */
 	case EXPR_SYMBOL:
 		if (expr_evaluate(ctx, &map->mappings) < 0)
 			return -1;
@@ -3422,8 +3432,19 @@ static int cmd_evaluate_monitor(struct eval_ctx *ctx, struct cmd *cmd)
 
 static int cmd_evaluate_export(struct eval_ctx *ctx, struct cmd *cmd)
 {
+	if (cmd->markup->format == __NFT_OUTPUT_NOTSUPP)
+		return cmd_error(ctx, "this output type is not supported");
+
 	return cache_update(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
 			    ctx->debug_mask & NFT_DEBUG_NETLINK, ctx->octx);
+}
+
+static int cmd_evaluate_import(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	if (cmd->markup->format == __NFT_OUTPUT_NOTSUPP)
+		return cmd_error(ctx, "this output type not supported");
+
+	return 0;
 }
 
 static const char * const cmd_op_name[] = {
@@ -3485,7 +3506,7 @@ int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_MONITOR:
 		return cmd_evaluate_monitor(ctx, cmd);
 	case CMD_IMPORT:
-		return 0;
+		return cmd_evaluate_import(ctx, cmd);
 	default:
 		BUG("invalid command operation %u\n", cmd->op);
 	};

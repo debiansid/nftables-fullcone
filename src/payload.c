@@ -48,7 +48,7 @@ static void payload_expr_print(const struct expr *expr, struct output_ctx *octx)
 	if (payload_is_known(expr))
 		nft_print(octx, "%s %s", desc->name, tmpl->token);
 	else
-		nft_print(octx, "payload @%s,%u,%u",
+		nft_print(octx, "@%s,%u,%u",
 			  proto_base_tokens[expr->payload.base],
 			  expr->payload.offset, expr->len);
 }
@@ -172,6 +172,7 @@ void payload_init_raw(struct expr *expr, enum proto_bases base,
 	expr->payload.base	= base;
 	expr->payload.offset	= offset;
 	expr->len		= len;
+	expr->dtype		= &integer_type;
 }
 
 unsigned int payload_hdr_field(const struct expr *expr)
@@ -429,43 +430,87 @@ void payload_dependency_store(struct payload_dep_ctx *ctx,
 }
 
 /**
- * __payload_dependency_kill - kill a redundant payload depedency
+ * payload_dependency_exists - there is a payload dependency in place
+ * @ctx: payload dependency context
+ * @base: payload protocol base
+ *
+ * Check if we have seen a protocol key payload expression for this base, we can
+ * usually remove it if we can infer it from another payload expression in the
+ * upper base.
+ */
+bool payload_dependency_exists(const struct payload_dep_ctx *ctx,
+			       enum proto_bases base)
+{
+	return ctx->pbase != PROTO_BASE_INVALID &&
+	       ctx->pbase == base &&
+	       ctx->pdep != NULL;
+}
+
+void payload_dependency_release(struct payload_dep_ctx *ctx)
+{
+	list_del(&ctx->pdep->list);
+	stmt_free(ctx->pdep);
+
+	ctx->pbase = PROTO_BASE_INVALID;
+	if (ctx->pdep == ctx->prev)
+		ctx->prev = NULL;
+	ctx->pdep  = NULL;
+}
+
+static bool payload_may_dependency_kill(struct payload_dep_ctx *ctx,
+					unsigned int family, struct expr *expr)
+{
+	struct expr *dep = ctx->pdep->expr;
+
+	/* Protocol key payload expression at network base such as 'ip6 nexthdr'
+	 * need to be left in place since it implicitly restricts matching to
+	 * IPv6 for the bridge, inet and netdev families.
+	 */
+	switch (family) {
+	case NFPROTO_BRIDGE:
+	case NFPROTO_NETDEV:
+	case NFPROTO_INET:
+		if (dep->left->ops->type == EXPR_PAYLOAD &&
+		    dep->left->payload.base == PROTO_BASE_NETWORK_HDR &&
+		    (dep->left->payload.desc == &proto_ip ||
+		     dep->left->payload.desc == &proto_ip6) &&
+		    expr->payload.base == PROTO_BASE_TRANSPORT_HDR)
+			return false;
+		break;
+	}
+
+	return true;
+}
+
+/**
+ * payload_dependency_kill - kill a redundant payload dependency
  *
  * @ctx: payload dependency context
  * @expr: higher layer payload expression
  *
  * Kill a redundant payload expression if a higher layer payload expression
- * implies its existance.
+ * implies its existence. Skip this if the dependency is a network payload and
+ * we are in bridge, netdev and inet families.
  */
-void __payload_dependency_kill(struct payload_dep_ctx *ctx,
-			       enum proto_bases base)
+void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
+			     unsigned int family)
 {
-	if (ctx->pbase != PROTO_BASE_INVALID &&
-	    ctx->pbase == base &&
-	    ctx->pdep != NULL) {
-		list_del(&ctx->pdep->list);
-		stmt_free(ctx->pdep);
-
-		ctx->pbase = PROTO_BASE_INVALID;
-		if (ctx->pdep == ctx->prev)
-			ctx->prev = NULL;
-		ctx->pdep  = NULL;
-	}
+	if (payload_dependency_exists(ctx, expr->payload.base) &&
+	    payload_may_dependency_kill(ctx, family, expr))
+		payload_dependency_release(ctx);
 }
 
-void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
-{
-	__payload_dependency_kill(ctx, expr->payload.base);
-}
-
-void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr)
+void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
+			    unsigned int family)
 {
 	switch (expr->exthdr.op) {
 	case NFT_EXTHDR_OP_TCPOPT:
-		__payload_dependency_kill(ctx, PROTO_BASE_TRANSPORT_HDR);
+		if (payload_dependency_exists(ctx, PROTO_BASE_TRANSPORT_HDR))
+			payload_dependency_release(ctx);
 		break;
 	case NFT_EXTHDR_OP_IPV6:
-		__payload_dependency_kill(ctx, PROTO_BASE_NETWORK_HDR);
+		if (payload_dependency_exists(ctx, PROTO_BASE_NETWORK_HDR))
+			payload_dependency_release(ctx);
 		break;
 	default:
 		break;
@@ -490,7 +535,7 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 	assert(expr->ops->type == EXPR_PAYLOAD);
 
 	desc = ctx->protocol[expr->payload.base].desc;
-	if (desc == NULL)
+	if (desc == NULL || desc == &proto_inet)
 		return;
 	assert(desc->base == expr->payload.base);
 
@@ -618,6 +663,10 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 
 	for (i = 1; i < array_size(desc->templates); i++) {
 		tmpl = &desc->templates[i];
+
+		if (tmpl->len == 0)
+			break;
+
 		if (tmpl->offset != expr->payload.offset)
 			continue;
 

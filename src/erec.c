@@ -8,6 +8,7 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#define _GNU_SOURCE
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
@@ -121,7 +122,7 @@ void erec_print(struct output_ctx *octx, const struct error_record *erec,
 	char buf[1024] = {};
 	char *pbuf = NULL;
 	unsigned int i, end;
-	int l, ret;
+	int l;
 	off_t orig_offset = 0;
 	FILE *f = octx->output_fp;
 
@@ -136,12 +137,12 @@ void erec_print(struct output_ctx *octx, const struct error_record *erec,
 		break;
 	case INDESC_FILE:
 		orig_offset = ftell(indesc->fp);
-		fseek(indesc->fp, loc->line_offset, SEEK_SET);
-		ret = fread(buf, 1, sizeof(buf) - 1, indesc->fp);
-		if (ret > 0)
+		if (orig_offset >= 0 &&
+		    !fseek(indesc->fp, loc->line_offset, SEEK_SET) &&
+		    fread(buf, 1, sizeof(buf) - 1, indesc->fp) > 0 &&
+		    !fseek(indesc->fp, orig_offset, SEEK_SET))
 			*strchrnul(buf, '\n') = '\0';
 		line = buf;
-		fseek(indesc->fp, orig_offset, SEEK_SET);
 		break;
 	case INDESC_INTERNAL:
 	case INDESC_NETLINK:

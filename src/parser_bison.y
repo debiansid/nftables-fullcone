@@ -29,6 +29,7 @@
 #include <rule.h>
 #include <statement.h>
 #include <expression.h>
+#include <headers.h>
 #include <utils.h>
 #include <parser.h>
 #include <erec.h>
@@ -184,6 +185,8 @@ int nft_lex(void *, void *, void *);
 
 %token INCLUDE			"include"
 %token DEFINE			"define"
+%token REDEFINE			"redefine"
+%token UNDEFINE			"undefine"
 
 %token FIB			"fib"
 
@@ -672,13 +675,15 @@ int nft_lex(void *, void *, void *);
 %destructor { expr_free($$); }	meta_expr
 %type <val>			meta_key	meta_key_qualified	meta_key_unqualified	numgen_type
 
+%type <val>			nf_key_proto
+
 %type <expr>			rt_expr
 %destructor { expr_free($$); }	rt_expr
-%type <val>			rt_key_proto	rt_key
+%type <val>			rt_key
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
-%type <val>			ct_key		ct_dir	ct_key_dir_optional	ct_key_dir	ct_key_proto	ct_key_proto_field
+%type <val>			ct_key		ct_dir	ct_key_dir_optional	ct_key_dir	ct_key_proto_field
 
 %type <expr>			fib_expr
 %destructor { expr_free($$); }	fib_expr
@@ -760,6 +765,26 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 				}
 
 				symbol_bind(scope, $2, $4);
+				xfree($2);
+			}
+			|	REDEFINE	identifier	'='	initializer_expr	stmt_separator
+			{
+				struct scope *scope = current_scope(state);
+
+				/* ignore missing identifier */
+				symbol_unbind(scope, $2);
+				symbol_bind(scope, $2, $4);
+				xfree($2);
+			}
+			|	UNDEFINE	identifier	stmt_separator
+			{
+				struct scope *scope = current_scope(state);
+
+				if (symbol_unbind(scope, $2) < 0) {
+					erec_queue(error(&@2, "undefined symbol '%s'", $2),
+						   state->msgs);
+					YYERROR;
+				}
 				xfree($2);
 			}
 			|	error		stmt_separator
@@ -1197,7 +1222,6 @@ import_cmd			:       RULESET         markup_format
 				struct markup *markup = markup_alloc($1);
 				$$ = cmd_alloc(CMD_IMPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
 			}
-			|	JSON		{ $$ = NULL; }
 			;
 
 export_cmd		:	RULESET		markup_format
@@ -1212,7 +1236,6 @@ export_cmd		:	RULESET		markup_format
 				struct markup *markup = markup_alloc($1);
 				$$ = cmd_alloc(CMD_EXPORT, CMD_OBJ_MARKUP, &h, &@$, markup);
 			}
-			|	JSON		{ $$ = NULL; }
 			;
 
 monitor_cmd		:	monitor_event	monitor_object	monitor_format
@@ -1240,10 +1263,10 @@ monitor_object		:	/* empty */	{ $$ = CMD_MONITOR_OBJ_ANY; }
 
 monitor_format		:	/* empty */	{ $$ = NFTNL_OUTPUT_DEFAULT; }
 			|	markup_format
-			|	JSON		{ $$ = NFTNL_OUTPUT_JSON; }
 			;
 
-markup_format		: 	XML 		{ $$ = NFTNL_OUTPUT_XML; }
+markup_format		: 	XML 		{ $$ = __NFT_OUTPUT_NOTSUPP; }
+			|	JSON		{ $$ = __NFT_OUTPUT_NOTSUPP; }
 			|	VM JSON		{ $$ = NFTNL_OUTPUT_JSON; }
 			;
 
@@ -1441,6 +1464,11 @@ map_block_alloc		:	/* empty */
 map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	common_block
 			|	map_block	stmt_separator
+			|	map_block	TIMEOUT		time_spec	stmt_separator
+			{
+				$1->timeout = $3 * 1000;
+				$$ = $1;
+			}
 			|	map_block	TYPE
 						data_type_expr	COLON	data_type_expr
 						stmt_separator
@@ -3304,7 +3332,7 @@ hash_expr		:	JHASH		expr	MOD	NUM	SEED	NUM	offset_opt
 			}
 			;
 
-rt_key_proto		:	IP		{ $$ = NFPROTO_IPV4; }
+nf_key_proto		:	IP		{ $$ = NFPROTO_IPV4; }
 			|	IP6		{ $$ = NFPROTO_IPV6; }
 			;
 
@@ -3312,7 +3340,7 @@ rt_expr			:	RT	rt_key
 			{
 				$$ = rt_expr_alloc(&@$, $2, true);
 			}
-			|	RT	rt_key_proto	rt_key
+			|	RT	nf_key_proto	rt_key
 			{
 				enum nft_rt_keys rtk = $3;
 
@@ -3345,7 +3373,7 @@ ct_expr			: 	CT	ct_key
 			{
 				$$ = ct_expr_alloc(&@$, $3, $2, NFPROTO_UNSPEC);
 			}
-			|	CT	ct_dir	ct_key_proto ct_key_proto_field
+			|	CT	ct_dir	nf_key_proto ct_key_proto_field
 			{
 				$$ = ct_expr_alloc(&@$, $4, $2, $3);
 			}
@@ -3379,10 +3407,6 @@ ct_key_dir		:	SADDR		{ $$ = NFT_CT_SRC; }
 			|	PROTO_SRC	{ $$ = NFT_CT_PROTO_SRC; }
 			|	PROTO_DST	{ $$ = NFT_CT_PROTO_DST; }
 			|	ct_key_dir_optional
-			;
-
-ct_key_proto		:	IP		{ $$ = NFPROTO_IPV4; }
-			|	IP6		{ $$ = NFPROTO_IPV6; }
 			;
 
 ct_key_proto_field	:	SADDR		{ $$ = NFT_CT_SRC; }
@@ -3466,6 +3490,9 @@ payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
 				$$->payload.offset	= $4;
 				$$->len			= $6;
 				$$->dtype		= &integer_type;
+				$$->byteorder		= BYTEORDER_BIG_ENDIAN;
+				$$->payload.is_raw	= true;
+				$$->flags		= 0;
 			}
 			;
 

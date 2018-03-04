@@ -28,14 +28,6 @@ override_dh_systemd_start:
 override_dh_strip:
 	dh_strip --dbgsym-migration='nftables-dbg (<< 0.7~)'
 
-override_dh_auto_install:
-	dh_auto_install --destdir=debian/nftables
-
-	# upstream examples are installed in by the 'install' target to '/etc/nftables'
-	mkdir -p debian/nftables/usr/share/doc/nftables/examples/syntax
-	mv debian/nftables/etc/nftables/* debian/nftables/usr/share/doc/nftables/examples/syntax/
-	rm -rf debian/nftables/etc/nftables
-
 override_dh_installdocs:
 	dh_installdocs --link-doc=nftables
 
@@ -43,3 +35,8 @@ override_dh_installinit:
 	# dh_installinit will try to mess with /etc/init.d/nftables in
 	# the maintainer scripts, but we don't ship it
 	dh_installinit -n
+
+override_dh_installexamples:
+	dh_installexamples
+	# upstream examples are installed in by the 'install' target to '/etc/nftables'
+	rm -rf debian/nftables/etc/nftables

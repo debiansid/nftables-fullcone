@@ -17,11 +17,8 @@ override_dh_fixperms:
 	dh_fixperms
 	chmod a+x debian/nftables/etc/nftables.conf
 
-override_dh_systemd_enable:
-	dh_systemd_enable --no-enable
-
-override_dh_systemd_start:
-	dh_systemd_start --no-start
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
 
 # https://wiki.debian.org/DebugPackage
 .PHONY: override_dh_strip

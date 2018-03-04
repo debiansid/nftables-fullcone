@@ -1,0 +1,235 @@
+From a502ba00e44a03cbce9b5769274e1b604d3f08ad Mon Sep 17 00:00:00 2001
+From: Arturo Borrero Gonzalez <arturo@netfilter.org>
+Date: Tue, 1 May 2018 19:33:45 +0200
+Subject: libnftables: fix header export
+
+Instruct Make to actually install the header to the system, otherwise
+users won't see the header in their system after running 'make install'.
+
+Also, export main libnftables header with a proper name, since we have another
+private header called 'nftables.h' (i.e, let's be concrete with the naming).
+
+Signed-off-by: Arturo Borrero Gonzalez <arturo@netfilter.org>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+---
+ include/nftables.h             |  2 +-
+ include/nftables/Makefile.am   |  2 +-
+ include/nftables/libnftables.h | 75 ++++++++++++++++++++++++++++++++++++++++++
+ include/nftables/nftables.h    | 75 ------------------------------------------
+ src/libnftables.c              |  2 +-
+ src/main.c                     |  2 +-
+ 6 files changed, 79 insertions(+), 79 deletions(-)
+ create mode 100644 include/nftables/libnftables.h
+ delete mode 100644 include/nftables/nftables.h
+
+diff --git a/include/nftables.h b/include/nftables.h
+index 5f2da8b..f525ba6 100644
+--- a/include/nftables.h
++++ b/include/nftables.h
+@@ -5,7 +5,7 @@
+ #include <stdarg.h>
+ #include <limits.h>
+ #include <utils.h>
+-#include <nftables/nftables.h>
++#include <nftables/libnftables.h>
+ 
+ struct cookie {
+ 	FILE *fp;
+diff --git a/include/nftables/Makefile.am b/include/nftables/Makefile.am
+index 9e31d51..5cfb0c6 100644
+--- a/include/nftables/Makefile.am
++++ b/include/nftables/Makefile.am
+@@ -1 +1 @@
+-noinst_HEADERS = nftables.h
++pkginclude_HEADERS = libnftables.h
+diff --git a/include/nftables/libnftables.h b/include/nftables/libnftables.h
+new file mode 100644
+index 0000000..652e0ca
+--- /dev/null
++++ b/include/nftables/libnftables.h
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (c) 2017 Eric Leblond <eric@regit.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#ifndef LIB_NFTABLES_H
++#define LIB_NFTABLES_H
++
++#define _GNU_SOURCE
++#include <stdint.h>
++#include <stdio.h>
++#include <stdbool.h>
++
++struct nft_ctx;
++
++enum nft_debug_level {
++	NFT_DEBUG_SCANNER		= 0x1,
++	NFT_DEBUG_PARSER		= 0x2,
++	NFT_DEBUG_EVALUATION		= 0x4,
++	NFT_DEBUG_NETLINK		= 0x8,
++	NFT_DEBUG_MNL			= 0x10,
++	NFT_DEBUG_PROTO_CTX		= 0x20,
++	NFT_DEBUG_SEGTREE		= 0x40,
++};
++
++enum nft_numeric_level {
++	NFT_NUMERIC_NONE,
++	NFT_NUMERIC_ADDR,
++	NFT_NUMERIC_PORT,
++	NFT_NUMERIC_ALL,
++};
++
++/**
++ * Possible flags to pass to nft_ctx_new()
++ */
++#define NFT_CTX_DEFAULT		0
++
++struct nft_ctx *nft_ctx_new(uint32_t flags);
++void nft_ctx_free(struct nft_ctx *ctx);
++
++bool nft_ctx_get_dry_run(struct nft_ctx *ctx);
++void nft_ctx_set_dry_run(struct nft_ctx *ctx, bool dry);
++enum nft_numeric_level nft_ctx_output_get_numeric(struct nft_ctx *ctx);
++void nft_ctx_output_set_numeric(struct nft_ctx *ctx, enum nft_numeric_level level);
++bool nft_ctx_output_get_stateless(struct nft_ctx *ctx);
++void nft_ctx_output_set_stateless(struct nft_ctx *ctx, bool val);
++bool nft_ctx_output_get_ip2name(struct nft_ctx *ctx);
++void nft_ctx_output_set_ip2name(struct nft_ctx *ctx, bool val);
++unsigned int nft_ctx_output_get_debug(struct nft_ctx *ctx);
++void nft_ctx_output_set_debug(struct nft_ctx *ctx, unsigned int mask);
++bool nft_ctx_output_get_handle(struct nft_ctx *ctx);
++void nft_ctx_output_set_handle(struct nft_ctx *ctx, bool val);
++bool nft_ctx_output_get_echo(struct nft_ctx *ctx);
++void nft_ctx_output_set_echo(struct nft_ctx *ctx, bool val);
++
++FILE *nft_ctx_set_output(struct nft_ctx *ctx, FILE *fp);
++int nft_ctx_buffer_output(struct nft_ctx *ctx);
++int nft_ctx_unbuffer_output(struct nft_ctx *ctx);
++const char *nft_ctx_get_output_buffer(struct nft_ctx *ctx);
++
++FILE *nft_ctx_set_error(struct nft_ctx *ctx, FILE *fp);
++int nft_ctx_buffer_error(struct nft_ctx *ctx);
++int nft_ctx_unbuffer_error(struct nft_ctx *ctx);
++const char *nft_ctx_get_error_buffer(struct nft_ctx *ctx);
++
++int nft_ctx_add_include_path(struct nft_ctx *ctx, const char *path);
++void nft_ctx_clear_include_paths(struct nft_ctx *ctx);
++
++int nft_run_cmd_from_buffer(struct nft_ctx *nft, char *buf, size_t buflen);
++int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename);
++
++#endif /* LIB_NFTABLES_H */
+diff --git a/include/nftables/nftables.h b/include/nftables/nftables.h
+deleted file mode 100644
+index 652e0ca..0000000
+--- a/include/nftables/nftables.h
++++ /dev/null
+@@ -1,75 +0,0 @@
+-/*
+- * Copyright (c) 2017 Eric Leblond <eric@regit.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-#ifndef LIB_NFTABLES_H
+-#define LIB_NFTABLES_H
+-
+-#define _GNU_SOURCE
+-#include <stdint.h>
+-#include <stdio.h>
+-#include <stdbool.h>
+-
+-struct nft_ctx;
+-
+-enum nft_debug_level {
+-	NFT_DEBUG_SCANNER		= 0x1,
+-	NFT_DEBUG_PARSER		= 0x2,
+-	NFT_DEBUG_EVALUATION		= 0x4,
+-	NFT_DEBUG_NETLINK		= 0x8,
+-	NFT_DEBUG_MNL			= 0x10,
+-	NFT_DEBUG_PROTO_CTX		= 0x20,
+-	NFT_DEBUG_SEGTREE		= 0x40,
+-};
+-
+-enum nft_numeric_level {
+-	NFT_NUMERIC_NONE,
+-	NFT_NUMERIC_ADDR,
+-	NFT_NUMERIC_PORT,
+-	NFT_NUMERIC_ALL,
+-};
+-
+-/**
+- * Possible flags to pass to nft_ctx_new()
+- */
+-#define NFT_CTX_DEFAULT		0
+-
+-struct nft_ctx *nft_ctx_new(uint32_t flags);
+-void nft_ctx_free(struct nft_ctx *ctx);
+-
+-bool nft_ctx_get_dry_run(struct nft_ctx *ctx);
+-void nft_ctx_set_dry_run(struct nft_ctx *ctx, bool dry);
+-enum nft_numeric_level nft_ctx_output_get_numeric(struct nft_ctx *ctx);
+-void nft_ctx_output_set_numeric(struct nft_ctx *ctx, enum nft_numeric_level level);
+-bool nft_ctx_output_get_stateless(struct nft_ctx *ctx);
+-void nft_ctx_output_set_stateless(struct nft_ctx *ctx, bool val);
+-bool nft_ctx_output_get_ip2name(struct nft_ctx *ctx);
+-void nft_ctx_output_set_ip2name(struct nft_ctx *ctx, bool val);
+-unsigned int nft_ctx_output_get_debug(struct nft_ctx *ctx);
+-void nft_ctx_output_set_debug(struct nft_ctx *ctx, unsigned int mask);
+-bool nft_ctx_output_get_handle(struct nft_ctx *ctx);
+-void nft_ctx_output_set_handle(struct nft_ctx *ctx, bool val);
+-bool nft_ctx_output_get_echo(struct nft_ctx *ctx);
+-void nft_ctx_output_set_echo(struct nft_ctx *ctx, bool val);
+-
+-FILE *nft_ctx_set_output(struct nft_ctx *ctx, FILE *fp);
+-int nft_ctx_buffer_output(struct nft_ctx *ctx);
+-int nft_ctx_unbuffer_output(struct nft_ctx *ctx);
+-const char *nft_ctx_get_output_buffer(struct nft_ctx *ctx);
+-
+-FILE *nft_ctx_set_error(struct nft_ctx *ctx, FILE *fp);
+-int nft_ctx_buffer_error(struct nft_ctx *ctx);
+-int nft_ctx_unbuffer_error(struct nft_ctx *ctx);
+-const char *nft_ctx_get_error_buffer(struct nft_ctx *ctx);
+-
+-int nft_ctx_add_include_path(struct nft_ctx *ctx, const char *path);
+-void nft_ctx_clear_include_paths(struct nft_ctx *ctx);
+-
+-int nft_run_cmd_from_buffer(struct nft_ctx *nft, char *buf, size_t buflen);
+-int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename);
+-
+-#endif /* LIB_NFTABLES_H */
+diff --git a/src/libnftables.c b/src/libnftables.c
+index fe5143f..df4f092 100644
+--- a/src/libnftables.c
++++ b/src/libnftables.c
+@@ -6,7 +6,7 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-#include <nftables/nftables.h>
++#include <nftables/libnftables.h>
+ #include <erec.h>
+ #include <mnl.h>
+ #include <parser.h>
+diff --git a/src/main.c b/src/main.c
+index 1f08dfe..d26ea01 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -18,7 +18,7 @@
+ #include <fcntl.h>
+ #include <sys/types.h>
+ 
+-#include <nftables/nftables.h>
++#include <nftables/libnftables.h>
+ #include <utils.h>
+ #include <cli.h>
+ 
+-- 
+cgit v1.1
+

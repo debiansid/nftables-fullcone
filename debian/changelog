@@ -1,3 +1,9 @@
+nftables (0.8.3-1~bpo9+1) stretch-backports; urgency=medium
+
+  * Rebuild for stretch-backports.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Sat, 10 Mar 2018 13:34:17 +0100
+
 nftables (0.8.3-1) unstable; urgency=medium
 
   * [2cc4fde] New upstream version 0.8.3

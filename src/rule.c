@@ -485,6 +485,21 @@ void symbol_bind(struct scope *scope, const char *identifier, struct expr *expr)
 	list_add_tail(&sym->list, &scope->symbols);
 }
 
+int symbol_unbind(struct scope *scope, const char *identifier)
+{
+	struct symbol *sym;
+
+	sym = symbol_lookup(scope, identifier);
+	if (!sym)
+		return -1;
+
+	list_del(&sym->list);
+	xfree(sym->identifier);
+	expr_free(sym->expr);
+	xfree(sym);
+	return 0;
+}
+
 struct symbol *symbol_lookup(const struct scope *scope, const char *identifier)
 {
 	struct symbol *sym;
@@ -984,7 +999,7 @@ static int __do_add_setelems(struct netlink_ctx *ctx, const struct handle *h,
 			     struct set *set, struct expr *expr, uint32_t flags)
 {
 	expr->set_flags |= set->flags;
-	if (netlink_add_setelems(ctx, h, expr, flags) < 0)
+	if (netlink_add_setelems_batch(ctx, h, expr, flags) < 0)
 		return -1;
 
 	return 0;
@@ -1016,7 +1031,7 @@ static int do_add_set(struct netlink_ctx *ctx, const struct handle *h,
 				     ctx->debug_mask, set->automerge) < 0)
 			return -1;
 	}
-	if (netlink_add_set(ctx, h, set, flags) < 0)
+	if (netlink_add_set_batch(ctx, h, set, flags) < 0)
 		return -1;
 	if (set->init != NULL) {
 		return __do_add_setelems(ctx, &set->handle, set, set->init,
@@ -1042,11 +1057,13 @@ static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd, bool excl)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_TABLE:
-		return netlink_add_table(ctx, &cmd->handle, &cmd->location,
-					 cmd->table, flags);
+		return netlink_add_table_batch(ctx, &cmd->handle,
+					       &cmd->location, cmd->table,
+					       flags);
 	case CMD_OBJ_CHAIN:
-		return netlink_add_chain(ctx, &cmd->handle, &cmd->location,
-					 cmd->chain, flags);
+		return netlink_add_chain_batch(ctx, &cmd->handle,
+					       &cmd->location, cmd->chain,
+					       flags);
 	case CMD_OBJ_RULE:
 		return netlink_add_rule_batch(ctx, &cmd->handle,
 					      cmd->rule, flags | NLM_F_APPEND);
@@ -1116,7 +1133,7 @@ static int do_delete_setelems(struct netlink_ctx *ctx, const struct handle *h,
 			     ctx->debug_mask, set->automerge) < 0)
 		return -1;
 
-	if (netlink_delete_setelems(ctx, h, expr) < 0)
+	if (netlink_delete_setelems_batch(ctx, h, expr) < 0)
 		return -1;
 
 	return 0;
@@ -1126,14 +1143,14 @@ static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->obj) {
 	case CMD_OBJ_TABLE:
-		return netlink_delete_table(ctx, &cmd->handle, &cmd->location);
+		return netlink_delete_table_batch(ctx, &cmd->handle, &cmd->location);
 	case CMD_OBJ_CHAIN:
-		return netlink_delete_chain(ctx, &cmd->handle, &cmd->location);
+		return netlink_delete_chain_batch(ctx, &cmd->handle, &cmd->location);
 	case CMD_OBJ_RULE:
 		return netlink_del_rule_batch(ctx, &cmd->handle,
 					      &cmd->location);
 	case CMD_OBJ_SET:
-		return netlink_delete_set(ctx, &cmd->handle, &cmd->location);
+		return netlink_delete_set_batch(ctx, &cmd->handle, &cmd->location);
 	case CMD_OBJ_SETELEM:
 		return do_delete_setelems(ctx, &cmd->handle, cmd->expr);
 	case CMD_OBJ_COUNTER:
@@ -1326,7 +1343,7 @@ static void obj_print_data(const struct obj *obj,
 		}
 		}
 		break;
-	case NFT_OBJECT_CT_HELPER: {
+	case NFT_OBJECT_CT_HELPER:
 		nft_print(octx, "ct helper %s {\n", obj->handle.obj);
 		nft_print(octx, "\t\ttype \"%s\" protocol ",
 			  obj->ct_helper.name);
@@ -1334,7 +1351,6 @@ static void obj_print_data(const struct obj *obj,
 		nft_print(octx, "\t\tl3proto %s",
 			  family2str(obj->ct_helper.l3proto));
 		break;
-		}
 	case NFT_OBJECT_LIMIT: {
 		bool inv = obj->limit.flags & NFT_LIMIT_F_INV;
 		const char *data_unit;
@@ -1646,11 +1662,13 @@ static int do_command_reset(struct netlink_ctx *ctx, struct cmd *cmd)
 	switch (cmd->obj) {
 	case CMD_OBJ_COUNTERS:
 		dump = true;
+		/* fall through */
 	case CMD_OBJ_COUNTER:
 		type = NFT_OBJECT_COUNTER;
 		break;
 	case CMD_OBJ_QUOTAS:
 		dump = true;
+		/* fall through */
 	case CMD_OBJ_QUOTA:
 		type = NFT_OBJECT_QUOTA;
 		break;
@@ -1698,7 +1716,7 @@ static int do_command_rename(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_CHAIN:
 		chain = chain_lookup(table, &cmd->handle);
 
-		return netlink_rename_chain(ctx, &chain->handle, &cmd->location,
+		return netlink_rename_chain_batch(ctx, &chain->handle, &cmd->location,
 					    cmd->arg);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);

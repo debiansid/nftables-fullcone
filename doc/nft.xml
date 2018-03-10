@@ -823,6 +823,9 @@ filter input iif $int_ifs accept
 			</cmdsynopsis>
 		</para>
 		<para>
+			Rules are added to <literal>chain</literal> in the given <literal>table</literal>.
+			If the <literal>family</literal> is not specified, the <literal>ip</literal> family
+			is used.
 			Rules are constructed from two kinds of components according to a set
 			of grammatical rules: expressions and statements.
 		</para>
@@ -864,6 +867,30 @@ filter input iif $int_ifs accept
 				</listitem>
 			</varlistentry>
 		</variablelist>
+
+			<example>
+				<title>add a rule to ip table input chain</title>
+				<programlisting>
+nft add rule filter output ip daddr 192.168.0.0/24 accept # 'ip filter' is assumed
+# same command, slightly more verbose
+nft add rule ip filter output ip daddr 192.168.0.0/24 accept
+
+				</programlisting>
+			</example>
+			<example>
+				<title>delete rule from inet table</title>
+				<programlisting>
+# nft -a list ruleset
+table inet filter {
+        chain input {
+                type filter hook input priority 0; policy accept;
+                ct state established,related accept # handle 4
+                ip saddr 10.1.1.1 tcp dport ssh accept # handle 5
+		...
+# delete the rule with handle 5
+# nft delete rule inet filter input handle 5
+				</programlisting>
+			</example>
 	</refsect1>
 
 	<refsect1>
@@ -1663,13 +1690,23 @@ filter output ip daddr localhost
 				</table>
 			</para>
 			<para>
-				The IPv6 address type is used for IPv6 addresses.  FIXME
+				The IPv6 address type is used for IPv6 addresses.
+				Addresses are specified as a host name or as hexadecimal halfwords separated
+				by colons.  Addresses might be enclosed in square brackets ("[]") to differentiate them
+				from port numbers.
 			</para>
 			<example>
 				<title>IPv6 address specification</title>
 				<programlisting>
 # abbreviated loopback address
 filter output ip6 daddr ::1
+				</programlisting>
+			<example>
+			</example>
+				<title>IPv6 address specification with bracket notation</title>
+				<programlisting>
+# without [] the port number (22) would be parsed as part of ipv6 address
+ip6 nat prerouting tcp dport 2222 dnat to [1ce::d0]:22
 				</programlisting>
 			</example>
 		</refsect2>
@@ -2523,6 +2560,9 @@ filter output icmpv6 type { echo-request, echo-reply }
 				Qualified meta expressions require the <command>meta</command> keyword before the
 				meta key, unqualified meta expressions can be specified by using the meta key directly
 				or as qualified meta expressions.
+
+				Meta l4proto is useful to match a particular transport protocol that is part of either
+				an IPv4 or IPv6 packet.  It will also skip any IPv6 extension headers present in an IPv6 packet.
 			</para>
 			<para>
 				<table frame="all">
@@ -2550,6 +2590,11 @@ filter output icmpv6 type { echo-request, echo-reply }
 								<entry>integer (32 bit)</entry>
 							</row>
 							<row>
+								<entry>l4proto</entry>
+								<entry>layer 4 protocol, skips ipv6 extension headers</entry>
+								<entry>integer (8 bit)</entry>
+							</row>
+							<row>
 								<entry>protocol</entry>
 								<entry>Ethertype protocol value</entry>
 								<entry>ether_type</entry>
@@ -2572,7 +2617,7 @@ filter output icmpv6 type { echo-request, echo-reply }
 							<row>
 								<entry>iifname</entry>
 								<entry>Input interface name</entry>
-								<entry>string</entry>
+								<entry>ifname</entry>
 							</row>
 							<row>
 								<entry>iiftype</entry>
@@ -2587,7 +2632,7 @@ filter output icmpv6 type { echo-request, echo-reply }
 							<row>
 								<entry>oifname</entry>
 								<entry>Output interface name</entry>
-								<entry>string</entry>
+								<entry>ifname</entry>
 							</row>
 							<row>
 								<entry>oiftype</entry>
@@ -2612,12 +2657,12 @@ filter output icmpv6 type { echo-request, echo-reply }
 							<row>
 								<entry>ibriport</entry>
 								<entry>Input bridge interface name</entry>
-								<entry>string</entry>
+								<entry>ifname</entry>
 							</row>
 							<row>
 								<entry>obriport</entry>
 								<entry>Output bridge interface name</entry>
-								<entry>string</entry>
+								<entry>ifname</entry>
 							</row>
 							<row>
 								<entry>pkttype</entry>
@@ -3227,6 +3272,15 @@ inet filter output rt ip6 nexthop fd00::1
 				</cmdsynopsis>
 			</para>
 			<para>
+				This expression refers to the ipv6 header fields.
+				Caution when using <command>ip6 nexthdr</command>, the value only refers to
+				the next header, i.e. <command>ip6 nexthdr tcp</command> will only match if the ipv6 packet does not
+				contain any extension headers.  Packets that are fragmented or e.g. contain a routing extension headers
+				will not be matched.
+				Please use <command>meta l4proto</command> if you wish to match the real transport header and
+				ignore any additional extension headers instead.
+			</para>
+			<para>
 				<table frame="all">
 					<title>IPv6 header expression</title>
 					<tgroup cols='3' align='left' colsep='1' rowsep='1'>
@@ -3290,8 +3344,15 @@ inet filter output rt ip6 nexthop fd00::1
 					</tgroup>
 				</table>
 			</para>
+			<para>
+				<example>
+					<title>matching if first extension header indicates a fragment</title>
+					<programlisting>
+ip6 nexthdr ipv6-frag counter
+					</programlisting>
+				</example>
+			</para>
 		</refsect2>
-
 		<refsect2>
 			<title>ICMPv6 header expression</title>
 			<para>
@@ -3568,7 +3629,7 @@ inet filter output rt ip6 nexthop fd00::1
 							</row>
 							<row>
 								<entry>vtag</entry>
-								<entry>Verfication Tag</entry>
+								<entry>Verification Tag</entry>
 								<entry>integer (32 bit)</entry>
 							</row>
 							<row>
@@ -3755,6 +3816,65 @@ inet filter output rt ip6 nexthop fd00::1
 						</tbody>
 					</tgroup>
 				</table>
+			</para>
+		</refsect2>
+		<refsect2>
+			<title>Raw payload expression</title>
+			<para>
+				<cmdsynopsis>
+						<command>@</command>
+						<arg opt="req"><replaceable>base,offset,length</replaceable></arg>
+				</cmdsynopsis>
+			</para>
+
+			The raw payload expression instructs to load <replaceable>length</replaceable>bits starting at <replaceable>offset</replaceable>bits.
+			Bit 0 refers the the very first bit -- in the C programming language, this corresponds to the topmost bit, i.e. 0x80 in case of an octet.
+			They are useful to match headers that do not have a human-readable template expression yet.
+			Note that nft will not add dependencies for Raw payload expressions.
+			If you e.g. want to match protocol fields of a transport header with protocol number 5, you need to manually
+			exclude packets that have a different transport header, for instance my using <literal>meta l4proto 5</literal> before
+			the raw expression.
+
+			<table frame="all">
+				<title>Supported payload protocol bases</title>
+				<tgroup cols="2" align="left" colsep="1" rowsep="1">
+					<colspec colname="c1"/>
+					<colspec colname="c2"/>
+					<thead>
+						<row>
+							<entry>Base</entry>
+							<entry>Description</entry>
+						</row>
+					</thead>
+					<tbody>
+						<row>
+							<entry>ll</entry>
+							<entry>Link layer, for example the ethernet header</entry>
+						</row>
+						<row>
+							<entry>nh</entry>
+							<entry>Network header, for example IPv4 or IPv6</entry>
+						</row>
+						<row>
+							<entry>th</entry>
+							<entry>Transport Header, for example TCP</entry>
+						</row>
+					</tbody>
+				</tgroup>
+			</table>
+			<para>
+				<example>
+					<title>Matching destination port of both UDP and TCP</title>
+					<programlisting>
+inet filter input meta l4proto {tcp, udp} @th,16,16 { dns, http }
+					</programlisting>
+				</example>
+				<example>
+					<title>Rewrite arp packet target hardware address if target protocol address matches a given address</title>
+					<programlisting>
+input meta iifname enp2s0 arp ptype 0x0800 arp htype 1 arp hlen 6 arp plen 4 @nh,192,32 0xc0a88f10 @nh,144,48 set 0x112233445566 accept
+					</programlisting>
+				</example>
 			</para>
 		</refsect2>
 
@@ -5096,7 +5216,7 @@ dup to ip daddr map { 192.168.7.1 : "eth0", 192.168.7.2 : "eth1" }
 				XML, JSON or native nft format.
 			</para>
 			<para>
-				To filter events related to a concrete object, use one of the keywords 'tables', 'chains', 'sets', 'rules', 'elements'				      , 'ruleset'.
+				To filter events related to a concrete object, use one of the keywords 'tables', 'chains', 'sets', 'rules', 'elements', 'ruleset'.
 			</para>
 			<para>
 				To filter events related to a concrete action, use keyword 'new' or 'destroy'.

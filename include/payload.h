@@ -40,12 +40,13 @@ void payload_dependency_reset(struct payload_dep_ctx *ctx);
 extern void payload_dependency_store(struct payload_dep_ctx *ctx,
 				     struct stmt *stmt,
 				     enum proto_bases base);
-extern void __payload_dependency_kill(struct payload_dep_ctx *ctx,
+extern bool payload_dependency_exists(const struct payload_dep_ctx *ctx,
 				      enum proto_bases base);
+extern void payload_dependency_release(struct payload_dep_ctx *ctx);
 extern void payload_dependency_kill(struct payload_dep_ctx *ctx,
-				    struct expr *expr);
+				    struct expr *expr, unsigned int family);
 extern void exthdr_dependency_kill(struct payload_dep_ctx *ctx,
-				   struct expr *expr);
+				   struct expr *expr, unsigned int family);
 
 extern bool payload_can_merge(const struct expr *e1, const struct expr *e2);
 extern struct expr *payload_expr_join(const struct expr *e1,

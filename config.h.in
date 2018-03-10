@@ -1,13 +1,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define to 1 if you have the <arpa/inet.h> header file. */
-#undef HAVE_ARPA_INET_H
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
-
-/* Define to 1 if you have the <fcntl.h> header file. */
-#undef HAVE_FCNTL_H
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -21,38 +15,8 @@
 /* 0 */
 #undef HAVE_LIBXTABLES
 
-/* Define to 1 if you have the <limits.h> header file. */
-#undef HAVE_LIMITS_H
-
-/* Define to 1 if you have the <malloc.h> header file. */
-#undef HAVE_MALLOC_H
-
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
-
-/* Define to 1 if you have the <netdb.h> header file. */
-#undef HAVE_NETDB_H
-
-/* Define to 1 if you have the <netinet/in.h> header file. */
-#undef HAVE_NETINET_IN_H
-
-/* Define to 1 if you have the <netinet/ip6.h> header file. */
-#undef HAVE_NETINET_IP6_H
-
-/* Define to 1 if you have the <netinet/ip.h> header file. */
-#undef HAVE_NETINET_IP_H
-
-/* Define to 1 if you have the <netinet/ip_icmp.h> header file. */
-#undef HAVE_NETINET_IP_ICMP_H
-
-/* Define to 1 if you have the <netinet/tcp.h> header file. */
-#undef HAVE_NETINET_TCP_H
-
-/* Define to 1 if you have the <netinet/udp.h> header file. */
-#undef HAVE_NETINET_UDP_H
-
-/* Define to 1 if you have the <stddef.h> header file. */
-#undef HAVE_STDDEF_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -77,9 +41,6 @@
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
-
-/* Define to 1 if assertions should be disabled. */
-#undef NDEBUG
 
 /* Name of package */
 #undef PACKAGE
@@ -114,9 +75,3 @@
 /* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
    `char[]'. */
 #undef YYTEXT_POINTER
-
-/* Enable various GNU extensions */
-#undef _GNU_SOURCE
-
-/* printf-style format macros */
-#undef _STDC_FORMAT_MACROS

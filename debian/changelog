@@ -1,3 +1,11 @@
+nftables (0.8.3-1) unstable; urgency=medium
+
+  * [2cc4fde] New upstream version 0.8.3
+  * [b2ad2f6] nftables: refresh example files
+  * [680e9d0] d/rules: use dh_installsystemd
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Sun, 04 Mar 2018 22:01:25 +0100
+
 nftables (0.8.2-1~bpo9+1) stretch-backports; urgency=medium
 
   * Rebuild for stretch-backports.

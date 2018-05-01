@@ -26,7 +26,6 @@
 #include <erec.h>
 #include <expression.h>
 #include <datatype.h>
-#include <gmputil.h>
 #include <ct.h>
 #include <gmputil.h>
 #include <utils.h>
@@ -293,7 +292,7 @@ static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,
 	case NFT_CT_DST:
 		desc = proto_find_upper(&proto_inet, nfproto);
 		if (desc)
-			printf("%s ", desc->name);
+			nft_print(octx, "%s ", desc->name);
 		break;
 	default:
 		break;
@@ -455,4 +454,27 @@ static const struct stmt_ops notrack_stmt_ops = {
 struct stmt *notrack_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &notrack_stmt_ops);
+}
+
+static void flow_offload_stmt_print(const struct stmt *stmt,
+				    struct output_ctx *octx)
+{
+	printf("flow offload @%s", stmt->flow.table_name);
+}
+
+static const struct stmt_ops flow_offload_stmt_ops = {
+	.type		= STMT_FLOW_OFFLOAD,
+	.name		= "flow_offload",
+	.print		= flow_offload_stmt_print,
+};
+
+struct stmt *flow_offload_stmt_alloc(const struct location *loc,
+				     const char *table_name)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &flow_offload_stmt_ops);
+	stmt->flow.table_name	= table_name;
+
+	return stmt;
 }

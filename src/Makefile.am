@@ -24,7 +24,7 @@ AM_YFLAGS = -d
 
 BUILT_SOURCES = parser_bison.h
 
-noinst_LTLIBRARIES = libnftables.la
+lib_LTLIBRARIES = libnftables.la
 
 libnftables_la_SOURCES =			\
 		rule.c				\
@@ -44,6 +44,7 @@ libnftables_la_SOURCES =			\
 		netlink.c			\
 		netlink_linearize.c		\
 		netlink_delinearize.c		\
+		monitor.c			\
 		segtree.c			\
 		rbtree.c			\
 		gmputil.c			\
@@ -57,7 +58,7 @@ libnftables_la_SOURCES =			\
 		libnftables.c
 
 # yacc and lex generate dirty code
-noinst_LTLIBRARIES += libparser.la
+noinst_LTLIBRARIES = libparser.la
 libparser_la_SOURCES = parser_bison.y scanner.l
 libparser_la_CFLAGS = ${AM_CFLAGS} \
 		      -Wno-missing-prototypes \

@@ -35,6 +35,7 @@ struct position_spec {
  * @chain:	chain name (chains and rules only)
  * @set:	set name (sets only)
  * @obj:	stateful object name (stateful object only)
+ * @flowtable:	flow table name (flow table only)
  * @handle:	rule handle (rules only)
  * @position:	rule position (rules only)
  * @set_id:	set ID (sets only)
@@ -45,6 +46,7 @@ struct handle {
 	const char		*chain;
 	const char		*set;
 	const char		*obj;
+	const char		*flowtable;
 	struct handle_spec	handle;
 	struct position_spec	position;
 	uint32_t		set_id;
@@ -73,18 +75,21 @@ extern void scope_release(const struct scope *scope);
  * @list:	scope symbol list node
  * @identifier:	identifier
  * @expr:	initializer
+ * @refcnt:	reference counter
  */
 struct symbol {
 	struct list_head	list;
 	const char		*identifier;
 	struct expr		*expr;
+	int			refcnt;
 };
 
 extern void symbol_bind(struct scope *scope, const char *identifier,
 			struct expr *expr);
-extern int symbol_unbind(struct scope *scope, const char *identifier);
+extern int symbol_unbind(const struct scope *scope, const char *identifier);
 extern struct symbol *symbol_lookup(const struct scope *scope,
 				    const char *identifier);
+struct symbol *symbol_get(const struct scope *scope, const char *identifier);
 
 enum table_flags {
 	TABLE_F_DORMANT		= (1 << 0),
@@ -99,6 +104,7 @@ enum table_flags {
  * @chains:	chains contained in the table
  * @sets:	sets contained in the table
  * @objs:	stateful objects contained in the table
+ * @flowtables:	flow tables contained in the table
  * @flags:	table flags
  * @refcnt:	table reference counter
  */
@@ -110,6 +116,7 @@ struct table {
 	struct list_head	chains;
 	struct list_head	sets;
 	struct list_head	objs;
+	struct list_head	flowtables;
 	enum table_flags 	flags;
 	unsigned int		refcnt;
 };
@@ -248,6 +255,7 @@ struct set {
 extern struct set *set_alloc(const struct location *loc);
 extern struct set *set_get(struct set *set);
 extern void set_free(struct set *set);
+extern struct set *set_clone(const struct set *set);
 extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
@@ -316,6 +324,27 @@ void obj_print_plain(const struct obj *obj, struct output_ctx *octx);
 const char *obj_type_name(uint32_t type);
 uint32_t obj_type_to_cmd(uint32_t type);
 
+struct flowtable {
+	struct list_head	list;
+	struct handle		handle;
+	struct scope		scope;
+	struct location		location;
+	const char *		hookstr;
+	unsigned int		hooknum;
+	int			priority;
+	const char		**dev_array;
+	struct expr		*dev_expr;
+	int			dev_array_len;
+	unsigned int		refcnt;
+};
+
+extern struct flowtable *flowtable_alloc(const struct location *loc);
+extern struct flowtable *flowtable_get(struct flowtable *flowtable);
+extern void flowtable_free(struct flowtable *flowtable);
+extern void flowtable_add_hash(struct flowtable *flowtable, struct table *table);
+
+void flowtable_print(const struct flowtable *n, struct output_ctx *octx);
+
 /**
  * enum cmd_ops - command operations
  *
@@ -325,6 +354,7 @@ uint32_t obj_type_to_cmd(uint32_t type);
  * @CMD_CREATE:		create object (exclusive)
  * @CMD_INSERT:		insert object
  * @CMD_DELETE:		delete object
+ * @CMD_GET:		get object
  * @CMD_LIST:		list container
  * @CMD_RESET:		reset container
  * @CMD_FLUSH:		flush container
@@ -341,6 +371,7 @@ enum cmd_ops {
 	CMD_CREATE,
 	CMD_INSERT,
 	CMD_DELETE,
+	CMD_GET,
 	CMD_LIST,
 	CMD_RESET,
 	CMD_FLUSH,
@@ -362,6 +393,8 @@ enum cmd_ops {
  * @CMD_OBJ_CHAIN:	chain
  * @CMD_OBJ_CHAINS:	multiple chains
  * @CMD_OBJ_TABLE:	table
+ * @CMD_OBJ_FLOWTABLE:	flowtable
+ * @CMD_OBJ_FLOWTABLES:	flowtables
  * @CMD_OBJ_RULESET:	ruleset
  * @CMD_OBJ_EXPR:	expression
  * @CMD_OBJ_MONITOR:	monitor
@@ -374,6 +407,7 @@ enum cmd_ops {
  * @CMD_OBJ_QUOTAS:	multiple quotas
  * @CMD_OBJ_LIMIT:	limit
  * @CMD_OBJ_LIMITS:	multiple limits
+ * @CMD_OBJ_FLOWTABLES:	flow tables
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
@@ -400,6 +434,8 @@ enum cmd_obj {
 	CMD_OBJ_CT_HELPERS,
 	CMD_OBJ_LIMIT,
 	CMD_OBJ_LIMITS,
+	CMD_OBJ_FLOWTABLE,
+	CMD_OBJ_FLOWTABLES,
 };
 
 struct markup {
@@ -458,6 +494,7 @@ struct cmd {
 		struct rule	*rule;
 		struct chain	*chain;
 		struct table	*table;
+		struct flowtable *flowtable;
 		struct monitor	*monitor;
 		struct markup	*markup;
 		struct obj	*object;
@@ -515,7 +552,7 @@ struct netlink_ctx;
 extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 
 extern int cache_update(struct mnl_socket *nf_sock, struct nft_cache *cache,
-			enum cmd_ops cmd, struct list_head *msgs, bool debug,
+			enum cmd_ops cmd, struct list_head *msgs, unsigned int debug_flag,
 			struct output_ctx *octx);
 extern void cache_flush(struct list_head *table_list);
 extern void cache_release(struct nft_cache *cache);

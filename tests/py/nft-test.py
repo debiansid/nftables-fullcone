@@ -15,11 +15,9 @@
 
 import sys
 import os
-import subprocess
 import argparse
 import signal
 
-NFT_BIN = os.getenv('NFT', "src/nft")
 TESTS_PATH = os.path.dirname(os.path.abspath(__file__))
 TESTS_DIRECTORY = ["any", "arp", "bridge", "inet", "ip", "ip6"]
 LOGFILE = "/tmp/nftables-test.log"
@@ -57,6 +55,9 @@ class Chain:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+    def __str__(self):
+        return "%s" % self.name
+
 
 class Table:
     """Class that represents a table"""
@@ -68,6 +69,9 @@ class Table:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def __str__(self):
+        return "%s %s" % (self.family, self.name)
 
 
 class Set:
@@ -133,8 +137,8 @@ def table_exist(table, filename, lineno):
     '''
     Exists a table.
     '''
-    cmd = NFT_BIN + " list -nnn table " + table.family + " " + table.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list table %s" % table
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -143,7 +147,7 @@ def table_flush(table, filename, lineno):
     '''
     Flush a table.
     '''
-    cmd = NFT_BIN + " flush table " + table.family + " " + table.name
+    cmd = "flush table %s" % table
     execute_cmd(cmd, filename, lineno)
 
     return cmd
@@ -155,18 +159,18 @@ def table_create(table, filename, lineno):
     '''
     # We check if table exists.
     if table_exist(table, filename, lineno):
-        reason = "Table " + table.name + " already exists"
+        reason = "Table %s already exists" % table
         print_error(reason, filename, lineno)
         return -1
 
     table_list.append(table)
 
     # We add a new table
-    cmd = NFT_BIN + " add table " + table.family + " " + table.name
+    cmd = "add table %s" % table
     ret = execute_cmd(cmd, filename, lineno)
 
     if ret != 0:
-        reason = "Cannot add table " + table.name
+        reason = "Cannot " + cmd
         print_error(reason, filename, lineno)
         table_list.remove(table)
         return -1
@@ -174,16 +178,16 @@ def table_create(table, filename, lineno):
     # We check if table was added correctly.
     if not table_exist(table, filename, lineno):
         table_list.remove(table)
-        reason = "I have just added the table " + table.name + \
-                 " but it does not exist. Giving up!"
+        reason = "I have just added the table %s " \
+                 "but it does not exist. Giving up!" % table
         print_error(reason, filename, lineno)
         return -1
 
     for table_chain in table.chains:
         chain = chain_get_by_name(table_chain)
         if chain is None:
-            reason = "The chain " + table_chain + " requested by table " + \
-                     table.name + " does not exist."
+            reason = "The chain %s requested by table %s " \
+                     "does not exist." % (table_chain, table)
             print_error(reason, filename, lineno)
         else:
             chain_create(chain, table, filename)
@@ -195,25 +199,21 @@ def table_delete(table, filename=None, lineno=None):
     '''
     Deletes a table.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if not table_exist(table, filename, lineno):
-        reason = "Table " + table.name + \
-                 " does not exist but I added it before."
+        reason = "Table %s does not exist but I added it before." % table
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " delete table" + table_info
+    cmd = "delete table %s" % table
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = cmd + ": " + "I cannot delete table '" + table.name + \
-                 "'. Giving up! "
+        reason = "%s: I cannot delete table %s. Giving up!" % (cmd, table)
         print_error(reason, filename, lineno)
         return -1
 
     if table_exist(table, filename, lineno):
-        reason = "I have just deleted the table " + table.name + \
-                 " but the table still exists."
+        reason = "I have just deleted the table %s " \
+                 "but it still exists." % table
         print_error(reason, filename, lineno)
         return -1
 
@@ -224,9 +224,8 @@ def chain_exist(chain, table, filename):
     '''
     Checks a chain
     '''
-    table_info = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn chain" + table_info + chain.name
-    ret = execute_cmd(cmd, filename, chain.lineno)
+    cmd = "list chain %s %s" % (table, chain)
+    ret = execute_cmd(cmd, filename, chain.lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -235,26 +234,23 @@ def chain_create(chain, table, filename):
     '''
     Adds a chain
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if chain_exist(chain, table, filename):
-        reason = "This chain '" + chain.name + "' exists in " + table.name + \
-                 ". I cannot create two chains with same name."
+        reason = "This chain '%s' exists in %s. I cannot create " \
+                 "two chains with same name." % (chain, table)
         print_error(reason, filename, chain.lineno)
         return -1
 
-    cmd = NFT_BIN + " add chain" + table_info + chain.name + \
-          "\{ " + chain.config + "\; \}"
+    cmd = "add chain %s %s { %s; }" % (table, chain, chain.config)
 
     ret = execute_cmd(cmd, filename, chain.lineno)
     if ret != 0:
-        reason = "I cannot create the chain '" + chain.name + "'"
+        reason = "I cannot create the chain '%s'" % chain
         print_error(reason, filename, chain.lineno)
         return -1
 
     if not chain_exist(chain, table, filename):
-        reason = "I have added the chain '" + chain.name + \
-                 "' but it does not exist in " + table.name
+        reason = "I have added the chain '%s' " \
+                 "but it does not exist in %s" % (chain, table)
         print_error(reason, filename, chain.lineno)
         return -1
 
@@ -265,31 +261,29 @@ def chain_delete(chain, table, filename=None, lineno=None):
     '''
     Flushes and deletes a chain.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if not chain_exist(chain, table, filename):
-        reason = "The chain " + chain.name + " does not exists in " + \
-                 table.name + ". I cannot delete it."
+        reason = "The chain %s does not exist in %s. " \
+                 "I cannot delete it." % (chain, table)
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " flush chain" + table_info + chain.name
+    cmd = "flush chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = "I cannot flush this chain " + chain.name
+        reason = "I cannot flush this chain " + chain
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " delete chain" + table_info + chain.name
+    cmd = "delete chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = cmd + "I cannot delete this chain. DD"
+        reason = cmd + "I cannot delete this chain " + chain
         print_error(reason, filename, lineno)
         return -1
 
     if chain_exist(chain, table, filename):
-        reason = "The chain " + chain.name + " exists in " + table.name + \
-                 ". I cannot delete this chain"
+        reason = "The chain %s exists in %s. " \
+                 "I cannot delete this chain" % (chain, table)
         print_error(reason, filename, lineno)
         return -1
 
@@ -319,28 +313,26 @@ def set_add(s, test_result, filename, lineno):
         s.table = table.name
         s.family = table.family
         if _set_exist(s, filename, lineno):
-            reason = "Set " + s.name + " already exists in " + table.name
+            reason = "Set %s already exists in %s" % (s.name, table)
             print_error(reason, filename, lineno)
             return -1
 
-        table_handle = " " + table.family + " " + table.name + " "
-        if s.flags == "":
-            set_cmd = " " + s.name + " { type " + s.type + "\;}"
-        else:
-            set_cmd = " " + s.name + " { type " + s.type + "\; flags " + s.flags + "\; }"
+        flags = s.flags
+        if flags != "":
+            flags = "flags %s; " % flags
 
-        cmd = NFT_BIN + " add set" + table_handle + set_cmd
+        cmd = "add set %s %s { type %s; %s}" % (table, s.name, s.type, flags)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (ret == 0 and test_result == "fail") or \
                 (ret != 0 and test_result == "ok"):
-            reason = cmd + ": " + "I cannot add the set " + s.name
+            reason = "%s: I cannot add the set %s" % (cmd, s.name)
             print_error(reason, filename, lineno)
             return -1
 
         if not _set_exist(s, filename, lineno):
-            reason = "I have just added the set " + s.name + \
-                     " to the table " + table.name + " but it does not exist"
+            reason = "I have just added the set %s to " \
+                     "the table %s but it does not exist" % (s.name, table)
             print_error(reason, filename, lineno)
             return -1
 
@@ -360,22 +352,13 @@ def set_add_elements(set_element, set_name, state, filename, lineno):
         # Check if set exists.
         if (not set_exist(set_name, table, filename, lineno) or
                     set_name not in all_set) and state == "ok":
-            reason = "I cannot add an element to the set " + set_name + \
-                     " since it does not exist."
+            reason = "I cannot add an element to the set %s " \
+                     "since it does not exist." % set_name
             print_error(reason, filename, lineno)
             return -1
 
-        table_info = " " + table.family + " " + table.name + " "
-
-        element = ""
-        for e in set_element:
-            if not element:
-                element = e
-            else:
-                element = element + ", " + e
-
-        set_text = set_name + " { " + element + " }"
-        cmd = NFT_BIN + " add element" + table_info + set_text
+        element = ", ".join(set_element)
+        cmd = "add element %s %s { %s }" % (table, set_name, element)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (state == "fail" and ret == 0) or (state == "ok" and ret != 0):
@@ -397,15 +380,12 @@ def set_delete_elements(set_element, set_name, table, filename=None,
     '''
     Deletes elements in a set.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     for element in set_element:
-        set_text = set_name + " {" + element + "}"
-        cmd = NFT_BIN + " delete element" + table_info + set_text
+        cmd = "delete element %s %s { %s }" % (table, set_name, element)
         ret = execute_cmd(cmd, filename, lineno)
         if ret != 0:
-            reason = "I cannot delete an element" + element + \
-                     " from the set '" + set_name
+            reason = "I cannot delete element %s " \
+                     "from the set %s" % (element, set_name)
             print_error(reason, filename, lineno)
             return -1
 
@@ -419,8 +399,8 @@ def set_delete(table, filename=None, lineno=None):
     for set_name in all_set.keys():
         # Check if exists the set
         if not set_exist(set_name, table, filename, lineno):
-            reason = "The set " + set_name + \
-                     " does not exist, I cannot delete it"
+            reason = "The set %s does not exist, " \
+                     "I cannot delete it" % set_name
             print_error(reason, filename, lineno)
             return -1
 
@@ -429,8 +409,7 @@ def set_delete(table, filename=None, lineno=None):
                             lineno)
 
         # We delete the set.
-        table_info = " " + table.family + " " + table.name + " "
-        cmd = NFT_BIN + " delete set " + table_info + " " + set_name
+        cmd = "delete set %s %s" % (table, set_name)
         ret = execute_cmd(cmd, filename, lineno)
 
         # Check if the set still exists after I deleted it.
@@ -446,9 +425,8 @@ def set_exist(set_name, table, filename, lineno):
     '''
     Check if the set exists.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn set" + table_info + set_name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list set %s %s" % (table, set_name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -457,9 +435,8 @@ def _set_exist(s, filename, lineno):
     '''
     Check if the set exists.
     '''
-    table_handle = " " + s.family + " " + s.table + " "
-    cmd = NFT_BIN + " list -nnn set" + table_handle + s.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list set %s %s %s" % (s.family, s.table, s.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -471,6 +448,10 @@ def set_check_element(rule1, rule2):
     ret = -1
     pos1 = rule1.find("{")
     pos2 = rule2.find("{")
+
+    if (cmp(rule1[:pos1], rule2[:pos2]) != 0):
+        return ret;
+
     end1 = rule1.find("}")
     end2 = rule2.find("}")
 
@@ -502,18 +483,16 @@ def obj_add(o, test_result, filename, lineno):
         o.family = table.family
         obj_handle = o.type + " " + o.name
         if _obj_exist(o, filename, lineno):
-            reason = "The " + obj_handle + " already exists in " + table.name
+            reason = "The %s already exists in %s" % (obj_handle, table)
             print_error(reason, filename, lineno)
             return -1
 
-        table_handle = " " + table.family + " " + table.name + " "
-
-        cmd = NFT_BIN + " add " + o.type + table_handle + o.name + " " + o.spcf
+        cmd = "add %s %s %s %s" % (o.type, table, o.name, o.spcf)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (ret == 0 and test_result == "fail") or \
                 (ret != 0 and test_result == "ok"):
-            reason = cmd + ": " + "I cannot add the " + obj_handle
+            reason = "%s: I cannot add the %s" % (cmd, obj_handle)
             print_error(reason, filename, lineno)
             return -1
 
@@ -522,16 +501,16 @@ def obj_add(o, test_result, filename, lineno):
         if exist:
             if test_result == "ok":
                  return 0
-            reason = "I added the " + obj_handle + \
-                     " to the table " + table.name + " but it should have failed"
+            reason = "I added the %s to the table %s " \
+                     "but it should have failed" % (obj_handle, table)
             print_error(reason, filename, lineno)
             return -1
 
         if test_result == "fail":
             return 0
 
-        reason = "I have just added the " + obj_handle + \
-                 " to the table " + table.name + " but it does not exist"
+        reason = "I have just added the %s to " \
+                 "the table %s but it does not exist" % (obj_handle, table)
         print_error(reason, filename, lineno)
         return -1
 
@@ -543,13 +522,12 @@ def obj_delete(table, filename=None, lineno=None):
         obj_handle = o.type + " " + o.name
         # Check if exists the obj
         if not obj_exist(o, table, filename, lineno):
-            reason = "The " + obj_handle + " does not exist, I cannot delete it"
+            reason = "The %s does not exist, I cannot delete it" % obj_handle
             print_error(reason, filename, lineno)
             return -1
 
         # We delete the object.
-        table_info = " " + table.family + " " + table.name + " "
-        cmd = NFT_BIN + " delete " + o.type + table_info + " " + o.name
+        cmd = "delete %s %s %s" % (o.type, table, o.name)
         ret = execute_cmd(cmd, filename, lineno)
 
         # Check if the object still exists after I deleted it.
@@ -565,9 +543,8 @@ def obj_exist(o, table, filename, lineno):
     '''
     Check if the object exists.
     '''
-    table_handle = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list %s %s %s" % (o.type, table, o.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -576,9 +553,8 @@ def _obj_exist(o, filename, lineno):
     '''
     Check if the object exists.
     '''
-    table_handle = " " + o.family + " " + o.table + " "
-    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list %s %s %s %s" % (o.type, o.family, o.table, o.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -693,13 +669,11 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
             chain = chain_get_by_name(table_chain)
             unit_tests += 1
             table_flush(table, filename, lineno)
-            table_info = " " + table.family + " " + table.name + " "
 
             payload_log = os.tmpfile()
 
-            cmd = NFT_BIN + " add rule --debug=netlink" + table_info + \
-                  chain.name + " " + rule[0]
-            ret = execute_cmd(cmd, filename, lineno, payload_log)
+            cmd = "add rule %s %s %s" % (table, chain, rule[0])
+            ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
 
             state = rule[1].rstrip()
             if (ret in [0,134] and state == "fail") or (ret != 0 and state == "ok"):
@@ -736,13 +710,14 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                                   gotf.name, 1)
 
                 # Check output of nft
-                process = subprocess.Popen([NFT_BIN, '-nnns', 'list', 'table',
-                                            table.family, table.name],
-                                           shell=False,
-                                           stdout=subprocess.PIPE,
-                                           preexec_fn=preexec)
-                pre_output = process.communicate()
-                output = pre_output[0].split(";")
+                numeric_old = nftables.set_numeric_output("all")
+                stateless_old = nftables.set_stateless_output(True)
+                list_cmd = 'list table %s' % table
+                rc, pre_output, err = nftables.cmd(list_cmd)
+                nftables.set_numeric_output(numeric_old)
+                nftables.set_stateless_output(stateless_old)
+
+                output = pre_output.split(";")
                 if len(output) < 2:
                     reason = cmd + ": Listing is broken."
                     print_error(reason, filename, lineno)
@@ -751,7 +726,7 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                     if not force_all_family_option:
                         return [ret, warning, error, unit_tests]
                 else:
-                    rule_output = output_clean(pre_output[0], chain)
+                    rule_output = output_clean(pre_output, chain)
                     if len(rule) == 3:
                         teoric_exit = rule[2]
                     else:
@@ -762,8 +737,8 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                             if set_check_element(teoric_exit.rstrip(), rule_output.rstrip()) != 0:
                                 warning += 1
                                 print_differences_warning(filename, lineno,
-                                                          rule[0], rule_output,
-                                                          cmd)
+                                                          teoric_exit.rstrip(),
+                                                          rule_output, cmd)
                                 if not force_all_family_option:
                                     return [ret, warning, error, unit_tests]
                         else:
@@ -805,7 +780,8 @@ def signal_handler(signal, frame):
     signal_received = 1
 
 
-def execute_cmd(cmd, filename, lineno, stdout_log=False):
+def execute_cmd(cmd, filename, lineno,
+                stdout_log=False, numeric=False, debug=False):
     '''
     Executes a command, checks for segfaults and returns the command exit
     code.
@@ -813,23 +789,36 @@ def execute_cmd(cmd, filename, lineno, stdout_log=False):
     :param cmd: string with the command to be executed
     :param filename: name of the file tested (used for print_error purposes)
     :param lineno: line number being tested (used for print_error purposes)
+    :param stdout_log: redirect stdout to this file instead of global log_file
+    :param numeric: turn numeric output temporarily on
+    :param debug: temporarily set these debug flags
     '''
     global log_file
     print >> log_file, "command: %s" % cmd
     if debug_option:
         print cmd
 
+    if numeric:
+        numeric_old = nftables.get_numeric_output()
+        nftables.set_numeric_output(numeric)
+    if debug:
+        debug_old = nftables.get_debug()
+        nftables.set_debug(debug)
+
+    ret, out, err = nftables.cmd(cmd)
+
     if not stdout_log:
         stdout_log = log_file
 
-    ret = subprocess.call(cmd, shell=True, universal_newlines=True,
-                          stderr=log_file, stdout=stdout_log,
-                          preexec_fn=preexec)
+    stdout_log.write(out)
+    stdout_log.flush()
+    log_file.write(err)
     log_file.flush()
 
-    if ret == -11:
-        reason = "command segfaults: " + cmd
-        print_error(reason, filename, lineno)
+    if numeric:
+        nftables.set_numeric_output(numeric_old)
+    if debug:
+        nftables.set_debug(debug_old)
 
     return ret
 
@@ -1024,7 +1013,7 @@ def run_test_file(filename, force_all_family_option, specific_file):
         rule = line.split(';')  # rule[1] Ok or FAIL
         if len(rule) == 1 or len(rule) > 3 or rule[1].rstrip() \
                 not in {"ok", "fail"}:
-            reason = "Skipping malformed rule test. (" + line.rstrip('\n') + ")"
+            reason = "Skipping malformed rule test. (%s)" % line.rstrip('\n')
             print_warning(reason, filename, lineno)
             continue
 
@@ -1089,8 +1078,8 @@ def run_test_file(filename, force_all_family_option, specific_file):
 def main():
     parser = argparse.ArgumentParser(description='Run nft tests', version='1.0')
 
-    parser.add_argument('filename', nargs='?', metavar='path/to/file.t',
-                        help='Run only this test')
+    parser.add_argument('filenames', nargs='*', metavar='path/to/file.t',
+                        help='Run only these tests')
 
     parser.add_argument('-d', '--debug', action='store_true', dest='debug',
                         help='enable debugging mode')
@@ -1119,9 +1108,16 @@ def main():
     # Change working directory to repository root
     os.chdir(TESTS_PATH + "/../..")
 
-    if not os.path.isfile(NFT_BIN):
-        print "The nft binary does not exist. You need to build the project."
+    sys.path.append('py/')
+    from nftables import Nftables
+
+    if not os.path.exists('src/.libs/libnftables.so'):
+        print "The nftables library does not exist. " \
+              "You need to build the project."
         return
+
+    global nftables
+    nftables = Nftables('src/.libs/libnftables.so')
 
     test_files = files_ok = run_total = 0
     tests = passed = warnings = errors = 0
@@ -1133,9 +1129,10 @@ def main():
         return
 
     file_list = []
-    if args.filename:
-        file_list = [args.filename]
-        specific_file = True
+    if args.filenames:
+        file_list = args.filenames
+        if len(args.filenames) == 1:
+            specific_file = True
     else:
         for directory in TESTS_DIRECTORY:
             path = os.path.join(TESTS_PATH, directory)

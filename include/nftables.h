@@ -7,13 +7,28 @@
 #include <utils.h>
 #include <nftables/nftables.h>
 
+struct cookie {
+	FILE *fp;
+	FILE *orig_fp;
+	char *buf;
+	size_t buflen;
+	size_t pos;
+};
+
 struct output_ctx {
 	unsigned int numeric;
 	unsigned int stateless;
 	unsigned int ip2name;
 	unsigned int handle;
 	unsigned int echo;
-	FILE *output_fp;
+	union {
+		FILE *output_fp;
+		struct cookie output_cookie;
+	};
+	union {
+		FILE *error_fp;
+		struct cookie error_cookie;
+	};
 };
 
 struct nft_cache {
@@ -99,10 +114,7 @@ struct input_descriptor {
 	struct location			location;
 	enum input_descriptor_types	type;
 	const char			*name;
-	union {
-		const char		*data;
-		FILE			*fp;
-	};
+	const char			*data;
 	unsigned int			lineno;
 	unsigned int			column;
 	off_t				token_offset;

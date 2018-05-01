@@ -65,7 +65,7 @@ void expr_free(struct expr *expr)
 		return;
 	if (--expr->refcnt > 0)
 		return;
-	if (expr->ops->destroy)
+	if (expr->ops && expr->ops->destroy)
 		expr->ops->destroy(expr);
 	xfree(expr);
 }
@@ -251,6 +251,45 @@ struct expr *symbol_expr_alloc(const struct location *loc,
 	expr->symtype	 = type;
 	expr->scope	 = scope;
 	expr->identifier = xstrdup(identifier);
+	return expr;
+}
+
+static void variable_expr_print(const struct expr *expr,
+				struct output_ctx *octx)
+{
+	nft_print(octx, "$%s", expr->sym->identifier);
+}
+
+static void variable_expr_clone(struct expr *new, const struct expr *expr)
+{
+	new->scope      = expr->scope;
+	new->sym	= expr->sym;
+
+	expr->sym->refcnt++;
+}
+
+static void variable_expr_destroy(struct expr *expr)
+{
+	expr->sym->refcnt--;
+}
+
+static const struct expr_ops variable_expr_ops = {
+	.type		= EXPR_VARIABLE,
+	.name		= "variable",
+	.print		= variable_expr_print,
+	.clone		= variable_expr_clone,
+	.destroy	= variable_expr_destroy,
+};
+
+struct expr *variable_expr_alloc(const struct location *loc,
+				 struct scope *scope, struct symbol *sym)
+{
+	struct expr *expr;
+
+	expr = expr_alloc(loc, &variable_expr_ops, &invalid_type,
+			  BYTEORDER_INVALID, 0);
+	expr->scope	 = scope;
+	expr->sym	 = sym;
 	return expr;
 }
 
@@ -457,8 +496,6 @@ const char *expr_op_symbols[] = {
 	[OP_GT]		= ">",
 	[OP_LTE]	= "<=",
 	[OP_GTE]	= ">=",
-	[OP_RANGE]	= "within range",
-	[OP_LOOKUP]	= NULL,
 };
 
 static void unary_expr_print(const struct expr *expr, struct output_ctx *octx)
@@ -523,10 +560,6 @@ static void binop_arg_print(const struct expr *op, const struct expr *arg,
 
 static bool must_print_eq_op(const struct expr *expr)
 {
-	if (expr->right->dtype->basetype != NULL &&
-	    expr->right->dtype->basetype->type == TYPE_BITMASK)
-		return true;
-
 	return expr->left->ops->type == EXPR_BINOP;
 }
 
@@ -606,7 +639,7 @@ void relational_expr_pctx_update(struct proto_ctx *ctx,
 	const struct expr *left = expr->left;
 
 	assert(expr->ops->type == EXPR_RELATIONAL);
-	assert(expr->op == OP_EQ);
+	assert(expr->op == OP_EQ || expr->op == OP_IMPLICIT);
 
 	if (left->ops->pctx_update &&
 	    (left->flags & EXPR_F_PROTOCOL))
@@ -663,8 +696,8 @@ struct expr *range_expr_alloc(const struct location *loc,
 	return expr;
 }
 
-static struct expr *compound_expr_alloc(const struct location *loc,
-					const struct expr_ops *ops)
+struct expr *compound_expr_alloc(const struct location *loc,
+				 const struct expr_ops *ops)
 {
 	struct expr *expr;
 

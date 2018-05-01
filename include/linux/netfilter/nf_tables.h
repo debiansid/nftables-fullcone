@@ -92,6 +92,9 @@ enum nft_verdicts {
  * @NFT_MSG_GETOBJ: get a stateful object (enum nft_obj_attributes)
  * @NFT_MSG_DELOBJ: delete a stateful object (enum nft_obj_attributes)
  * @NFT_MSG_GETOBJ_RESET: get and reset a stateful object (enum nft_obj_attributes)
+ * @NFT_MSG_NEWFLOWTABLE: add new flow table (enum nft_flowtable_attributes)
+ * @NFT_MSG_GETFLOWTABLE: get flow table (enum nft_flowtable_attributes)
+ * @NFT_MSG_DELFLOWTABLE: delete flow table (enum nft_flowtable_attributes)
  */
 enum nf_tables_msg_types {
 	NFT_MSG_NEWTABLE,
@@ -116,6 +119,9 @@ enum nf_tables_msg_types {
 	NFT_MSG_GETOBJ,
 	NFT_MSG_DELOBJ,
 	NFT_MSG_GETOBJ_RESET,
+	NFT_MSG_NEWFLOWTABLE,
+	NFT_MSG_GETFLOWTABLE,
+	NFT_MSG_DELFLOWTABLE,
 	NFT_MSG_MAX,
 };
 
@@ -162,12 +168,14 @@ enum nft_table_flags {
  * @NFTA_TABLE_NAME: name of the table (NLA_STRING)
  * @NFTA_TABLE_FLAGS: bitmask of enum nft_table_flags (NLA_U32)
  * @NFTA_TABLE_USE: number of chains in this table (NLA_U32)
+ * @NFTA_TABLE_HANDLE: numeric handle of the table (NLA_U64)
  */
 enum nft_table_attributes {
 	NFTA_TABLE_UNSPEC,
 	NFTA_TABLE_NAME,
 	NFTA_TABLE_FLAGS,
 	NFTA_TABLE_USE,
+	NFTA_TABLE_HANDLE,
 	__NFTA_TABLE_MAX
 };
 #define NFTA_TABLE_MAX		(__NFTA_TABLE_MAX - 1)
@@ -311,6 +319,7 @@ enum nft_set_desc_attributes {
  * @NFTA_SET_GC_INTERVAL: garbage collection interval (NLA_U32)
  * @NFTA_SET_USERDATA: user data (NLA_BINARY)
  * @NFTA_SET_OBJ_TYPE: stateful object type (NLA_U32: NFT_OBJECT_*)
+ * @NFTA_SET_HANDLE: numeric handle of the set (NLA_U64)
  */
 enum nft_set_attributes {
 	NFTA_SET_UNSPEC,
@@ -329,6 +338,7 @@ enum nft_set_attributes {
 	NFTA_SET_USERDATA,
 	NFTA_SET_PAD,
 	NFTA_SET_OBJ_TYPE,
+	NFTA_SET_HANDLE,
 	__NFTA_SET_MAX
 };
 #define NFTA_SET_MAX		(__NFTA_SET_MAX - 1)
@@ -1294,6 +1304,7 @@ enum nft_ct_helper_attributes {
  *
  * @NFTA_OBJ_TABLE: name of the table containing the expression (NLA_STRING)
  * @NFTA_OBJ_NAME: name of this expression type (NLA_STRING)
+ * @NFTA_OBJ_HANDLE: numeric handle of object (NLA_U64)
  * @NFTA_OBJ_TYPE: stateful object type (NLA_U32)
  * @NFTA_OBJ_DATA: stateful object data (NLA_NESTED)
  * @NFTA_OBJ_USE: number of references to this expression (NLA_U32)
@@ -1305,6 +1316,7 @@ enum nft_object_attributes {
 	NFTA_OBJ_TYPE,
 	NFTA_OBJ_DATA,
 	NFTA_OBJ_USE,
+	NFTA_OBJ_HANDLE,
 	__NFTA_OBJ_MAX
 };
 #define NFTA_OBJ_MAX		(__NFTA_OBJ_MAX - 1)
@@ -1314,6 +1326,7 @@ enum nft_object_attributes {
  *
  * @NFTA_TRACE_TABLE: name of the table (NLA_STRING)
  * @NFTA_TRACE_CHAIN: name of the chain (NLA_STRING)
+ * @NFTA_TRACE_TABLE_HANDLE: numeric handle of the table (NLA_U64)
  * @NFTA_TRACE_RULE_HANDLE: numeric handle of the rule (NLA_U64)
  * @NFTA_TRACE_TYPE: type of the event (NLA_U32: nft_trace_types)
  * @NFTA_TRACE_VERDICT: verdict returned by hook (NLA_NESTED: nft_verdicts)
@@ -1333,6 +1346,7 @@ enum nft_trace_attributes {
 	NFTA_TRACE_UNSPEC,
 	NFTA_TRACE_TABLE,
 	NFTA_TRACE_CHAIN,
+	NFTA_TRACE_TABLE_HANDLE,
 	NFTA_TRACE_RULE_HANDLE,
 	NFTA_TRACE_TYPE,
 	NFTA_TRACE_VERDICT,

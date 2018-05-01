@@ -47,7 +47,7 @@
 		errno = 0;							\
 		clearerr(yyin);							\
 	}									\
-	if (result > 1) {							\
+	if (result > 1 && !feof(yyin)) {					\
 		while (result > 1 && 						\
 		       (buf[result - 1] != '\n' &&  buf[result - 1] != ' '))	\
 			result--, n++;						\
@@ -240,6 +240,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "hook"			{ return HOOK; }
 "device"		{ return DEVICE; }
+"devices"		{ return DEVICES; }
 "table"			{ return TABLE; }
 "tables"		{ return TABLES; }
 "chain"			{ return CHAIN; }
@@ -251,6 +252,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "element"		{ return ELEMENT; }
 "map"			{ return MAP; }
 "maps"			{ return MAPS; }
+"flowtable"		{ return FLOWTABLE; }
 "handle"		{ return HANDLE; }
 "ruleset"		{ return RULESET; }
 "trace"			{ return TRACE; }
@@ -272,6 +274,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "create"		{ return CREATE; }
 "insert"		{ return INSERT; }
 "delete"		{ return DELETE; }
+"get"			{ return GET; }
 "list"			{ return LIST; }
 "reset"			{ return RESET; }
 "flush"			{ return FLUSH; }
@@ -296,8 +299,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "memory"		{ return MEMORY; }
 
 "flow"			{ return FLOW; }
+"offload"		{ return OFFLOAD; }
 "meter"			{ return METER; }
 "meters"		{ return METERS; }
+
+"flowtables"		{ return FLOWTABLES; }
 
 "counter"		{ return COUNTER; }
 "name"			{ return NAME; }
@@ -450,8 +456,12 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "rt"			{ return RT; }
 "rt0"			{ return RT0; }
 "rt2"			{ return RT2; }
+"srh"			{ return RT4; }
 "seg-left"		{ return SEG_LEFT; }
 "addr"			{ return ADDR; }
+"last-entry"		{ return LAST_ENT; }
+"tag"			{ return TAG; }
+"sid"			{ return SID; }
 
 "hbh"			{ return HBH; }
 
@@ -476,7 +486,9 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "nftrace"		{ return NFTRACE; }
 "rtclassid"		{ return RTCLASSID; }
 "ibriport"		{ return IBRIPORT; }
+"ibrname"		{ return IBRIDGENAME; }
 "obriport"		{ return OBRIPORT; }
+"obrname"		{ return OBRIDGENAME; }
 "pkttype"		{ return PKTTYPE; }
 "cpu"			{ return CPU; }
 "iifgroup"		{ return IIFGROUP; }
@@ -497,6 +509,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "event"			{ return EVENT; }
 "expiration"		{ return EXPIRATION; }
 "helper"		{ return HELPER; }
+"helpers"		{ return HELPERS; }
 "label"			{ return LABEL; }
 "state"			{ return STATE; }
 "status"		{ return STATUS; }
@@ -652,7 +665,6 @@ static struct error_record *scanner_push_file(void *scanner, const char *filenam
 		state->indesc->location = *loc;
 	state->indesc->type	= INDESC_FILE;
 	state->indesc->name	= xstrdup(filename);
-	state->indesc->fp	= f;
 	init_pos(state);
 	return NULL;
 }
@@ -881,7 +893,6 @@ void scanner_destroy(void *scanner)
 		if (inpdesc && inpdesc->name) {
 			xfree(inpdesc->name);
 			inpdesc->name = NULL;
-			fclose(inpdesc->fp);
 		}
 		yypop_buffer_state(scanner);
 	} while (state->indesc_idx--);

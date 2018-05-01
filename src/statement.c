@@ -313,6 +313,11 @@ const char *get_rate(uint64_t byte_rate, uint64_t *rate)
 {
 	int i;
 
+	if (!byte_rate) {
+		*rate = 0;
+		return data_unit[0];
+	}
+
 	for (i = 0; data_unit[i + 1] != NULL; i++) {
 		if (byte_rate % 1024)
 			break;
@@ -499,10 +504,16 @@ static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	static const char * const nat_types[] = {
 		[NFT_NAT_SNAT]	= "snat",
 		[NFT_NAT_DNAT]	= "dnat",
+		[NFT_NAT_MASQ]	= "masquerade",
+		[NFT_NAT_REDIR]	= "redirect",
 	};
 
-	nft_print(octx, "%s to ", nat_types[stmt->nat.type]);
+	nft_print(octx, "%s", nat_types[stmt->nat.type]);
+	if (stmt->nat.addr || stmt->nat.proto)
+		nft_print(octx, " to");
+
 	if (stmt->nat.addr) {
+		nft_print(octx, " ");
 		if (stmt->nat.proto) {
 			if (stmt->nat.addr->ops->type == EXPR_VALUE &&
 			    stmt->nat.addr->dtype->type == TYPE_IP6ADDR) {
@@ -525,6 +536,8 @@ static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	}
 
 	if (stmt->nat.proto) {
+		if (!stmt->nat.addr)
+			nft_print(octx, " ");
 		nft_print(octx, ":");
 		expr_print(stmt->nat.proto, octx);
 	}
@@ -545,67 +558,13 @@ static const struct stmt_ops nat_stmt_ops = {
 	.destroy	= nat_stmt_destroy,
 };
 
-struct stmt *nat_stmt_alloc(const struct location *loc)
+struct stmt *nat_stmt_alloc(const struct location *loc,
+			    enum nft_nat_etypes type)
 {
-	return stmt_alloc(loc, &nat_stmt_ops);
-}
+	struct stmt *stmt = stmt_alloc(loc, &nat_stmt_ops);
 
-static void masq_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
-{
-	nft_print(octx, "masquerade");
-
-	if (stmt->masq.proto) {
-		nft_print(octx, " to :");
-		expr_print(stmt->masq.proto, octx);
-	}
-
-	print_nf_nat_flags(stmt->masq.flags, octx);
-}
-
-static void masq_stmt_destroy(struct stmt *stmt)
-{
-	expr_free(stmt->masq.proto);
-}
-
-static const struct stmt_ops masq_stmt_ops = {
-	.type		= STMT_MASQ,
-	.name		= "masq",
-	.print		= masq_stmt_print,
-	.destroy	= masq_stmt_destroy,
-};
-
-struct stmt *masq_stmt_alloc(const struct location *loc)
-{
-	return stmt_alloc(loc, &masq_stmt_ops);
-}
-
-static void redir_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
-{
-	nft_print(octx, "redirect");
-
-	if (stmt->redir.proto) {
-		nft_print(octx, " to :");
-		expr_print(stmt->redir.proto, octx);
-	}
-
-	print_nf_nat_flags(stmt->redir.flags, octx);
-}
-
-static void redir_stmt_destroy(struct stmt *stmt)
-{
-	expr_free(stmt->redir.proto);
-}
-
-static const struct stmt_ops redir_stmt_ops = {
-	.type		= STMT_REDIR,
-	.name		= "redir",
-	.print		= redir_stmt_print,
-	.destroy	= redir_stmt_destroy,
-};
-
-struct stmt *redir_stmt_alloc(const struct location *loc)
-{
-	return stmt_alloc(loc, &redir_stmt_ops);
+	stmt->nat.type = type;
+	return stmt;
 }
 
 static const char * const set_stmt_op_names[] = {
@@ -615,10 +574,11 @@ static const char * const set_stmt_op_names[] = {
 
 static void set_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	nft_print(octx, "set %s ", set_stmt_op_names[stmt->set.op]);
-	expr_print(stmt->set.key, octx);
-	nft_print(octx, " ");
+	nft_print(octx, "%s ", set_stmt_op_names[stmt->set.op]);
 	expr_print(stmt->set.set, octx);
+	nft_print(octx, " { ");
+	expr_print(stmt->set.key, octx);
+	nft_print(octx, " } ");
 }
 
 static void set_stmt_destroy(struct stmt *stmt)
@@ -637,6 +597,35 @@ static const struct stmt_ops set_stmt_ops = {
 struct stmt *set_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &set_stmt_ops);
+}
+
+static void map_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	nft_print(octx, "%s ", set_stmt_op_names[stmt->map.op]);
+	expr_print(stmt->map.set, octx);
+	nft_print(octx, "{ ");
+	expr_print(stmt->map.map->map->key, octx);
+	nft_print(octx, " : ");
+	expr_print(stmt->map.map->mappings, octx);
+	nft_print(octx, " } ");
+}
+
+static void map_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->map.map);
+	expr_free(stmt->map.set);
+}
+
+static const struct stmt_ops map_stmt_ops = {
+	.type		= STMT_MAP,
+	.name		= "map",
+	.print		= map_stmt_print,
+	.destroy	= map_stmt_destroy,
+};
+
+struct stmt *map_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &map_stmt_ops);
 }
 
 static void dup_stmt_print(const struct stmt *stmt, struct output_ctx *octx)

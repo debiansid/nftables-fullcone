@@ -10,6 +10,12 @@ extern struct stmt *expr_stmt_alloc(const struct location *loc,
 extern struct stmt *verdict_stmt_alloc(const struct location *loc,
 				       struct expr *expr);
 
+struct flow_stmt {
+	const char		*table_name;
+};
+
+struct stmt *flow_stmt_alloc(const struct location *loc, const char *name);
+
 struct objref_stmt {
 	uint32_t		type;
 	struct expr		*expr;
@@ -92,28 +98,22 @@ struct reject_stmt {
 
 extern struct stmt *reject_stmt_alloc(const struct location *loc);
 
+enum nft_nat_etypes {
+	__NFT_NAT_SNAT = NFT_NAT_SNAT,
+	__NFT_NAT_DNAT = NFT_NAT_DNAT,
+	NFT_NAT_MASQ,
+	NFT_NAT_REDIR,
+};
+
 struct nat_stmt {
-	enum nft_nat_types	type;
+	enum nft_nat_etypes	type;
 	struct expr		*addr;
 	struct expr		*proto;
 	uint32_t		flags;
 };
 
-extern struct stmt *nat_stmt_alloc(const struct location *loc);
-
-struct masq_stmt {
-	uint32_t		flags;
-	struct expr		*proto;
-};
-
-extern struct stmt *masq_stmt_alloc(const struct location *loc);
-
-struct redir_stmt {
-	struct expr		*proto;
-	uint32_t		flags;
-};
-
-extern struct stmt *redir_stmt_alloc(const struct location *loc);
+extern struct stmt *nat_stmt_alloc(const struct location *loc,
+				   enum nft_nat_etypes type);
 
 struct queue_stmt {
 	struct expr		*queue;
@@ -164,6 +164,14 @@ struct set_stmt {
 };
 
 extern struct stmt *set_stmt_alloc(const struct location *loc);
+
+struct map_stmt {
+	struct expr		*set;
+	struct expr		*map;
+	enum nft_dynset_ops	op;
+};
+
+extern struct stmt *map_stmt_alloc(const struct location *loc);
 
 struct meter_stmt {
 	struct expr		*set;
@@ -219,8 +227,6 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_LOG:		log statement
  * @STMT_REJECT:	REJECT statement
  * @STMT_NAT:		NAT statement
- * @STMT_MASQ:		masquerade statement
- * @STMT_REDIR:		redirect statement
  * @STMT_QUEUE:		QUEUE statement
  * @STMT_CT:		conntrack statement
  * @STMT_SET:		set statement
@@ -231,6 +237,8 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_NOTRACK:	notrack statement
  * @STMT_OBJREF:	stateful object reference statement
  * @STMT_EXTHDR:	extension header statement
+ * @STMT_FLOW_OFFLOAD:	flow offload statement
+ * @STMT_MAP:		map statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -244,8 +252,6 @@ enum stmt_types {
 	STMT_LOG,
 	STMT_REJECT,
 	STMT_NAT,
-	STMT_MASQ,
-	STMT_REDIR,
 	STMT_QUEUE,
 	STMT_CT,
 	STMT_SET,
@@ -256,6 +262,8 @@ enum stmt_types {
 	STMT_NOTRACK,
 	STMT_OBJREF,
 	STMT_EXTHDR,
+	STMT_FLOW_OFFLOAD,
+	STMT_MAP,
 };
 
 /**
@@ -306,8 +314,6 @@ struct stmt {
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;
 		struct nat_stmt		nat;
-		struct masq_stmt	masq;
-		struct redir_stmt	redir;
 		struct queue_stmt	queue;
 		struct quota_stmt	quota;
 		struct ct_stmt		ct;
@@ -316,6 +322,8 @@ struct stmt {
 		struct fwd_stmt		fwd;
 		struct xt_stmt		xt;
 		struct objref_stmt	objref;
+		struct flow_stmt	flow;
+		struct map_stmt		map;
 	};
 };
 

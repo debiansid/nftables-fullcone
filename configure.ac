@@ -1,4 +1,4 @@
-AC_INIT([nftables], [0.8.3], [netfilter-devel@vger.kernel.org])
+AC_INIT([nftables], [0.8.4], [netfilter-devel@vger.kernel.org])
 AC_DEFINE([RELEASE_NAME], ["Joe Btfsplk"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
@@ -76,7 +76,7 @@ AM_COND_IF([BUILD_PDF], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.0.9])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.0])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])], [],
@@ -99,7 +99,7 @@ AM_CONDITIONAL([BUILD_CLI], [test "x$with_cli" != xno])
 
 AC_ARG_WITH([xtables], [AS_HELP_STRING([--with-xtables],
             [Use libxtables for iptables interaction)])],
-	    [with_libxtables=yes], [with_libxtables=no])
+	    [with_libxtables=$withval], [with_libxtables=no])
 AS_IF([test "x$with_libxtables" != xno], [
 PKG_CHECK_MODULES([XTABLES], [xtables >= 1.6.1])
 AC_DEFINE([HAVE_LIBXTABLES], [1], [0])
@@ -109,6 +109,7 @@ AM_CONDITIONAL([BUILD_XTABLES], [test "x$with_libxtables" == xyes])
 
 AC_CONFIG_FILES([					\
 		Makefile				\
+		libnftables.pc				\
 		src/Makefile				\
 		include/Makefile			\
 		include/nftables/Makefile		\

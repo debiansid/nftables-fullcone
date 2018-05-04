@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <utils.h>
-#include <nftables/libnftables.h>
+#include <nftables/nftables.h>
 
 struct cookie {
 	FILE *fp;

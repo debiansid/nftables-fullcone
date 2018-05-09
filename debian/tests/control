@@ -6,9 +6,10 @@ Tests: internaltest-shell.sh
 Depends: @, kmod
 Restrictions: needs-root, allow-stderr, isolation-container
 
-Tests: internaltest-py.sh
-Depends: @, python
-Restrictions: needs-root, allow-stderr, isolation-container, build-needed
+# Disable test until we decide what to do with the nftables python module
+#Tests: internaltest-py.sh
+#Depends: @, python
+#Restrictions: needs-root, allow-stderr, isolation-container, build-needed
 
 Tests: systemd-service-test.sh
 Depends: @, systemd

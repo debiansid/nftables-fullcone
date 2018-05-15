@@ -978,11 +978,11 @@ static void set_ref_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	if (expr->set->flags & NFT_SET_ANONYMOUS) {
 		if (expr->set->flags & NFT_SET_EVAL)
-			nft_print(octx, "%s", expr->set->handle.set);
+			nft_print(octx, "%s", expr->set->handle.set.name);
 		else
 			expr_print(expr->set->init, octx);
 	} else {
-		nft_print(octx, "@%s", expr->set->handle.set);
+		nft_print(octx, "@%s", expr->set->handle.set.name);
 	}
 }
 
@@ -1020,11 +1020,11 @@ static void set_elem_expr_print(const struct expr *expr,
 	expr_print(expr->key, octx);
 	if (expr->timeout) {
 		nft_print(octx, " timeout ");
-		time_print(expr->timeout / 1000, octx);
+		time_print(expr->timeout, octx);
 	}
 	if (!octx->stateless && expr->expiration) {
 		nft_print(octx, " expires ");
-		time_print(expr->expiration / 1000, octx);
+		time_print(expr->expiration, octx);
 	}
 	if (expr->comment)
 		nft_print(octx, " comment \"%s\"", expr->comment);

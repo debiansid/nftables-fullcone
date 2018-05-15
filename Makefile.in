@@ -384,6 +384,7 @@ with_libxtables = @with_libxtables@
 ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = src	\
 		include	\
+		files	\
 		doc
 
 EXTRA_DIST = tests	\

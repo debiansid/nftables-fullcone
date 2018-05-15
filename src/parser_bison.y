@@ -181,7 +181,6 @@ int nft_lex(void *, void *, void *);
 %token DASH			"-"
 %token AT			"@"
 %token VMAP			"vmap"
-%token LOOKUP			"lookup"
 
 %token INCLUDE			"include"
 %token DEFINE			"define"
@@ -486,6 +485,7 @@ int nft_lex(void *, void *, void *);
 %token SEED			"seed"
 
 %token POSITION			"position"
+%token INDEX			"index"
 %token COMMENT			"comment"
 
 %token XML			"xml"
@@ -513,8 +513,8 @@ int nft_lex(void *, void *, void *);
 %type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
 %destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
 
-%type <handle>			table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
-%destructor { handle_free(&$$); } table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
+%type <handle>			table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec index_spec
+%destructor { handle_free(&$$); } table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec index_spec
 %type <handle>			set_spec setid_spec set_identifier flowtable_identifier obj_spec objid_spec obj_identifier
 %destructor { handle_free(&$$); } set_spec setid_spec set_identifier obj_spec objid_spec obj_identifier
 %type <val>			family_spec family_spec_explicit chain_policy prio_spec
@@ -1497,12 +1497,12 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	set_block	TIMEOUT		time_spec	stmt_separator
 			{
-				$1->timeout = $3 * 1000;
+				$1->timeout = $3;
 				$$ = $1;
 			}
 			|	set_block	GC_INTERVAL	time_spec	stmt_separator
 			{
-				$1->gc_int = $3 * 1000;
+				$1->gc_int = $3;
 				$$ = $1;
 			}
 			|	set_block	ELEMENTS	'='		set_block_expr
@@ -1545,7 +1545,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	stmt_separator
 			|	map_block	TIMEOUT		time_spec	stmt_separator
 			{
-				$1->timeout = $3 * 1000;
+				$1->timeout = $3;
 				$$ = $1;
 			}
 			|	map_block	TYPE
@@ -1845,7 +1845,8 @@ table_spec		:	family_spec	identifier
 			{
 				memset(&$$, 0, sizeof($$));
 				$$.family	= $1;
-				$$.table	= $2;
+				$$.table.location = @2;
+				$$.table.name	= $2;
 			}
 			;
 
@@ -1861,7 +1862,8 @@ tableid_spec 		: 	family_spec 	HANDLE NUM
 chain_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.chain	= $2;
+				$$.chain.name	= $2;
+				$$.chain.location = @2;
 			}
 			;
 
@@ -1876,14 +1878,16 @@ chainid_spec 		: 	table_spec 	HANDLE NUM
 chain_identifier	:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.chain	= $1;
+				$$.chain.name		= $1;
+				$$.chain.location	= @1;
 			}
 			;
 
 set_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.set		= $2;
+				$$.set.name	= $2;
+				$$.set.location	= @2;
 			}
 			;
 
@@ -1898,7 +1902,8 @@ setid_spec 		: 	table_spec 	HANDLE NUM
 set_identifier		:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.set		= $1;
+				$$.set.name	= $1;
+				$$.set.location	= @1;
 			}
 			;
 
@@ -1920,7 +1925,8 @@ flowtable_identifier	:	identifier
 obj_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.obj		= $2;
+				$$.obj.name	= $2;
+				$$.obj.location	= @2;
 			}
 			;
 
@@ -1935,7 +1941,8 @@ objid_spec		:	table_spec	HANDLE NUM
 obj_identifier		:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.obj		= $1;
+				$$.obj.name		= $1;
+				$$.obj.location		= @1;
 			}
 			;
 
@@ -1955,11 +1962,32 @@ position_spec		:	POSITION	NUM
 			}
 			;
 
+index_spec		:	INDEX		NUM
+			{
+				memset(&$$, 0, sizeof($$));
+				$$.index.location	= @$;
+				$$.index.id		= $2 + 1;
+			}
+			;
+
 rule_position		:	chain_spec
 			{
 				$$ = $1;
 			}
 			|	chain_spec	position_spec
+			{
+				handle_merge(&$1, &$2);
+				$$ = $1;
+			}
+			|	chain_spec	handle_spec
+			{
+				$2.position.location = $2.handle.location;
+				$2.position.id = $2.handle.id;
+				$2.handle.id = 0;
+				handle_merge(&$1, &$2);
+				$$ = $1;
+			}
+			|	chain_spec	index_spec
 			{
 				handle_merge(&$1, &$2);
 				$$ = $1;
@@ -2761,8 +2789,18 @@ meter_stmt_alloc	:	METER	identifier		'{' meter_key_expr stmt '}'
 			{
 				$$ = meter_stmt_alloc(&@$);
 				$$->meter.name = $2;
+				$$->meter.size = 0xffff;
 				$$->meter.key  = $4;
 				$$->meter.stmt = $5;
+				$$->location  = @$;
+			}
+			|	METER	identifier	SIZE	NUM	'{' meter_key_expr stmt '}'
+			{
+				$$ = meter_stmt_alloc(&@$);
+				$$->meter.name = $2;
+				$$->meter.size = $4;
+				$$->meter.key  = $6;
+				$$->meter.stmt = $7;
 				$$->location  = @$;
 			}
 			;
@@ -3036,7 +3074,7 @@ set_elem_options	:	set_elem_option
 
 set_elem_option		:	TIMEOUT			time_spec
 			{
-				$<expr>0->timeout = $2 * 1000;
+				$<expr>0->timeout = $2;
 			}
 			|	comment_spec
 			{
@@ -3436,6 +3474,7 @@ meta_expr		:	META	meta_key
 
 				$$ = meta_expr_alloc(&@$, key);
 			}
+			;
 
 meta_key		:	meta_key_qualified
 			|	meta_key_unqualified

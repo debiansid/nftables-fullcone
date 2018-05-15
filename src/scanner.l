@@ -118,7 +118,7 @@ asteriskstring	({string}\*|{string}\\\*)
 comment		#.*$
 slash		\/
 
-timestring	([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?
+timestring	([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?
 
 hex4		([[:xdigit:]]{1,4})
 v680		(({hex4}:){7}{hex4})
@@ -158,10 +158,11 @@ v632		((({hex4}:){2})((:{hex4}){1}))
 v633		((({hex4}:){3})(:))
 v63		({v630}|{v631}|{v632}|{v633})
 v620		((:)((:{hex4}){2}))
+v620_rfc4291	((:)(:{ip4addr}))
 v621		((({hex4}:){1})((:{hex4}){1}))
 v622		((({hex4}:){2})(:))
 v62_rfc4291	((:)(:[fF]{4})(:{ip4addr}))
-v62		({v620}|{v621}|{v622}|{v62_rfc4291})
+v62		({v620}|{v621}|{v622}|{v62_rfc4291}|{v620_rfc4291})
 v610		((:)(:{hex4}{1}))
 v611		((({hex4}:){1})(:))
 v61		({v610}|{v611})
@@ -284,6 +285,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "monitor"		{ return MONITOR; }
 
 "position"		{ return POSITION; }
+"index"			{ return INDEX; }
 "comment"		{ return COMMENT; }
 
 "constant"		{ return CONSTANT; }

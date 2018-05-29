@@ -41,6 +41,7 @@ Description: Program to control packet filtering rules by Netfilter project
 Package: libnftables-dev
 Section: libdevel
 Architecture: linux-any
+Multi-Arch: same
 Depends: libnftables0 (=${binary:Version}), ${misc:Depends}
 Description: Development files for libnftables
  This library provides high level semantics to interact with the nftables
@@ -59,6 +60,7 @@ Description: Development files for libnftables
 Package: libnftables0
 Section: libs
 Architecture: linux-any
+Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Netfilter nftables high level userspace API library
  This library provides high level semantics to interact with the nftables

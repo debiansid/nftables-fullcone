@@ -1712,6 +1712,13 @@ static int expr_evaluate_meta(struct eval_ctx *ctx, struct expr **exprp)
 	return expr_evaluate_primary(ctx, exprp);
 }
 
+static int expr_evaluate_socket(struct eval_ctx *ctx, struct expr **expr)
+{
+	__expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->byteorder,
+			   (*expr)->len, 1);
+	return 0;
+}
+
 static int expr_evaluate_variable(struct eval_ctx *ctx, struct expr **exprp)
 {
 	struct expr *new = expr_clone((*exprp)->sym->expr);
@@ -1749,6 +1756,8 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 		return expr_evaluate_primary(ctx, expr);
 	case EXPR_META:
 		return expr_evaluate_meta(ctx, expr);
+	case EXPR_SOCKET:
+		return expr_evaluate_socket(ctx, expr);
 	case EXPR_FIB:
 		return expr_evaluate_fib(ctx, expr);
 	case EXPR_PAYLOAD:
@@ -2402,8 +2411,8 @@ static int stmt_evaluate_reject(struct eval_ctx *ctx, struct stmt *stmt)
 static int nat_evaluate_family(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	switch (ctx->pctx.family) {
-	case AF_INET:
-	case AF_INET6:
+	case NFPROTO_IPV4:
+	case NFPROTO_IPV6:
 		return 0;
 	default:
 		return stmt_error(ctx, stmt,
@@ -2418,7 +2427,7 @@ static int evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 	const struct datatype *dtype;
 	unsigned int len;
 
-	if (pctx->family == AF_INET) {
+	if (pctx->family == NFPROTO_IPV4) {
 		dtype = &ipaddr_type;
 		len   = 4 * BITS_PER_BYTE;
 	} else {
@@ -2512,19 +2521,40 @@ static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_fwd(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	int err;
+	const struct datatype *dtype;
+	int err, len;
 
 	switch (ctx->pctx.family) {
 	case NFPROTO_NETDEV:
-		if (stmt->fwd.to == NULL)
+		if (stmt->fwd.dev == NULL)
 			return stmt_error(ctx, stmt,
 					  "missing destination interface");
 
 		err = stmt_evaluate_arg(ctx, stmt, &ifindex_type,
 					sizeof(uint32_t) * BITS_PER_BYTE,
-					BYTEORDER_HOST_ENDIAN, &stmt->fwd.to);
+					BYTEORDER_HOST_ENDIAN, &stmt->fwd.dev);
 		if (err < 0)
 			return err;
+
+		if (stmt->fwd.addr != NULL) {
+			switch (stmt->fwd.family) {
+			case NFPROTO_IPV4:
+				dtype = &ipaddr_type;
+				len   = 4 * BITS_PER_BYTE;
+				break;
+			case NFPROTO_IPV6:
+				dtype = &ip6addr_type;
+				len   = 16 * BITS_PER_BYTE;
+				break;
+			default:
+				return stmt_error(ctx, stmt, "missing family");
+			}
+			err = stmt_evaluate_arg(ctx, stmt, dtype, len,
+						BYTEORDER_BIG_ENDIAN,
+						&stmt->fwd.addr);
+			if (err < 0)
+				return err;
+		}
 		break;
 	default:
 		return stmt_error(ctx, stmt, "unsupported family");
@@ -2562,6 +2592,10 @@ static int stmt_evaluate_log(struct eval_ctx *ctx, struct stmt *stmt)
 			return stmt_error(ctx, stmt,
 				  "flags and group are mutually exclusive");
 	}
+	if (stmt->log.level == LOGLEVEL_AUDIT &&
+	    (stmt->log.flags & ~STMT_LOG_LEVEL || stmt->log.logflags))
+		return stmt_error(ctx, stmt,
+				  "log level audit doesn't support any further options");
 	return 0;
 }
 
@@ -2699,6 +2733,7 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 
 	switch (stmt->ops->type) {
+	case STMT_CONNLIMIT:
 	case STMT_COUNTER:
 	case STMT_LIMIT:
 	case STMT_QUOTA:
@@ -2797,6 +2832,10 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 					 "specified in %s definition",
 					 set->key->dtype->name, type);
 	}
+	if (set->flags & NFT_SET_INTERVAL &&
+	    set->key->ops->type == EXPR_CONCAT)
+		return set_error(ctx, set, "concatenated types not supported in interval sets");
+
 	if (set->flags & NFT_SET_MAP) {
 		if (set->datatype == NULL)
 			return set_error(ctx, set, "map definition does not "
@@ -2888,7 +2927,7 @@ static int rule_translate_index(struct eval_ctx *ctx, struct rule *rule)
 	if (!rule->handle.position.id)
 		return cmd_error(ctx, &rule->handle.index.location,
 				"Could not process rule: %s",
-				strerror(EINVAL));
+				strerror(ENOENT));
 	return 0;
 }
 
@@ -3309,7 +3348,8 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_RULESET:
-		cache_flush(&ctx->cache->list);
+		cache_flush(ctx->nf_sock, ctx->cache, cmd->op, ctx->msgs,
+			    ctx->debug_mask, ctx->octx);
 		break;
 	case CMD_OBJ_TABLE:
 		/* Flushing a table does not empty the sets in the table nor remove

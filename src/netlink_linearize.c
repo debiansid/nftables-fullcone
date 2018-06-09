@@ -207,6 +207,18 @@ static void netlink_gen_rt(struct netlink_linearize_ctx *ctx,
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_socket(struct netlink_linearize_ctx *ctx,
+			     const struct expr *expr,
+			     enum nft_registers dreg)
+{
+	struct nftnl_expr *nle;
+
+	nle = alloc_nft_expr("socket");
+	netlink_put_register(nle, NFTNL_EXPR_SOCKET_DREG, dreg);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_SOCKET_KEY, expr->socket.key);
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_numgen(struct netlink_linearize_ctx *ctx,
 			    const struct expr *expr,
 			    enum nft_registers dreg)
@@ -694,6 +706,8 @@ static void netlink_gen_expr(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_hash(ctx, expr, dreg);
 	case EXPR_FIB:
 		return netlink_gen_fib(ctx, expr, dreg);
+	case EXPR_SOCKET:
+		return netlink_gen_socket(ctx, expr, dreg);
 	default:
 		BUG("unknown expression type %s\n", expr->ops->name);
 	}
@@ -731,6 +745,21 @@ static void netlink_gen_objref_stmt(struct netlink_linearize_ctx *ctx,
 		BUG("unsupported expression %u\n", expr->ops->type);
 	}
 	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
+static struct nftnl_expr *
+netlink_gen_connlimit_stmt(struct netlink_linearize_ctx *ctx,
+			   const struct stmt *stmt)
+{
+	struct nftnl_expr *nle;
+
+	nle = alloc_nft_expr("connlimit");
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_CONNLIMIT_COUNT,
+			   stmt->connlimit.count);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_CONNLIMIT_FLAGS,
+			   stmt->connlimit.flags);
+
+	return nle;
 }
 
 static struct nftnl_expr *
@@ -789,6 +818,8 @@ netlink_gen_stmt_stateful(struct netlink_linearize_ctx *ctx,
 			  const struct stmt *stmt)
 {
 	switch (stmt->ops->type) {
+	case STMT_CONNLIMIT:
+		return netlink_gen_connlimit_stmt(ctx, stmt);
 	case STMT_COUNTER:
 		return netlink_gen_counter_stmt(ctx, stmt);
 	case STMT_LIMIT:
@@ -1074,15 +1105,26 @@ static void netlink_gen_dup_stmt(struct netlink_linearize_ctx *ctx,
 static void netlink_gen_fwd_stmt(struct netlink_linearize_ctx *ctx,
 				 const struct stmt *stmt)
 {
-	enum nft_registers sreg1;
+	enum nft_registers sreg1, sreg2;
 	struct nftnl_expr *nle;
 
 	nle = alloc_nft_expr("fwd");
 
-	sreg1 = get_register(ctx, stmt->fwd.to);
-	netlink_gen_expr(ctx, stmt->fwd.to, sreg1);
+	sreg1 = get_register(ctx, stmt->fwd.dev);
+	netlink_gen_expr(ctx, stmt->fwd.dev, sreg1);
 	netlink_put_register(nle, NFTNL_EXPR_FWD_SREG_DEV, sreg1);
-	release_register(ctx, stmt->fwd.to);
+
+	if (stmt->fwd.addr != NULL) {
+		sreg2 = get_register(ctx, stmt->fwd.addr);
+		netlink_gen_expr(ctx, stmt->fwd.addr, sreg2);
+		netlink_put_register(nle, NFTNL_EXPR_FWD_SREG_ADDR, sreg2);
+		release_register(ctx, stmt->fwd.addr);
+	}
+	release_register(ctx, stmt->fwd.dev);
+
+	if (stmt->fwd.family)
+		nftnl_expr_set_u32(nle, NFTNL_EXPR_FWD_NFPROTO,
+				   stmt->fwd.family);
 
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
@@ -1269,6 +1311,7 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_set_stmt(ctx, stmt);
 	case STMT_FWD:
 		return netlink_gen_fwd_stmt(ctx, stmt);
+	case STMT_CONNLIMIT:
 	case STMT_COUNTER:
 	case STMT_LIMIT:
 	case STMT_QUOTA:

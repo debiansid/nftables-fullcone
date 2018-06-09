@@ -322,6 +322,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 with_cli = @with_cli@
 with_debug = @with_debug@
+with_json = @with_json@
 with_libxtables = @with_libxtables@
 SUBDIRS = linux		\
 			nftables
@@ -331,6 +332,7 @@ noinst_HEADERS = cli.h		\
 			expression.h	\
 			fib.h		\
 			hash.h		\
+			json.h		\
 			mini-gmp.h	\
 			gmputil.h	\
 			iface.h		\
@@ -350,6 +352,7 @@ noinst_HEADERS = cli.h		\
 			netlink.h	\
 			parser.h	\
 			proto.h		\
+			socket.h	\
 			rule.h		\
 			rt.h		\
 			utils.h		\

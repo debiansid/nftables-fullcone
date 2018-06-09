@@ -21,6 +21,7 @@ struct output_ctx {
 	unsigned int ip2name;
 	unsigned int handle;
 	unsigned int echo;
+	unsigned int json;
 	union {
 		FILE *output_fp;
 		struct cookie output_cookie;
@@ -38,6 +39,7 @@ struct nft_cache {
 };
 
 struct mnl_socket;
+struct parser_state;
 
 struct nft_ctx {
 	struct mnl_socket	*nf_sock;
@@ -49,6 +51,8 @@ struct nft_ctx {
 	bool			check;
 	struct nft_cache	cache;
 	uint32_t		flags;
+	struct parser_state	*state;
+	void			*scanner;
 };
 
 enum nftables_exit_codes {

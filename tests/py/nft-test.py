@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # (C) 2014 by Ana Rey Botello <anarey@gmail.com>
 #
@@ -17,6 +17,7 @@ import sys
 import os
 import argparse
 import signal
+import json
 
 TESTS_PATH = os.path.dirname(os.path.abspath(__file__))
 TESTS_DIRECTORY = ["any", "arp", "bridge", "inet", "ip", "ip6"]
@@ -103,35 +104,70 @@ class Obj:
         return self.__dict__ == other.__dict__
 
 
-def print_msg(reason, filename=None, lineno=None, color=None, errstr=None):
+def print_msg(reason, errstr, filename=None, lineno=None, color=None):
     '''
     Prints a message with nice colors, indicating file and line number.
     '''
     if filename and lineno:
-        print filename + ": " + color + "ERROR:" + Colors.ENDC + \
-              " line %d: %s" % (lineno + 1, reason)
+        sys.stderr.write(filename + ": " + color + errstr + Colors.ENDC + \
+              " line %d: %s" % (lineno + 1, reason))
     else:
-        print color + "ERROR:" + Colors.ENDC + " %s" % reason
+        sys.stderr.write(color + errstr + Colors.ENDC + " %s" % reason)
+    sys.stderr.write("\n")
+    sys.stderr.flush() # So that the message stay in the right place.
 
 
 def print_error(reason, filename=None, lineno=None):
-    print_msg(reason, filename, lineno, Colors.RED, "ERROR:")
+    print_msg(reason, "ERROR:", filename, lineno, Colors.RED)
 
 
 def print_warning(reason, filename=None, lineno=None):
-    print_msg(reason, filename, lineno, Colors.YELLOW, "WARNING:")
+    print_msg(reason, "WARNING:", filename, lineno, Colors.YELLOW)
 
+def print_info(reason, filename=None, lineno=None):
+    print_msg(reason, "INFO:", filename, lineno, Colors.GREEN)
+
+def color_differences(rule, other, color):
+    rlen = len(rule)
+    olen = len(other)
+
+    # find equal part at start
+    for i in range(rlen):
+        if i >= olen or rule[i] != other[i]:
+            break
+    start_idx = i
+
+    # find equal part at end
+    found = False
+    for i in range(-1, start_idx -rlen - 1, -1):
+        if i < start_idx -olen:
+            break
+        if rule[i] != other[i]:
+            found = True
+            break
+    end_idx = i
+    if found:
+        end_idx += 1
+
+    out = ""
+    if start_idx > 0:
+        out += rule[:start_idx]
+    out += color + rule[start_idx:end_idx] + Colors.ENDC
+    if end_idx < 0:
+        out += rule[end_idx:]
+
+    return out
 
 def print_differences_warning(filename, lineno, rule1, rule2, cmd):
-    reason = "'" + rule1 + "' mismatches '" + rule2 + "'"
-    print filename + ": " + Colors.YELLOW + "WARNING: " + Colors.ENDC + \
-          "line: " + str(lineno + 1) + ": '" + cmd + "': " + reason
+    colored_rule1 = color_differences(rule1, rule2, Colors.YELLOW)
+    colored_rule2 = color_differences(rule2, rule1, Colors.YELLOW)
+    reason = "'%s': '%s' mismatches '%s'" % (cmd, colored_rule1, colored_rule2)
+    print_warning(reason, filename, lineno)
 
 
 def print_differences_error(filename, lineno, cmd):
-    reason = "Listing is broken."
-    print filename + ": " + Colors.RED + "ERROR: " + Colors.ENDC + "line: " + \
-          str(lineno + 1) + ": '" + cmd + "': " + reason
+    reason = "'%s': Listing is broken." % cmd
+    print_error(reason, filename, lineno)
 
 
 def table_exist(table, filename, lineno):
@@ -636,6 +672,16 @@ def payload_check(payload_buffer, file, cmd):
     return i > 0
 
 
+def json_dump_normalize(json_string, human_readable = False):
+    json_obj = json.loads(json_string)
+
+    if human_readable:
+        return json.dumps(json_obj, sort_keys = True,
+                          indent = 4, separators = (',', ': '))
+    else:
+        return json.dumps(json_obj, sort_keys = True)
+
+
 def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
     '''
     Adds a rule
@@ -648,23 +694,58 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
         print_error(reason, filename, lineno)
         return [-1, warning, error, unit_tests]
 
-    payload_expected = []
+    if rule[1].strip() == "ok":
+        try:
+            payload_log = open("%s.payload" % filename_path)
+            payload_expected = payload_find_expected(payload_log, rule[0])
+        except:
+            payload_expected = None
+
+        if enable_json_option:
+            try:
+                json_log = open("%s.json" % filename_path)
+                json_input = json_find_expected(json_log, rule[0])
+            except:
+                json_input = None
+
+            if not json_input:
+                print_error("did not find JSON equivalent for rule '%s'"
+                            % rule[0])
+            else:
+                try:
+                    json_input = json_dump_normalize(json_input)
+                except ValueError:
+                    reason = "Invalid JSON syntax in rule: %s" % json_input
+                    print_error(reason)
+                    return [-1, warning, error, unit_tests]
+
+            try:
+                json_log = open("%s.json.output" % filename_path)
+                json_expected = json_find_expected(json_log, rule[0])
+            except:
+                # will use json_input for comparison
+                json_expected = None
+
+            if json_expected:
+                try:
+                    json_expected = json_dump_normalize(json_expected)
+                except ValueError:
+                    reason = "Invalid JSON syntax in expected output: %s" % json_expected
+                    print_error(reason)
+                    return [-1, warning, error, unit_tests]
 
     for table in table_list:
-        try:
-            payload_log = open("%s.payload.%s" % (filename_path, table.family))
-        except IOError:
-            payload_log = open("%s.payload" % filename_path)
-
         if rule[1].strip() == "ok":
+            table_payload_expected = None
             try:
-                payload_expected.index(rule[0])
-            except ValueError:
-                payload_expected = payload_find_expected(payload_log, rule[0])
-
+                payload_log = open("%s.payload.%s" % (filename_path, table.family))
+                table_payload_expected = payload_find_expected(payload_log, rule[0])
+            except:
                 if not payload_expected:
                     print_error("did not find payload information for "
                                 "rule '%s'" % rule[0], payload_log.name, 1)
+            if not table_payload_expected:
+                table_payload_expected = payload_expected
 
         for table_chain in table.chains:
             chain = chain_get_by_name(table_chain)
@@ -673,6 +754,7 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
 
             payload_log = os.tmpfile()
 
+            # Add rule and check return code
             cmd = "add rule %s %s %s" % (table, chain, rule[0])
             ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
 
@@ -693,75 +775,168 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                 ret = 0
                 continue
 
-            if ret == 0:
-                # Check for matching payload
-                if state == "ok" and not payload_check(payload_expected,
-                                                       payload_log, cmd):
-                    error += 1
-                    gotf = open("%s.payload.got" % filename_path, 'a')
-                    payload_log.seek(0, 0)
-                    gotf.write("# %s\n" % rule[0])
-                    while True:
-                        line = payload_log.readline()
-                        if line == "":
-                            break
-                        gotf.write(line)
-                    gotf.close()
-                    print_warning("Wrote payload for rule %s" % rule[0],
-                                  gotf.name, 1)
+            if ret != 0:
+                continue
 
-                # Check output of nft
-                numeric_old = nftables.set_numeric_output("all")
-                stateless_old = nftables.set_stateless_output(True)
-                list_cmd = 'list table %s' % table
-                rc, pre_output, err = nftables.cmd(list_cmd)
-                nftables.set_numeric_output(numeric_old)
-                nftables.set_stateless_output(stateless_old)
+            # Check for matching payload
+            if state == "ok" and not payload_check(table_payload_expected,
+                                                   payload_log, cmd):
+                error += 1
+                gotf = open("%s.payload.got" % filename_path, 'a')
+                payload_log.seek(0, 0)
+                gotf.write("# %s\n" % rule[0])
+                while True:
+                    line = payload_log.readline()
+                    if line == "":
+                        break
+                    gotf.write(line)
+                gotf.close()
+                print_warning("Wrote payload for rule %s" % rule[0],
+                              gotf.name, 1)
 
-                output = pre_output.split(";")
-                if len(output) < 2:
-                    reason = cmd + ": Listing is broken."
-                    print_error(reason, filename, lineno)
-                    ret = -1
-                    error += 1
+            # Check for matching ruleset listing
+            numeric_old = nftables.set_numeric_output("all")
+            stateless_old = nftables.set_stateless_output(True)
+            list_cmd = 'list table %s' % table
+            rc, pre_output, err = nftables.cmd(list_cmd)
+            nftables.set_numeric_output(numeric_old)
+            nftables.set_stateless_output(stateless_old)
+
+            output = pre_output.split(";")
+            if len(output) < 2:
+                reason = cmd + ": Listing is broken."
+                print_error(reason, filename, lineno)
+                ret = -1
+                error += 1
+                if not force_all_family_option:
+                    return [ret, warning, error, unit_tests]
+                continue
+
+            rule_output = output_clean(pre_output, chain)
+            if len(rule) == 3:
+                teoric_exit = rule[2]
+            else:
+                teoric_exit = rule[0]
+
+            if rule_output.rstrip() != teoric_exit.rstrip():
+                if rule[0].find("{") != -1:  # anonymous sets
+                    if set_check_element(teoric_exit.rstrip(),
+                                         rule_output.rstrip()) != 0:
+                        warning += 1
+                        print_differences_warning(filename, lineno,
+                                                  teoric_exit.rstrip(),
+                                                  rule_output, cmd)
+                        if not force_all_family_option:
+                            return [ret, warning, error, unit_tests]
+                else:
+                    if len(rule_output) <= 0:
+                        error += 1
+                        print_differences_error(filename, lineno, cmd)
+                        if not force_all_family_option:
+                            return [ret, warning, error, unit_tests]
+
+                    warning += 1
+                    print_differences_warning(filename, lineno,
+                                              teoric_exit.rstrip(),
+                                              rule_output, cmd)
+
                     if not force_all_family_option:
                         return [ret, warning, error, unit_tests]
-                else:
-                    rule_output = output_clean(pre_output, chain)
-                    if len(rule) == 3:
-                        teoric_exit = rule[2]
-                    else:
-                        teoric_exit = rule[0]
 
-                    if rule_output.rstrip() != teoric_exit.rstrip():
-                        if rule[0].find("{") != -1:  # anonymous sets
-                            if set_check_element(teoric_exit.rstrip(), rule_output.rstrip()) != 0:
-                                warning += 1
-                                print_differences_warning(filename, lineno,
-                                                          teoric_exit.rstrip(),
-                                                          rule_output, cmd)
-                                if not force_all_family_option:
-                                    return [ret, warning, error, unit_tests]
-                        else:
-                            if len(rule_output) <= 0:
-                                error += 1
-                                print_differences_error(filename, lineno, cmd)
-                                if not force_all_family_option:
-                                    return [ret, warning, error, unit_tests]
+            if not enable_json_option:
+                continue
 
-                            warning += 1
-                            print_differences_warning(filename, lineno,
-                                                      teoric_exit.rstrip(),
-                                                      rule_output, cmd)
+            # Generate JSON equivalent for rule if not found
+            if not json_input:
+                json_old = nftables.set_json_output(True)
+                rc, json_output, err = nftables.cmd(list_cmd)
+                nftables.set_json_output(json_old)
 
-                            if not force_all_family_option:
-                                return [ret, warning, error, unit_tests]
+                json_output = json.loads(json_output)
+                for item in json_output["nftables"]:
+                    if "rule" in item:
+                        del(item["rule"]["handle"])
+                        json_output = item["rule"]
+                        break
+                json_input = json.dumps(json_output["expr"], sort_keys = True)
+
+                gotf = open("%s.json.got" % filename_path, 'a')
+                jdump = json_dump_normalize(json_input, True)
+                gotf.write("# %s\n%s\n\n" % (rule[0], jdump))
+                gotf.close()
+                print_warning("Wrote JSON equivalent for rule %s" % rule[0],
+                              gotf.name, 1)
+
+            table_flush(table, filename, lineno)
+            payload_log = os.tmpfile()
+
+            # Add rule in JSON format
+            cmd = json.dumps({ "nftables": [{ "add": { "rule": {
+                    "family": table.family,
+                    "table": table.name,
+                    "chain": chain.name,
+                    "expr": json.loads(json_input),
+            }}}]})
+
+            json_old = nftables.set_json_output(True)
+            ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
+            nftables.set_json_output(json_old)
+
+            if ret != 0:
+                reason = "Failed to add JSON equivalent rule"
+                print_error(reason, filename, lineno)
+                continue
+
+            # Check for matching payload
+            if not payload_check(table_payload_expected, payload_log, cmd):
+                error += 1
+                gotf = open("%s.json.payload.got" % filename_path, 'a')
+                payload_log.seek(0, 0)
+                gotf.write("# %s\n" % rule[0])
+                while True:
+                    line = payload_log.readline()
+                    if line == "":
+                        break
+                    gotf.write(line)
+                gotf.close()
+                print_warning("Wrote JSON payload for rule %s" % rule[0],
+                              gotf.name, 1)
+
+            # Check for matching ruleset listing
+            numeric_old = nftables.set_numeric_output("all")
+            stateless_old = nftables.set_stateless_output(True)
+            json_old = nftables.set_json_output(True)
+            rc, json_output, err = nftables.cmd(list_cmd)
+            nftables.set_json_output(json_old)
+            nftables.set_numeric_output(numeric_old)
+            nftables.set_stateless_output(stateless_old)
+
+            json_output = json.loads(json_output)
+            for item in json_output["nftables"]:
+                if "rule" in item:
+                    del(item["rule"]["handle"])
+                    json_output = item["rule"]
+                    break
+            json_output = json.dumps(json_output["expr"], sort_keys = True)
+
+            if not json_expected and json_output != json_input:
+                print_differences_warning(filename, lineno,
+                                          json_input, json_output, cmd)
+                error += 1
+                gotf = open("%s.json.output.got" % filename_path, 'a')
+                jdump = json_dump_normalize(json_output, True)
+                gotf.write("# %s\n%s\n\n" % (rule[0], jdump))
+                gotf.close()
+                print_warning("Wrote JSON output for rule %s" % rule[0],
+                              gotf.name, 1)
+                # prevent further warnings and .got file updates
+                json_expected = json_output
+            elif json_expected and json_output != json_expected:
+                print_differences_warning(filename, lineno,
+                                          json_expected, json_output, cmd)
+                error += 1
 
     return [ret, warning, error, unit_tests]
-
-
-def preexec():
-    os.setpgrp()  # Don't forward signals.
 
 
 def cleanup_on_exit():
@@ -947,6 +1122,37 @@ def payload_find_expected(payload_log, rule):
     return payload_buffer
 
 
+def json_find_expected(json_log, rule):
+    '''
+    Find the corresponding JSON for given rule
+
+    :param json_log: open file handle of the json data
+    :param rule: nft rule we are going to add
+    '''
+    found = 0
+    json_buffer = ""
+
+    while True:
+        line = json_log.readline()
+        if not line:
+            break
+
+        if line[0] == "#":  # rule start
+            rule_line = line.strip()[2:]
+
+            if rule_line == rule.strip():
+                found = 1
+                continue
+
+        if found == 1:
+            json_buffer += line.rstrip("\n").strip()
+            if line.isspace():
+                return json_buffer
+
+    json_log.seek(0, 0)
+    return json_buffer
+
+
 def run_test_file(filename, force_all_family_option, specific_file):
     '''
     Runs a test file
@@ -1100,11 +1306,16 @@ def main():
                         dest='force_all_family',
                         help='keep testing all families on error')
 
+    parser.add_argument('-j', '--enable-json', action='store_true',
+                        dest='enable_json',
+                        help='test JSON functionality as well')
+
     args = parser.parse_args()
-    global debug_option, need_fix_option
+    global debug_option, need_fix_option, enable_json_option
     debug_option = args.debug
     need_fix_option = args.need_fix_line
     force_all_family_option = args.force_all_family
+    enable_json_option = args.enable_json
     specific_file = False
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -1133,8 +1344,9 @@ def main():
     global log_file
     try:
         log_file = open(LOGFILE, 'w')
+        print_info("Log will be available at %s" % LOGFILE)
     except IOError:
-        print "Cannot open log file %s" % LOGFILE
+        print_error("Cannot open log file %s" % LOGFILE)
         return
 
     file_list = []

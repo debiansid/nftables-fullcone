@@ -9,6 +9,7 @@
 #include <datatype.h>
 #include <utils.h>
 #include <list.h>
+#include <json.h>
 
 /**
  * enum expr_types
@@ -23,6 +24,7 @@
  * @EXPR_PAYLOAD:	payload expression
  * @EXPR_EXTHDR:	exthdr expression
  * @EXPR_META:		meta expression
+ * @EXPR_SOCKET:	socket expression
  * @EXPR_CT:		conntrack expression
  * @EXPR_CONCAT:	concatenation
  * @EXPR_LIST:		list of expressions
@@ -49,6 +51,7 @@ enum expr_types {
 	EXPR_PAYLOAD,
 	EXPR_EXTHDR,
 	EXPR_META,
+	EXPR_SOCKET,
 	EXPR_CT,
 	EXPR_CONCAT,
 	EXPR_LIST,
@@ -154,6 +157,8 @@ struct expr_ops {
 					    enum byteorder byteorder);
 	void			(*print)(const struct expr *expr,
 					 struct output_ctx *octx);
+	json_t			*(*json)(const struct expr *expr,
+					 struct output_ctx *octx);
 	bool			(*cmp)(const struct expr *e1,
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
@@ -185,6 +190,7 @@ enum expr_flags {
 #include <rt.h>
 #include <hash.h>
 #include <ct.h>
+#include <socket.h>
 
 /**
  * struct expr
@@ -294,6 +300,10 @@ struct expr {
 			enum proto_bases	base;
 		} meta;
 		struct {
+			/* SOCKET */
+			enum nft_socket_keys	key;
+		} socket;
+		struct {
 			/* EXPR_RT */
 			enum nft_rt_keys	key;
 		} rt;
@@ -365,6 +375,8 @@ extern struct expr *unary_expr_alloc(const struct location *loc,
 
 extern struct expr *binop_expr_alloc(const struct location *loc, enum ops op,
 				     struct expr *left, struct expr *right);
+
+extern bool must_print_eq_op(const struct expr *expr);
 
 extern struct expr *relational_expr_alloc(const struct location *loc, enum ops op,
 					  struct expr *left, struct expr *right);

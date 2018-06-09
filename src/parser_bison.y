@@ -189,6 +189,9 @@ int nft_lex(void *, void *, void *);
 
 %token FIB			"fib"
 
+%token SOCKET			"socket"
+%token TRANSPARENT		"transparent"
+
 %token HOOK			"hook"
 %token DEVICE			"device"
 %token DEVICES			"devices"
@@ -560,8 +563,8 @@ int nft_lex(void *, void *, void *);
 %type <stmt>			log_stmt log_stmt_alloc
 %destructor { stmt_free($$); }	log_stmt log_stmt_alloc
 %type <val>			level_type log_flags log_flags_tcp log_flag_tcp
-%type <stmt>			limit_stmt quota_stmt
-%destructor { stmt_free($$); }	limit_stmt quota_stmt
+%type <stmt>			limit_stmt quota_stmt connlimit_stmt
+%destructor { stmt_free($$); }	limit_stmt quota_stmt connlimit_stmt
 %type <val>			limit_burst limit_mode time_unit quota_mode
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
@@ -594,16 +597,16 @@ int nft_lex(void *, void *, void *);
 
 %type <expr>			multiton_rhs_expr
 %destructor { expr_free($$); }	multiton_rhs_expr
-%type <expr>			prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
-%destructor { expr_free($$); }	prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
+%type <expr>			prefix_rhs_expr range_rhs_expr
+%destructor { expr_free($$); }	prefix_rhs_expr range_rhs_expr
 
 %type <expr>			stmt_expr concat_stmt_expr map_stmt_expr map_stmt_expr_set
 %destructor { expr_free($$); }	stmt_expr concat_stmt_expr map_stmt_expr map_stmt_expr_set
 
 %type <expr>			multiton_stmt_expr
 %destructor { expr_free($$); }	multiton_stmt_expr
-%type <expr>			prefix_stmt_expr range_stmt_expr wildcard_stmt_expr
-%destructor { expr_free($$); }	prefix_stmt_expr range_stmt_expr wildcard_stmt_expr
+%type <expr>			prefix_stmt_expr range_stmt_expr wildcard_expr
+%destructor { expr_free($$); }	prefix_stmt_expr range_stmt_expr wildcard_expr
 
 %type <expr>			primary_stmt_expr basic_stmt_expr
 %destructor { expr_free($$); }	primary_stmt_expr basic_stmt_expr
@@ -692,11 +695,17 @@ int nft_lex(void *, void *, void *);
 %destructor { expr_free($$); }	meta_expr
 %type <val>			meta_key	meta_key_qualified	meta_key_unqualified	numgen_type
 
+%type <expr>			socket_expr
+%destructor { expr_free($$); } socket_expr
+%type<val>			socket_key
+
 %type <val>			nf_key_proto
 
 %type <expr>			rt_expr
 %destructor { expr_free($$); }	rt_expr
 %type <val>			rt_key
+
+%type <val>			fwd_key_proto
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
@@ -2062,6 +2071,7 @@ stmt_list		:	stmt
 stmt			:	verdict_stmt
 			|	match_stmt
 			|	meter_stmt
+			|	connlimit_stmt
 			|	counter_stmt
 			|	payload_stmt
 			|	meta_stmt
@@ -2126,6 +2136,19 @@ verdict_map_list_expr	:	verdict_map_list_member_expr
 verdict_map_list_member_expr:	opt_newline	set_elem_expr	COLON	verdict_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
+			}
+			;
+
+connlimit_stmt		:	CT	COUNT	NUM
+			{
+				$$ = connlimit_stmt_alloc(&@$);
+				$$->connlimit.count	= $3;
+			}
+			|	CT	COUNT	OVER	NUM
+			{
+				$$ = connlimit_stmt_alloc(&@$);
+				$$->connlimit.count = $4;
+				$$->connlimit.flags = NFT_CONNLIMIT_F_INV;
 			}
 			;
 
@@ -2227,6 +2250,8 @@ level_type		:	string
 					$$ = LOG_INFO;
 				else if (!strcmp("debug", $1))
 					$$ = LOG_DEBUG;
+				else if (!strcmp("audit", $1))
+					$$ = LOGLEVEL_AUDIT;
 				else {
 					erec_queue(error(&@1, "invalid log level"),
 						   state->msgs);
@@ -2540,7 +2565,7 @@ range_stmt_expr		:	basic_stmt_expr	DASH	basic_stmt_expr
 			}
 			;
 
-wildcard_stmt_expr	:	ASTERISK
+wildcard_expr		:	ASTERISK
 			{
 				struct expr *expr;
 
@@ -2553,7 +2578,7 @@ wildcard_stmt_expr	:	ASTERISK
 
 multiton_stmt_expr	:	prefix_stmt_expr
 			|	range_stmt_expr
-			|	wildcard_stmt_expr
+			|	wildcard_expr
 			;
 
 stmt_expr		:	map_stmt_expr
@@ -2659,10 +2684,21 @@ dup_stmt		:	DUP	TO	stmt_expr
 			}
 			;
 
-fwd_stmt		:	FWD	TO	expr
+fwd_key_proto		:	IP		{ $$ = NFPROTO_IPV4; }
+			|	IP6		{ $$ = NFPROTO_IPV6; }
+			;
+
+fwd_stmt		:	FWD	TO	stmt_expr
 			{
 				$$ = fwd_stmt_alloc(&@$);
-				$$->fwd.to = $3;
+				$$->fwd.dev = $3;
+			}
+			|	FWD	fwd_key_proto	TO	stmt_expr	DEVICE	stmt_expr
+			{
+				$$ = fwd_stmt_alloc(&@$);
+				$$->fwd.family = $2;
+				$$->fwd.addr = $4;
+				$$->fwd.dev = $6;
 			}
 			;
 
@@ -2789,7 +2825,7 @@ meter_stmt_alloc	:	METER	identifier		'{' meter_key_expr stmt '}'
 			{
 				$$ = meter_stmt_alloc(&@$);
 				$$->meter.name = $2;
-				$$->meter.size = 0xffff;
+				$$->meter.size = 0;
 				$$->meter.key  = $4;
 				$$->meter.stmt = $5;
 				$$->location  = @$;
@@ -2863,6 +2899,7 @@ primary_expr		:	symbol_expr			{ $$ = $1; }
 			|	exthdr_expr			{ $$ = $1; }
 			|	exthdr_exists_expr		{ $$ = $1; }
 			|	meta_expr			{ $$ = $1; }
+			|	socket_expr			{ $$ = $1; }
 			|	rt_expr				{ $$ = $1; }
 			|	ct_expr				{ $$ = $1; }
 			|	numgen_expr			{ $$ = $1; }
@@ -2980,20 +3017,9 @@ range_rhs_expr		:	basic_rhs_expr	DASH	basic_rhs_expr
 			}
 			;
 
-wildcard_rhs_expr	:	ASTERISK
-	       		{
-				struct expr *expr;
-
-				expr = constant_expr_alloc(&@$, &integer_type,
-							   BYTEORDER_HOST_ENDIAN,
-							   0, NULL);
-				$$ = prefix_expr_alloc(&@$, expr, 0);
-			}
-			;
-
 multiton_rhs_expr	:	prefix_rhs_expr
 			|	range_rhs_expr
-			|	wildcard_rhs_expr
+			|	wildcard_expr
 			;
 
 map_expr		:	concat_expr	MAP	rhs_expr
@@ -3538,6 +3564,15 @@ meta_stmt		:	META	meta_key	SET	stmt_expr
 			{
 				$$ = flow_offload_stmt_alloc(&@$, $4);
 			}
+			;
+
+socket_expr		:	SOCKET	socket_key
+			{
+				$$ = socket_expr_alloc(&@$, $2);
+			}
+			;
+
+socket_key 		: TRANSPARENT { $$ = NFT_SOCKET_TRANSPARENT; }
 			;
 
 offset_opt		:	/* empty */	{ $$ = 0; }

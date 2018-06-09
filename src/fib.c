@@ -52,7 +52,7 @@ const struct datatype fib_addr_type = {
 	.sym_tbl	= &addrtype_tbl,
 };
 
-static const char *fib_result_str(enum nft_fib_result result)
+const char *fib_result_str(enum nft_fib_result result)
 {
 	if (result <= NFT_FIB_RESULT_MAX)
 		return fib_result[result];
@@ -105,6 +105,7 @@ static const struct expr_ops fib_expr_ops = {
 	.type		= EXPR_FIB,
 	.name		= "fib",
 	.print		= fib_expr_print,
+	.json		= fib_expr_json,
 	.cmp		= fib_expr_cmp,
 	.clone		= fib_expr_clone,
 };

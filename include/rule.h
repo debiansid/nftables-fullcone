@@ -115,6 +115,9 @@ struct symbol *symbol_get(const struct scope *scope, const char *identifier);
 enum table_flags {
 	TABLE_F_DORMANT		= (1 << 0),
 };
+#define TABLE_FLAGS_MAX 1
+
+extern const char *table_flags_name[TABLE_FLAGS_MAX];
 
 /**
  * struct table - nftables table
@@ -201,6 +204,7 @@ extern struct chain *chain_lookup(const struct table *table,
 
 extern const char *family2str(unsigned int family);
 extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
+extern const char *chain_policy2str(uint32_t policy);
 extern void chain_print_plain(const struct chain *chain,
 			      struct output_ctx *octx);
 
@@ -281,6 +285,7 @@ extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
 				     const char *name, struct nft_cache *cache);
+extern const char *set_policy2str(uint32_t policy);
 extern void set_print(const struct set *set, struct output_ctx *octx);
 extern void set_print_plain(const struct set *s, struct output_ctx *octx);
 
@@ -575,7 +580,9 @@ extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 extern int cache_update(struct mnl_socket *nf_sock, struct nft_cache *cache,
 			enum cmd_ops cmd, struct list_head *msgs, unsigned int debug_flag,
 			struct output_ctx *octx);
-extern void cache_flush(struct list_head *table_list);
+extern void cache_flush(struct mnl_socket *nf_sock, struct nft_cache *cache,
+			enum cmd_ops cmd, struct list_head *msgs,
+			unsigned int debug_mask, struct output_ctx *octx);
 extern void cache_release(struct nft_cache *cache);
 
 enum udata_type {

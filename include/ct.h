@@ -16,6 +16,8 @@ struct ct_template {
 	unsigned int		len;
 };
 
+extern const struct ct_template ct_templates[__NFT_CT_MAX];
+
 #define CT_TEMPLATE(__token, __dtype, __byteorder, __len) {	\
 	.token		= (__token),				\
 	.dtype		= (__dtype),				\
@@ -31,6 +33,8 @@ extern void ct_expr_update_type(struct proto_ctx *ctx, struct expr *expr);
 extern struct stmt *notrack_stmt_alloc(const struct location *loc);
 extern struct stmt *flow_offload_stmt_alloc(const struct location *loc,
 					    const char *table_name);
+extern const char *ct_dir2str(int dir);
+extern const char *ct_label2str(unsigned long value);
 
 extern const struct datatype ct_dir_type;
 extern const struct datatype ct_state_type;

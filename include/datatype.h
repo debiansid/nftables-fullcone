@@ -1,6 +1,8 @@
 #ifndef NFTABLES_DATATYPE_H
 #define NFTABLES_DATATYPE_H
 
+#include <json.h>
+
 /**
  * enum datatypes
  *
@@ -149,6 +151,8 @@ struct datatype {
 	const char			*basefmt;
 	void				(*print)(const struct expr *expr,
 						 struct output_ctx *octx);
+	json_t				*(*json)(const struct expr *expr,
+						 struct output_ctx *octx);
 	struct error_record		*(*parse)(const struct expr *sym,
 						  struct expr **res);
 	const struct symbol_table	*sym_tbl;
@@ -218,6 +222,7 @@ extern struct symbol_table *rt_symbol_table_init(const char *filename);
 extern void rt_symbol_table_free(struct symbol_table *tbl);
 
 extern const struct symbol_table inet_service_tbl;
+extern struct symbol_table *mark_tbl;
 
 extern const struct datatype invalid_type;
 extern const struct datatype verdict_type;

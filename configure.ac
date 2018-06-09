@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.8.5], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Joe Btfsplk"], [Release name])
+AC_INIT([nftables], [0.9.0], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Fearless Fosdick"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -62,7 +62,7 @@ AM_COND_IF([BUILD_MAN], [
 	      [AS_IF([test "$DOCBOOK2MAN" != "no"], [DB2MAN="$DOCBOOK2MAN"],
 		     [AS_IF([test "$DB2X_DOCBOOK2MAN" != "no"],
 			    [DB2MAN="$DB2X_DOCBOOK2MAN"],
-			    [AC_MSG_ERROR([docbookx2-man/db2x_docbook2man not found, required for building man pages])]
+			    [AC_MSG_ERROR([docbook2x-man/db2x_docbook2man not found, required for building man pages])]
 		     )]
 	     )]
 	)
@@ -76,7 +76,7 @@ AM_COND_IF([BUILD_PDF], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.0])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.1])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])], [],
@@ -107,6 +107,17 @@ AC_DEFINE([HAVE_LIBXTABLES], [1], [0])
 AC_SUBST(with_libxtables)
 AM_CONDITIONAL([BUILD_XTABLES], [test "x$with_libxtables" == xyes])
 
+AC_ARG_WITH([json], [AS_HELP_STRING([--with-json],
+            [Enable JSON output support)])],
+	    [], [with_json=no])
+AS_IF([test "x$with_json" != xno], [
+AC_CHECK_LIB([jansson], [json_object], ,
+	AC_MSG_ERROR([No suitable version of libjansson found]))
+AC_DEFINE([HAVE_LIBJANSSON], [1], [Define if you have libjansson])
+])
+AC_SUBST(with_json)
+AM_CONDITIONAL([BUILD_JSON], [test "x$with_json" != xno])
+
 AC_CONFIG_FILES([					\
 		Makefile				\
 		libnftables.pc				\
@@ -132,4 +143,5 @@ nft configuration:
   use mini-gmp:			${with_mini_gmp}
   enable man page:              ${enable_man_doc}
   enable pdf documentation:	${enable_pdf_doc}
-  libxtables support:		${with_libxtables}"
+  libxtables support:		${with_libxtables}
+  json output support:          ${with_json}"

@@ -21,6 +21,7 @@
 #include <utils.h>
 #include <netdb.h>
 #include <netlink.h>
+#include <json.h>
 
 #include <libnftnl/common.h>
 #include <libnftnl/ruleset.h>
@@ -186,7 +187,7 @@ replay:
 	return 0;
 }
 
-void cache_flush(struct list_head *table_list)
+static void __cache_flush(struct list_head *table_list)
 {
 	struct table *table, *next;
 
@@ -196,9 +197,26 @@ void cache_flush(struct list_head *table_list)
 	}
 }
 
+void cache_flush(struct mnl_socket *nf_sock, struct nft_cache *cache,
+		 enum cmd_ops cmd, struct list_head *msgs,
+		 unsigned int debug_mask, struct output_ctx *octx)
+{
+	struct netlink_ctx ctx = {
+		.list		= LIST_HEAD_INIT(ctx.list),
+		.nf_sock	= nf_sock,
+		.cache		= cache,
+		.msgs		= msgs,
+		.debug_mask	= debug_mask,
+		.octx		= octx,
+	};
+
+	__cache_flush(&cache->list);
+	cache->genid = netlink_genid_get(&ctx);
+}
+
 void cache_release(struct nft_cache *cache)
 {
-	cache_flush(&cache->list);
+	__cache_flush(&cache->list);
 	cache->genid = 0;
 }
 
@@ -295,7 +313,7 @@ struct print_fmt_options {
 	const char	*stmt_separator;
 };
 
-static const char *set_policy2str(uint32_t policy)
+const char *set_policy2str(uint32_t policy)
 {
 	switch (policy) {
 	case NFT_SET_POL_PERFORMANCE:
@@ -740,7 +758,7 @@ const char *hooknum2str(unsigned int family, unsigned int hooknum)
 	return "unknown";
 }
 
-static const char *chain_policy2str(uint32_t policy)
+const char *chain_policy2str(uint32_t policy)
 {
 	switch (policy) {
 	case NF_DROP:
@@ -855,8 +873,6 @@ struct table *table_lookup(const struct handle *h,
 	}
 	return NULL;
 }
-
-#define TABLE_FLAGS_MAX 1
 
 const char *table_flags_name[TABLE_FLAGS_MAX] = {
 	"dormant",
@@ -1820,6 +1836,9 @@ static int do_list_set(struct netlink_ctx *ctx, struct cmd *cmd,
 static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table = NULL;
+
+	if (ctx->octx->json)
+		return do_command_list_json(ctx, cmd);
 
 	if (cmd->handle.table.name != NULL)
 		table = table_lookup(&cmd->handle, ctx->cache);

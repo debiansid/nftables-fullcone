@@ -3,6 +3,7 @@
 
 #include <list.h>
 #include <expression.h>
+#include <json.h>
 
 extern struct stmt *expr_stmt_alloc(const struct location *loc,
 				    struct expr *expr);
@@ -21,7 +22,15 @@ struct objref_stmt {
 	struct expr		*expr;
 };
 
+const char *objref_type_name(uint32_t type);
 struct stmt *objref_stmt_alloc(const struct location *loc);
+
+struct connlimit_stmt {
+	uint32_t		count;
+	uint32_t		flags;
+};
+
+extern struct stmt *connlimit_stmt_alloc(const struct location *loc);
 
 struct counter_stmt {
 	uint64_t		packets;
@@ -75,6 +84,8 @@ struct log_stmt {
 	uint32_t		flags;
 };
 
+extern const char *log_level(uint32_t level);
+extern int log_level_parse(const char *level);
 extern struct stmt *log_stmt_alloc(const struct location *loc);
 
 
@@ -104,6 +115,8 @@ enum nft_nat_etypes {
 	NFT_NAT_MASQ,
 	NFT_NAT_REDIR,
 };
+
+extern const char *nat_etype2str(enum nft_nat_etypes type);
 
 struct nat_stmt {
 	enum nft_nat_etypes	type;
@@ -151,7 +164,9 @@ struct stmt *dup_stmt_alloc(const struct location *loc);
 uint32_t dup_stmt_type(const char *type);
 
 struct fwd_stmt {
-	struct expr		*to;
+	uint8_t			family;
+	struct expr		*addr;
+	struct expr		*dev;
 };
 
 struct stmt *fwd_stmt_alloc(const struct location *loc);
@@ -162,6 +177,8 @@ struct set_stmt {
 	struct expr		*key;
 	enum nft_dynset_ops	op;
 };
+
+extern const char * const set_stmt_op_names[];
 
 extern struct stmt *set_stmt_alloc(const struct location *loc);
 
@@ -239,6 +256,7 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_OBJREF:	stateful object reference statement
  * @STMT_EXTHDR:	extension header statement
  * @STMT_FLOW_OFFLOAD:	flow offload statement
+ * @STMT_CONNLIMIT:	connection limit statement
  * @STMT_MAP:		map statement
  */
 enum stmt_types {
@@ -264,6 +282,7 @@ enum stmt_types {
 	STMT_OBJREF,
 	STMT_EXTHDR,
 	STMT_FLOW_OFFLOAD,
+	STMT_CONNLIMIT,
 	STMT_MAP,
 };
 
@@ -281,6 +300,8 @@ struct stmt_ops {
 	const char		*name;
 	void			(*destroy)(struct stmt *stmt);
 	void			(*print)(const struct stmt *stmt,
+					 struct output_ctx *octx);
+	json_t			*(*json)(const struct stmt *stmt,
 					 struct output_ctx *octx);
 };
 
@@ -308,6 +329,7 @@ struct stmt {
 		struct expr		*expr;
 		struct exthdr_stmt	exthdr;
 		struct meter_stmt	meter;
+		struct connlimit_stmt	connlimit;
 		struct counter_stmt	counter;
 		struct payload_stmt	payload;
 		struct meta_stmt	meta;

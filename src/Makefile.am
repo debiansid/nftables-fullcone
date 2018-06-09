@@ -55,6 +55,7 @@ libnftables_la_SOURCES =			\
 		services.c			\
 		mergesort.c			\
 		tcpopt.c			\
+		socket.c			\
 		libnftables.c
 
 # yacc and lex generate dirty code
@@ -86,6 +87,11 @@ nft_SOURCES = main.c
 
 if BUILD_CLI
 nft_SOURCES += cli.c
+endif
+
+if BUILD_JSON
+libnftables_la_SOURCES += json.c parser_json.c
+libnftables_la_LIBADD += ${JANSSON_LIBS}
 endif
 
 nft_LDADD = libnftables.la

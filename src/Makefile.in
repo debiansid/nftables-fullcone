@@ -97,6 +97,8 @@ sbin_PROGRAMS = nft$(EXEEXT)
 @BUILD_XTABLES_TRUE@am__append_5 = xt.c
 @BUILD_XTABLES_TRUE@am__append_6 = ${XTABLES_LIBS}
 @BUILD_CLI_TRUE@am__append_7 = cli.c
+@BUILD_JSON_TRUE@am__append_8 = json.c parser_json.c
+@BUILD_JSON_TRUE@am__append_9 = ${JANSSON_LIBS}
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -156,21 +158,22 @@ am__DEPENDENCIES_1 =
 @BUILD_XTABLES_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 libnftables_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) libparser.la $(am__append_4) \
-	$(am__DEPENDENCIES_2)
+	$(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1)
 am__libnftables_la_SOURCES_DIST = rule.c statement.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c fib.c \
 	hash.c meta.c rt.c numgen.c ct.c netlink.c netlink_linearize.c \
 	netlink_delinearize.c monitor.c segtree.c rbtree.c gmputil.c \
 	utils.c erec.c mnl.c iface.c services.c mergesort.c tcpopt.c \
-	libnftables.c xt.c
+	socket.c libnftables.c xt.c json.c parser_json.c
 @BUILD_XTABLES_TRUE@am__objects_1 = xt.lo
+@BUILD_JSON_TRUE@am__objects_2 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo datatype.lo \
 	expression.lo evaluate.lo proto.lo payload.lo exthdr.lo fib.lo \
 	hash.lo meta.lo rt.lo numgen.lo ct.lo netlink.lo \
 	netlink_linearize.lo netlink_delinearize.lo monitor.lo \
 	segtree.lo rbtree.lo gmputil.lo utils.lo erec.lo mnl.lo \
-	iface.lo services.lo mergesort.lo tcpopt.lo libnftables.lo \
-	$(am__objects_1)
+	iface.lo services.lo mergesort.lo tcpopt.lo socket.lo \
+	libnftables.lo $(am__objects_1) $(am__objects_2)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
 libparser_la_LIBADD =
 am_libparser_la_OBJECTS = libparser_la-parser_bison.lo \
@@ -181,8 +184,8 @@ libparser_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 PROGRAMS = $(sbin_PROGRAMS)
 am__nft_SOURCES_DIST = main.c cli.c
-@BUILD_CLI_TRUE@am__objects_2 = cli.$(OBJEXT)
-am_nft_OBJECTS = main.$(OBJEXT) $(am__objects_2)
+@BUILD_CLI_TRUE@am__objects_3 = cli.$(OBJEXT)
+am_nft_OBJECTS = main.$(OBJEXT) $(am__objects_3)
 nft_OBJECTS = $(am_nft_OBJECTS)
 nft_DEPENDENCIES = libnftables.la
 AM_V_P = $(am__v_P_@AM_V@)
@@ -406,6 +409,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 with_cli = @with_cli@
 with_debug = @with_debug@
+with_json = @with_json@
 with_libxtables = @with_libxtables@
 CLEANFILES = scanner.c parser_bison.c
 AM_CPPFLAGS = -I$(top_srcdir)/include \
@@ -426,7 +430,7 @@ libnftables_la_SOURCES = rule.c statement.c datatype.c expression.c \
 	numgen.c ct.c netlink.c netlink_linearize.c \
 	netlink_delinearize.c monitor.c segtree.c rbtree.c gmputil.c \
 	utils.c erec.c mnl.c iface.c services.c mergesort.c tcpopt.c \
-	libnftables.c $(am__append_5)
+	socket.c libnftables.c $(am__append_5) $(am__append_8)
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la $(am__append_3)
@@ -440,7 +444,7 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 		      -Wno-redundant-decls
 
 libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la \
-	$(am__append_4) $(am__append_6)
+	$(am__append_4) $(am__append_6) $(am__append_9)
 @BUILD_MINIGMP_TRUE@libminigmp_la_SOURCES = mini-gmp.c
 @BUILD_MINIGMP_TRUE@libminigmp_la_CFLAGS = ${AM_CFLAGS} -Wno-sign-compare
 nft_SOURCES = main.c $(am__append_7)
@@ -608,6 +612,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libminigmp_la-mini-gmp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnftables.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libparser_la-parser_bison.Plo@am__quote@
@@ -621,6 +626,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_delinearize.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_linearize.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/numgen.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parser_json.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/payload.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rbtree.Plo@am__quote@
@@ -628,6 +634,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rule.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/segtree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/services.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/socket.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/statement.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpopt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Plo@am__quote@

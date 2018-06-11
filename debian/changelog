@@ -1,3 +1,9 @@
+nftables (0.9.0-1~bpo9+1) stretch-backports; urgency=medium
+
+  * Rebuild for stretch-backports.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 11 Jun 2018 10:47:02 +0200
+
 nftables (0.9.0-1) unstable; urgency=medium
 
   * [d1ad0df] d/t/internaltest-shell.sh: use installed nft binary

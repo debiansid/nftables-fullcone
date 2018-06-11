@@ -22,6 +22,7 @@
 #include <datatype.h>
 #include <rt.h>
 #include <rule.h>
+#include <json.h>
 
 static struct symbol_table *realm_tbl;
 void realm_table_rt_init(void)
@@ -57,7 +58,7 @@ const struct datatype realm_type = {
 	.flags		= DTYPE_F_PREFIX,
 };
 
-static const struct rt_template rt_templates[] = {
+const struct rt_template rt_templates[] = {
 	[NFT_RT_CLASSID]	= RT_TEMPLATE("classid",
 					      &realm_type,
 					      4 * BITS_PER_BYTE,
@@ -112,6 +113,7 @@ static const struct expr_ops rt_expr_ops = {
 	.type		= EXPR_RT,
 	.name		= "rt",
 	.print		= rt_expr_print,
+	.json		= rt_expr_json,
 	.cmp		= rt_expr_cmp,
 	.clone		= rt_expr_clone,
 };

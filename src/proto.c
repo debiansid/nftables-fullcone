@@ -591,6 +591,7 @@ const struct proto_desc proto_ip = {
 	.checksum_key	= IPHDR_CHECKSUM,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
+		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 		PROTO_LINK(IPPROTO_ESP,		&proto_esp),
 		PROTO_LINK(IPPROTO_AH,		&proto_ah),
 		PROTO_LINK(IPPROTO_COMP,	&proto_comp),
@@ -688,7 +689,7 @@ const struct proto_desc proto_icmp6 = {
 		[ICMP6HDR_CODE]		= ICMP6HDR_FIELD("code", icmp6_code),
 		[ICMP6HDR_CHECKSUM]	= ICMP6HDR_FIELD("checksum", icmp6_cksum),
 		[ICMP6HDR_PPTR]		= ICMP6HDR_FIELD("parameter-problem", icmp6_pptr),
-		[ICMP6HDR_MTU]		= ICMP6HDR_FIELD("packet-too-big", icmp6_mtu),
+		[ICMP6HDR_MTU]		= ICMP6HDR_FIELD("mtu", icmp6_mtu),
 		[ICMP6HDR_ID]		= ICMP6HDR_FIELD("id", icmp6_id),
 		[ICMP6HDR_SEQ]		= ICMP6HDR_FIELD("sequence", icmp6_seq),
 		[ICMP6HDR_MAXDELAY]	= ICMP6HDR_FIELD("max-delay", icmp6_maxdelay),
@@ -718,6 +719,7 @@ const struct proto_desc proto_ip6 = {
 		PROTO_LINK(IPPROTO_TCP,		&proto_tcp),
 		PROTO_LINK(IPPROTO_DCCP,	&proto_dccp),
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
+		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 	},
 	.templates	= {

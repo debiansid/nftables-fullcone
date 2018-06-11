@@ -2,14 +2,6 @@
 
 set -e
 
-tmpfile=$(mktemp)
-if [ ! -w $tmpfile ] ; then
-        echo "Failed to create tmp file" >&2
-        exit 0
-fi
-
-trap "rm -rf $tmpfile" EXIT # cleanup if aborted
-
 RULESET="table inet filter {
 	chain ssh {
 		type filter hook input priority 0; policy accept;
@@ -23,28 +15,8 @@ table inet filter {
 	}
 }"
 
-echo "$RULESET" > $tmpfile
-$NFT -f $tmpfile
+$NFT -f - <<< "$RULESET"
 if [ $? -ne 0 ] ; then
         echo "E: unable to load good ruleset" >&2
         exit 1
-fi
-
-EXPECTED="table inet filter {
-	chain ssh {
-		type filter hook input priority 0; policy accept;
-		tcp dport ssh accept
-	}
-
-	chain input {
-		type filter hook input priority 1; policy accept;
-	}
-}"
-
-GET="$($NFT list ruleset)"
-
-if [ "$EXPECTED" != "$GET" ] ; then
-	DIFF="$(which diff)"
-	[ -x $DIFF ] && $DIFF -u <(echo "$EXPECTED") <(echo "$GET")
-	exit 1
 fi

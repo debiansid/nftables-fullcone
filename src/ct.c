@@ -26,7 +26,6 @@
 #include <erec.h>
 #include <expression.h>
 #include <datatype.h>
-#include <gmputil.h>
 #include <ct.h>
 #include <gmputil.h>
 #include <utils.h>
@@ -64,6 +63,18 @@ static const struct symbol_table ct_dir_tbl = {
 		SYMBOL_LIST_END
 	}
 };
+
+const char *ct_dir2str(int dir)
+{
+	const struct symbolic_constant *s;
+
+	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
+		if (dir == (int)s->value)
+			return s->identifier;
+	}
+
+	return NULL;
+}
 
 const struct datatype ct_dir_type = {
 	.type		= TYPE_CT_DIR,
@@ -134,20 +145,30 @@ static struct symbol_table *ct_label_tbl;
 
 #define CT_LABEL_BIT_SIZE 128
 
+const char *ct_label2str(unsigned long value)
+{
+	const struct symbolic_constant *s;
+
+	for (s = ct_label_tbl->symbols; s->identifier; s++) {
+		if (value == s->value)
+			return s->identifier;
+	}
+
+	return NULL;
+}
+
 static void ct_label_type_print(const struct expr *expr,
 				 struct output_ctx *octx)
 {
 	unsigned long bit = mpz_scan1(expr->value, 0);
-	const struct symbolic_constant *s;
+	const char *labelstr = ct_label2str(bit);
 
-	for (s = ct_label_tbl->symbols; s->identifier != NULL; s++) {
-		if (bit != s->value)
-			continue;
-		nft_print(octx, "\"%s\"", s->identifier);
+	if (labelstr) {
+		nft_print(octx, "\"%s\"", labelstr);
 		return;
 	}
 	/* can happen when connlabel.conf is altered after rules were added */
-	nft_print(octx, "%ld", (long)mpz_scan1(expr->value, 0));
+	nft_print(octx, "%lu", bit);
 }
 
 static struct error_record *ct_label_type_parse(const struct expr *sym,
@@ -204,6 +225,7 @@ static const struct datatype ct_label_type = {
 	.size		= CT_LABEL_BIT_SIZE,
 	.basetype	= &bitmask_type,
 	.print		= ct_label_type_print,
+	.json		= ct_label_type_json,
 	.parse		= ct_label_type_parse,
 };
 
@@ -221,7 +243,7 @@ void ct_label_table_exit(void)
 #define NF_CT_HELPER_NAME_LEN	16
 #endif
 
-static const struct ct_template ct_templates[] = {
+const struct ct_template ct_templates[__NFT_CT_MAX] = {
 	[NFT_CT_STATE]		= CT_TEMPLATE("state",	    &ct_state_type,
 					      BYTEORDER_HOST_ENDIAN,
 					      4 * BITS_PER_BYTE),
@@ -274,26 +296,22 @@ static const struct ct_template ct_templates[] = {
 static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,
 		     struct output_ctx *octx)
 {
-	const struct symbolic_constant *s;
+	const char *dirstr = ct_dir2str(dir);
 	const struct proto_desc *desc;
 
 	nft_print(octx, "ct ");
 	if (dir < 0)
 		goto done;
 
-	for (s = ct_dir_tbl.symbols; s->identifier != NULL; s++) {
-		if (dir == (int)s->value) {
-			nft_print(octx, "%s ", s->identifier);
-			break;
-		}
-	}
+	if (dirstr)
+		nft_print(octx, "%s ", dirstr);
 
 	switch (key) {
 	case NFT_CT_SRC:
 	case NFT_CT_DST:
 		desc = proto_find_upper(&proto_inet, nfproto);
 		if (desc)
-			printf("%s ", desc->name);
+			nft_print(octx, "%s ", desc->name);
 		break;
 	default:
 		break;
@@ -343,6 +361,7 @@ static const struct expr_ops ct_expr_ops = {
 	.type		= EXPR_CT,
 	.name		= "ct",
 	.print		= ct_expr_print,
+	.json		= ct_expr_json,
 	.cmp		= ct_expr_cmp,
 	.clone		= ct_expr_clone,
 	.pctx_update	= ct_expr_pctx_update,
@@ -425,6 +444,7 @@ static const struct stmt_ops ct_stmt_ops = {
 	.type		= STMT_CT,
 	.name		= "ct",
 	.print		= ct_stmt_print,
+	.json		= ct_stmt_json,
 };
 
 struct stmt *ct_stmt_alloc(const struct location *loc, enum nft_ct_keys key,
@@ -450,9 +470,33 @@ static const struct stmt_ops notrack_stmt_ops = {
 	.type		= STMT_NOTRACK,
 	.name		= "notrack",
 	.print		= notrack_stmt_print,
+	.json		= notrack_stmt_json,
 };
 
 struct stmt *notrack_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &notrack_stmt_ops);
+}
+
+static void flow_offload_stmt_print(const struct stmt *stmt,
+				    struct output_ctx *octx)
+{
+	printf("flow offload @%s", stmt->flow.table_name);
+}
+
+static const struct stmt_ops flow_offload_stmt_ops = {
+	.type		= STMT_FLOW_OFFLOAD,
+	.name		= "flow_offload",
+	.print		= flow_offload_stmt_print,
+};
+
+struct stmt *flow_offload_stmt_alloc(const struct location *loc,
+				     const char *table_name)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &flow_offload_stmt_ops);
+	stmt->flow.table_name	= table_name;
+
+	return stmt;
 }

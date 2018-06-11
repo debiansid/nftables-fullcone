@@ -9,6 +9,7 @@
 #include <datatype.h>
 #include <utils.h>
 #include <list.h>
+#include <json.h>
 
 /**
  * enum expr_types
@@ -16,12 +17,14 @@
  * @EXPR_INVALID:	uninitialized type, should not happen
  * @EXPR_VERDICT:	nftables verdict expression
  * @EXPR_SYMBOL:	unparsed symbol
+ * @EXPR_VARIABLE:	variable
  * @EXPR_VALUE:		literal numeric or string expression
  * @EXPR_PREFIX:	prefixed expression
  * @EXPR_RANGE:		literal range
  * @EXPR_PAYLOAD:	payload expression
  * @EXPR_EXTHDR:	exthdr expression
  * @EXPR_META:		meta expression
+ * @EXPR_SOCKET:	socket expression
  * @EXPR_CT:		conntrack expression
  * @EXPR_CONCAT:	concatenation
  * @EXPR_LIST:		list of expressions
@@ -41,12 +44,14 @@ enum expr_types {
 	EXPR_INVALID,
 	EXPR_VERDICT,
 	EXPR_SYMBOL,
+	EXPR_VARIABLE,
 	EXPR_VALUE,
 	EXPR_PREFIX,
 	EXPR_RANGE,
 	EXPR_PAYLOAD,
 	EXPR_EXTHDR,
 	EXPR_META,
+	EXPR_SOCKET,
 	EXPR_CT,
 	EXPR_CONCAT,
 	EXPR_LIST,
@@ -83,12 +88,6 @@ enum ops {
 	OP_GT,
 	OP_LTE,
 	OP_GTE,
-	/* Range comparison */
-	OP_RANGE,
-	/* Flag comparison */
-	OP_FLAGCMP,
-	/* Set lookup */
-	OP_LOOKUP,
 	__OP_MAX
 };
 #define OP_MAX		(__OP_MAX - 1)
@@ -97,7 +96,6 @@ extern const char *expr_op_symbols[];
 
 enum symbol_types {
 	SYMBOL_VALUE,
-	SYMBOL_DEFINE,
 	SYMBOL_SET,
 };
 
@@ -159,6 +157,8 @@ struct expr_ops {
 					    enum byteorder byteorder);
 	void			(*print)(const struct expr *expr,
 					 struct output_ctx *octx);
+	json_t			*(*json)(const struct expr *expr,
+					 struct output_ctx *octx);
 	bool			(*cmp)(const struct expr *e1,
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
@@ -190,6 +190,7 @@ enum expr_flags {
 #include <rt.h>
 #include <hash.h>
 #include <ct.h>
+#include <socket.h>
 
 /**
  * struct expr
@@ -224,6 +225,10 @@ struct expr {
 			const struct scope	*scope;
 			const char		*identifier;
 			enum symbol_types	symtype;
+		};
+		struct {
+			/* EXPR_VARIABLE */
+			struct symbol		*sym;
 		};
 		struct {
 			/* EXPR_VERDICT */
@@ -294,6 +299,10 @@ struct expr {
 			enum nft_meta_keys	key;
 			enum proto_bases	base;
 		} meta;
+		struct {
+			/* SOCKET */
+			enum nft_socket_keys	key;
+		} socket;
 		struct {
 			/* EXPR_RT */
 			enum nft_rt_keys	key;
@@ -367,6 +376,8 @@ extern struct expr *unary_expr_alloc(const struct location *loc,
 extern struct expr *binop_expr_alloc(const struct location *loc, enum ops op,
 				     struct expr *left, struct expr *right);
 
+extern bool must_print_eq_op(const struct expr *expr);
+
 extern struct expr *relational_expr_alloc(const struct location *loc, enum ops op,
 					  struct expr *left, struct expr *right);
 
@@ -386,6 +397,9 @@ static inline void symbol_expr_set_type(struct expr *expr,
 	if (expr->ops->type == EXPR_SYMBOL)
 		expr->dtype = dtype;
 }
+
+struct expr *variable_expr_alloc(const struct location *loc,
+				 struct scope *scope, struct symbol *sym);
 
 extern struct expr *constant_expr_alloc(const struct location *loc,
 					const struct datatype *dtype,
@@ -408,6 +422,8 @@ extern struct expr *prefix_expr_alloc(const struct location *loc,
 extern struct expr *range_expr_alloc(const struct location *loc,
 				     struct expr *low, struct expr *high);
 
+extern struct expr *compound_expr_alloc(const struct location *loc,
+					const struct expr_ops *ops);
 extern void compound_expr_add(struct expr *compound, struct expr *expr);
 extern void compound_expr_remove(struct expr *compound, struct expr *expr);
 extern void list_expr_sort(struct list_head *head);
@@ -422,6 +438,11 @@ extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add,
 			    unsigned int debug_mask, bool merge);
 extern void interval_map_decompose(struct expr *set);
+
+extern struct expr *get_set_intervals(const struct set *set,
+				      const struct expr *init);
+struct table;
+extern void get_set_decompose(struct table *table, struct set *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,
 				       struct expr *from, struct expr *to);

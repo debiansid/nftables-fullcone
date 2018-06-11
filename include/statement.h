@@ -3,6 +3,7 @@
 
 #include <list.h>
 #include <expression.h>
+#include <json.h>
 
 extern struct stmt *expr_stmt_alloc(const struct location *loc,
 				    struct expr *expr);
@@ -10,12 +11,26 @@ extern struct stmt *expr_stmt_alloc(const struct location *loc,
 extern struct stmt *verdict_stmt_alloc(const struct location *loc,
 				       struct expr *expr);
 
+struct flow_stmt {
+	const char		*table_name;
+};
+
+struct stmt *flow_stmt_alloc(const struct location *loc, const char *name);
+
 struct objref_stmt {
 	uint32_t		type;
 	struct expr		*expr;
 };
 
+const char *objref_type_name(uint32_t type);
 struct stmt *objref_stmt_alloc(const struct location *loc);
+
+struct connlimit_stmt {
+	uint32_t		count;
+	uint32_t		flags;
+};
+
+extern struct stmt *connlimit_stmt_alloc(const struct location *loc);
 
 struct counter_stmt {
 	uint64_t		packets;
@@ -69,6 +84,8 @@ struct log_stmt {
 	uint32_t		flags;
 };
 
+extern const char *log_level(uint32_t level);
+extern int log_level_parse(const char *level);
 extern struct stmt *log_stmt_alloc(const struct location *loc);
 
 
@@ -92,28 +109,24 @@ struct reject_stmt {
 
 extern struct stmt *reject_stmt_alloc(const struct location *loc);
 
+enum nft_nat_etypes {
+	__NFT_NAT_SNAT = NFT_NAT_SNAT,
+	__NFT_NAT_DNAT = NFT_NAT_DNAT,
+	NFT_NAT_MASQ,
+	NFT_NAT_REDIR,
+};
+
+extern const char *nat_etype2str(enum nft_nat_etypes type);
+
 struct nat_stmt {
-	enum nft_nat_types	type;
+	enum nft_nat_etypes	type;
 	struct expr		*addr;
 	struct expr		*proto;
 	uint32_t		flags;
 };
 
-extern struct stmt *nat_stmt_alloc(const struct location *loc);
-
-struct masq_stmt {
-	uint32_t		flags;
-	struct expr		*proto;
-};
-
-extern struct stmt *masq_stmt_alloc(const struct location *loc);
-
-struct redir_stmt {
-	struct expr		*proto;
-	uint32_t		flags;
-};
-
-extern struct stmt *redir_stmt_alloc(const struct location *loc);
+extern struct stmt *nat_stmt_alloc(const struct location *loc,
+				   enum nft_nat_etypes type);
 
 struct queue_stmt {
 	struct expr		*queue;
@@ -151,7 +164,9 @@ struct stmt *dup_stmt_alloc(const struct location *loc);
 uint32_t dup_stmt_type(const char *type);
 
 struct fwd_stmt {
-	struct expr		*to;
+	uint8_t			family;
+	struct expr		*addr;
+	struct expr		*dev;
 };
 
 struct stmt *fwd_stmt_alloc(const struct location *loc);
@@ -163,13 +178,24 @@ struct set_stmt {
 	enum nft_dynset_ops	op;
 };
 
+extern const char * const set_stmt_op_names[];
+
 extern struct stmt *set_stmt_alloc(const struct location *loc);
+
+struct map_stmt {
+	struct expr		*set;
+	struct expr		*map;
+	enum nft_dynset_ops	op;
+};
+
+extern struct stmt *map_stmt_alloc(const struct location *loc);
 
 struct meter_stmt {
 	struct expr		*set;
 	struct expr		*key;
 	struct stmt		*stmt;
 	const char		*name;
+	uint32_t		size;
 };
 
 extern struct stmt *meter_stmt_alloc(const struct location *loc);
@@ -219,8 +245,6 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_LOG:		log statement
  * @STMT_REJECT:	REJECT statement
  * @STMT_NAT:		NAT statement
- * @STMT_MASQ:		masquerade statement
- * @STMT_REDIR:		redirect statement
  * @STMT_QUEUE:		QUEUE statement
  * @STMT_CT:		conntrack statement
  * @STMT_SET:		set statement
@@ -231,6 +255,9 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_NOTRACK:	notrack statement
  * @STMT_OBJREF:	stateful object reference statement
  * @STMT_EXTHDR:	extension header statement
+ * @STMT_FLOW_OFFLOAD:	flow offload statement
+ * @STMT_CONNLIMIT:	connection limit statement
+ * @STMT_MAP:		map statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -244,8 +271,6 @@ enum stmt_types {
 	STMT_LOG,
 	STMT_REJECT,
 	STMT_NAT,
-	STMT_MASQ,
-	STMT_REDIR,
 	STMT_QUEUE,
 	STMT_CT,
 	STMT_SET,
@@ -256,6 +281,9 @@ enum stmt_types {
 	STMT_NOTRACK,
 	STMT_OBJREF,
 	STMT_EXTHDR,
+	STMT_FLOW_OFFLOAD,
+	STMT_CONNLIMIT,
+	STMT_MAP,
 };
 
 /**
@@ -272,6 +300,8 @@ struct stmt_ops {
 	const char		*name;
 	void			(*destroy)(struct stmt *stmt);
 	void			(*print)(const struct stmt *stmt,
+					 struct output_ctx *octx);
+	json_t			*(*json)(const struct stmt *stmt,
 					 struct output_ctx *octx);
 };
 
@@ -299,6 +329,7 @@ struct stmt {
 		struct expr		*expr;
 		struct exthdr_stmt	exthdr;
 		struct meter_stmt	meter;
+		struct connlimit_stmt	connlimit;
 		struct counter_stmt	counter;
 		struct payload_stmt	payload;
 		struct meta_stmt	meta;
@@ -306,8 +337,6 @@ struct stmt {
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;
 		struct nat_stmt		nat;
-		struct masq_stmt	masq;
-		struct redir_stmt	redir;
 		struct queue_stmt	queue;
 		struct quota_stmt	quota;
 		struct ct_stmt		ct;
@@ -316,6 +345,8 @@ struct stmt {
 		struct fwd_stmt		fwd;
 		struct xt_stmt		xt;
 		struct objref_stmt	objref;
+		struct flow_stmt	flow;
+		struct map_stmt		map;
 	};
 };
 

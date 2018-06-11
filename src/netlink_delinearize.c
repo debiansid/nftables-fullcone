@@ -323,7 +323,7 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 		if (dreg != NFT_REG_VERDICT)
 			return netlink_set_register(ctx, dreg, expr);
 	} else {
-		expr = relational_expr_alloc(loc, OP_LOOKUP, left, right);
+		expr = relational_expr_alloc(loc, OP_EQ, left, right);
 	}
 
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_LOOKUP_FLAGS)) {
@@ -615,6 +615,21 @@ static void netlink_parse_meta_expr(struct netlink_parse_ctx *ctx,
 	netlink_set_register(ctx, dreg, expr);
 }
 
+static void netlink_parse_socket(struct netlink_parse_ctx *ctx,
+				      const struct location *loc,
+				      const struct nftnl_expr *nle)
+{
+	enum nft_registers dreg;
+	uint32_t key;
+	struct expr * expr;
+
+	key = nftnl_expr_get_u32(nle, NFTNL_EXPR_SOCKET_KEY);
+	expr = socket_expr_alloc(loc, key);
+
+	dreg = netlink_parse_register(nle, NFTNL_EXPR_SOCKET_DREG);
+	netlink_set_register(ctx, dreg, expr);
+}
+
 static void netlink_parse_meta_stmt(struct netlink_parse_ctx *ctx,
 				    const struct location *loc,
 				    const struct nftnl_expr *nle)
@@ -686,6 +701,16 @@ static void netlink_parse_notrack(struct netlink_parse_ctx *ctx,
 	ctx->stmt = notrack_stmt_alloc(loc);
 }
 
+static void netlink_parse_flow_offload(struct netlink_parse_ctx *ctx,
+				       const struct location *loc,
+				       const struct nftnl_expr *nle)
+{
+	const char *table_name;
+
+	table_name = xstrdup(nftnl_expr_get_str(nle, NFTNL_EXPR_FLOW_TABLE_NAME));
+	ctx->stmt = flow_offload_stmt_alloc(loc, table_name);
+}
+
 static void netlink_parse_ct_stmt(struct netlink_parse_ctx *ctx,
 				  const struct location *loc,
 				  const struct nftnl_expr *nle)
@@ -739,6 +764,21 @@ static void netlink_parse_ct(struct netlink_parse_ctx *ctx,
 		netlink_parse_ct_expr(ctx, loc, nle);
 	else
 		netlink_parse_ct_stmt(ctx, loc, nle);
+}
+
+static void netlink_parse_connlimit(struct netlink_parse_ctx *ctx,
+				    const struct location *loc,
+				    const struct nftnl_expr *nle)
+{
+	struct stmt *stmt;
+
+	stmt = connlimit_stmt_alloc(loc);
+	stmt->connlimit.count =
+		nftnl_expr_get_u32(nle, NFTNL_EXPR_CONNLIMIT_COUNT);
+	stmt->connlimit.flags =
+		nftnl_expr_get_u32(nle, NFTNL_EXPR_CONNLIMIT_FLAGS);
+
+	ctx->stmt = stmt;
 }
 
 static void netlink_parse_counter(struct netlink_parse_ctx *ctx,
@@ -851,8 +891,8 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	enum nft_registers reg1, reg2;
 	int family;
 
-	stmt = nat_stmt_alloc(loc);
-	stmt->nat.type = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_TYPE);
+	stmt = nat_stmt_alloc(loc,
+			      nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_TYPE));
 
 	family = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_FAMILY);
 
@@ -868,7 +908,7 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 			goto out_err;
 		}
 
-		if (family == AF_INET)
+		if (family == NFPROTO_IPV4)
 			expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
 		else
 			expr_set_type(addr, &ip6addr_type,
@@ -885,7 +925,7 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 			goto out_err;
 		}
 
-		if (family == AF_INET)
+		if (family == NFPROTO_IPV4)
 			expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
 		else
 			expr_set_type(addr, &ip6addr_type,
@@ -941,8 +981,8 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_MASQ_FLAGS))
 		flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_MASQ_FLAGS);
 
-	stmt = masq_stmt_alloc(loc);
-	stmt->masq.flags = flags;
+	stmt = nat_stmt_alloc(loc, NFT_NAT_MASQ);
+	stmt->nat.flags = flags;
 
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_PROTO_MIN);
 	if (reg1) {
@@ -953,7 +993,7 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
 			goto out_err;
 		}
 		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
-		stmt->masq.proto = proto;
+		stmt->nat.proto = proto;
 	}
 
 	reg2 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_PROTO_MAX);
@@ -965,9 +1005,9 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
 			goto out_err;
 		}
 		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
-		if (stmt->masq.proto != NULL)
-			proto = range_expr_alloc(loc, stmt->masq.proto, proto);
-		stmt->masq.proto = proto;
+		if (stmt->nat.proto != NULL)
+			proto = range_expr_alloc(loc, stmt->nat.proto, proto);
+		stmt->nat.proto = proto;
 	}
 
 	ctx->stmt = stmt;
@@ -985,11 +1025,11 @@ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
 	enum nft_registers reg1, reg2;
 	uint32_t flags;
 
-	stmt = redir_stmt_alloc(loc);
+	stmt = nat_stmt_alloc(loc, NFT_NAT_REDIR);
 
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_REDIR_FLAGS)) {
 		flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_REDIR_FLAGS);
-		stmt->redir.flags = flags;
+		stmt->nat.flags = flags;
 	}
 
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_REDIR_REG_PROTO_MIN);
@@ -1002,7 +1042,7 @@ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
 		}
 
 		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
-		stmt->redir.proto = proto;
+		stmt->nat.proto = proto;
 	}
 
 	reg2 = netlink_parse_register(nle, NFTNL_EXPR_REDIR_REG_PROTO_MAX);
@@ -1015,10 +1055,10 @@ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
 		}
 
 		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
-		if (stmt->redir.proto != NULL)
-			proto = range_expr_alloc(loc, stmt->redir.proto,
+		if (stmt->nat.proto != NULL)
+			proto = range_expr_alloc(loc, stmt->nat.proto,
 						 proto);
-		stmt->redir.proto = proto;
+		stmt->nat.proto = proto;
 	}
 
 	ctx->stmt = stmt;
@@ -1084,8 +1124,8 @@ static void netlink_parse_fwd(struct netlink_parse_ctx *ctx,
 			      const struct location *loc,
 			      const struct nftnl_expr *nle)
 {
-	enum nft_registers reg1;
-	struct expr *dev;
+	enum nft_registers reg1, reg2;
+	struct expr *dev, *addr;
 	struct stmt *stmt;
 
 	stmt = fwd_stmt_alloc(loc);
@@ -1100,7 +1140,37 @@ static void netlink_parse_fwd(struct netlink_parse_ctx *ctx,
 		}
 
 		expr_set_type(dev, &ifindex_type, BYTEORDER_HOST_ENDIAN);
-		stmt->fwd.to = dev;
+		stmt->fwd.dev = dev;
+	}
+
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_FWD_NFPROTO)) {
+		stmt->fwd.family =
+			nftnl_expr_get_u32(nle, NFTNL_EXPR_FWD_NFPROTO);
+	}
+
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_FWD_SREG_ADDR)) {
+		reg2 = netlink_parse_register(nle, NFTNL_EXPR_FWD_SREG_ADDR);
+		if (reg2) {
+			addr = netlink_get_register(ctx, loc, reg2);
+			if (addr == NULL)
+				return netlink_error(ctx, loc,
+						     "fwd statement has no output expression");
+
+			switch (stmt->fwd.family) {
+			case AF_INET:
+				expr_set_type(addr, &ipaddr_type,
+					      BYTEORDER_BIG_ENDIAN);
+				break;
+			case AF_INET6:
+				expr_set_type(addr, &ip6addr_type,
+					      BYTEORDER_BIG_ENDIAN);
+				break;
+			default:
+				return netlink_error(ctx, loc,
+						     "fwd statement has no family");
+			}
+			stmt->fwd.addr = addr;
+		}
 	}
 
 	ctx->stmt = stmt;
@@ -1140,11 +1210,11 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 				 const struct location *loc,
 				 const struct nftnl_expr *nle)
 {
+	struct expr *expr, *expr_data = NULL;
+	enum nft_registers sreg, sreg_data;
 	const struct nftnl_expr *dnle;
-	struct expr *expr;
 	struct stmt *stmt, *dstmt;
 	struct set *set;
-	enum nft_registers sreg;
 	const char *name;
 
 	name = nftnl_expr_get_str(nle, NFTNL_EXPR_DYNSET_SET_NAME);
@@ -1181,11 +1251,22 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 		dstmt = ctx->stmt;
 	}
 
+	if (nftnl_expr_is_set(nle, NFTNL_EXPR_DYNSET_SREG_DATA)) {
+		sreg_data = netlink_parse_register(nle, NFTNL_EXPR_DYNSET_SREG_DATA);
+		expr_data = netlink_get_register(ctx, loc, sreg_data);
+	}
+
 	if (dstmt != NULL) {
 		stmt = meter_stmt_alloc(loc);
 		stmt->meter.set  = set_ref_expr_alloc(loc, set);
 		stmt->meter.key  = expr;
 		stmt->meter.stmt = dstmt;
+		stmt->meter.size = set->desc.size;
+	} else if (expr_data != NULL) {
+		stmt = map_stmt_alloc(loc);
+		stmt->map.set	= set_ref_expr_alloc(loc, set);
+		stmt->map.map	= map_expr_alloc(loc, expr, expr_data);
+		stmt->map.op	= nftnl_expr_get_u32(nle, NFTNL_EXPR_DYNSET_OP);
 	} else {
 		stmt = set_stmt_alloc(loc);
 		stmt->set.set   = set_ref_expr_alloc(loc, set);
@@ -1271,8 +1352,10 @@ static const struct {
 	{ .name = "payload",	.parse = netlink_parse_payload },
 	{ .name = "exthdr",	.parse = netlink_parse_exthdr },
 	{ .name = "meta",	.parse = netlink_parse_meta },
+	{ .name = "socket",	.parse = netlink_parse_socket },
 	{ .name = "rt",		.parse = netlink_parse_rt },
 	{ .name = "ct",		.parse = netlink_parse_ct },
+	{ .name = "connlimit",	.parse = netlink_parse_connlimit },
 	{ .name = "counter",	.parse = netlink_parse_counter },
 	{ .name = "log",	.parse = netlink_parse_log },
 	{ .name = "limit",	.parse = netlink_parse_limit },
@@ -1294,6 +1377,7 @@ static const struct {
 	{ .name = "hash",	.parse = netlink_parse_hash },
 	{ .name = "fib",	.parse = netlink_parse_fib },
 	{ .name = "tcpopt",	.parse = netlink_parse_exthdr },
+	{ .name = "flow_offload", .parse = netlink_parse_flow_offload },
 };
 
 static int netlink_parse_expr(const struct nftnl_expr *nle,
@@ -1315,7 +1399,7 @@ static int netlink_parse_expr(const struct nftnl_expr *nle,
 	}
 
 	netlink_error(ctx, &loc, "unknown expression type '%s'", type);
-	return -1;
+	return 0;
 }
 
 static int netlink_parse_rule_expr(struct nftnl_expr *nle, void *arg)
@@ -1503,9 +1587,14 @@ static void ct_meta_common_postprocess(struct rule_pp_ctx *ctx,
 	const struct expr *left = expr->left;
 	struct expr *right = expr->right;
 
+	if (right->ops->type == EXPR_SET || right->ops->type == EXPR_SET_REF)
+		expr_set_type(right, left->dtype, left->byteorder);
+
 	switch (expr->op) {
 	case OP_EQ:
-		if (expr->right->ops->type == EXPR_RANGE)
+		if (expr->right->ops->type == EXPR_RANGE ||
+		    expr->right->ops->type == EXPR_SET ||
+		    expr->right->ops->type == EXPR_SET_REF)
 			break;
 
 		relational_expr_pctx_update(&ctx->pctx, expr);
@@ -1522,14 +1611,6 @@ static void ct_meta_common_postprocess(struct rule_pp_ctx *ctx,
 				payload_dependency_store(&ctx->pdctx, ctx->stmt, base);
 		}
 		break;
-	case OP_NEQ:
-		if (right->ops->type != EXPR_SET && right->ops->type != EXPR_SET_REF)
-			break;
-		/* fall through */
-	case OP_LOOKUP:
-		expr_set_type(right, left->dtype, left->byteorder);
-		break;
-
 	default:
 		break;
 	}
@@ -1630,7 +1711,7 @@ static void __binop_adjust(const struct expr *binop, struct expr *right,
 				binop_adjust_one(binop, i->key->right, shift);
 				break;
 			case EXPR_SET_ELEM:
-				binop_adjust_one(binop, i->key->key, shift);
+				__binop_adjust(binop, i->key->key, shift);
 				break;
 			default:
 				BUG("unknown expression type %s\n", i->key->ops->name);
@@ -1708,13 +1789,13 @@ static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *e
 		/* Flag comparison: data & flags != 0
 		 *
 		 * Split the flags into a list of flag values and convert the
-		 * op to OP_FLAGCMP.
+		 * op to OP_EQ.
 		 */
 		expr_free(value);
 
 		expr->left  = expr_get(binop->left);
 		expr->right = binop_tree_to_list(NULL, binop->right);
-		expr->op    = OP_FLAGCMP;
+		expr->op    = OP_IMPLICIT;
 
 		expr_free(binop);
 	} else if (binop->left->dtype->flags & DTYPE_F_PREFIX &&
@@ -1957,6 +2038,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_VERDICT:
 	case EXPR_NUMGEN:
 	case EXPR_FIB:
+	case EXPR_SOCKET:
 		break;
 	case EXPR_HASH:
 		if (expr->hash.expr)
@@ -2345,12 +2427,10 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 		case STMT_NAT:
 			if (stmt->nat.addr != NULL)
 				expr_postprocess(&rctx, &stmt->nat.addr);
-			if (stmt->nat.proto != NULL)
+			if (stmt->nat.proto != NULL) {
+				payload_dependency_reset(&rctx.pdctx);
 				expr_postprocess(&rctx, &stmt->nat.proto);
-			break;
-		case STMT_REDIR:
-			if (stmt->redir.proto != NULL)
-				expr_postprocess(&rctx, &stmt->redir.proto);
+			}
 			break;
 		case STMT_REJECT:
 			stmt_reject_postprocess(&rctx);
@@ -2365,8 +2445,9 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 				expr_postprocess(&rctx, &stmt->dup.dev);
 			break;
 		case STMT_FWD:
-			if (stmt->fwd.to != NULL)
-				expr_postprocess(&rctx, &stmt->fwd.to);
+			expr_postprocess(&rctx, &stmt->fwd.dev);
+			if (stmt->fwd.addr != NULL)
+				expr_postprocess(&rctx, &stmt->fwd.addr);
 			break;
 		case STMT_XT:
 			stmt_xt_postprocess(&rctx, stmt, rule);
@@ -2428,8 +2509,8 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 
 	memset(&h, 0, sizeof(h));
 	h.family = nftnl_rule_get_u32(nlr, NFTNL_RULE_FAMILY);
-	h.table  = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_TABLE));
-	h.chain  = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_CHAIN));
+	h.table.name = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_TABLE));
+	h.chain.name = xstrdup(nftnl_rule_get_str(nlr, NFTNL_RULE_CHAIN));
 	h.handle.id = nftnl_rule_get_u64(nlr, NFTNL_RULE_HANDLE);
 
 	if (nftnl_rule_is_set(nlr, NFTNL_RULE_POSITION))

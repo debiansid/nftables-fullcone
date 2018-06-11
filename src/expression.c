@@ -23,6 +23,7 @@
 #include <utils.h>
 #include <list.h>
 #include <erec.h>
+#include <json.h>
 
 struct expr *expr_alloc(const struct location *loc, const struct expr_ops *ops,
 			const struct datatype *dtype, enum byteorder byteorder,
@@ -65,7 +66,7 @@ void expr_free(struct expr *expr)
 		return;
 	if (--expr->refcnt > 0)
 		return;
-	if (expr->ops->destroy)
+	if (expr->ops && expr->ops->destroy)
 		expr->ops->destroy(expr);
 	xfree(expr);
 }
@@ -195,6 +196,7 @@ static const struct expr_ops verdict_expr_ops = {
 	.type		= EXPR_VERDICT,
 	.name		= "verdict",
 	.print		= verdict_expr_print,
+	.json		= verdict_expr_json,
 	.cmp		= verdict_expr_cmp,
 	.clone		= verdict_expr_clone,
 	.destroy	= verdict_expr_destroy,
@@ -254,6 +256,45 @@ struct expr *symbol_expr_alloc(const struct location *loc,
 	return expr;
 }
 
+static void variable_expr_print(const struct expr *expr,
+				struct output_ctx *octx)
+{
+	nft_print(octx, "$%s", expr->sym->identifier);
+}
+
+static void variable_expr_clone(struct expr *new, const struct expr *expr)
+{
+	new->scope      = expr->scope;
+	new->sym	= expr->sym;
+
+	expr->sym->refcnt++;
+}
+
+static void variable_expr_destroy(struct expr *expr)
+{
+	expr->sym->refcnt--;
+}
+
+static const struct expr_ops variable_expr_ops = {
+	.type		= EXPR_VARIABLE,
+	.name		= "variable",
+	.print		= variable_expr_print,
+	.clone		= variable_expr_clone,
+	.destroy	= variable_expr_destroy,
+};
+
+struct expr *variable_expr_alloc(const struct location *loc,
+				 struct scope *scope, struct symbol *sym)
+{
+	struct expr *expr;
+
+	expr = expr_alloc(loc, &variable_expr_ops, &invalid_type,
+			  BYTEORDER_INVALID, 0);
+	expr->scope	 = scope;
+	expr->sym	 = sym;
+	return expr;
+}
+
 static void constant_expr_print(const struct expr *expr,
 				 struct output_ctx *octx)
 {
@@ -280,6 +321,7 @@ static const struct expr_ops constant_expr_ops = {
 	.type		= EXPR_VALUE,
 	.name		= "value",
 	.print		= constant_expr_print,
+	.json		= constant_expr_json,
 	.cmp		= constant_expr_cmp,
 	.clone		= constant_expr_clone,
 	.destroy	= constant_expr_destroy,
@@ -425,6 +467,7 @@ static const struct expr_ops prefix_expr_ops = {
 	.type		= EXPR_PREFIX,
 	.name		= "prefix",
 	.print		= prefix_expr_print,
+	.json		= prefix_expr_json,
 	.set_type	= prefix_expr_set_type,
 	.clone		= prefix_expr_clone,
 	.destroy	= prefix_expr_destroy,
@@ -457,8 +500,6 @@ const char *expr_op_symbols[] = {
 	[OP_GT]		= ">",
 	[OP_LTE]	= "<=",
 	[OP_GTE]	= ">=",
-	[OP_RANGE]	= "within range",
-	[OP_LOOKUP]	= NULL,
 };
 
 static void unary_expr_print(const struct expr *expr, struct output_ctx *octx)
@@ -480,6 +521,7 @@ static const struct expr_ops unary_expr_ops = {
 	.type		= EXPR_UNARY,
 	.name		= "unary",
 	.print		= unary_expr_print,
+	.json		= unary_expr_json,
 	.clone		= unary_expr_clone,
 	.destroy	= unary_expr_destroy,
 };
@@ -521,10 +563,11 @@ static void binop_arg_print(const struct expr *op, const struct expr *arg,
 		nft_print(octx, ")");
 }
 
-static bool must_print_eq_op(const struct expr *expr)
+bool must_print_eq_op(const struct expr *expr)
 {
 	if (expr->right->dtype->basetype != NULL &&
-	    expr->right->dtype->basetype->type == TYPE_BITMASK)
+	    expr->right->dtype->basetype->type == TYPE_BITMASK &&
+	    expr->right->ops->type == EXPR_VALUE)
 		return true;
 
 	return expr->left->ops->type == EXPR_BINOP;
@@ -559,6 +602,7 @@ static const struct expr_ops binop_expr_ops = {
 	.type		= EXPR_BINOP,
 	.name		= "binop",
 	.print		= binop_expr_print,
+	.json		= binop_expr_json,
 	.clone		= binop_expr_clone,
 	.destroy	= binop_expr_destroy,
 };
@@ -580,6 +624,7 @@ static const struct expr_ops relational_expr_ops = {
 	.type		= EXPR_RELATIONAL,
 	.name		= "relational",
 	.print		= binop_expr_print,
+	.json		= relational_expr_json,
 	.destroy	= binop_expr_destroy,
 };
 
@@ -606,7 +651,7 @@ void relational_expr_pctx_update(struct proto_ctx *ctx,
 	const struct expr *left = expr->left;
 
 	assert(expr->ops->type == EXPR_RELATIONAL);
-	assert(expr->op == OP_EQ);
+	assert(expr->op == OP_EQ || expr->op == OP_IMPLICIT);
 
 	if (left->ops->pctx_update &&
 	    (left->flags & EXPR_F_PROTOCOL))
@@ -646,6 +691,7 @@ static const struct expr_ops range_expr_ops = {
 	.type		= EXPR_RANGE,
 	.name		= "range",
 	.print		= range_expr_print,
+	.json		= range_expr_json,
 	.clone		= range_expr_clone,
 	.destroy	= range_expr_destroy,
 	.set_type	= range_expr_set_type,
@@ -663,8 +709,8 @@ struct expr *range_expr_alloc(const struct location *loc,
 	return expr;
 }
 
-static struct expr *compound_expr_alloc(const struct location *loc,
-					const struct expr_ops *ops)
+struct expr *compound_expr_alloc(const struct location *loc,
+				 const struct expr_ops *ops)
 {
 	struct expr *expr;
 
@@ -730,6 +776,7 @@ static const struct expr_ops concat_expr_ops = {
 	.type		= EXPR_CONCAT,
 	.name		= "concat",
 	.print		= concat_expr_print,
+	.json		= concat_expr_json,
 	.clone		= compound_expr_clone,
 	.destroy	= concat_expr_destroy,
 };
@@ -748,6 +795,7 @@ static const struct expr_ops list_expr_ops = {
 	.type		= EXPR_LIST,
 	.name		= "list",
 	.print		= list_expr_print,
+	.json		= list_expr_json,
 	.clone		= compound_expr_clone,
 	.destroy	= compound_expr_destroy,
 };
@@ -834,6 +882,7 @@ static const struct expr_ops set_expr_ops = {
 	.type		= EXPR_SET,
 	.name		= "set",
 	.print		= set_expr_print,
+	.json		= set_expr_json,
 	.set_type	= set_expr_set_type,
 	.clone		= compound_expr_clone,
 	.destroy	= compound_expr_destroy,
@@ -882,6 +931,7 @@ static const struct expr_ops mapping_expr_ops = {
 	.type		= EXPR_MAPPING,
 	.name		= "mapping",
 	.print		= mapping_expr_print,
+	.json		= mapping_expr_json,
 	.set_type	= mapping_expr_set_type,
 	.clone		= mapping_expr_clone,
 	.destroy	= mapping_expr_destroy,
@@ -926,6 +976,7 @@ static const struct expr_ops map_expr_ops = {
 	.type		= EXPR_MAP,
 	.name		= "map",
 	.print		= map_expr_print,
+	.json		= map_expr_json,
 	.clone		= map_expr_clone,
 	.destroy	= map_expr_destroy,
 };
@@ -945,11 +996,11 @@ static void set_ref_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	if (expr->set->flags & NFT_SET_ANONYMOUS) {
 		if (expr->set->flags & NFT_SET_EVAL)
-			nft_print(octx, "%s", expr->set->handle.set);
+			nft_print(octx, "%s", expr->set->handle.set.name);
 		else
 			expr_print(expr->set->init, octx);
 	} else {
-		nft_print(octx, "@%s", expr->set->handle.set);
+		nft_print(octx, "@%s", expr->set->handle.set.name);
 	}
 }
 
@@ -967,6 +1018,7 @@ static const struct expr_ops set_ref_expr_ops = {
 	.type		= EXPR_SET_REF,
 	.name		= "set reference",
 	.print		= set_ref_expr_print,
+	.json		= set_ref_expr_json,
 	.clone		= set_ref_expr_clone,
 	.destroy	= set_ref_expr_destroy,
 };
@@ -987,11 +1039,11 @@ static void set_elem_expr_print(const struct expr *expr,
 	expr_print(expr->key, octx);
 	if (expr->timeout) {
 		nft_print(octx, " timeout ");
-		time_print(expr->timeout / 1000, octx);
+		time_print(expr->timeout, octx);
 	}
 	if (!octx->stateless && expr->expiration) {
 		nft_print(octx, " expires ");
-		time_print(expr->expiration / 1000, octx);
+		time_print(expr->expiration, octx);
 	}
 	if (expr->comment)
 		nft_print(octx, " comment \"%s\"", expr->comment);
@@ -1022,6 +1074,7 @@ static const struct expr_ops set_elem_expr_ops = {
 	.name		= "set element",
 	.clone		= set_elem_expr_clone,
 	.print		= set_elem_expr_print,
+	.json		= set_elem_expr_json,
 	.destroy	= set_elem_expr_destroy,
 };
 

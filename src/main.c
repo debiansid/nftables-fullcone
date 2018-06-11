@@ -18,7 +18,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 
-#include <nftables/nftables.h>
+#include <nftables/libnftables.h>
 #include <utils.h>
 #include <cli.h>
 
@@ -31,6 +31,7 @@ enum opt_vals {
 	OPT_FILE		= 'f',
 	OPT_INTERACTIVE		= 'i',
 	OPT_INCLUDEPATH		= 'I',
+	OPT_JSON		= 'j',
 	OPT_NUMERIC		= 'n',
 	OPT_STATELESS		= 's',
 	OPT_IP2NAME		= 'N',
@@ -40,7 +41,7 @@ enum opt_vals {
 	OPT_INVALID		= '?',
 };
 
-#define OPTSTRING	"hvcf:iI:vnsNae"
+#define OPTSTRING	"hvcf:iI:jvnsNae"
 
 static const struct option options[] = {
 	{
@@ -95,6 +96,10 @@ static const struct option options[] = {
 		.val		= OPT_ECHO,
 	},
 	{
+		.name		= "json",
+		.val		= OPT_JSON,
+	},
+	{
 		.name		= NULL
 	}
 };
@@ -112,6 +117,7 @@ static void show_help(const char *name)
 "  -f, --file <filename>		Read input from <filename>\n"
 "  -i, --interactive		Read input from interactive CLI\n"
 "\n"
+"  -j, --json			Format output in JSON\n"
 "  -n, --numeric			When specified once, show network addresses numerically (default behaviour).\n"
 "  				Specify twice to also show Internet services (port numbers) numerically.\n"
 "				Specify three times to also show protocols, user IDs, and group IDs numerically.\n"
@@ -255,6 +261,9 @@ int main(int argc, char * const *argv)
 		case OPT_ECHO:
 			nft_ctx_output_set_echo(nft, true);
 			break;
+		case OPT_JSON:
+			nft_ctx_output_set_json(nft, true);
+			break;
 		case OPT_INVALID:
 			exit(EXIT_FAILURE);
 		}
@@ -264,14 +273,13 @@ int main(int argc, char * const *argv)
 		for (len = 0, i = optind; i < argc; i++)
 			len += strlen(argv[i]) + strlen(" ");
 
-		buf = xzalloc(len + 2);
+		buf = xzalloc(len);
 		for (i = optind; i < argc; i++) {
 			strcat(buf, argv[i]);
 			if (i + 1 < argc)
 				strcat(buf, " ");
 		}
-		strcat(buf, "\n");
-		rc = !!nft_run_cmd_from_buffer(nft, buf, len + 2);
+		rc = !!nft_run_cmd_from_buffer(nft, buf, len);
 	} else if (filename != NULL) {
 		rc = !!nft_run_cmd_from_filename(nft, filename);
 	} else if (interactive) {

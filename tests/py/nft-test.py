@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # (C) 2014 by Ana Rey Botello <anarey@gmail.com>
 #
@@ -15,11 +15,10 @@
 
 import sys
 import os
-import subprocess
 import argparse
 import signal
+import json
 
-NFT_BIN = os.getenv('NFT', "src/nft")
 TESTS_PATH = os.path.dirname(os.path.abspath(__file__))
 TESTS_DIRECTORY = ["any", "arp", "bridge", "inet", "ip", "ip6"]
 LOGFILE = "/tmp/nftables-test.log"
@@ -57,6 +56,9 @@ class Chain:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+    def __str__(self):
+        return "%s" % self.name
+
 
 class Table:
     """Class that represents a table"""
@@ -69,15 +71,19 @@ class Table:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+    def __str__(self):
+        return "%s %s" % (self.family, self.name)
+
 
 class Set:
     """Class that represents a set"""
 
-    def __init__(self, family, table, name, type, flags):
+    def __init__(self, family, table, name, type, timeout, flags):
         self.family = family
         self.table = table
         self.name = name
         self.type = type
+        self.timeout = timeout
         self.flags = flags
 
     def __eq__(self, other):
@@ -98,43 +104,78 @@ class Obj:
         return self.__dict__ == other.__dict__
 
 
-def print_msg(reason, filename=None, lineno=None, color=None, errstr=None):
+def print_msg(reason, errstr, filename=None, lineno=None, color=None):
     '''
     Prints a message with nice colors, indicating file and line number.
     '''
     if filename and lineno:
-        print filename + ": " + color + "ERROR:" + Colors.ENDC + \
-              " line %d: %s" % (lineno + 1, reason)
+        sys.stderr.write(filename + ": " + color + errstr + Colors.ENDC + \
+              " line %d: %s" % (lineno + 1, reason))
     else:
-        print color + "ERROR:" + Colors.ENDC + " %s" % reason
+        sys.stderr.write(color + errstr + Colors.ENDC + " %s" % reason)
+    sys.stderr.write("\n")
+    sys.stderr.flush() # So that the message stay in the right place.
 
 
 def print_error(reason, filename=None, lineno=None):
-    print_msg(reason, filename, lineno, Colors.RED, "ERROR:")
+    print_msg(reason, "ERROR:", filename, lineno, Colors.RED)
 
 
 def print_warning(reason, filename=None, lineno=None):
-    print_msg(reason, filename, lineno, Colors.YELLOW, "WARNING:")
+    print_msg(reason, "WARNING:", filename, lineno, Colors.YELLOW)
 
+def print_info(reason, filename=None, lineno=None):
+    print_msg(reason, "INFO:", filename, lineno, Colors.GREEN)
+
+def color_differences(rule, other, color):
+    rlen = len(rule)
+    olen = len(other)
+
+    # find equal part at start
+    for i in range(rlen):
+        if i >= olen or rule[i] != other[i]:
+            break
+    start_idx = i
+
+    # find equal part at end
+    found = False
+    for i in range(-1, start_idx -rlen - 1, -1):
+        if i < start_idx -olen:
+            break
+        if rule[i] != other[i]:
+            found = True
+            break
+    end_idx = i
+    if found:
+        end_idx += 1
+
+    out = ""
+    if start_idx > 0:
+        out += rule[:start_idx]
+    out += color + rule[start_idx:end_idx] + Colors.ENDC
+    if end_idx < 0:
+        out += rule[end_idx:]
+
+    return out
 
 def print_differences_warning(filename, lineno, rule1, rule2, cmd):
-    reason = "'" + rule1 + "' mismatches '" + rule2 + "'"
-    print filename + ": " + Colors.YELLOW + "WARNING: " + Colors.ENDC + \
-          "line: " + str(lineno + 1) + ": '" + cmd + "': " + reason
+    colored_rule1 = color_differences(rule1, rule2, Colors.YELLOW)
+    colored_rule2 = color_differences(rule2, rule1, Colors.YELLOW)
+    reason = "'%s': '%s' mismatches '%s'" % (cmd, colored_rule1, colored_rule2)
+    print_warning(reason, filename, lineno)
 
 
 def print_differences_error(filename, lineno, cmd):
-    reason = "Listing is broken."
-    print filename + ": " + Colors.RED + "ERROR: " + Colors.ENDC + "line: " + \
-          str(lineno + 1) + ": '" + cmd + "': " + reason
+    reason = "'%s': Listing is broken." % cmd
+    print_error(reason, filename, lineno)
 
 
 def table_exist(table, filename, lineno):
     '''
     Exists a table.
     '''
-    cmd = NFT_BIN + " list -nnn table " + table.family + " " + table.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list table %s" % table
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -143,7 +184,7 @@ def table_flush(table, filename, lineno):
     '''
     Flush a table.
     '''
-    cmd = NFT_BIN + " flush table " + table.family + " " + table.name
+    cmd = "flush table %s" % table
     execute_cmd(cmd, filename, lineno)
 
     return cmd
@@ -155,18 +196,18 @@ def table_create(table, filename, lineno):
     '''
     # We check if table exists.
     if table_exist(table, filename, lineno):
-        reason = "Table " + table.name + " already exists"
+        reason = "Table %s already exists" % table
         print_error(reason, filename, lineno)
         return -1
 
     table_list.append(table)
 
     # We add a new table
-    cmd = NFT_BIN + " add table " + table.family + " " + table.name
+    cmd = "add table %s" % table
     ret = execute_cmd(cmd, filename, lineno)
 
     if ret != 0:
-        reason = "Cannot add table " + table.name
+        reason = "Cannot " + cmd
         print_error(reason, filename, lineno)
         table_list.remove(table)
         return -1
@@ -174,16 +215,16 @@ def table_create(table, filename, lineno):
     # We check if table was added correctly.
     if not table_exist(table, filename, lineno):
         table_list.remove(table)
-        reason = "I have just added the table " + table.name + \
-                 " but it does not exist. Giving up!"
+        reason = "I have just added the table %s " \
+                 "but it does not exist. Giving up!" % table
         print_error(reason, filename, lineno)
         return -1
 
     for table_chain in table.chains:
         chain = chain_get_by_name(table_chain)
         if chain is None:
-            reason = "The chain " + table_chain + " requested by table " + \
-                     table.name + " does not exist."
+            reason = "The chain %s requested by table %s " \
+                     "does not exist." % (table_chain, table)
             print_error(reason, filename, lineno)
         else:
             chain_create(chain, table, filename)
@@ -195,25 +236,21 @@ def table_delete(table, filename=None, lineno=None):
     '''
     Deletes a table.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if not table_exist(table, filename, lineno):
-        reason = "Table " + table.name + \
-                 " does not exist but I added it before."
+        reason = "Table %s does not exist but I added it before." % table
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " delete table" + table_info
+    cmd = "delete table %s" % table
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = cmd + ": " + "I cannot delete table '" + table.name + \
-                 "'. Giving up! "
+        reason = "%s: I cannot delete table %s. Giving up!" % (cmd, table)
         print_error(reason, filename, lineno)
         return -1
 
     if table_exist(table, filename, lineno):
-        reason = "I have just deleted the table " + table.name + \
-                 " but the table still exists."
+        reason = "I have just deleted the table %s " \
+                 "but it still exists." % table
         print_error(reason, filename, lineno)
         return -1
 
@@ -224,9 +261,8 @@ def chain_exist(chain, table, filename):
     '''
     Checks a chain
     '''
-    table_info = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn chain" + table_info + chain.name
-    ret = execute_cmd(cmd, filename, chain.lineno)
+    cmd = "list chain %s %s" % (table, chain)
+    ret = execute_cmd(cmd, filename, chain.lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -235,26 +271,23 @@ def chain_create(chain, table, filename):
     '''
     Adds a chain
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if chain_exist(chain, table, filename):
-        reason = "This chain '" + chain.name + "' exists in " + table.name + \
-                 ". I cannot create two chains with same name."
+        reason = "This chain '%s' exists in %s. I cannot create " \
+                 "two chains with same name." % (chain, table)
         print_error(reason, filename, chain.lineno)
         return -1
 
-    cmd = NFT_BIN + " add chain" + table_info + chain.name + \
-          "\{ " + chain.config + "\; \}"
+    cmd = "add chain %s %s { %s; }" % (table, chain, chain.config)
 
     ret = execute_cmd(cmd, filename, chain.lineno)
     if ret != 0:
-        reason = "I cannot create the chain '" + chain.name + "'"
+        reason = "I cannot create the chain '%s'" % chain
         print_error(reason, filename, chain.lineno)
         return -1
 
     if not chain_exist(chain, table, filename):
-        reason = "I have added the chain '" + chain.name + \
-                 "' but it does not exist in " + table.name
+        reason = "I have added the chain '%s' " \
+                 "but it does not exist in %s" % (chain, table)
         print_error(reason, filename, chain.lineno)
         return -1
 
@@ -265,31 +298,29 @@ def chain_delete(chain, table, filename=None, lineno=None):
     '''
     Flushes and deletes a chain.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     if not chain_exist(chain, table, filename):
-        reason = "The chain " + chain.name + " does not exists in " + \
-                 table.name + ". I cannot delete it."
+        reason = "The chain %s does not exist in %s. " \
+                 "I cannot delete it." % (chain, table)
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " flush chain" + table_info + chain.name
+    cmd = "flush chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = "I cannot flush this chain " + chain.name
+        reason = "I cannot flush this chain " + chain
         print_error(reason, filename, lineno)
         return -1
 
-    cmd = NFT_BIN + " delete chain" + table_info + chain.name
+    cmd = "delete chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = cmd + "I cannot delete this chain. DD"
+        reason = cmd + "I cannot delete this chain " + chain
         print_error(reason, filename, lineno)
         return -1
 
     if chain_exist(chain, table, filename):
-        reason = "The chain " + chain.name + " exists in " + table.name + \
-                 ". I cannot delete this chain"
+        reason = "The chain %s exists in %s. " \
+                 "I cannot delete this chain" % (chain, table)
         print_error(reason, filename, lineno)
         return -1
 
@@ -319,28 +350,26 @@ def set_add(s, test_result, filename, lineno):
         s.table = table.name
         s.family = table.family
         if _set_exist(s, filename, lineno):
-            reason = "Set " + s.name + " already exists in " + table.name
+            reason = "Set %s already exists in %s" % (s.name, table)
             print_error(reason, filename, lineno)
             return -1
 
-        table_handle = " " + table.family + " " + table.name + " "
-        if s.flags == "":
-            set_cmd = " " + s.name + " { type " + s.type + "\;}"
-        else:
-            set_cmd = " " + s.name + " { type " + s.type + "\; flags " + s.flags + "\; }"
+        flags = s.flags
+        if flags != "":
+            flags = "flags %s; " % flags
 
-        cmd = NFT_BIN + " add set" + table_handle + set_cmd
+        cmd = "add set %s %s { type %s;%s %s}" % (table, s.name, s.type, s.timeout, flags)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (ret == 0 and test_result == "fail") or \
                 (ret != 0 and test_result == "ok"):
-            reason = cmd + ": " + "I cannot add the set " + s.name
+            reason = "%s: I cannot add the set %s" % (cmd, s.name)
             print_error(reason, filename, lineno)
             return -1
 
         if not _set_exist(s, filename, lineno):
-            reason = "I have just added the set " + s.name + \
-                     " to the table " + table.name + " but it does not exist"
+            reason = "I have just added the set %s to " \
+                     "the table %s but it does not exist" % (s.name, table)
             print_error(reason, filename, lineno)
             return -1
 
@@ -360,22 +389,13 @@ def set_add_elements(set_element, set_name, state, filename, lineno):
         # Check if set exists.
         if (not set_exist(set_name, table, filename, lineno) or
                     set_name not in all_set) and state == "ok":
-            reason = "I cannot add an element to the set " + set_name + \
-                     " since it does not exist."
+            reason = "I cannot add an element to the set %s " \
+                     "since it does not exist." % set_name
             print_error(reason, filename, lineno)
             return -1
 
-        table_info = " " + table.family + " " + table.name + " "
-
-        element = ""
-        for e in set_element:
-            if not element:
-                element = e
-            else:
-                element = element + ", " + e
-
-        set_text = set_name + " { " + element + " }"
-        cmd = NFT_BIN + " add element" + table_info + set_text
+        element = ", ".join(set_element)
+        cmd = "add element %s %s { %s }" % (table, set_name, element)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (state == "fail" and ret == 0) or (state == "ok" and ret != 0):
@@ -397,15 +417,12 @@ def set_delete_elements(set_element, set_name, table, filename=None,
     '''
     Deletes elements in a set.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-
     for element in set_element:
-        set_text = set_name + " {" + element + "}"
-        cmd = NFT_BIN + " delete element" + table_info + set_text
+        cmd = "delete element %s %s { %s }" % (table, set_name, element)
         ret = execute_cmd(cmd, filename, lineno)
         if ret != 0:
-            reason = "I cannot delete an element" + element + \
-                     " from the set '" + set_name
+            reason = "I cannot delete element %s " \
+                     "from the set %s" % (element, set_name)
             print_error(reason, filename, lineno)
             return -1
 
@@ -419,8 +436,8 @@ def set_delete(table, filename=None, lineno=None):
     for set_name in all_set.keys():
         # Check if exists the set
         if not set_exist(set_name, table, filename, lineno):
-            reason = "The set " + set_name + \
-                     " does not exist, I cannot delete it"
+            reason = "The set %s does not exist, " \
+                     "I cannot delete it" % set_name
             print_error(reason, filename, lineno)
             return -1
 
@@ -429,8 +446,7 @@ def set_delete(table, filename=None, lineno=None):
                             lineno)
 
         # We delete the set.
-        table_info = " " + table.family + " " + table.name + " "
-        cmd = NFT_BIN + " delete set " + table_info + " " + set_name
+        cmd = "delete set %s %s" % (table, set_name)
         ret = execute_cmd(cmd, filename, lineno)
 
         # Check if the set still exists after I deleted it.
@@ -446,9 +462,8 @@ def set_exist(set_name, table, filename, lineno):
     '''
     Check if the set exists.
     '''
-    table_info = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn set" + table_info + set_name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list set %s %s" % (table, set_name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -457,9 +472,8 @@ def _set_exist(s, filename, lineno):
     '''
     Check if the set exists.
     '''
-    table_handle = " " + s.family + " " + s.table + " "
-    cmd = NFT_BIN + " list -nnn set" + table_handle + s.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list set %s %s %s" % (s.family, s.table, s.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -471,6 +485,10 @@ def set_check_element(rule1, rule2):
     ret = -1
     pos1 = rule1.find("{")
     pos2 = rule2.find("{")
+
+    if (cmp(rule1[:pos1], rule2[:pos2]) != 0):
+        return ret;
+
     end1 = rule1.find("}")
     end2 = rule2.find("}")
 
@@ -502,18 +520,16 @@ def obj_add(o, test_result, filename, lineno):
         o.family = table.family
         obj_handle = o.type + " " + o.name
         if _obj_exist(o, filename, lineno):
-            reason = "The " + obj_handle + " already exists in " + table.name
+            reason = "The %s already exists in %s" % (obj_handle, table)
             print_error(reason, filename, lineno)
             return -1
 
-        table_handle = " " + table.family + " " + table.name + " "
-
-        cmd = NFT_BIN + " add " + o.type + table_handle + o.name + " " + o.spcf
+        cmd = "add %s %s %s %s" % (o.type, table, o.name, o.spcf)
         ret = execute_cmd(cmd, filename, lineno)
 
         if (ret == 0 and test_result == "fail") or \
                 (ret != 0 and test_result == "ok"):
-            reason = cmd + ": " + "I cannot add the " + obj_handle
+            reason = "%s: I cannot add the %s" % (cmd, obj_handle)
             print_error(reason, filename, lineno)
             return -1
 
@@ -522,16 +538,16 @@ def obj_add(o, test_result, filename, lineno):
         if exist:
             if test_result == "ok":
                  return 0
-            reason = "I added the " + obj_handle + \
-                     " to the table " + table.name + " but it should have failed"
+            reason = "I added the %s to the table %s " \
+                     "but it should have failed" % (obj_handle, table)
             print_error(reason, filename, lineno)
             return -1
 
         if test_result == "fail":
             return 0
 
-        reason = "I have just added the " + obj_handle + \
-                 " to the table " + table.name + " but it does not exist"
+        reason = "I have just added the %s to " \
+                 "the table %s but it does not exist" % (obj_handle, table)
         print_error(reason, filename, lineno)
         return -1
 
@@ -543,13 +559,12 @@ def obj_delete(table, filename=None, lineno=None):
         obj_handle = o.type + " " + o.name
         # Check if exists the obj
         if not obj_exist(o, table, filename, lineno):
-            reason = "The " + obj_handle + " does not exist, I cannot delete it"
+            reason = "The %s does not exist, I cannot delete it" % obj_handle
             print_error(reason, filename, lineno)
             return -1
 
         # We delete the object.
-        table_info = " " + table.family + " " + table.name + " "
-        cmd = NFT_BIN + " delete " + o.type + table_info + " " + o.name
+        cmd = "delete %s %s %s" % (o.type, table, o.name)
         ret = execute_cmd(cmd, filename, lineno)
 
         # Check if the object still exists after I deleted it.
@@ -565,9 +580,8 @@ def obj_exist(o, table, filename, lineno):
     '''
     Check if the object exists.
     '''
-    table_handle = " " + table.family + " " + table.name + " "
-    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list %s %s %s" % (o.type, table, o.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -576,9 +590,8 @@ def _obj_exist(o, filename, lineno):
     '''
     Check if the object exists.
     '''
-    table_handle = " " + o.family + " " + o.table + " "
-    cmd = NFT_BIN + " list -nnn " + o.type + table_handle + o.name
-    ret = execute_cmd(cmd, filename, lineno)
+    cmd = "list %s %s %s %s" % (o.type, o.family, o.table, o.name)
+    ret = execute_cmd(cmd, filename, lineno, numeric="all")
 
     return True if (ret == 0) else False
 
@@ -659,6 +672,16 @@ def payload_check(payload_buffer, file, cmd):
     return i > 0
 
 
+def json_dump_normalize(json_string, human_readable = False):
+    json_obj = json.loads(json_string)
+
+    if human_readable:
+        return json.dumps(json_obj, sort_keys = True,
+                          indent = 4, separators = (',', ': '))
+    else:
+        return json.dumps(json_obj, sort_keys = True)
+
+
 def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
     '''
     Adds a rule
@@ -671,35 +694,69 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
         print_error(reason, filename, lineno)
         return [-1, warning, error, unit_tests]
 
-    payload_expected = []
+    if rule[1].strip() == "ok":
+        try:
+            payload_log = open("%s.payload" % filename_path)
+            payload_expected = payload_find_expected(payload_log, rule[0])
+        except:
+            payload_expected = None
+
+        if enable_json_option:
+            try:
+                json_log = open("%s.json" % filename_path)
+                json_input = json_find_expected(json_log, rule[0])
+            except:
+                json_input = None
+
+            if not json_input:
+                print_error("did not find JSON equivalent for rule '%s'"
+                            % rule[0])
+            else:
+                try:
+                    json_input = json_dump_normalize(json_input)
+                except ValueError:
+                    reason = "Invalid JSON syntax in rule: %s" % json_input
+                    print_error(reason)
+                    return [-1, warning, error, unit_tests]
+
+            try:
+                json_log = open("%s.json.output" % filename_path)
+                json_expected = json_find_expected(json_log, rule[0])
+            except:
+                # will use json_input for comparison
+                json_expected = None
+
+            if json_expected:
+                try:
+                    json_expected = json_dump_normalize(json_expected)
+                except ValueError:
+                    reason = "Invalid JSON syntax in expected output: %s" % json_expected
+                    print_error(reason)
+                    return [-1, warning, error, unit_tests]
 
     for table in table_list:
-        try:
-            payload_log = open("%s.payload.%s" % (filename_path, table.family))
-        except IOError:
-            payload_log = open("%s.payload" % filename_path)
-
         if rule[1].strip() == "ok":
+            table_payload_expected = None
             try:
-                payload_expected.index(rule[0])
-            except ValueError:
-                payload_expected = payload_find_expected(payload_log, rule[0])
-
+                payload_log = open("%s.payload.%s" % (filename_path, table.family))
+                table_payload_expected = payload_find_expected(payload_log, rule[0])
+            except:
                 if not payload_expected:
                     print_error("did not find payload information for "
                                 "rule '%s'" % rule[0], payload_log.name, 1)
+            if not table_payload_expected:
+                table_payload_expected = payload_expected
 
         for table_chain in table.chains:
             chain = chain_get_by_name(table_chain)
             unit_tests += 1
             table_flush(table, filename, lineno)
-            table_info = " " + table.family + " " + table.name + " "
 
             payload_log = os.tmpfile()
 
-            cmd = NFT_BIN + " add rule --debug=netlink" + table_info + \
-                  chain.name + " " + rule[0]
-            ret = execute_cmd(cmd, filename, lineno, payload_log)
+            # Add rule and check return code
+            cmd = "add rule %s %s %s" % (table, chain, rule[0])
+            ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
 
             state = rule[1].rstrip()
             if (ret in [0,134] and state == "fail") or (ret != 0 and state == "ok"):
@@ -718,74 +775,168 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                 ret = 0
                 continue
 
-            if ret == 0:
-                # Check for matching payload
-                if state == "ok" and not payload_check(payload_expected,
-                                                       payload_log, cmd):
-                    error += 1
-                    gotf = open("%s.payload.got" % filename_path, 'a')
-                    payload_log.seek(0, 0)
-                    gotf.write("# %s\n" % rule[0])
-                    while True:
-                        line = payload_log.readline()
-                        if line == "":
-                            break
-                        gotf.write(line)
-                    gotf.close()
-                    print_warning("Wrote payload for rule %s" % rule[0],
-                                  gotf.name, 1)
+            if ret != 0:
+                continue
 
-                # Check output of nft
-                process = subprocess.Popen([NFT_BIN, '-nnns', 'list', 'table',
-                                            table.family, table.name],
-                                           shell=False,
-                                           stdout=subprocess.PIPE,
-                                           preexec_fn=preexec)
-                pre_output = process.communicate()
-                output = pre_output[0].split(";")
-                if len(output) < 2:
-                    reason = cmd + ": Listing is broken."
-                    print_error(reason, filename, lineno)
-                    ret = -1
-                    error += 1
+            # Check for matching payload
+            if state == "ok" and not payload_check(table_payload_expected,
+                                                   payload_log, cmd):
+                error += 1
+                gotf = open("%s.payload.got" % filename_path, 'a')
+                payload_log.seek(0, 0)
+                gotf.write("# %s\n" % rule[0])
+                while True:
+                    line = payload_log.readline()
+                    if line == "":
+                        break
+                    gotf.write(line)
+                gotf.close()
+                print_warning("Wrote payload for rule %s" % rule[0],
+                              gotf.name, 1)
+
+            # Check for matching ruleset listing
+            numeric_old = nftables.set_numeric_output("all")
+            stateless_old = nftables.set_stateless_output(True)
+            list_cmd = 'list table %s' % table
+            rc, pre_output, err = nftables.cmd(list_cmd)
+            nftables.set_numeric_output(numeric_old)
+            nftables.set_stateless_output(stateless_old)
+
+            output = pre_output.split(";")
+            if len(output) < 2:
+                reason = cmd + ": Listing is broken."
+                print_error(reason, filename, lineno)
+                ret = -1
+                error += 1
+                if not force_all_family_option:
+                    return [ret, warning, error, unit_tests]
+                continue
+
+            rule_output = output_clean(pre_output, chain)
+            if len(rule) == 3:
+                teoric_exit = rule[2]
+            else:
+                teoric_exit = rule[0]
+
+            if rule_output.rstrip() != teoric_exit.rstrip():
+                if rule[0].find("{") != -1:  # anonymous sets
+                    if set_check_element(teoric_exit.rstrip(),
+                                         rule_output.rstrip()) != 0:
+                        warning += 1
+                        print_differences_warning(filename, lineno,
+                                                  teoric_exit.rstrip(),
+                                                  rule_output, cmd)
+                        if not force_all_family_option:
+                            return [ret, warning, error, unit_tests]
+                else:
+                    if len(rule_output) <= 0:
+                        error += 1
+                        print_differences_error(filename, lineno, cmd)
+                        if not force_all_family_option:
+                            return [ret, warning, error, unit_tests]
+
+                    warning += 1
+                    print_differences_warning(filename, lineno,
+                                              teoric_exit.rstrip(),
+                                              rule_output, cmd)
+
                     if not force_all_family_option:
                         return [ret, warning, error, unit_tests]
-                else:
-                    rule_output = output_clean(pre_output[0], chain)
-                    if len(rule) == 3:
-                        teoric_exit = rule[2]
-                    else:
-                        teoric_exit = rule[0]
 
-                    if rule_output.rstrip() != teoric_exit.rstrip():
-                        if rule[0].find("{") != -1:  # anonymous sets
-                            if set_check_element(teoric_exit.rstrip(), rule_output.rstrip()) != 0:
-                                warning += 1
-                                print_differences_warning(filename, lineno,
-                                                          rule[0], rule_output,
-                                                          cmd)
-                                if not force_all_family_option:
-                                    return [ret, warning, error, unit_tests]
-                        else:
-                            if len(rule_output) <= 0:
-                                error += 1
-                                print_differences_error(filename, lineno, cmd)
-                                if not force_all_family_option:
-                                    return [ret, warning, error, unit_tests]
+            if not enable_json_option:
+                continue
 
-                            warning += 1
-                            print_differences_warning(filename, lineno,
-                                                      teoric_exit.rstrip(),
-                                                      rule_output, cmd)
+            # Generate JSON equivalent for rule if not found
+            if not json_input:
+                json_old = nftables.set_json_output(True)
+                rc, json_output, err = nftables.cmd(list_cmd)
+                nftables.set_json_output(json_old)
 
-                            if not force_all_family_option:
-                                return [ret, warning, error, unit_tests]
+                json_output = json.loads(json_output)
+                for item in json_output["nftables"]:
+                    if "rule" in item:
+                        del(item["rule"]["handle"])
+                        json_output = item["rule"]
+                        break
+                json_input = json.dumps(json_output["expr"], sort_keys = True)
+
+                gotf = open("%s.json.got" % filename_path, 'a')
+                jdump = json_dump_normalize(json_input, True)
+                gotf.write("# %s\n%s\n\n" % (rule[0], jdump))
+                gotf.close()
+                print_warning("Wrote JSON equivalent for rule %s" % rule[0],
+                              gotf.name, 1)
+
+            table_flush(table, filename, lineno)
+            payload_log = os.tmpfile()
+
+            # Add rule in JSON format
+            cmd = json.dumps({ "nftables": [{ "add": { "rule": {
+                    "family": table.family,
+                    "table": table.name,
+                    "chain": chain.name,
+                    "expr": json.loads(json_input),
+            }}}]})
+
+            json_old = nftables.set_json_output(True)
+            ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
+            nftables.set_json_output(json_old)
+
+            if ret != 0:
+                reason = "Failed to add JSON equivalent rule"
+                print_error(reason, filename, lineno)
+                continue
+
+            # Check for matching payload
+            if not payload_check(table_payload_expected, payload_log, cmd):
+                error += 1
+                gotf = open("%s.json.payload.got" % filename_path, 'a')
+                payload_log.seek(0, 0)
+                gotf.write("# %s\n" % rule[0])
+                while True:
+                    line = payload_log.readline()
+                    if line == "":
+                        break
+                    gotf.write(line)
+                gotf.close()
+                print_warning("Wrote JSON payload for rule %s" % rule[0],
+                              gotf.name, 1)
+
+            # Check for matching ruleset listing
+            numeric_old = nftables.set_numeric_output("all")
+            stateless_old = nftables.set_stateless_output(True)
+            json_old = nftables.set_json_output(True)
+            rc, json_output, err = nftables.cmd(list_cmd)
+            nftables.set_json_output(json_old)
+            nftables.set_numeric_output(numeric_old)
+            nftables.set_stateless_output(stateless_old)
+
+            json_output = json.loads(json_output)
+            for item in json_output["nftables"]:
+                if "rule" in item:
+                    del(item["rule"]["handle"])
+                    json_output = item["rule"]
+                    break
+            json_output = json.dumps(json_output["expr"], sort_keys = True)
+
+            if not json_expected and json_output != json_input:
+                print_differences_warning(filename, lineno,
+                                          json_input, json_output, cmd)
+                error += 1
+                gotf = open("%s.json.output.got" % filename_path, 'a')
+                jdump = json_dump_normalize(json_output, True)
+                gotf.write("# %s\n%s\n\n" % (rule[0], jdump))
+                gotf.close()
+                print_warning("Wrote JSON output for rule %s" % rule[0],
+                              gotf.name, 1)
+                # prevent further warnings and .got file updates
+                json_expected = json_output
+            elif json_expected and json_output != json_expected:
+                print_differences_warning(filename, lineno,
+                                          json_expected, json_output, cmd)
+                error += 1
 
     return [ret, warning, error, unit_tests]
-
-
-def preexec():
-    os.setpgrp()  # Don't forward signals.
 
 
 def cleanup_on_exit():
@@ -805,7 +956,8 @@ def signal_handler(signal, frame):
     signal_received = 1
 
 
-def execute_cmd(cmd, filename, lineno, stdout_log=False):
+def execute_cmd(cmd, filename, lineno,
+                stdout_log=False, numeric=False, debug=False):
     '''
     Executes a command, checks for segfaults and returns the command exit
     code.
@@ -813,23 +965,36 @@ def execute_cmd(cmd, filename, lineno, stdout_log=False):
     :param cmd: string with the command to be executed
     :param filename: name of the file tested (used for print_error purposes)
     :param lineno: line number being tested (used for print_error purposes)
+    :param stdout_log: redirect stdout to this file instead of global log_file
+    :param numeric: turn numeric output temporarily on
+    :param debug: temporarily set these debug flags
     '''
     global log_file
     print >> log_file, "command: %s" % cmd
     if debug_option:
         print cmd
 
+    if numeric:
+        numeric_old = nftables.get_numeric_output()
+        nftables.set_numeric_output(numeric)
+    if debug:
+        debug_old = nftables.get_debug()
+        nftables.set_debug(debug)
+
+    ret, out, err = nftables.cmd(cmd)
+
     if not stdout_log:
         stdout_log = log_file
 
-    ret = subprocess.call(cmd, shell=True, universal_newlines=True,
-                          stderr=log_file, stdout=stdout_log,
-                          preexec_fn=preexec)
+    stdout_log.write(out)
+    stdout_log.flush()
+    log_file.write(err)
     log_file.flush()
 
-    if ret == -11:
-        reason = "command segfaults: " + cmd
-        print_error(reason, filename, lineno)
+    if numeric:
+        nftables.set_numeric_output(numeric_old)
+    if debug:
+        nftables.set_debug(debug_old)
 
     return ret
 
@@ -861,22 +1026,28 @@ def chain_process(chain_line, lineno):
 
 def set_process(set_line, filename, lineno):
     test_result = set_line[1]
+    timeout=""
 
     tokens = set_line[0].split(" ")
     set_name = tokens[0]
     set_type = tokens[2]
+    set_flags = ""
 
     i = 3
     while len(tokens) > i and tokens[i] == ".":
         set_type += " . " + tokens[i+1]
         i += 2
 
+    if len(tokens) == i+2 and tokens[i] == "timeout":
+        timeout = "timeout " + tokens[i+1] + ";"
+        i += 2
+
     if len(tokens) == i+2 and tokens[i] == "flags":
         set_flags = tokens[i+1]
-    else:
-        set_flags = ""
+    elif len(tokens) != i:
+        print_error(set_name + " bad flag: " + tokens[i], filename, lineno)
 
-    s = Set("", "", set_name, set_type, set_flags)
+    s = Set("", "", set_name, set_type, timeout, set_flags)
 
     ret = set_add(s, test_result, filename, lineno)
     if ret == 0:
@@ -887,9 +1058,11 @@ def set_process(set_line, filename, lineno):
 
 def set_element_process(element_line, filename, lineno):
     rule_state = element_line[1]
-    set_name = element_line[0].split(" ")[0]
-    set_element = element_line[0].split(" ")
-    set_element.remove(set_name)
+    element_line = element_line[0]
+    space = element_line.find(" ")
+    set_name = element_line[:space]
+    set_element = element_line[space:].split(",")
+
     return set_add_elements(set_element, set_name, rule_state, filename, lineno)
 
 
@@ -947,6 +1120,37 @@ def payload_find_expected(payload_log, rule):
 
     payload_log.seek(0, 0)
     return payload_buffer
+
+
+def json_find_expected(json_log, rule):
+    '''
+    Find the corresponding JSON for given rule
+
+    :param json_log: open file handle of the json data
+    :param rule: nft rule we are going to add
+    '''
+    found = 0
+    json_buffer = ""
+
+    while True:
+        line = json_log.readline()
+        if not line:
+            break
+
+        if line[0] == "#":  # rule start
+            rule_line = line.strip()[2:]
+
+            if rule_line == rule.strip():
+                found = 1
+                continue
+
+        if found == 1:
+            json_buffer += line.rstrip("\n").strip()
+            if line.isspace():
+                return json_buffer
+
+    json_log.seek(0, 0)
+    return json_buffer
 
 
 def run_test_file(filename, force_all_family_option, specific_file):
@@ -1024,7 +1228,7 @@ def run_test_file(filename, force_all_family_option, specific_file):
         rule = line.split(';')  # rule[1] Ok or FAIL
         if len(rule) == 1 or len(rule) > 3 or rule[1].rstrip() \
                 not in {"ok", "fail"}:
-            reason = "Skipping malformed rule test. (" + line.rstrip('\n') + ")"
+            reason = "Skipping malformed rule test. (%s)" % line.rstrip('\n')
             print_warning(reason, filename, lineno)
             continue
 
@@ -1089,8 +1293,8 @@ def run_test_file(filename, force_all_family_option, specific_file):
 def main():
     parser = argparse.ArgumentParser(description='Run nft tests', version='1.0')
 
-    parser.add_argument('filename', nargs='?', metavar='path/to/file.t',
-                        help='Run only this test')
+    parser.add_argument('filenames', nargs='*', metavar='path/to/file.t',
+                        help='Run only these tests')
 
     parser.add_argument('-d', '--debug', action='store_true', dest='debug',
                         help='enable debugging mode')
@@ -1102,11 +1306,16 @@ def main():
                         dest='force_all_family',
                         help='keep testing all families on error')
 
+    parser.add_argument('-j', '--enable-json', action='store_true',
+                        dest='enable_json',
+                        help='test JSON functionality as well')
+
     args = parser.parse_args()
-    global debug_option, need_fix_option
+    global debug_option, need_fix_option, enable_json_option
     debug_option = args.debug
     need_fix_option = args.need_fix_line
     force_all_family_option = args.force_all_family
+    enable_json_option = args.enable_json
     specific_file = False
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -1119,23 +1328,32 @@ def main():
     # Change working directory to repository root
     os.chdir(TESTS_PATH + "/../..")
 
-    if not os.path.isfile(NFT_BIN):
-        print "The nft binary does not exist. You need to build the project."
+    sys.path.append('py/')
+    from nftables import Nftables
+
+    if not os.path.exists('src/.libs/libnftables.so'):
+        print "The nftables library does not exist. " \
+              "You need to build the project."
         return
+
+    global nftables
+    nftables = Nftables('src/.libs/libnftables.so')
 
     test_files = files_ok = run_total = 0
     tests = passed = warnings = errors = 0
     global log_file
     try:
         log_file = open(LOGFILE, 'w')
+        print_info("Log will be available at %s" % LOGFILE)
     except IOError:
-        print "Cannot open log file %s" % LOGFILE
+        print_error("Cannot open log file %s" % LOGFILE)
         return
 
     file_list = []
-    if args.filename:
-        file_list = [args.filename]
-        specific_file = True
+    if args.filenames:
+        file_list = args.filenames
+        if len(args.filenames) == 1:
+            specific_file = True
     else:
         for directory in TESTS_DIRECTORY:
             path = os.path.join(TESTS_PATH, directory)

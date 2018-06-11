@@ -36,20 +36,19 @@
 
 #include "parser_bison.h"
 
-void parser_init(struct mnl_socket *nf_sock, struct nft_cache *cache,
-		 struct parser_state *state, struct list_head *msgs,
-		 unsigned int debug_mask, struct output_ctx *octx)
+void parser_init(struct nft_ctx *nft, struct parser_state *state,
+		 struct list_head *msgs, struct list_head *cmds)
 {
 	memset(state, 0, sizeof(*state));
-	init_list_head(&state->cmds);
 	init_list_head(&state->top_scope.symbols);
 	state->msgs = msgs;
+	state->cmds = cmds;
 	state->scopes[0] = scope_init(&state->top_scope, NULL);
-	state->ectx.cache = cache;
+	state->ectx.cache = &nft->cache;
 	state->ectx.msgs = msgs;
-	state->ectx.nf_sock = nf_sock;
-	state->ectx.debug_mask = debug_mask;
-	state->ectx.octx = octx;
+	state->ectx.nf_sock = nft->nf_sock;
+	state->ectx.debug_mask = nft->debug_mask;
+	state->ectx.octx = &nft->output;
 }
 
 static void yyerror(struct location *loc, struct nft_ctx *nft, void *scanner,
@@ -146,6 +145,7 @@ int nft_lex(void *, void *, void *);
 	struct expr		*expr;
 	struct set		*set;
 	struct obj		*obj;
+	struct flowtable	*flowtable;
 	struct counter		*counter;
 	struct quota		*quota;
 	struct ct		*ct;
@@ -181,7 +181,6 @@ int nft_lex(void *, void *, void *);
 %token DASH			"-"
 %token AT			"@"
 %token VMAP			"vmap"
-%token LOOKUP			"lookup"
 
 %token INCLUDE			"include"
 %token DEFINE			"define"
@@ -190,8 +189,12 @@ int nft_lex(void *, void *, void *);
 
 %token FIB			"fib"
 
+%token SOCKET			"socket"
+%token TRANSPARENT		"transparent"
+
 %token HOOK			"hook"
 %token DEVICE			"device"
+%token DEVICES			"devices"
 %token TABLE			"table"
 %token TABLES			"tables"
 %token CHAIN			"chain"
@@ -203,6 +206,7 @@ int nft_lex(void *, void *, void *);
 %token ELEMENT			"element"
 %token MAP			"map"
 %token MAPS			"maps"
+%token FLOWTABLE		"flowtable"
 %token HANDLE			"handle"
 %token RULESET			"ruleset"
 %token TRACE			"trace"
@@ -216,6 +220,7 @@ int nft_lex(void *, void *, void *);
 %token CREATE			"create"
 %token INSERT			"insert"
 %token DELETE			"delete"
+%token GET			"get"
 %token LIST			"list"
 %token RESET			"reset"
 %token FLUSH			"flush"
@@ -248,8 +253,11 @@ int nft_lex(void *, void *, void *);
 %token SIZE			"size"
 
 %token FLOW			"flow"
+%token OFFLOAD			"offload"
 %token METER			"meter"
 %token METERS			"meters"
+
+%token FLOWTABLES		"flowtables"
 
 %token <val> NUM		"number"
 %token <string> STRING		"string"
@@ -357,8 +365,12 @@ int nft_lex(void *, void *, void *);
 %token RT			"rt"
 %token RT0			"rt0"
 %token RT2			"rt2"
+%token RT4			"srh"
 %token SEG_LEFT			"seg-left"
 %token ADDR			"addr"
+%token LAST_ENT			"last-entry"
+%token TAG			"tag"
+%token SID			"sid"
 
 %token HBH			"hbh"
 
@@ -384,6 +396,8 @@ int nft_lex(void *, void *, void *);
 %token RTCLASSID		"rtclassid"
 %token IBRIPORT			"ibriport"
 %token OBRIPORT			"obriport"
+%token IBRIDGENAME		"ibrname"
+%token OBRIDGENAME		"obrname"
 %token PKTTYPE			"pkttype"
 %token CPU			"cpu"
 %token IIFGROUP			"iifgroup"
@@ -474,6 +488,7 @@ int nft_lex(void *, void *, void *);
 %token SEED			"seed"
 
 %token POSITION			"position"
+%token INDEX			"index"
 %token COMMENT			"comment"
 
 %token XML			"xml"
@@ -498,13 +513,13 @@ int nft_lex(void *, void *, void *);
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
+%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
 
-%type <handle>			table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
-%destructor { handle_free(&$$); } table_spec chain_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec
-%type <handle>			set_spec set_identifier obj_spec obj_identifier
-%destructor { handle_free(&$$); } set_spec set_identifier obj_spec obj_identifier
+%type <handle>			table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec index_spec
+%destructor { handle_free(&$$); } table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec index_spec
+%type <handle>			set_spec setid_spec set_identifier flowtable_identifier obj_spec objid_spec obj_identifier
+%destructor { handle_free(&$$); } set_spec setid_spec set_identifier obj_spec objid_spec obj_identifier
 %type <val>			family_spec family_spec_explicit chain_policy prio_spec
 
 %type <string>			dev_spec quota_unit
@@ -527,6 +542,9 @@ int nft_lex(void *, void *, void *);
 %type <set>			map_block_alloc map_block
 %destructor { set_free($$); }	map_block_alloc
 
+%type <flowtable>		flowtable_block_alloc flowtable_block
+%destructor { flowtable_free($$); }	flowtable_block_alloc
+
 %type <obj>			obj_block_alloc counter_block quota_block ct_helper_block limit_block
 %destructor { obj_free($$); }	obj_block_alloc
 
@@ -545,8 +563,8 @@ int nft_lex(void *, void *, void *);
 %type <stmt>			log_stmt log_stmt_alloc
 %destructor { stmt_free($$); }	log_stmt log_stmt_alloc
 %type <val>			level_type log_flags log_flags_tcp log_flag_tcp
-%type <stmt>			limit_stmt quota_stmt
-%destructor { stmt_free($$); }	limit_stmt quota_stmt
+%type <stmt>			limit_stmt quota_stmt connlimit_stmt
+%destructor { stmt_free($$); }	limit_stmt quota_stmt connlimit_stmt
 %type <val>			limit_burst limit_mode time_unit quota_mode
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
@@ -563,6 +581,8 @@ int nft_lex(void *, void *, void *);
 %type <stmt>			set_stmt
 %destructor { stmt_free($$); }	set_stmt
 %type <val>			set_stmt_op
+%type <stmt>			map_stmt
+%destructor { stmt_free($$); }	map_stmt
 %type <stmt>			meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
 %destructor { stmt_free($$); }	meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
 
@@ -577,16 +597,16 @@ int nft_lex(void *, void *, void *);
 
 %type <expr>			multiton_rhs_expr
 %destructor { expr_free($$); }	multiton_rhs_expr
-%type <expr>			prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
-%destructor { expr_free($$); }	prefix_rhs_expr range_rhs_expr wildcard_rhs_expr
+%type <expr>			prefix_rhs_expr range_rhs_expr
+%destructor { expr_free($$); }	prefix_rhs_expr range_rhs_expr
 
 %type <expr>			stmt_expr concat_stmt_expr map_stmt_expr map_stmt_expr_set
 %destructor { expr_free($$); }	stmt_expr concat_stmt_expr map_stmt_expr map_stmt_expr_set
 
 %type <expr>			multiton_stmt_expr
 %destructor { expr_free($$); }	multiton_stmt_expr
-%type <expr>			prefix_stmt_expr range_stmt_expr wildcard_stmt_expr
-%destructor { expr_free($$); }	prefix_stmt_expr range_stmt_expr wildcard_stmt_expr
+%type <expr>			prefix_stmt_expr range_stmt_expr wildcard_expr
+%destructor { expr_free($$); }	prefix_stmt_expr range_stmt_expr wildcard_expr
 
 %type <expr>			primary_stmt_expr basic_stmt_expr
 %destructor { expr_free($$); }	primary_stmt_expr basic_stmt_expr
@@ -607,8 +627,8 @@ int nft_lex(void *, void *, void *);
 %type <expr>			verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
 %destructor { expr_free($$); }	verdict_map_expr verdict_map_list_expr verdict_map_list_member_expr
 
-%type <expr>			set_expr set_block_expr set_list_expr set_list_member_expr
-%destructor { expr_free($$); }	set_expr set_block_expr set_list_expr set_list_member_expr
+%type <expr>			set_expr set_block_expr set_list_expr set_list_member_expr flowtable_expr flowtable_list_expr flowtable_expr_member
+%destructor { expr_free($$); }	set_expr set_block_expr set_list_expr set_list_member_expr flowtable_expr flowtable_list_expr flowtable_expr_member
 %type <expr>			set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
 %destructor { expr_free($$); }	set_elem_expr set_elem_expr_alloc set_lhs_expr set_rhs_expr
 %type <expr>			set_elem_expr_stmt set_elem_expr_stmt_alloc
@@ -664,9 +684,9 @@ int nft_lex(void *, void *, void *);
 %type <expr>			hbh_hdr_expr	frag_hdr_expr		dst_hdr_expr
 %destructor { expr_free($$); }	hbh_hdr_expr	frag_hdr_expr		dst_hdr_expr
 %type <val>			hbh_hdr_field	frag_hdr_field		dst_hdr_field
-%type <expr>			rt_hdr_expr	rt0_hdr_expr		rt2_hdr_expr
-%destructor { expr_free($$); }	rt_hdr_expr	rt0_hdr_expr		rt2_hdr_expr
-%type <val>			rt_hdr_field	rt0_hdr_field		rt2_hdr_field
+%type <expr>			rt_hdr_expr	rt0_hdr_expr		rt2_hdr_expr	rt4_hdr_expr
+%destructor { expr_free($$); }	rt_hdr_expr	rt0_hdr_expr		rt2_hdr_expr	rt4_hdr_expr
+%type <val>			rt_hdr_field	rt0_hdr_field		rt2_hdr_field	rt4_hdr_field
 %type <expr>			mh_hdr_expr
 %destructor { expr_free($$); }	mh_hdr_expr
 %type <val>			mh_hdr_field
@@ -675,11 +695,17 @@ int nft_lex(void *, void *, void *);
 %destructor { expr_free($$); }	meta_expr
 %type <val>			meta_key	meta_key_qualified	meta_key_unqualified	numgen_type
 
+%type <expr>			socket_expr
+%destructor { expr_free($$); } socket_expr
+%type<val>			socket_key
+
 %type <val>			nf_key_proto
 
 %type <expr>			rt_expr
 %destructor { expr_free($$); }	rt_expr
 %type <val>			rt_key
+
+%type <val>			fwd_key_proto
 
 %type <expr>			ct_expr
 %destructor { expr_free($$); }	ct_expr
@@ -732,7 +758,7 @@ input			:	/* empty */
 						if (++state->nerrs == nft->parser_max_errors)
 							YYABORT;
 					} else
-						list_splice_tail(&list, &state->cmds);
+						list_splice_tail(&list, state->cmds);
 				}
 			}
 			;
@@ -771,8 +797,6 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 			{
 				struct scope *scope = current_scope(state);
 
-				/* ignore missing identifier */
-				symbol_unbind(scope, $2);
 				symbol_bind(scope, $2, $4);
 				xfree($2);
 			}
@@ -820,7 +844,7 @@ line			:	common_block			{ $$ = NULL; }
 						if (++state->nerrs == nft->parser_max_errors)
 							YYABORT;
 					} else
-						list_splice_tail(&list, &state->cmds);
+						list_splice_tail(&list, state->cmds);
 				}
 				if (state->nerrs)
 					YYABORT;
@@ -836,6 +860,7 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	CREATE		create_cmd	{ $$ = $2; }
 			|	INSERT		insert_cmd	{ $$ = $2; }
 			|	DELETE		delete_cmd	{ $$ = $2; }
+			|	GET		get_cmd		{ $$ = $2; }
 			|	LIST		list_cmd	{ $$ = $2; }
 			|	RESET		reset_cmd	{ $$ = $2; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
@@ -894,6 +919,13 @@ add_cmd			:	TABLE		table_spec
 			|	ELEMENT		set_spec	set_block_expr
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SETELEM, &$2, &@$, $3);
+			}
+			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
+						'{'	flowtable_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_FLOWTABLE, &$2, &@$, $5);
 			}
 			|	COUNTER		obj_spec
 			{
@@ -970,6 +1002,13 @@ create_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SETELEM, &$2, &@$, $3);
 			}
+			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
+						'{'	flowtable_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_FLOWTABLE, &$2, &@$, $5);
+			}
 			|	COUNTER		obj_spec
 			{
 				struct obj *obj;
@@ -1007,7 +1046,15 @@ delete_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_TABLE, &$2, &@$, NULL);
 			}
+			|	TABLE 		tableid_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_TABLE, &$2, &@$, NULL);
+			}
 			|	CHAIN		chain_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_CHAIN, &$2, &@$, NULL);
+			}
+			| 	CHAIN 		chainid_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_CHAIN, &$2, &@$, NULL);
 			}
@@ -1019,6 +1066,10 @@ delete_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SET, &$2, &@$, NULL);
 			}
+			| 	SET 		setid_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SET, &$2, &@$, NULL);
+			}
 			|	MAP		set_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SET, &$2, &@$, NULL);
@@ -1027,11 +1078,23 @@ delete_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SETELEM, &$2, &@$, $3);
 			}
+			|	FLOWTABLE	flowtable_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_FLOWTABLE, &$2, &@$, NULL);
+			}
 			|	COUNTER		obj_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_COUNTER, &$2, &@$, NULL);
 			}
+			|  	COUNTER 	objid_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_COUNTER, &$2, &@$, NULL);
+			}
 			|	QUOTA		obj_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_QUOTA, &$2, &@$, NULL);
+			}
+			| 	QUOTA 		objid_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_QUOTA, &$2, &@$, NULL);
 			}
@@ -1042,6 +1105,16 @@ delete_cmd		:	TABLE		table_spec
 			|	LIMIT		obj_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_LIMIT, &$2, &@$, NULL);
+			}
+			| 	LIMIT 		objid_spec
+			{
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_LIMIT, &$2, &@$, NULL);
+			}
+			;
+
+get_cmd			:	ELEMENT		set_spec	set_block_expr
+			{
+				$$ = cmd_alloc(CMD_GET, CMD_OBJ_SETELEM, &$2, &@$, $3);
 			}
 			;
 
@@ -1128,6 +1201,10 @@ list_cmd		:	TABLE		table_spec
 			|	METER		set_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_METER, &$2, &@$, NULL);
+			}
+			|       FLOWTABLES      ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_FLOWTABLES, &$2, &@$, NULL);
 			}
 			|	MAPS		ruleset_spec
 			{
@@ -1334,6 +1411,17 @@ table_block		:	/* empty */	{ $$ = $<table>-1; }
 				list_add_tail(&$4->list, &$1->sets);
 				$$ = $1;
 			}
+
+			|	table_block	FLOWTABLE	flowtable_identifier
+					flowtable_block_alloc	'{'	flowtable_block	'}'
+					stmt_separator
+			{
+				$4->location = @3;
+				handle_merge(&$4->handle, &$3);
+				handle_free(&$3);
+				list_add_tail(&$4->list, &$1->flowtables);
+				$$ = $1;
+			}
 			|	table_block	COUNTER		obj_identifier
 					obj_block_alloc	'{'	counter_block	'}'
 					stmt_separator
@@ -1418,12 +1506,12 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	set_block	TIMEOUT		time_spec	stmt_separator
 			{
-				$1->timeout = $3 * 1000;
+				$1->timeout = $3;
 				$$ = $1;
 			}
 			|	set_block	GC_INTERVAL	time_spec	stmt_separator
 			{
-				$1->gc_int = $3 * 1000;
+				$1->gc_int = $3;
 				$$ = $1;
 			}
 			|	set_block	ELEMENTS	'='		set_block_expr
@@ -1466,7 +1554,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	stmt_separator
 			|	map_block	TIMEOUT		time_spec	stmt_separator
 			{
-				$1->timeout = $3 * 1000;
+				$1->timeout = $3;
 				$$ = $1;
 			}
 			|	map_block	TYPE
@@ -1532,6 +1620,62 @@ set_mechanism		:	POLICY		set_policy_spec
 
 set_policy_spec		:	PERFORMANCE	{ $$ = NFT_SET_POL_PERFORMANCE; }
 			|	MEMORY		{ $$ = NFT_SET_POL_MEMORY; }
+			;
+
+flowtable_block_alloc	:	/* empty */
+			{
+				$$ = flowtable_alloc(NULL);
+			}
+			;
+
+flowtable_block		:	/* empty */	{ $$ = $<flowtable>-1; }
+			|	flowtable_block	common_block
+			|	flowtable_block	stmt_separator
+			|	flowtable_block	HOOK		STRING	PRIORITY        prio_spec	stmt_separator
+			{
+				$$->hookstr	= chain_hookname_lookup($3);
+				if ($$->hookstr == NULL) {
+					erec_queue(error(&@3, "unknown chain hook %s", $3),
+						   state->msgs);
+					xfree($3);
+					YYERROR;
+				}
+				xfree($3);
+
+				$$->priority = $5;
+			}
+			|	flowtable_block	DEVICES		'='	flowtable_expr	stmt_separator
+			{
+				$$->dev_expr = $4;
+			}
+			;
+
+flowtable_expr		:	'{'	flowtable_list_expr	'}'
+			{
+				$2->location = @$;
+				$$ = $2;
+			}
+			;
+
+flowtable_list_expr	:	flowtable_expr_member
+			{
+				$$ = compound_expr_alloc(&@$, NULL);
+				compound_expr_add($$, $1);
+			}
+			|	flowtable_list_expr	COMMA	flowtable_expr_member
+			{
+				compound_expr_add($1, $3);
+				$$ = $1;
+			}
+			|	flowtable_list_expr	COMMA	opt_newline
+			;
+
+flowtable_expr_member	:	STRING
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state),
+						       $1);
+			}
 			;
 
 data_type_atom_expr	:	type_identifier
@@ -1710,49 +1854,104 @@ table_spec		:	family_spec	identifier
 			{
 				memset(&$$, 0, sizeof($$));
 				$$.family	= $1;
-				$$.table	= $2;
+				$$.table.location = @2;
+				$$.table.name	= $2;
+			}
+			;
+
+tableid_spec 		: 	family_spec 	HANDLE NUM
+			{
+				memset(&$$, 0, sizeof($$));
+				$$.family 		= $1;
+				$$.handle.id 		= $3;
+				$$.handle.location	= @$;
 			}
 			;
 
 chain_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.chain	= $2;
+				$$.chain.name	= $2;
+				$$.chain.location = @2;
+			}
+			;
+
+chainid_spec 		: 	table_spec 	HANDLE NUM
+			{
+				$$ 			= $1;
+				$$.handle.location 	= @$;
+				$$.handle.id 		= $3;
 			}
 			;
 
 chain_identifier	:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.chain	= $1;
+				$$.chain.name		= $1;
+				$$.chain.location	= @1;
 			}
 			;
 
 set_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.set		= $2;
+				$$.set.name	= $2;
+				$$.set.location	= @2;
+			}
+			;
+
+setid_spec 		: 	table_spec 	HANDLE NUM
+			{
+				$$ 			= $1;
+				$$.handle.location 	= @$;
+				$$.handle.id 		= $3;
 			}
 			;
 
 set_identifier		:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.set		= $1;
+				$$.set.name	= $1;
+				$$.set.location	= @1;
+			}
+			;
+
+
+flowtable_spec		:	table_spec	identifier
+			{
+				$$		= $1;
+				$$.flowtable	= $2;
+			}
+			;
+
+flowtable_identifier	:	identifier
+			{
+				memset(&$$, 0, sizeof($$));
+				$$.flowtable	= $1;
 			}
 			;
 
 obj_spec		:	table_spec	identifier
 			{
 				$$		= $1;
-				$$.obj		= $2;
+				$$.obj.name	= $2;
+				$$.obj.location	= @2;
+			}
+			;
+
+objid_spec		:	table_spec	HANDLE NUM
+			{
+				$$ 			= $1;
+				$$.handle.location	= @$;
+				$$.handle.id		= $3;
 			}
 			;
 
 obj_identifier		:	identifier
 			{
 				memset(&$$, 0, sizeof($$));
-				$$.obj		= $1;
+				$$.obj.name		= $1;
+				$$.obj.location		= @1;
 			}
 			;
 
@@ -1772,11 +1971,32 @@ position_spec		:	POSITION	NUM
 			}
 			;
 
+index_spec		:	INDEX		NUM
+			{
+				memset(&$$, 0, sizeof($$));
+				$$.index.location	= @$;
+				$$.index.id		= $2 + 1;
+			}
+			;
+
 rule_position		:	chain_spec
 			{
 				$$ = $1;
 			}
 			|	chain_spec	position_spec
+			{
+				handle_merge(&$1, &$2);
+				$$ = $1;
+			}
+			|	chain_spec	handle_spec
+			{
+				$2.position.location = $2.handle.location;
+				$2.position.id = $2.handle.id;
+				$2.handle.id = 0;
+				handle_merge(&$1, &$2);
+				$$ = $1;
+			}
+			|	chain_spec	index_spec
 			{
 				handle_merge(&$1, &$2);
 				$$ = $1;
@@ -1851,6 +2071,7 @@ stmt_list		:	stmt
 stmt			:	verdict_stmt
 			|	match_stmt
 			|	meter_stmt
+			|	connlimit_stmt
 			|	counter_stmt
 			|	payload_stmt
 			|	meta_stmt
@@ -1866,6 +2087,7 @@ stmt			:	verdict_stmt
 			|	dup_stmt
 			|	fwd_stmt
 			|	set_stmt
+			|	map_stmt
 			;
 
 verdict_stmt		:	verdict_expr
@@ -1914,6 +2136,19 @@ verdict_map_list_expr	:	verdict_map_list_member_expr
 verdict_map_list_member_expr:	opt_newline	set_elem_expr	COLON	verdict_expr	opt_newline
 			{
 				$$ = mapping_expr_alloc(&@$, $2, $4);
+			}
+			;
+
+connlimit_stmt		:	CT	COUNT	NUM
+			{
+				$$ = connlimit_stmt_alloc(&@$);
+				$$->connlimit.count	= $3;
+			}
+			|	CT	COUNT	OVER	NUM
+			{
+				$$ = connlimit_stmt_alloc(&@$);
+				$$->connlimit.count = $4;
+				$$->connlimit.flags = NFT_CONNLIMIT_F_INV;
 			}
 			;
 
@@ -2015,6 +2250,8 @@ level_type		:	string
 					$$ = LOG_INFO;
 				else if (!strcmp("debug", $1))
 					$$ = LOG_DEBUG;
+				else if (!strcmp("audit", $1))
+					$$ = LOGLEVEL_AUDIT;
 				else {
 					erec_queue(error(&@1, "invalid log level"),
 						   state->msgs);
@@ -2234,16 +2471,8 @@ reject_opts		:       /* empty */
 nat_stmt		:	nat_stmt_alloc	nat_stmt_args
 			;
 
-nat_stmt_alloc		:	SNAT
-			{
-				$$ = nat_stmt_alloc(&@$);
-				$$->nat.type = NFT_NAT_SNAT;
-			}
-			|	DNAT
-			{
-				$$ = nat_stmt_alloc(&@$);
-				$$->nat.type = NFT_NAT_DNAT;
-			}
+nat_stmt_alloc		:	SNAT	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_SNAT); }
+			|	DNAT	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_DNAT); }
 			;
 
 primary_stmt_expr	:	symbol_expr		{ $$ = $1; }
@@ -2336,7 +2565,7 @@ range_stmt_expr		:	basic_stmt_expr	DASH	basic_stmt_expr
 			}
 			;
 
-wildcard_stmt_expr	:	ASTERISK
+wildcard_expr		:	ASTERISK
 			{
 				struct expr *expr;
 
@@ -2349,7 +2578,7 @@ wildcard_stmt_expr	:	ASTERISK
 
 multiton_stmt_expr	:	prefix_stmt_expr
 			|	range_stmt_expr
-			|	wildcard_stmt_expr
+			|	wildcard_expr
 			;
 
 stmt_expr		:	map_stmt_expr
@@ -2393,21 +2622,21 @@ masq_stmt		:	masq_stmt_alloc		masq_stmt_args
 			|	masq_stmt_alloc
 			;
 
-masq_stmt_alloc		:	MASQUERADE 	{ $$ = masq_stmt_alloc(&@$); }
+masq_stmt_alloc		:	MASQUERADE	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_MASQ); }
 			;
 
 masq_stmt_args		:	TO 	COLON	stmt_expr
 			{
-				$<stmt>0->masq.proto = $3;
+				$<stmt>0->nat.proto = $3;
 			}
 			|	TO 	COLON	stmt_expr	nf_nat_flags
 			{
-				$<stmt>0->masq.proto = $3;
-				$<stmt>0->masq.flags = $4;
+				$<stmt>0->nat.proto = $3;
+				$<stmt>0->nat.flags = $4;
 			}
 			|	nf_nat_flags
 			{
-				$<stmt>0->masq.flags = $1;
+				$<stmt>0->nat.flags = $1;
 			}
 			;
 
@@ -2415,30 +2644,30 @@ redir_stmt		:	redir_stmt_alloc	redir_stmt_arg
 			|	redir_stmt_alloc
 			;
 
-redir_stmt_alloc	:	REDIRECT	{ $$ = redir_stmt_alloc(&@$); }
+redir_stmt_alloc	:	REDIRECT	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_REDIR); }
 			;
 
 redir_stmt_arg		:	TO	stmt_expr
 			{
-				$<stmt>0->redir.proto = $2;
+				$<stmt>0->nat.proto = $2;
 			}
 			|	TO	COLON	stmt_expr
 			{
-				$<stmt>0->redir.proto = $3;
+				$<stmt>0->nat.proto = $3;
 			}
 			|	nf_nat_flags
 			{
-				$<stmt>0->redir.flags = $1;
+				$<stmt>0->nat.flags = $1;
 			}
 			|	TO	stmt_expr	nf_nat_flags
 			{
-				$<stmt>0->redir.proto = $2;
-				$<stmt>0->redir.flags = $3;
+				$<stmt>0->nat.proto = $2;
+				$<stmt>0->nat.flags = $3;
 			}
 			|	TO	COLON	stmt_expr	nf_nat_flags
 			{
-				$<stmt>0->redir.proto = $3;
-				$<stmt>0->redir.flags = $4;
+				$<stmt>0->nat.proto = $3;
+				$<stmt>0->nat.flags = $4;
 			}
 			;
 
@@ -2455,10 +2684,21 @@ dup_stmt		:	DUP	TO	stmt_expr
 			}
 			;
 
-fwd_stmt		:	FWD	TO	expr
+fwd_key_proto		:	IP		{ $$ = NFPROTO_IPV4; }
+			|	IP6		{ $$ = NFPROTO_IPV6; }
+			;
+
+fwd_stmt		:	FWD	TO	stmt_expr
 			{
 				$$ = fwd_stmt_alloc(&@$);
-				$$->fwd.to = $3;
+				$$->fwd.dev = $3;
+			}
+			|	FWD	fwd_key_proto	TO	stmt_expr	DEVICE	stmt_expr
+			{
+				$$ = fwd_stmt_alloc(&@$);
+				$$->fwd.family = $2;
+				$$->fwd.addr = $4;
+				$$->fwd.dev = $6;
 			}
 			;
 
@@ -2530,10 +2770,26 @@ set_stmt		:	SET	set_stmt_op	set_elem_expr_stmt	symbol_expr
 				$$->set.key = $3;
 				$$->set.set = $4;
 			}
+			|	set_stmt_op	symbol_expr	'{' set_elem_expr_stmt	'}'
+			{
+				$$ = set_stmt_alloc(&@$);
+				$$->set.op  = $1;
+				$$->set.key = $4;
+				$$->set.set = $2;
+			}
 			;
 
 set_stmt_op		:	ADD	{ $$ = NFT_DYNSET_OP_ADD; }
 			|	UPDATE	{ $$ = NFT_DYNSET_OP_UPDATE; }
+			;
+
+map_stmt		:	set_stmt_op	symbol_expr '{'	set_elem_expr_stmt	COLON	set_elem_expr_stmt	'}'
+			{
+				$$ = map_stmt_alloc(&@$);
+				$$->map.op  = $1;
+				$$->map.map = map_expr_alloc(&@$, $4, $6);
+				$$->map.set = $2;
+			}
 			;
 
 meter_stmt		:	flow_stmt_legacy_alloc		flow_stmt_opts	'{' meter_key_expr stmt '}'
@@ -2569,8 +2825,18 @@ meter_stmt_alloc	:	METER	identifier		'{' meter_key_expr stmt '}'
 			{
 				$$ = meter_stmt_alloc(&@$);
 				$$->meter.name = $2;
+				$$->meter.size = 0;
 				$$->meter.key  = $4;
 				$$->meter.stmt = $5;
+				$$->location  = @$;
+			}
+			|	METER	identifier	SIZE	NUM	'{' meter_key_expr stmt '}'
+			{
+				$$ = meter_stmt_alloc(&@$);
+				$$->meter.name = $2;
+				$$->meter.size = $4;
+				$$->meter.key  = $6;
+				$$->meter.stmt = $7;
 				$$->location  = @$;
 			}
 			;
@@ -2584,16 +2850,17 @@ match_stmt		:	relational_expr
 variable_expr		:	'$'	identifier
 			{
 				struct scope *scope = current_scope(state);
+				struct symbol *sym;
 
-				if (symbol_lookup(scope, $2) == NULL) {
+				sym = symbol_get(scope, $2);
+				if (!sym) {
 					erec_queue(error(&@2, "unknown identifier '%s'", $2),
 						   state->msgs);
 					xfree($2);
 					YYERROR;
 				}
 
-				$$ = symbol_expr_alloc(&@$, SYMBOL_DEFINE,
-						       scope, $2);
+				$$ = variable_expr_alloc(&@$, scope, sym);
 				xfree($2);
 			}
 			;
@@ -2632,6 +2899,7 @@ primary_expr		:	symbol_expr			{ $$ = $1; }
 			|	exthdr_expr			{ $$ = $1; }
 			|	exthdr_exists_expr		{ $$ = $1; }
 			|	meta_expr			{ $$ = $1; }
+			|	socket_expr			{ $$ = $1; }
 			|	rt_expr				{ $$ = $1; }
 			|	ct_expr				{ $$ = $1; }
 			|	numgen_expr			{ $$ = $1; }
@@ -2749,20 +3017,9 @@ range_rhs_expr		:	basic_rhs_expr	DASH	basic_rhs_expr
 			}
 			;
 
-wildcard_rhs_expr	:	ASTERISK
-	       		{
-				struct expr *expr;
-
-				expr = constant_expr_alloc(&@$, &integer_type,
-							   BYTEORDER_HOST_ENDIAN,
-							   0, NULL);
-				$$ = prefix_expr_alloc(&@$, expr, 0);
-			}
-			;
-
 multiton_rhs_expr	:	prefix_rhs_expr
 			|	range_rhs_expr
-			|	wildcard_rhs_expr
+			|	wildcard_expr
 			;
 
 map_expr		:	concat_expr	MAP	rhs_expr
@@ -2843,7 +3100,7 @@ set_elem_options	:	set_elem_option
 
 set_elem_option		:	TIMEOUT			time_spec
 			{
-				$<expr>0->timeout = $2 * 1000;
+				$<expr>0->timeout = $2;
 			}
 			|	comment_spec
 			{
@@ -2992,7 +3249,7 @@ relational_expr		:	expr	/* implicit */	rhs_expr
 			}
 			|	expr	/* implicit */	list_rhs_expr
 			{
-				$$ = relational_expr_alloc(&@$, OP_FLAGCMP, $1, $2);
+				$$ = relational_expr_alloc(&@$, OP_IMPLICIT, $1, $2);
 			}
 			|	expr	relational_op	rhs_expr
 			{
@@ -3243,6 +3500,7 @@ meta_expr		:	META	meta_key
 
 				$$ = meta_expr_alloc(&@$, key);
 			}
+			;
 
 meta_key		:	meta_key_qualified
 			|	meta_key_unqualified
@@ -3267,6 +3525,8 @@ meta_key_unqualified	:	MARK		{ $$ = NFT_META_MARK; }
 			|	RTCLASSID	{ $$ = NFT_META_RTCLASSID; }
 			|	IBRIPORT	{ $$ = NFT_META_BRI_IIFNAME; }
 			|       OBRIPORT	{ $$ = NFT_META_BRI_OIFNAME; }
+			|	IBRIDGENAME	{ $$ = NFT_META_BRI_IIFNAME; }
+			|       OBRIDGENAME	{ $$ = NFT_META_BRI_OIFNAME; }
 			|       PKTTYPE		{ $$ = NFT_META_PKTTYPE; }
 			|       CPU		{ $$ = NFT_META_CPU; }
 			|       IIFGROUP	{ $$ = NFT_META_IIFGROUP; }
@@ -3300,6 +3560,19 @@ meta_stmt		:	META	meta_key	SET	stmt_expr
 			{
 				$$ = notrack_stmt_alloc(&@$);
 			}
+			|	FLOW	OFFLOAD	AT string
+			{
+				$$ = flow_offload_stmt_alloc(&@$, $4);
+			}
+			;
+
+socket_expr		:	SOCKET	socket_key
+			{
+				$$ = socket_expr_alloc(&@$, $2);
+			}
+			;
+
+socket_key 		: TRANSPARENT { $$ = NFT_SOCKET_TRANSPARENT; }
 			;
 
 offset_opt		:	/* empty */	{ $$ = 0; }
@@ -3486,13 +3759,9 @@ payload_expr		:	payload_raw_expr
 payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
 			{
 				$$ = payload_expr_alloc(&@$, NULL, 0);
-				$$->payload.base	= $2;
-				$$->payload.offset	= $4;
-				$$->len			= $6;
-				$$->dtype		= &integer_type;
+				payload_init_raw($$, $2, $4, $6);
 				$$->byteorder		= BYTEORDER_BIG_ENDIAN;
 				$$->payload.is_raw	= true;
-				$$->flags		= 0;
 			}
 			;
 
@@ -3740,6 +4009,7 @@ exthdr_expr		:	hbh_hdr_expr
 			|	rt_hdr_expr
 			|	rt0_hdr_expr
 			|	rt2_hdr_expr
+			|	rt4_hdr_expr
 			|	frag_hdr_expr
 			|	dst_hdr_expr
 			|	mh_hdr_expr
@@ -3786,6 +4056,21 @@ rt2_hdr_expr		:	RT2	rt2_hdr_field
 			;
 
 rt2_hdr_field		:	ADDR		{ $$ = RT2HDR_ADDR; }
+			;
+
+rt4_hdr_expr		:	RT4	rt4_hdr_field
+			{
+				$$ = exthdr_expr_alloc(&@$, &exthdr_rt4, $2);
+			}
+			;
+
+rt4_hdr_field		:	LAST_ENT	{ $$ = RT4HDR_LASTENT; }
+			|	FLAGS		{ $$ = RT4HDR_FLAGS; }
+			|	TAG		{ $$ = RT4HDR_TAG; }
+			|	SID		'['	NUM	']'
+			{
+				$$ = RT4HDR_SID_1 + $3 - 1;
+			}
 			;
 
 frag_hdr_expr		:	FRAG	frag_hdr_field

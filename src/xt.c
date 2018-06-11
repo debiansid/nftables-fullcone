@@ -204,9 +204,10 @@ void netlink_parse_match(struct netlink_parse_ctx *ctx,
 	name = nftnl_expr_get_str(nle, NFTNL_EXPR_MT_NAME);
 
 	mt = xtables_find_match(name, XTF_TRY_LOAD, NULL);
-	if (!mt)
-		BUG("XT match %s not found\n", name);
-
+	if (!mt) {
+		fprintf(stderr, "XT match %s not found\n", name);
+		return;
+	}
 	mtinfo = nftnl_expr_get(nle, NFTNL_EXPR_MT_INFO, &mt_len);
 
 	m = xzalloc(sizeof(struct xt_entry_match) + mt_len);
@@ -240,9 +241,10 @@ void netlink_parse_target(struct netlink_parse_ctx *ctx,
 
 	name = nftnl_expr_get_str(nle, NFTNL_EXPR_TG_NAME);
 	tg = xtables_find_target(name, XTF_TRY_LOAD);
-	if (!tg)
-		BUG("XT target %s not found\n", name);
-
+	if (!tg) {
+		fprintf(stderr, "XT target %s not found\n", name);
+		return;
+	}
 	tginfo = nftnl_expr_get(nle, NFTNL_EXPR_TG_INFO, &tg_len);
 
 	size = XT_ALIGN(sizeof(struct xt_entry_target)) + tg_len;
@@ -291,14 +293,30 @@ static int nft_xt_compatible_revision(const char *name, uint8_t rev, int opt)
 	struct mnl_socket *nl;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
-	uint32_t portid, seq, type;
+	uint32_t portid, seq, type, family;
 	struct nfgenmsg *nfg;
 	int ret = 0;
 
-	if (opt == IPT_SO_GET_REVISION_MATCH)
+	switch (rev) {
+	case IPT_SO_GET_REVISION_MATCH:
+		family = NFPROTO_IPV4;
 		type = 0;
-	else
+		break;
+	case IPT_SO_GET_REVISION_TARGET:
+		family = NFPROTO_IPV4;
 		type = 1;
+		break;
+	case IP6T_SO_GET_REVISION_MATCH:
+		family = NFPROTO_IPV6;
+		type = 0;
+		break;
+	case IP6T_SO_GET_REVISION_TARGET:
+		family = NFPROTO_IPV6;
+		type = 1;
+		break;
+	default: /* No revision support, assume ok */
+		return 1;
+	}
 
 	nlh = mnl_nlmsg_put_header(buf);
 	nlh->nlmsg_type = (NFNL_SUBSYS_NFT_COMPAT << 8) | NFNL_MSG_COMPAT_GET;
@@ -306,7 +324,7 @@ static int nft_xt_compatible_revision(const char *name, uint8_t rev, int opt)
 	nlh->nlmsg_seq = seq = time(NULL);
 
 	nfg = mnl_nlmsg_put_extra_header(nlh, sizeof(*nfg));
-	nfg->nfgen_family = AF_INET;
+	nfg->nfgen_family = family;
 	nfg->version = NFNETLINK_V0;
 	nfg->res_id = 0;
 

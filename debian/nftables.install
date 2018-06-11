@@ -1,1 +1,2 @@
 debian/nftables.conf		etc
+usr/sbin/*

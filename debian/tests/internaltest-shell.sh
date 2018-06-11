@@ -10,4 +10,4 @@ fi
 
 set -e
 cd tests/shell
-./run-tests.sh -v
+NFT=$(which nft) ./run-tests.sh -v

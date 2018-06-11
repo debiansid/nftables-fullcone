@@ -6,6 +6,10 @@ Files: *
 Copyright: 2008 Patrick McHardy <kaber@trash.net>
 License: GPL-2
 
+Files: src/libnftables.c include/nftables/nftables.h
+Copyright: 2017 Eric Leblond <eric@regit.org>
+License: GPL-2
+
 Files: src/netlink.c
 Copyright: 2008-2012 Patrick McHardy <kaber@trash.net>
 	   2013 Pablo Neira Ayuso <pablo@netfilter.org>

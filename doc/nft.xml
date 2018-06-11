@@ -141,7 +141,7 @@ vi:ts=4 sw=4
 				<term><option>-a, --handle</option></term>
 				<listitem>
 					<para>
-						Show rule handles in output.
+						Show object handles in output.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -167,7 +167,7 @@ vi:ts=4 sw=4
 				<term><option>-f, --file <replaceable>filename</replaceable></option></term>
 				<listitem>
 					<para>
-						Read input from <replaceable>filename</replaceable>.
+						Read input from <replaceable>filename</replaceable>. If <replaceable>filename</replaceable> is <literal>-</literal>, read from <literal>stdin</literal>.
 					</para>
 					<para>
 						nft scripts must start <command>#!/usr/sbin/nft -f</command>
@@ -178,7 +178,7 @@ vi:ts=4 sw=4
 				<term><option>-i, --interactive</option></term>
 				<listitem>
 					<para>
-						Read input from an interactive readline CLI.
+						Read input from an interactive readline CLI.  You can use <command>quit</command> to exit, or use the <literal>EOF</literal> marker, normally this is <literal>CTRL-D</literal>.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -222,7 +222,7 @@ vi:ts=4 sw=4
 				The directories to be searched for include files can be specified using
 				the <option>-I/--includepath</option> option. You can override this behaviour
 				either by prepending ./ to your path to force inclusion of files located in the
-				current working directory (ie. relative path) or / for file location expressed
+				current working directory (i.e. relative path) or / for file location expressed
 				as an absolute path.
 			</para>
 			<para>
@@ -429,7 +429,7 @@ filter input iif $int_ifs accept
 		<refsect2>
 			<title>Bridge address family</title>
 			<para>
-				The bridge address family handles ethernet packets traversing bridge devices.
+				The bridge address family handles Ethernet packets traversing bridge devices.
 			</para>
 			<para>
 				The list of supported hooks is identical to IPv4/IPv6/Inet address families above.
@@ -481,9 +481,9 @@ filter input iif $int_ifs accept
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 			</cmdsynopsis>
 			<cmdsynopsis>
-				<arg choice="req">export</arg>
+				<arg choice="plain">export</arg>
 				<arg choice="opt"><command>ruleset</command></arg>
-				<arg choice="req"><replaceable>format</replaceable></arg>
+				<arg choice="plain"><replaceable>format</replaceable></arg>
 			</cmdsynopsis>
 		</para>
 
@@ -547,6 +547,19 @@ filter input iif $int_ifs accept
 			<cmdsynopsis>
 				<group choice="req">
 					<arg>add</arg>
+					<arg>create</arg>
+				</group>
+				<command>table</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<replaceable>table</replaceable>
+				<arg choice="opt">
+					<arg choice="req">
+						flags <replaceable>flags</replaceable>
+					</arg>
+				</arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
 					<arg>delete</arg>
 					<arg>list</arg>
 					<arg>flush</arg>
@@ -554,6 +567,12 @@ filter input iif $int_ifs accept
 				<command>table</command>
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 				<replaceable>table</replaceable>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<literal>delete</literal>
+				<command>table</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<literal> handle </literal><replaceable>handle</replaceable>
 			</cmdsynopsis>
 		</para>
 
@@ -572,9 +591,57 @@ filter input iif $int_ifs accept
 
 			The <literal>inet</literal> address family is a dummy family which is used to create
 			hybrid IPv4/IPv6 tables.  The <literal>meta</literal> expression <literal>nfproto</literal>
-			keyword can be used to test which family (ipv4 or ipv6) context the packet is being processed in.
+			keyword can be used to test which family (IPv4 or IPv6) context the packet is being processed in.
 
 			When no address family is specified, <literal>ip</literal> is used by default.
+
+			The only difference between <command>add</command> and <command>create</command> is that the former will
+			not return an error if the specified table already exists while <command>create</command> will return an error.
+
+			<table frame="all">
+			<title>Table flags</title>
+			<tgroup cols='2' align='left' colsep='1' rowsep='1'>
+				<colspec colname='c1'/>
+				<colspec colname='c2'/>
+				<thead>
+					<row>
+						<entry>Flag</entry>
+						<entry>Description</entry>
+					</row>
+				</thead>
+				<tbody>
+					<row>
+						<entry>dormant</entry>
+						<entry>table is not evaluated any more (base chains are unregistered)</entry>
+					</row>
+				</tbody>
+			</tgroup>
+			</table>
+		</para>
+
+		<para>
+			<example>
+				<title>Add, change, delete a table</title>
+				<programlisting>
+# start nft in interactive mode
+nft --interactive
+
+# create a new table.
+create table inet mytable
+
+# add a new base chain: get input packets
+add chain inet mytable myin { type filter hook input priority 0; }
+
+# add a single counter to the chain
+add rule inet mytable myin counter
+
+# disable the table temporarily -- rules are not evaluated anymore
+add table inet mytable { flags dormant; }
+
+# make table active again:
+add table inet mytable
+				</programlisting>
+			</example>
 		</para>
 
 		<variablelist>
@@ -645,6 +712,13 @@ filter input iif $int_ifs accept
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 				<replaceable>table</replaceable>
 				<replaceable>chain</replaceable>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<literal>delete</literal>
+				<command>chain</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<replaceable>table</replaceable>
+				<literal> handle </literal><replaceable>handle</replaceable>
 			</cmdsynopsis>
 			<cmdsynopsis>
 				<literal>rename</literal>
@@ -801,7 +875,19 @@ filter input iif $int_ifs accept
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 				<replaceable>table</replaceable>
 				<replaceable>chain</replaceable>
-				<arg choice="opt">position <replaceable>position</replaceable></arg>
+				<group choice="opt">
+					<arg>
+						<group choice="req">
+							<arg>handle</arg>
+							<arg>position</arg>
+						</group>
+						<replaceable>handle</replaceable>
+					</arg>
+					<arg>
+						<literal>index</literal>
+						<replaceable>index</replaceable>
+					</arg>
+				</group>
 				<replaceable>statement</replaceable>...
 			</cmdsynopsis>
 			<cmdsynopsis>
@@ -829,6 +915,17 @@ filter input iif $int_ifs accept
 			Rules are constructed from two kinds of components according to a set
 			of grammatical rules: expressions and statements.
 		</para>
+		<para>
+			The <literal>add</literal> and <literal>insert</literal> commands support an optional
+			location specifier, which is either a <replaceable>handle</replaceable> of an existing
+			rule or an <replaceable>index</replaceable> (starting at zero).  Internally,
+			rule locations are always identified by <replaceable>handle</replaceable> and the
+			translation from <replaceable>index</replaceable> happens in userspace. This has two
+			potential implications in case a concurrent ruleset change happens after the translation
+			was done: The effective rule index might change if a rule was inserted or deleted before
+			the referred one.  If the referred rule was deleted, the command is rejected by the
+			kernel just as if an invalid <replaceable>handle</replaceable> was given.
+		</para>
 
 		<variablelist>
 			<varlistentry>
@@ -836,8 +933,10 @@ filter input iif $int_ifs accept
 				<listitem>
 					<para>
 						Add a new rule described by the list of statements. The rule is appended to the
-						given chain unless a position is specified, in which case the rule is appended to
-						the rule given by the position.
+						given chain unless a <literal>handle</literal> is specified, in which case the
+						rule is appended to the rule given by the <replaceable>handle</replaceable>.
+						The alternative name <literal>position</literal> is deprecated and should not be
+						used anymore.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -846,7 +945,8 @@ filter input iif $int_ifs accept
 				<listitem>
 					<para>
 						Similar to the <command>add</command> command, but the rule is prepended to the
-						beginning of the chain or before the rule at the given position.
+						beginning of the chain or before the rule with the given
+						<replaceable>handle</replaceable>.
 					</para>
 				</listitem>
 			</varlistentry>
@@ -896,6 +996,31 @@ table inet filter {
 	<refsect1>
 		<title>Sets</title>
 		<para>
+		nftables offers two kinds of set concepts.
+		Anonymous sets are sets that have no specific name.  The set members are enclosed in curly braces,
+		with commas to separate elements when creating the rule the set is used in.
+		Once that rule is removed, the set is removed as well.
+		They cannot be updated, i.e. once an anonymous set is declared it cannot be changed anymore except by
+		removing/altering the rule that uses the anonymous set.
+		<example>
+			<title>Using anonymous sets to accept particular subnets and ports</title>
+			<programlisting>
+        nft add rule filter input ip saddr { 10.0.0.0/8, 192.168.0.0/16 } tcp dport { 22, 443 } accept
+			</programlisting>
+		</example>
+		Named sets are sets that need to be defined first before they can be referenced
+		in rules.  Unlike anonymous sets, elements can be added to or removed from a named set at any time.
+		Sets are referenced from rules using an <literal>@</literal> prefixed to the sets name.
+			<example>
+				<title>Using named sets to accept addresses and ports</title>
+				<programlisting>
+        nft add rule filter input ip saddr @allowed_hosts tcp dport @allowed_ports accept
+				</programlisting>
+			The sets <literal>allowed_hosts</literal> and <literal>allowed_ports</literal> need to
+			be created first.  The next section describes nft set syntax in more detail.
+			</example>
+		</para>
+		<para>
 			<cmdsynopsis>
 				<literal>add</literal>
 				<command> set</command>
@@ -923,6 +1048,13 @@ table inet filter {
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 				<replaceable>table</replaceable>
 				<replaceable>set</replaceable>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<literal>delete</literal>
+				<command> set</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<replaceable>table</replaceable>
+				<literal> handle </literal><replaceable>handle</replaceable>
 			</cmdsynopsis>
 			<cmdsynopsis>
 				<group choice="req">
@@ -1018,7 +1150,7 @@ table inet filter {
 					</row>
 					<row>
 						<entry>timeout</entry>
-						<entry>time an element stays in the set</entry>
+						<entry>time an element stays in the set, mandatory if set is added to from the packet path (ruleset).</entry>
 						<entry>string, decimal followed by unit. Units are: d, h, m, s</entry>
 					</row>
 					<row>
@@ -1033,7 +1165,7 @@ table inet filter {
 					</row>
 					<row>
 						<entry>size</entry>
-						<entry>maximun number of elements in the set</entry>
+						<entry>maximum number of elements in the set, mandatory if set is added to from the packet path (ruleset).</entry>
 						<entry>unsigned integer (64 bit)</entry>
 					</row>
 					<row>
@@ -1179,7 +1311,7 @@ table inet filter {
 					</row>
 					<row>
 						<entry>size</entry>
-						<entry>maximun number of elements in the map</entry>
+						<entry>maximum number of elements in the map</entry>
 						<entry>unsigned integer (64 bit)</entry>
 					</row>
 					<row>
@@ -1190,6 +1322,91 @@ table inet filter {
 				</tbody>
 			</tgroup>
 		</table>
+	</refsect1>
+
+	<refsect1>
+		<title>Flowtables</title>
+		<para>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>add</arg>
+					<arg>create</arg>
+				</group>
+				<command>flowtable</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<arg choice="plain"><replaceable>table</replaceable></arg>
+				<arg choice="plain"><replaceable>flowtable</replaceable></arg>
+				<arg choice="req">
+					hook <replaceable>hook</replaceable>
+					priority <replaceable>priority</replaceable> ;
+					devices = { <replaceable>device</replaceable>[,...] } ;
+				</arg>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<group choice="req">
+					<arg>delete</arg>
+					<arg>list</arg>
+				</group>
+				<command>flowtable</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<replaceable>table</replaceable>
+				<replaceable>flowtable</replaceable>
+			</cmdsynopsis>
+		</para>
+
+		<para>
+			Flowtables allow you to accelerate packet forwarding in software.
+			Flowtables entries are represented through a tuple that is composed of the
+			input interface, source and destination address, source and destination
+			port; and layer 3/4 protocols. Each entry also caches the destination
+			interface and the gateway address - to update the destination link-layer
+			address - to forward packets. The ttl and hoplimit fields are also
+			decremented. Hence, flowtables provides an alternative path that allow
+			packets to bypass the classic forwarding path. Flowtables reside in the
+			ingress hook, that is located before the prerouting hook. You can select
+			what flows you want to offload through the <literal>flow offload</literal>
+			expression from the <literal>forward</literal> chain. Flowtables are
+			identified by their address family and their name. The address family
+			must be one of
+
+			<simplelist type="inline">
+				<member><literal>ip</literal></member>
+				<member><literal>ip6</literal></member>
+				<member><literal>inet</literal></member>
+			</simplelist>.
+
+			The <literal>inet</literal> address family is a dummy family which is used to create
+			hybrid IPv4/IPv6 tables.
+
+			When no address family is specified, <literal>ip</literal> is used by default.
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>add</option></term>
+				<listitem>
+					<para>
+						Add a new flowtable for the given family with the given name.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>delete</option></term>
+				<listitem>
+					<para>
+						Delete the specified flowtable.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><option>list</option></term>
+				<listitem>
+					<para>
+						List all flowtables.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
 	</refsect1>
 
 	<refsect1>
@@ -1206,6 +1423,13 @@ table inet filter {
 				<arg choice="opt"><replaceable>family</replaceable></arg>
 				<replaceable>table</replaceable>
 				<replaceable>object</replaceable>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<literal>delete</literal>
+				<command> type</command>
+				<arg choice="opt"><replaceable>family</replaceable></arg>
+				<replaceable>table</replaceable>
+				<literal> handle </literal><replaceable>handle</replaceable>
 			</cmdsynopsis>
 		</para>
 		<para>
@@ -1266,7 +1490,7 @@ table inet filter {
 			<para>
 				Ct helper is used to define connection tracking helpers that can then be used in combination with the <literal>"ct helper set"</literal> statement.
 				type and protocol are mandatory, l3proto is derived from the table family by default, i.e. in the inet table the kernel will
-				try to load both the ipv4 and ipv6 helper backends, if they are supported by the kernel.
+				try to load both the IPv4 and IPv6 helper backends, if they are supported by the kernel.
 			</para>
 			<table frame="all">
 				<title>conntrack helper specifications</title>
@@ -1386,12 +1610,12 @@ table inet myhelpers {
 						<row>
 							<entry>quota</entry>
 							<entry>quota limit, used as the quota name</entry>
-							<entry>Two arguments, unsigned interger (64 bit) and string: bytes, kbytes, mbytes. "over" and "until" go before these arguments</entry>
+							<entry>Two arguments, unsigned integer (64 bit) and string: bytes, kbytes, mbytes. "over" and "until" go before these arguments</entry>
 						</row>
 						<row>
 							<entry>used</entry>
 							<entry>initial value of used quota</entry>
-							<entry>Two arguments, unsigned interger (64 bit) and string: bytes, kbytes, mbytes</entry>
+							<entry>Two arguments, unsigned integer (64 bit) and string: bytes, kbytes, mbytes</entry>
 						</row>
 					</tbody>
 				</tgroup>
@@ -1430,7 +1654,7 @@ table inet myhelpers {
 $ nft describe tcp flags
 payload expression, datatype tcp_flag (TCP flag) (basetype bitmask, integer), 8 bits
 
-pre-defined symbolic constants:
+predefined symbolic constants:
 fin                           	0x01
 syn                           	0x02
 rst                           	0x04
@@ -2540,8 +2764,8 @@ filter output icmpv6 type { echo-request, echo-reply }
 						<arg>skgid</arg>
 						<arg>nftrace</arg>
 						<arg>rtclassid</arg>
-						<arg>ibriport</arg>
-						<arg>obriport</arg>
+						<arg>ibrname</arg>
+						<arg>obrname</arg>
 						<arg>pkttype</arg>
 						<arg>cpu</arg>
 						<arg>iifgroup</arg>
@@ -2596,7 +2820,7 @@ filter output icmpv6 type { echo-request, echo-reply }
 							</row>
 							<row>
 								<entry>protocol</entry>
-								<entry>Ethertype protocol value</entry>
+								<entry>EtherType protocol value</entry>
 								<entry>ether_type</entry>
 							</row>
 							<row>
@@ -2655,12 +2879,12 @@ filter output icmpv6 type { echo-request, echo-reply }
 								<entry>realm</entry>
 							</row>
 							<row>
-								<entry>ibriport</entry>
+								<entry>ibrname</entry>
 								<entry>Input bridge interface name</entry>
 								<entry>ifname</entry>
 							</row>
 							<row>
-								<entry>obriport</entry>
+								<entry>obrname</entry>
 								<entry>Output bridge interface name</entry>
 								<entry>ifname</entry>
 							</row>
@@ -2968,7 +3192,7 @@ inet filter output rt ip6 nexthop fd00::1
 			<para>
 				<cmdsynopsis>
 					<command>ether</command>
-					<arg opt="req"><replaceable>ethernet header field</replaceable></arg>
+					<arg opt="req"><replaceable>Ethernet header field</replaceable></arg>
 				</cmdsynopsis>
 			</para>
 			<para>
@@ -3776,7 +4000,7 @@ ip6 nexthdr ipv6-frag counter
 		</refsect2>
 
 		<refsect2>
-			<title>IPcomp header expression</title>
+			<title>IPComp header expression</title>
 			<para>
 				<cmdsynopsis>
 					<command>comp</command>
@@ -3849,7 +4073,7 @@ ip6 nexthdr ipv6-frag counter
 					<tbody>
 						<row>
 							<entry>ll</entry>
-							<entry>Link layer, for example the ethernet header</entry>
+							<entry>Link layer, for example the Ethernet header</entry>
 						</row>
 						<row>
 							<entry>nh</entry>
@@ -3882,7 +4106,7 @@ input meta iifname enp2s0 arp ptype 0x0800 arp htype 1 arp hlen 6 arp plen 4 @nh
 			<title>Extension header expressions</title>
 			<para>
 				Extension header expressions refer to data from variable-sized protocol headers, such as IPv6 extension headers and
-				TCPs options.
+				TCP options.
 			</para>
 			<para>
 				nftables currently supports matching (finding) a given ipv6 extension header or TCP option.
@@ -3927,6 +4151,15 @@ input meta iifname enp2s0 arp ptype 0x0800 arp htype 1 arp hlen 6 arp plen 4 @nh
 					<arg>hdrlength</arg>
 					<arg>checksum</arg>
 					<arg>type</arg>
+				</group>
+			</cmdsynopsis>
+			<cmdsynopsis>
+				<command>srh</command>
+				<group choice="req">
+					<arg>flags</arg>
+					<arg>tag</arg>
+					<arg>sid</arg>
+					<arg>seg-left</arg>
 				</group>
 			</cmdsynopsis>
 			<cmdsynopsis>
@@ -4008,6 +4241,10 @@ input meta iifname enp2s0 arp ptype 0x0800 arp htype 1 arp hlen 6 arp plen 4 @nh
 							<row>
 								<entry>mh</entry>
 								<entry>Mobility Header</entry>
+							</row>
+							<row>
+								<entry>srh</entry>
+								<entry>Segment Routing Header</entry>
 							</row>
 						</tbody>
 					</tgroup>
@@ -4256,7 +4493,7 @@ ip6 filter input frag more-fragments 1 counter
 							</row>
 							<row>
 								<entry>bytes</entry>
-								<entry>bytecount seen, see description for <command>packets</command> keyword</entry>
+								<entry>byte count seen, see description for <command>packets</command> keyword</entry>
 								<entry>integer (64 bit)</entry>
 							</row>
 							<row>
@@ -4575,14 +4812,14 @@ ip6 filter output log flags all
 						<arg choice="none">with</arg>
 						<group choice="req">
 							<arg>icmp</arg>
-							<arg>icmp6</arg>
+							<arg>icmpv6</arg>
 							<arg>icmpx</arg>
 						</group>
 						<arg choice="none">type</arg>
 						<group choice="req">
-							<arg>icmp_type</arg>
-							<arg>icmp6_type</arg>
-							<arg>icmpx_type</arg>
+							<arg>icmp_code</arg>
+							<arg>icmpv6_code</arg>
+							<arg>icmpx_code</arg>
 						</group>
 					</arg>
 				</cmdsynopsis>
@@ -4617,7 +4854,7 @@ ip6 filter output log flags all
 								<entry>icmp_code</entry>
 							</row>
 							<row>
-								<entry>icmp6</entry>
+								<entry>icmpv6</entry>
 								<entry>ip6</entry>
 								<entry>icmpv6_code</entry>
 							</row>
@@ -4635,6 +4872,10 @@ ip6 filter output log flags all
 				keywords refer to <literal>DATA TYPES</literal> section above.
 				The common default reject value is
 				<command>port-unreachable</command>.
+			</para>
+			<para>
+				Note that in bridge family, reject statement is only allowed in base chains which
+				hook into <literal>input</literal> or <literal>prerouting</literal>.
 			</para>
 		</refsect2>
 		<refsect2>
@@ -4980,7 +5221,7 @@ ct event set new,related,destroy
 							<row>
 								<entry>address</entry>
 								<entry>Specifies that the source/destination address of the packet should be modified. You may specify a mapping to relate a list of tuples composed of arbitrary expression key with address value.</entry>
-								<entry>ipv4_addr, ipv6_addr, eg. abcd::1234, or you can use a mapping, eg. meta mark map { 10 : 192.168.1.2, 20 : 192.168.1.3 }</entry>
+								<entry>ipv4_addr, ipv6_addr, e.g. abcd::1234, or you can use a mapping, e.g. meta mark map { 10 : 192.168.1.2, 20 : 192.168.1.3 }</entry>
 							</row>
 							<row>
 								<entry>port</entry>
@@ -5043,10 +5284,28 @@ add rule nat prerouting tcp dport 22 redirect to :2222
 				</example>
 			</para>
 		</refsect2>
+
+		<refsect2>
+			<title>Flow offload statement</title>
+			<para>
+				A flow offload statement allows us to select what flows
+				you want to accelerate forwarding through layer 3 network
+				stack bypass. You have to specify the flowtable name where
+				you want to offload this flow.
+			</para>
+			<para>
+				<cmdsynopsis>
+					<command>flow offload</command>
+					<literal>@flowtable</literal>
+				</cmdsynopsis>
+			</para>
+
+		</refsect2>
+
 		<refsect2>
 			<title>Queue statement</title>
 			<para>
-				This statement passes the packet to userspace using the nfnetlink_queue handler. The packet is put into the queue identified by its 16-bit queue number. Userspace can inspect and modify the packet if desired. Userspace must then drop or reinject the packet into the kernel. See libnetfilter_queue documentation for details.
+				This statement passes the packet to userspace using the nfnetlink_queue handler. The packet is put into the queue identified by its 16-bit queue number. Userspace can inspect and modify the packet if desired. Userspace must then drop or re-inject the packet into the kernel. See libnetfilter_queue documentation for details.
 			</para>
 			<para>
                                 <cmdsynopsis>
@@ -5109,7 +5368,7 @@ add rule nat prerouting tcp dport 22 redirect to :2222
 						<tbody>
 							<row>
 								<entry>bypass</entry>
-								<entry>Let packets go through if userspace application cannot back off. Before using this flag, read libnetfilter_queue documentation for performance tuning recomendations.</entry>
+								<entry>Let packets go through if userspace application cannot back off. Before using this flag, read libnetfilter_queue documentation for performance tuning recommendations.</entry>
 							</row>
 							<row>
 								<entry>fanout</entry>
@@ -5157,7 +5416,7 @@ add rule nat prerouting tcp dport 22 redirect to :2222
 							<row>
 								<entry>address</entry>
 								<entry>Specifies that the copy of the packet should be sent to a new gateway.</entry>
-								<entry>ipv4_addr, ipv6_addr, eg. abcd::1234, or you can use a mapping, eg. ip saddr map { 192.168.1.2 : 10.1.1.1 }</entry>
+								<entry>ipv4_addr, ipv6_addr, e.g. abcd::1234, or you can use a mapping, e.g. ip saddr map { 192.168.1.2 : 10.1.1.1 }</entry>
 							</row>
 							<row>
 								<entry>device</entry>
@@ -5200,6 +5459,58 @@ dup to ip daddr map { 192.168.7.1 : "eth0", 192.168.7.2 : "eth1" }
 			</para>
 		</refsect2>
 
+		<refsect2>
+			<title>Set statement</title>
+			<para>
+				The set statement is used to dynamically add or update elements in a set from the packet path.
+				The set <literal>setname</literal> must already exist in the given table.
+				Furthermore, any set that will be dynamically updated from the nftables ruleset must specify
+				both a maximum set size (to prevent memory exhaustion) and a timeout (so that number of entries in
+				set will not grow indefinitely).
+				The set statement can be used to e.g. create dynamic blacklists.
+			</para>
+			<para>
+				<cmdsynopsis>
+						<group choice="req">
+							<arg>add</arg>
+							<arg>update</arg>
+						</group>
+						<replaceable>@setname</replaceable>
+						<replaceable>{ expression </replaceable>
+							<arg choice="opt">timeout <replaceable>timeout</replaceable></arg>
+							<arg choice="opt">comment <replaceable>string</replaceable></arg>
+						<replaceable>}</replaceable>
+				</cmdsynopsis>
+			</para>
+			<para>
+				<example>
+					<title>Example for simple blacklist</title>
+					<programlisting>
+    # declare a set, bound to table "filter", in family "ip".  Timeout and size are mandatory because we will add elements from packet path.
+    nft add set ip filter blackhole "{ type ipv4_addr; flags timeout; size 65536; }"
+
+    # whitelist internal interface.
+    nft add rule ip filter input meta iifname "internal" accept
+
+    # drop packets coming from blacklisted ip addresses.
+    nft add rule ip filter input ip saddr @blackhole counter drop
+
+    # add source ip addresses to the blacklist if more than 10 tcp connection requests occurred per second and ip address.
+    # entries will timeout after one minute, after which they might be re-added if limit condition persists.
+    nft add rule ip filter input tcp flags syn tcp dport ssh meter flood size 128000 { ip saddr timeout 10s limit rate over 10/second} add @blackhole { ip saddr timeout 1m } drop
+
+    # inspect state of the rate limit meter:
+    nft list meter ip filter flood
+
+    # inspect content of blackhole:
+    nft list set ip filter blackhole
+
+    # manually add two addresses to the set:
+    nft add element filter blackhole { 10.2.3.4, 10.23.1.42 }
+					</programlisting>
+				</example>
+			</para>
+		</refsect2>
 	</refsect1>
 
 	<refsect1>
@@ -5262,7 +5573,7 @@ dup to ip daddr map { 192.168.7.1 : "eth0", 192.168.7.2 : "eth1" }
 		<para>
 			When an error is detected, nft shows the line(s) containing the error, the position
 			of the erroneous parts in the input stream and marks up the erroneous parts using
-			carrets (<literal>^</literal>). If the error results from the combination of two
+			carets (<literal>^</literal>). If the error results from the combination of two
 			expressions or statements, the part imposing the constraints which are violated is
 			marked using tildes (<literal>~</literal>).
 		</para>
@@ -5342,7 +5653,7 @@ Copyright &copy; 2013-2016 Pablo Neira Ayuso <email>pablo@netfilter.org</email>
 			published by the Free Software Foundation.
 		</para>
 		<para>
-			This documentation is licenced under the terms of the Creative
+			This documentation is licensed under the terms of the Creative
 			Commons Attribution-ShareAlike 4.0 license,
 			<ulink url="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</ulink>.
 		</para>

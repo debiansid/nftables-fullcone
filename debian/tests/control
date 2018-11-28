@@ -4,7 +4,7 @@ Restrictions: needs-root
 
 Tests: internaltest-shell.sh
 Depends: @, kmod
-Restrictions: needs-root, allow-stderr, isolation-container
+Restrictions: needs-root, allow-stderr, isolation-container, flaky
 
 # Disable test until we decide what to do with the nftables python module
 #Tests: internaltest-py.sh

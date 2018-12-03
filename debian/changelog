@@ -1,3 +1,11 @@
+nftables (0.9.0-2) unstable; urgency=medium
+
+  * [0509603] d/t/control: mark internaltest-shell.sh as flaky (Closes: #903083)
+  * [79434be] d/t: run monitor testsuite
+  * [9b254aa] nftables: enable JSON support
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 03 Dec 2018 14:11:14 +0100
+
 nftables (0.9.0-1) unstable; urgency=medium
 
   * [d1ad0df] d/t/internaltest-shell.sh: use installed nft binary

@@ -13,7 +13,8 @@ Build-Depends: automake,
                libnftnl-dev (>= 1.1.1),
                libreadline-dev,
 	       libxtables-dev (>= 1.6.1),
-               libtool (>=2.2.6)
+               libtool (>=2.2.6),
+	       libjansson-dev,
 Standards-Version: 4.1.4
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables

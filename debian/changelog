@@ -1,3 +1,21 @@
+nftables (0.9.1-1~exp1) experimental; urgency=medium
+
+  * [683e6f1] src:nftables: add salsa CI support
+  * [23e5163] d/watch: add missing line break
+  * [b6500d8] d/upstream/signing-key.asc: refresh key
+  * [b326349] New upstream version 0.9.1
+  * [bf731ca] d/patches: drop reproducible.patch
+  * [29aa197] nftables: refresh build-dep for documentation
+  * [9d4cbf9] nftables: bump libnftnl build-dep version requirement
+  * [6d3bbe5] d/patches: add build_docs.patch
+  * [d041ac8] nftables-dbg: drop debug symbol migration relationship depends
+  * [b1c680a] libnftables: bump SONAME from 0 to 1
+  * [8f39f4d] libnftables1: include additional manpages
+  * [40f70bf] d/copyright: refresh file
+  * [edb2911] python3-nftables: introduce new binary package
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 26 Jun 2019 13:43:47 +0200
+
 nftables (0.9.0-2) unstable; urgency=medium
 
   * [0509603] d/t/control: mark internaltest-shell.sh as flaky (Closes: #903083)

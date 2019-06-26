@@ -24,7 +24,7 @@ Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 Package: nftables
 Architecture: linux-any
 Pre-Depends: dpkg (>= 1.15.7.2)
-Depends: libnftables0 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Description: Program to control packet filtering rules by Netfilter project
  This software provides an in-kernel packet classification framework that is
  based on a network-specific Virtual Machine (VM) and the nft userspace
@@ -44,7 +44,7 @@ Package: libnftables-dev
 Section: libdevel
 Architecture: linux-any
 Multi-Arch: same
-Depends: libnftables0 (=${binary:Version}), ${misc:Depends}
+Depends: libnftables1 (=${binary:Version}), ${misc:Depends}
 Description: Development files for libnftables
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
@@ -59,7 +59,7 @@ Description: Development files for libnftables
  .
  This package provides development files and static libraries.
 
-Package: libnftables0
+Package: libnftables1
 Section: libs
 Architecture: linux-any
 Multi-Arch: same

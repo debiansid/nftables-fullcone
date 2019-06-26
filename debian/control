@@ -15,7 +15,10 @@ Build-Depends: asciidoc-base,
 	       libxtables-dev (>= 1.6.1),
                libtool (>=2.2.6),
 	       libjansson-dev,
-               xsltproc
+               xsltproc,
+               dh-python,
+               python3-all,
+               python3-setuptools
 Standards-Version: 4.1.4
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
@@ -77,3 +80,21 @@ Description: Netfilter nftables high level userspace API library
  A Linux kernel >= 3.13 is required. However, >= 4.14 is recommended.
  .
  This package contains the libnftables library.
+
+Package: python3-nftables
+Section: python
+Architecture: linux-any
+Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${python3:Depends}
+Description: nftables/libnftables python3 module
+ The libnftables library provides high level semantics to interact with the
+ nftables framework by the Netfilter project.
+ .
+ nftables replaces the old popular iptables, ip6tables, arptables and ebtables.
+ .
+ Netfilter software and nftables in particular are used in applications such
+ as Internet connection sharing, firewalls, IP accounting, transparent
+ proxying, advanced routing and traffic control.
+ .
+ A Linux kernel >= 3.13 is required. However, >= 4.14 is recommended.
+ .
+ This package contains the libnftables python3 bindings.

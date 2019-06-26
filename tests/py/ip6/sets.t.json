@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
+	    "op": "==",
             "right": "@set2"
         }
     },
@@ -23,7 +24,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
             "op": "!=",
@@ -44,17 +45,18 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip6"
+                            "protocol": "ip6"
                         }
                     },
                     {
                         "payload": {
                             "field": "daddr",
-                            "name": "ip6"
+                            "protocol": "ip6"
                         }
                     }
                 ]
             },
+	    "op": "==",
             "right": "@set5"
         }
     },
@@ -72,13 +74,13 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip6"
+                            "protocol": "ip6"
                         }
                     },
                     {
                         "payload": {
                             "field": "daddr",
-                            "name": "ip6"
+                            "protocol": "ip6"
                         }
                     }
                 ]

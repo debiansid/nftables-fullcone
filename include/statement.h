@@ -102,8 +102,9 @@ extern void __limit_stmt_print(const struct limit_stmt *limit);
 
 struct reject_stmt {
 	struct expr		*expr;
-	enum nft_reject_types	type;
+	enum nft_reject_types	type:8;
 	int8_t			icmp_code;
+	uint8_t			verbose_print:1;
 	unsigned int		family;
 };
 
@@ -123,10 +124,20 @@ struct nat_stmt {
 	struct expr		*addr;
 	struct expr		*proto;
 	uint32_t		flags;
+	uint8_t			family;
 };
 
 extern struct stmt *nat_stmt_alloc(const struct location *loc,
 				   enum nft_nat_etypes type);
+
+struct tproxy_stmt {
+	struct expr	*addr;
+	struct expr	*port;
+	uint8_t		family;
+	uint8_t		table_family; /* only used for printing the rule */
+};
+
+extern struct stmt *tproxy_stmt_alloc(const struct location *loc);
 
 struct queue_stmt {
 	struct expr		*queue;
@@ -175,6 +186,7 @@ uint32_t fwd_stmt_type(const char *type);
 struct set_stmt {
 	struct expr		*set;
 	struct expr		*key;
+	struct stmt		*stmt;
 	enum nft_dynset_ops	op;
 };
 
@@ -184,7 +196,9 @@ extern struct stmt *set_stmt_alloc(const struct location *loc);
 
 struct map_stmt {
 	struct expr		*set;
-	struct expr		*map;
+	struct expr		*key;
+	struct expr		*data;
+	struct stmt		*stmt;
 	enum nft_dynset_ops	op;
 };
 
@@ -225,7 +239,6 @@ struct xt_stmt {
 		struct xtables_match	*match;
 		struct xtables_target	*target;
 	};
-	const char			*opts;
 	void				*entry;
 };
 
@@ -271,6 +284,7 @@ enum stmt_types {
 	STMT_LOG,
 	STMT_REJECT,
 	STMT_NAT,
+	STMT_TPROXY,
 	STMT_QUEUE,
 	STMT_CT,
 	STMT_SET,
@@ -337,6 +351,7 @@ struct stmt {
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;
 		struct nat_stmt		nat;
+		struct tproxy_stmt	tproxy;
 		struct queue_stmt	queue;
 		struct quota_stmt	quota;
 		struct ct_stmt		ct;

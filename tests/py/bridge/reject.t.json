@@ -113,8 +113,9 @@
     {
         "match": {
             "left": {
-                "meta": "mark"
+                "meta": { "key": "mark" }
             },
+	    "op": "==",
             "right": 12345
         }
     },
@@ -123,9 +124,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "tcp"
         }
     },
@@ -150,9 +152,10 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "ether"
+                    "protocol": "ether"
                 }
             },
+	    "op": "==",
             "right": "ip"
         }
     },
@@ -168,9 +171,10 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "ether"
+                    "protocol": "ether"
                 }
             },
+	    "op": "==",
             "right": "ip6"
         }
     },
@@ -214,6 +218,50 @@
     {
         "reject": {
             "expr": "port-unreachable",
+            "type": "icmpx"
+        }
+    }
+]
+
+# ether type ip reject with icmpx type admin-prohibited
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "type",
+                    "protocol": "ether"
+                }
+            },
+            "op": "==",
+            "right": "ip"
+        }
+    },
+    {
+        "reject": {
+            "expr": "admin-prohibited",
+            "type": "icmpx"
+        }
+    }
+]
+
+# ether type ip6 reject with icmpx type admin-prohibited
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "type",
+                    "protocol": "ether"
+                }
+            },
+            "op": "==",
+            "right": "ip6"
+        }
+    },
+    {
+        "reject": {
+            "expr": "admin-prohibited",
             "type": "icmpx"
         }
     }

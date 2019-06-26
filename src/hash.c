@@ -56,13 +56,19 @@ static void hash_expr_clone(struct expr *new, const struct expr *expr)
 	new->hash.type = expr->hash.type;
 }
 
-static const struct expr_ops hash_expr_ops = {
+static void hash_expr_destroy(struct expr *expr)
+{
+	expr_free(expr->hash.expr);
+}
+
+const struct expr_ops hash_expr_ops = {
 	.type		= EXPR_HASH,
 	.name		= "hash",
 	.print		= hash_expr_print,
 	.json		= hash_expr_json,
 	.cmp		= hash_expr_cmp,
 	.clone		= hash_expr_clone,
+	.destroy	= hash_expr_destroy,
 };
 
 struct expr *hash_expr_alloc(const struct location *loc,
@@ -73,7 +79,7 @@ struct expr *hash_expr_alloc(const struct location *loc,
 {
 	struct expr *expr;
 
-	expr = expr_alloc(loc, &hash_expr_ops, &integer_type,
+	expr = expr_alloc(loc, EXPR_HASH, &integer_type,
 			  BYTEORDER_HOST_ENDIAN, 4 * BITS_PER_BYTE);
 	expr->hash.mod  = mod;
 	expr->hash.seed_set = seed_set;

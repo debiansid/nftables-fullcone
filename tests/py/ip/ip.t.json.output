@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "cs7"
         }
     }
@@ -20,7 +21,7 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -36,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "cs0",
@@ -75,9 +77,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 6
         }
     }
@@ -90,7 +93,7 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -106,9 +109,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     1,
@@ -136,7 +140,7 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -169,7 +173,7 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
                     "0.0.0.255"
@@ -188,9 +192,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "prefix": {
                     "addr": "255.255.0.0",
@@ -206,20 +211,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "ecn",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": "ect1"
+            "value": "ect1"
         }
     }
 ]

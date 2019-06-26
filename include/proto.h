@@ -182,6 +182,10 @@ enum arp_hdr_fields {
 	ARPHDR_HLN,
 	ARPHDR_PLN,
 	ARPHDR_OP,
+	ARPHDR_SADDR_ETHER,
+	ARPHDR_DADDR_ETHER,
+	ARPHDR_SADDR_IP,
+	ARPHDR_DADDR_IP,
 };
 
 enum ip_hdr_fields {
@@ -209,6 +213,14 @@ enum icmp_hdr_fields {
 	ICMPHDR_SEQ,
 	ICMPHDR_GATEWAY,
 	ICMPHDR_MTU,
+};
+
+enum igmp_hdr_fields {
+	IGMPHDR_INVALID,
+	IGMPHDR_TYPE,
+	IGMPHDR_CHECKSUM,
+	IGMPHDR_MRT,
+	IGMPHDR_GROUP,
 };
 
 enum icmp6_hdr_fields {
@@ -299,6 +311,7 @@ enum sctp_hdr_fields {
 };
 
 extern const struct proto_desc proto_icmp;
+extern const struct proto_desc proto_igmp;
 extern const struct proto_desc proto_ah;
 extern const struct proto_desc proto_esp;
 extern const struct proto_desc proto_comp;

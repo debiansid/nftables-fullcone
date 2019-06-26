@@ -2,18 +2,18 @@
 [
     {
         "mangle": {
-            "left": {
-                "meta": "mark"
+            "key": {
+                "meta": { "key": "mark" }
             },
-            "right": {
+            "value": {
                 "map": {
-                    "left": {
+                    "key": {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [
                                 "10.2.3.1",
@@ -35,18 +35,18 @@
 [
     {
         "mangle": {
-            "left": {
-                "meta": "mark"
+            "key": {
+                "meta": { "key": "mark" }
             },
-            "right": {
+            "value": {
                 "map": {
-                    "left": {
+                    "key": {
                         "payload": {
                             "field": "hdrlength",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [
                                 4,

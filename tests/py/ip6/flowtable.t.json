@@ -8,12 +8,12 @@
                     "val": {
                         "concat": [
                             {
-                                "meta": "iif"
+                                "meta": { "key": "iif" }
                             },
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip6"
+                                    "protocol": "ip6"
                                 }
                             }
                         ]
@@ -21,6 +21,7 @@
                 }
             },
             "name": "acct_out",
+            "size": 4096,
             "stmt": {
                 "counter": null
             }
@@ -40,17 +41,18 @@
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip6"
+                                    "protocol": "ip6"
                                 }
                             },
                             {
-                                "meta": "iif"
+                                "meta": { "key": "iif" }
                             }
                         ]
                     }
                 }
             },
             "name": "acct_out",
+            "size": 12345,
             "stmt": {
                 "counter": null
             }

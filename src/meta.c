@@ -207,7 +207,7 @@ static void uid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct passwd *pw;
 
-	if (octx->numeric < NFT_NUMERIC_ALL) {
+	if (nft_output_guid(octx)) {
 		uint32_t uid = mpz_get_uint32(expr->value);
 
 		pw = getpwuid(uid);
@@ -260,7 +260,7 @@ static void gid_type_print(const struct expr *expr, struct output_ctx *octx)
 {
 	struct group *gr;
 
-	if (octx->numeric < NFT_NUMERIC_ALL) {
+	if (nft_output_guid(octx)) {
 		uint32_t gid = mpz_get_uint32(expr->value);
 
 		gr = getgrgid(gid);
@@ -442,22 +442,25 @@ const struct meta_template meta_templates[] = {
 	[NFT_META_PRANDOM]	= META_TEMPLATE("random",    &integer_type,
 						4 * BITS_PER_BYTE,
 						BYTEORDER_BIG_ENDIAN), /* avoid conversion; doesn't have endianess */
-	[NFT_META_SECPATH]	= META_TEMPLATE("secpath", &boolean_type,
+	[NFT_META_SECPATH]	= META_TEMPLATE("ipsec", &boolean_type,
 						BITS_PER_BYTE, BYTEORDER_HOST_ENDIAN),
+	[NFT_META_IIFKIND]	= META_TEMPLATE("iifkind",   &ifname_type,
+						IFNAMSIZ * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_OIFKIND]	= META_TEMPLATE("oifkind",   &ifname_type,
+						IFNAMSIZ * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
 };
 
-static bool meta_key_is_qualified(enum nft_meta_keys key)
+static bool meta_key_is_unqualified(enum nft_meta_keys key)
 {
 	switch (key) {
-	case NFT_META_LEN:
-	case NFT_META_NFPROTO:
-	case NFT_META_L4PROTO:
-	case NFT_META_PROTOCOL:
-	case NFT_META_PRIORITY:
-	case NFT_META_PRANDOM:
-	case NFT_META_SECPATH:
-	case NFT_META_BRI_IIFNAME:
-	case NFT_META_BRI_OIFNAME:
+	case NFT_META_IIF:
+	case NFT_META_OIF:
+	case NFT_META_IIFNAME:
+	case NFT_META_OIFNAME:
+	case NFT_META_IIFGROUP:
+	case NFT_META_OIFGROUP:
 		return true;
 	default:
 		return false;
@@ -466,11 +469,11 @@ static bool meta_key_is_qualified(enum nft_meta_keys key)
 
 static void meta_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	if (meta_key_is_qualified(expr->meta.key))
-		nft_print(octx, "meta %s",
+	if (meta_key_is_unqualified(expr->meta.key))
+		nft_print(octx, "%s",
 			  meta_templates[expr->meta.key].token);
 	else
-		nft_print(octx, "%s",
+		nft_print(octx, "meta %s",
 			  meta_templates[expr->meta.key].token);
 }
 
@@ -536,7 +539,11 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 		proto_ctx_update(ctx, PROTO_BASE_TRANSPORT_HDR, &expr->location, desc);
 		break;
 	case NFT_META_PROTOCOL:
-		if (h->base < PROTO_BASE_NETWORK_HDR && ctx->family != NFPROTO_NETDEV)
+		if (h->base != PROTO_BASE_LL_HDR)
+			return;
+
+		if (ctx->family != NFPROTO_NETDEV &&
+		    ctx->family != NFPROTO_BRIDGE)
 			return;
 
 		desc = proto_find_upper(h->desc, ntohs(mpz_get_uint16(right->value)));
@@ -550,7 +557,7 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 	}
 }
 
-static const struct expr_ops meta_expr_ops = {
+const struct expr_ops meta_expr_ops = {
 	.type		= EXPR_META,
 	.name		= "meta",
 	.print		= meta_expr_print,
@@ -565,7 +572,7 @@ struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
 	const struct meta_template *tmpl = &meta_templates[key];
 	struct expr *expr;
 
-	expr = expr_alloc(loc, &meta_expr_ops, tmpl->dtype,
+	expr = expr_alloc(loc, EXPR_META, tmpl->dtype,
 			  tmpl->byteorder, tmpl->len);
 	expr->meta.key = key;
 
@@ -594,14 +601,19 @@ struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)
 
 static void meta_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	if (meta_key_is_qualified(stmt->meta.key))
-		nft_print(octx, "meta %s set ",
+	if (meta_key_is_unqualified(stmt->meta.key))
+		nft_print(octx, "%s set ",
 			  meta_templates[stmt->meta.key].token);
 	else
-		nft_print(octx, "%s set ",
+		nft_print(octx, "meta %s set ",
 			  meta_templates[stmt->meta.key].token);
 
 	expr_print(stmt->meta.expr, octx);
+}
+
+static void meta_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->meta.expr);
 }
 
 static const struct stmt_ops meta_stmt_ops = {
@@ -609,6 +621,7 @@ static const struct stmt_ops meta_stmt_ops = {
 	.name		= "meta",
 	.print		= meta_stmt_print,
 	.json		= meta_stmt_json,
+	.destroy	= meta_stmt_destroy,
 };
 
 struct stmt *meta_stmt_alloc(const struct location *loc, enum nft_meta_keys key,
@@ -667,6 +680,9 @@ struct error_record *meta_key_parse(const struct location *loc,
 		return NULL;
 	} else if (strcmp(str, "obriport") == 0) {
 		*value = NFT_META_BRI_OIFNAME;
+		return NULL;
+	} else if (strcmp(str, "secpath") == 0) {
+		*value = NFT_META_SECPATH;
 		return NULL;
 	}
 

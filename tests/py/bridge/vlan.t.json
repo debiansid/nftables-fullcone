@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     }
@@ -20,9 +21,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -35,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -46,9 +49,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -61,9 +65,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -72,7 +77,7 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
             "op": "!=",
@@ -88,9 +93,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -99,9 +105,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     }
@@ -114,9 +121,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -125,9 +133,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -136,9 +145,10 @@
             "left": {
                 "payload": {
                     "field": "pcp",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 7
         }
     }
@@ -151,9 +161,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -162,9 +173,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -173,9 +185,10 @@
             "left": {
                 "payload": {
                     "field": "pcp",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 3
         }
     }
@@ -188,9 +201,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     }
@@ -203,9 +217,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -218,9 +233,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -229,9 +245,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -244,9 +261,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -255,9 +273,10 @@
             "left": {
                 "payload": {
                     "field": "cfi",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     }
@@ -270,9 +289,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 4094
         }
     },
@@ -281,9 +301,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -296,9 +317,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -307,9 +329,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "10.0.0.1"
         }
     }
@@ -322,9 +345,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -333,9 +357,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "prefix": {
                     "addr": "10.0.0.0",
@@ -353,9 +378,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -364,9 +390,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "prefix": {
                     "addr": "10.0.0.0",
@@ -380,9 +407,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 53
         }
     }
@@ -395,9 +423,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -406,9 +435,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "prefix": {
                     "addr": "10.0.0.0",
@@ -422,9 +452,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 53
         }
     }
@@ -437,9 +468,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     1,
@@ -456,9 +488,10 @@
             "left": {
                 "payload": {
                     "field": "pcp",
-                    "name": "vlan"
+                    "protocol": "vlan"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 1, 3 ]
             }

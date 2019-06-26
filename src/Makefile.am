@@ -1,3 +1,5 @@
+include $(top_srcdir)/Make_global.am
+
 sbin_PROGRAMS = nft
 
 CLEANFILES = scanner.c parser_bison.c
@@ -29,6 +31,7 @@ lib_LTLIBRARIES = libnftables.la
 libnftables_la_SOURCES =			\
 		rule.c				\
 		statement.c			\
+		cache.c				\
 		datatype.c			\
 		expression.c			\
 		evaluate.c			\
@@ -41,9 +44,11 @@ libnftables_la_SOURCES =			\
 		rt.c				\
 		numgen.c			\
 		ct.c				\
+		xfrm.c				\
 		netlink.c			\
 		netlink_linearize.c		\
 		netlink_delinearize.c		\
+		misspell.c			\
 		monitor.c			\
 		segtree.c			\
 		rbtree.c			\
@@ -52,8 +57,9 @@ libnftables_la_SOURCES =			\
 		erec.c				\
 		mnl.c				\
 		iface.c				\
-		services.c			\
 		mergesort.c			\
+		osf.c				\
+		nfnl_osf.c			\
 		tcpopt.c			\
 		socket.c			\
 		libnftables.c
@@ -70,6 +76,7 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 		      -Wno-redundant-decls
 
 libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la
+libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION}
 
 if BUILD_MINIGMP
 noinst_LTLIBRARIES += libminigmp.la
@@ -78,8 +85,8 @@ libminigmp_la_CFLAGS = ${AM_CFLAGS} -Wno-sign-compare
 libnftables_la_LIBADD += libminigmp.la
 endif
 
-if BUILD_XTABLES
 libnftables_la_SOURCES += xt.c
+if BUILD_XTABLES
 libnftables_la_LIBADD += ${XTABLES_LIBS}
 endif
 

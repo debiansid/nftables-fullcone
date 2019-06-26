@@ -90,7 +90,7 @@ struct expr *exthdr_expr_alloc(const struct location *loc,
 	else
 		tmpl = &exthdr_unknown_template;
 
-	expr = expr_alloc(loc, &exthdr_expr_ops, tmpl->dtype,
+	expr = expr_alloc(loc, EXPR_EXTHDR, tmpl->dtype,
 			  BYTEORDER_BIG_ENDIAN, tmpl->len);
 	expr->exthdr.desc = desc;
 	expr->exthdr.tmpl = tmpl;
@@ -104,11 +104,18 @@ static void exthdr_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	expr_print(stmt->exthdr.val, octx);
 }
 
+static void exthdr_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->exthdr.expr);
+	expr_free(stmt->exthdr.val);
+}
+
 static const struct stmt_ops exthdr_stmt_ops = {
 	.type		= STMT_EXTHDR,
 	.name		= "exthdr",
 	.print		= exthdr_stmt_print,
 	.json		= exthdr_stmt_json,
+	.destroy	= exthdr_stmt_destroy,
 };
 
 struct stmt *exthdr_stmt_alloc(const struct location *loc,
@@ -162,7 +169,7 @@ void exthdr_init_raw(struct expr *expr, uint8_t type,
 	const struct proto_hdr_template *tmpl = &exthdr_unknown_template;
 	unsigned int i;
 
-	assert(expr->ops->type == EXPR_EXTHDR);
+	assert(expr->etype == EXPR_EXTHDR);
 	if (op == NFT_EXTHDR_OP_TCPOPT)
 		return tcpopt_init_raw(expr, type, offset, len, flags);
 
@@ -199,9 +206,9 @@ void exthdr_init_raw(struct expr *expr, uint8_t type,
  out:
 	expr->exthdr.tmpl = tmpl;
 	if (flags & NFT_EXTHDR_F_PRESENT)
-		expr->dtype = &boolean_type;
+		datatype_set(expr, &boolean_type);
 	else
-		expr->dtype = tmpl->dtype;
+		datatype_set(expr, tmpl->dtype);
 }
 
 static unsigned int mask_length(const struct expr *mask)

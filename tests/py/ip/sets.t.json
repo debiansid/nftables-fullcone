@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "@set1"
         }
     },
@@ -23,7 +24,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -42,9 +43,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "@set2"
         }
     },
@@ -60,7 +62,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -81,17 +83,18 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
                     {
                         "payload": {
                             "field": "daddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     }
                 ]
             },
+	    "op": "==",
             "right": "@set5"
         }
     },
@@ -109,13 +112,13 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
                     {
                         "payload": {
                             "field": "daddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     }
                 ]
@@ -133,9 +136,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "1.1.1.0",
@@ -154,9 +158,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     {

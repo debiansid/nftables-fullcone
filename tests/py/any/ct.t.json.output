@@ -7,6 +7,7 @@
                     "key": "state"
                 }
             },
+            "op": "in",
             "right": [
                 "established",
                 "related",
@@ -26,6 +27,7 @@
                     "key": "state"
                 }
             },
+            "op": "==",
             "right": {
                 "set": [
                     "established",
@@ -69,6 +71,7 @@
                     "key": "state"
                 }
             },
+            "op": "in",
             "right": "new"
         }
     }
@@ -83,6 +86,7 @@
                     "key": "direction"
                 }
             },
+            "op": "==",
             "right": {
                 "set": [
                     "original",
@@ -202,6 +206,7 @@
                     "key": "mark"
                 }
             },
+            "op": "==",
             "right": 50
         }
     }
@@ -231,6 +236,7 @@
                     "key": "mark"
                 }
             },
+            "op": "==",
             "right": 50
         }
     }
@@ -260,6 +266,7 @@
                     "key": "mark"
                 }
             },
+            "op": "==",
             "right": {
                 "range": [ 50, 69 ]
             }
@@ -293,6 +300,7 @@
                     "key": "mark"
                 }
             },
+            "op": "==",
             "right": {
                 "set": [
                     50,
@@ -313,6 +321,7 @@
                     "key": "mark"
                 }
             },
+            "op": "==",
             "right": {
                 "set": [
                     { "range": [ 50, 8738 ] },
@@ -348,12 +357,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": 4896
+            "value": 4896
         }
     }
 ]
@@ -362,12 +371,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": 17
+            "value": 17
         }
     }
 ]
@@ -376,12 +385,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": 19
+            "value": 19
         }
     }
 ]
@@ -390,12 +399,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": 17
+            "value": 17
         }
     }
 ]
@@ -409,6 +418,7 @@
                     "key": "expiration"
                 }
             },
+            "op": "==",
             "right": 30
         }
     }
@@ -423,6 +433,7 @@
                     "key": "expiration"
                 }
             },
+            "op": "==",
             "right": 30
         }
     }
@@ -437,6 +448,7 @@
                     "key": "expiration"
                 }
             },
+            "op": "==",
             "right": {
                 "range": [ 60, 3600 ]
             }
@@ -477,6 +489,7 @@
                     }
                 ]
             },
+            "op": "==",
             "right": {
                 "set": [
                     {
@@ -509,6 +522,7 @@
                     }
                 ]
             },
+            "op": "==",
             "right": {
                 "set": [
                     {
@@ -535,7 +549,7 @@
     }
 ]
 
-# ct direction . ct mark { original . 0x12345678}
+# ct direction . ct mark { original . 0x12345678, reply . 0x87654321}
 [
     {
         "match": {
@@ -553,12 +567,19 @@
                     }
                 ]
             },
+            "op": "==",
             "right": {
                 "set": [
                     {
                         "concat": [
                             "original",
                             305419896
+                        ]
+                    },
+                    {
+                        "concat": [
+                            "reply",
+                            2271560481
                         ]
                     }
                 ]
@@ -567,11 +588,11 @@
     }
 ]
 
-# ct state . ct mark vmap { new . 0x12345678 : drop}
+# ct state . ct mark vmap { new . 0x12345678 : drop, established . 0x87654321 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "concat": [
                     {
                         "ct": {
@@ -585,8 +606,19 @@
                     }
                 ]
             },
-            "right": {
+            "data": {
                 "set": [
+                    [
+                        {
+                            "concat": [
+                                "established",
+                                2271560481
+                            ]
+                        },
+                        {
+                            "accept": null
+                        }
+                    ],
                     [
                         {
                             "concat": [
@@ -608,12 +640,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "event"
                 }
             },
-            "right": "new"
+            "value": "new"
         }
     }
 ]
@@ -622,12 +654,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "event"
                 }
             },
-            "right": 0
+            "value": 0
         }
     }
 ]

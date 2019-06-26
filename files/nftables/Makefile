@@ -153,13 +153,14 @@ DATA = $(dist_pkgsysconf_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/missing aclocal-1.15
+A2X = a2x
+ACLOCAL = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/missing autoconf
-AUTOHEADER = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/missing autoheader
-AUTOMAKE = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/missing automake-1.15
+AUTOCONF = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing autoconf
+AUTOHEADER = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing autoheader
+AUTOMAKE = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing automake-1.15
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -167,14 +168,9 @@ CFLAGS = -g -O2
 CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
-DB2MAN = docbook2x-man
-DB2X_DOCBOOK2MAN = no
-DBLATEX = 
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
 DLLTOOL = false
-DOCBOOK2MAN = docbook2man
-DOCBOOK2X_MAN = docbook2x-man
 DSYMUTIL = 
 DUMPBIN = 
 ECHO_C = 
@@ -205,7 +201,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
-MAKEINFO = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/missing makeinfo
+MAKEINFO = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -217,28 +213,29 @@ OTOOL64 =
 PACKAGE = nftables
 PACKAGE_BUGREPORT = netfilter-devel@vger.kernel.org
 PACKAGE_NAME = nftables
-PACKAGE_STRING = nftables 0.9.0
+PACKAGE_STRING = nftables 0.9.1
 PACKAGE_TARNAME = nftables
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.9.0
+PACKAGE_VERSION = 0.9.1
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
 PKG_CONFIG_PATH = 
+PYTHON_BIN = /usr/bin/python
 RANLIB = ranlib
 SED = /bin/sed
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = strip
-VERSION = 0.9.0
+VERSION = 0.9.1
 XTABLES_CFLAGS = 
 XTABLES_LIBS = 
 YACC = bison -y
 YFLAGS = 
-abs_builddir = /tmp/tmp.EgMDc8URuC/files/nftables
-abs_srcdir = /tmp/tmp.EgMDc8URuC/files/nftables
-abs_top_builddir = /tmp/tmp.EgMDc8URuC
-abs_top_srcdir = /tmp/tmp.EgMDc8URuC
+abs_builddir = /tmp/tmp.oKn4z6YV6r/files/nftables
+abs_srcdir = /tmp/tmp.oKn4z6YV6r/files/nftables
+abs_top_builddir = /tmp/tmp.oKn4z6YV6r
+abs_top_srcdir = /tmp/tmp.oKn4z6YV6r
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -267,7 +264,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /tmp/tmp.EgMDc8URuC/build-aux/install-sh
+install_sh = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -289,9 +286,7 @@ top_build_prefix = ../../
 top_builddir = ../..
 top_srcdir = ../..
 with_cli = yes
-with_debug = yes
 with_json = no
-with_libxtables = no
 pkgsysconfdir = ${sysconfdir}/nftables
 dist_pkgsysconf_DATA = all-in-one.nft		\
 			arp-filter.nft		\
@@ -525,7 +520,7 @@ uninstall-am: uninstall-dist_pkgsysconfDATA
 
 
 install-data-hook:
-	${SED} -i 's|@sbindir[@]|${sbindir}/|g' ${DESTDIR}${pkgsysconfdir}/*
+	${SED} -i 's|@sbindir[@]|${sbindir}/|g' ${DESTDIR}${pkgsysconfdir}/*.nft
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -188,6 +188,12 @@ arp test-arp input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
+# arp operation 1-2
+arp test-arp input
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ cmp gte reg 1 0x00000100 ]
+  [ cmp lte reg 1 0x00000200 ]
+
 # arp operation request
 arp test-arp input
   [ payload load 2b @ network header + 6 => reg 1 ]
@@ -272,9 +278,32 @@ arp test-arp input
 arp test-arp input
   [ meta load iifname => reg 1 ]
   [ cmp eq reg 1 0x61766e69 0x0064696c 0x00000000 0x00000000 ]
-  [ payload load 6b @ network header + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00080100 0x00000406 ]
+  [ payload load 4b @ network header + 0 => reg 1 ]
+  [ cmp eq reg 1 0x00080100 ]
+  [ payload load 2b @ network header + 4 => reg 1 ]
+  [ cmp eq reg 1 0x00000406 ]
   [ payload load 4b @ network header + 24 => reg 1 ]
   [ cmp eq reg 1 0x108fa8c0 ]
   [ immediate reg 1 0x44332211 0x00006655 ]
   [ payload write reg 1 => 6b @ network header + 18 csum_type 0 csum_off 0 csum_flags 0x0 ]
+
+# arp saddr ip 1.2.3.4
+arp test-arp input 
+  [ payload load 4b @ network header + 14 => reg 1 ]
+  [ cmp eq reg 1 0x04030201 ]
+
+# arp daddr ip 4.3.2.1
+arp test-arp input 
+  [ payload load 4b @ network header + 24 => reg 1 ]
+  [ cmp eq reg 1 0x01020304 ]
+
+# arp saddr ether aa:bb:cc:aa:bb:cc
+arp test-arp input 
+  [ payload load 6b @ network header + 8 => reg 1 ]
+  [ cmp eq reg 1 0xaaccbbaa 0x0000ccbb ]
+
+# arp daddr ether aa:bb:cc:aa:bb:cc
+arp test-arp input 
+  [ payload load 6b @ network header + 18 => reg 1 ]
+  [ cmp eq reg 1 0xaaccbbaa 0x0000ccbb ]
+

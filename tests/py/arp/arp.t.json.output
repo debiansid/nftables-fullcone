@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "ptype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "ip"
         }
     }
@@ -20,9 +21,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "request",
@@ -45,7 +47,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -69,8 +71,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "invalid"
         }
     },
@@ -79,9 +82,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -90,9 +94,10 @@
             "left": {
                 "payload": {
                     "field": "ptype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "ip"
         }
     },
@@ -101,9 +106,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 6
         }
     },
@@ -112,9 +118,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 4
         }
     },
@@ -122,26 +129,23 @@
         "match": {
             "left": {
                 "payload": {
-                    "base": "nh",
-                    "len": 32,
-                    "name": "raw",
-                    "offset": 192
+                    "field": "daddr ip",
+                    "protocol": "arp"
                 }
             },
-            "right": 3232272144
+	    "op": "==",
+            "right": "192.168.143.16"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
-                    "base": "nh",
-                    "len": 48,
-                    "name": "raw",
-                    "offset": 144
+                    "field": "daddr ether",
+                    "protocol": "arp"
                 }
             },
-            "right": 18838586676582
+            "value": "11:22:33:44:55:66"
         }
     }
 ]

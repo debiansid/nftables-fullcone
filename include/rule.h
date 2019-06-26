@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <nftables.h>
 #include <list.h>
+#include <netinet/in.h>
+#include <libnftnl/object.h>	/* For NFTNL_CTTIMEOUT_ARRAY_MAX. */
 
 /**
  * struct handle_spec - handle ID
@@ -71,6 +73,8 @@ struct handle {
 	struct position_spec	position;
 	struct position_spec	index;
 	uint32_t		set_id;
+	uint32_t		rule_id;
+	uint32_t		position_id;
 };
 
 extern void handle_merge(struct handle *dst, const struct handle *src);
@@ -110,6 +114,8 @@ extern void symbol_bind(struct scope *scope, const char *identifier,
 extern int symbol_unbind(const struct scope *scope, const char *identifier);
 extern struct symbol *symbol_lookup(const struct scope *scope,
 				    const char *identifier);
+struct symbol *symbol_lookup_fuzzy(const struct scope *scope,
+				   const char *identifier);
 struct symbol *symbol_get(const struct scope *scope, const char *identifier);
 
 enum table_flags {
@@ -151,6 +157,8 @@ extern void table_free(struct table *table);
 extern void table_add_hash(struct table *table, struct nft_cache *cache);
 extern struct table *table_lookup(const struct handle *h,
 				  const struct nft_cache *cache);
+extern struct table *table_lookup_fuzzy(const struct handle *h,
+					const struct nft_cache *cache);
 
 /**
  * enum chain_flags - chain flags
@@ -159,6 +167,20 @@ extern struct table *table_lookup(const struct handle *h,
  */
 enum chain_flags {
 	CHAIN_F_BASECHAIN	= 0x1,
+};
+
+/**
+ * struct prio_spec - extendend priority specification for mixed
+ *                    textual/numerical parsing.
+ *
+ * @str:  name of the standard priority value
+ * @num:  Numerical value. This MUST contain the parsed value of str after
+ *        evaluation.
+ */
+struct prio_spec {
+	const char  *str;
+	int          num;
+	struct location loc;
 };
 
 /**
@@ -185,7 +207,7 @@ struct chain {
 	uint32_t		flags;
 	const char		*hookstr;
 	unsigned int		hooknum;
-	int			priority;
+	struct prio_spec	priority;
 	int			policy;
 	const char		*type;
 	const char		*dev;
@@ -193,6 +215,8 @@ struct chain {
 	struct list_head	rules;
 };
 
+#define STD_PRIO_BUFSIZE 100
+extern int std_prio_lookup(const char *std_prio_name, int family, int hook);
 extern const char *chain_type_name_lookup(const char *name);
 extern const char *chain_hookname_lookup(const char *name);
 extern struct chain *chain_alloc(const char *name);
@@ -201,6 +225,9 @@ extern void chain_free(struct chain *chain);
 extern void chain_add_hash(struct chain *chain, struct table *table);
 extern struct chain *chain_lookup(const struct table *table,
 				  const struct handle *h);
+extern struct chain *chain_lookup_fuzzy(const struct handle *h,
+					const struct nft_cache *cache,
+					const struct table **table);
 
 extern const char *family2str(unsigned int family);
 extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
@@ -235,6 +262,8 @@ extern struct rule *rule_get(struct rule *rule);
 extern void rule_free(struct rule *rule);
 extern void rule_print(const struct rule *rule, struct output_ctx *octx);
 extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
+extern struct rule *rule_lookup_by_index(const struct chain *chain,
+					 uint64_t index);
 
 /**
  * struct set - nftables set
@@ -285,6 +314,9 @@ extern void set_add_hash(struct set *set, struct table *table);
 extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
 				     const char *name, struct nft_cache *cache);
+extern struct set *set_lookup_fuzzy(const char *set_name,
+				    const struct nft_cache *cache,
+				    const struct table **table);
 extern const char *set_policy2str(uint32_t policy);
 extern void set_print(const struct set *set, struct output_ctx *octx);
 extern void set_print_plain(const struct set *s, struct output_ctx *octx);
@@ -308,12 +340,31 @@ struct ct_helper {
 	uint8_t l4proto;
 };
 
+struct timeout_state {
+	struct list_head head;
+	struct location location;
+	uint8_t timeout_index;
+	const char *timeout_str;
+	unsigned int timeout_value;
+};
+
+struct ct_timeout {
+	uint16_t l3proto;
+	uint8_t l4proto;
+	uint32_t timeout[NFTNL_CTTIMEOUT_ARRAY_MAX];
+	struct list_head timeout_list;
+};
+
 struct limit {
 	uint64_t	rate;
 	uint64_t	unit;
 	uint32_t	burst;
 	uint32_t	type;
 	uint32_t	flags;
+};
+
+struct secmark {
+	char		ctx[NFT_SECMARK_CTX_MAXLEN];
 };
 
 /**
@@ -336,6 +387,8 @@ struct obj {
 		struct quota		quota;
 		struct ct_helper	ct_helper;
 		struct limit		limit;
+		struct ct_timeout	ct_timeout;
+		struct secmark		secmark;
 	};
 };
 
@@ -345,6 +398,9 @@ void obj_free(struct obj *obj);
 void obj_add_hash(struct obj *obj, struct table *table);
 struct obj *obj_lookup(const struct table *table, const char *name,
 		       uint32_t type);
+struct obj *obj_lookup_fuzzy(const char *obj_name,
+			     const struct nft_cache *cache,
+			     const struct table **t);
 void obj_print(const struct obj *n, struct output_ctx *octx);
 void obj_print_plain(const struct obj *obj, struct output_ctx *octx);
 const char *obj_type_name(uint32_t type);
@@ -357,7 +413,7 @@ struct flowtable {
 	struct location		location;
 	const char *		hookstr;
 	unsigned int		hooknum;
-	int			priority;
+	struct prio_spec	priority;
 	const char		**dev_array;
 	struct expr		*dev_expr;
 	int			dev_array_len;
@@ -434,6 +490,8 @@ enum cmd_ops {
  * @CMD_OBJ_LIMIT:	limit
  * @CMD_OBJ_LIMITS:	multiple limits
  * @CMD_OBJ_FLOWTABLES:	flow tables
+ * @CMD_OBJ_SECMARK:	secmark
+ * @CMD_OBJ_SECMARKS:	multiple secmarks
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
@@ -462,6 +520,9 @@ enum cmd_obj {
 	CMD_OBJ_LIMITS,
 	CMD_OBJ_FLOWTABLE,
 	CMD_OBJ_FLOWTABLES,
+	CMD_OBJ_CT_TIMEOUT,
+	CMD_OBJ_SECMARK,
+	CMD_OBJ_SECMARKS,
 };
 
 struct markup {
@@ -543,7 +604,7 @@ extern void cmd_free(struct cmd *cmd);
 /**
  * struct eval_ctx - evaluation context
  *
- * @nf_sock:	netlink socket (for caching)
+ * @nft:	nftables context
  * @msgs:	message queue
  * @cmd:	current command
  * @table:	current table
@@ -556,16 +617,13 @@ extern void cmd_free(struct cmd *cmd);
  * @pctx:	payload context
  */
 struct eval_ctx {
-	struct mnl_socket	*nf_sock;
+	struct nft_ctx		*nft;
 	struct list_head	*msgs;
 	struct cmd		*cmd;
 	struct table		*table;
 	struct rule		*rule;
 	struct set		*set;
 	struct stmt		*stmt;
-	struct nft_cache	*cache;
-	struct output_ctx	*octx;
-	unsigned int		debug_mask;
 	struct expr_ctx		ectx;
 	struct proto_ctx	pctx;
 };
@@ -577,44 +635,20 @@ extern struct error_record *rule_postprocess(struct rule *rule);
 struct netlink_ctx;
 extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 
-extern int cache_update(struct mnl_socket *nf_sock, struct nft_cache *cache,
-			enum cmd_ops cmd, struct list_head *msgs, unsigned int debug_flag,
-			struct output_ctx *octx);
-extern void cache_flush(struct mnl_socket *nf_sock, struct nft_cache *cache,
-			enum cmd_ops cmd, struct list_head *msgs,
-			unsigned int debug_mask, struct output_ctx *octx);
+extern unsigned int cache_evaluate(struct nft_ctx *nft, struct list_head *cmds);
+extern int cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
+			struct list_head *msgs);
+extern void cache_flush(struct nft_ctx *ctx, struct list_head *msgs);
 extern void cache_release(struct nft_cache *cache);
+extern bool cache_is_complete(struct nft_cache *cache, enum cmd_ops cmd);
 
-enum udata_type {
-	UDATA_TYPE_COMMENT,
-	__UDATA_TYPE_MAX,
+struct timeout_protocol {
+	uint32_t array_size;
+	const char *const *state_to_name;
+	uint32_t *dflt_timeout;
 };
-#define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
 
-#define UDATA_COMMENT_MAXLEN 128
-
-enum udata_set_type {
-	UDATA_SET_KEYBYTEORDER,
-	UDATA_SET_DATABYTEORDER,
-	UDATA_SET_MERGE_ELEMENTS,
-	__UDATA_SET_MAX,
-};
-#define UDATA_SET_MAX (__UDATA_SET_MAX - 1)
-
-enum udata_set_elem_type {
-	UDATA_SET_ELEM_COMMENT,
-	UDATA_SET_ELEM_FLAGS,
-	__UDATA_SET_ELEM_MAX,
-};
-#define UDATA_SET_ELEM_MAX (__UDATA_SET_ELEM_MAX - 1)
-
-/**
- * enum udata_set_elem_flags - meaning of bits in UDATA_SET_ELEM_FLAGS
- *
- * @SET_ELEM_F_INTERVAL_OPEN:	set element denotes a half-open range
- */
-enum udata_set_elem_flags {
-	SET_ELEM_F_INTERVAL_OPEN	= 0x1,
-};
+extern struct timeout_protocol timeout_protocol[IPPROTO_MAX];
+extern int timeout_str2num(uint16_t l4proto, struct timeout_state *ts);
 
 #endif /* NFTABLES_RULE_H */

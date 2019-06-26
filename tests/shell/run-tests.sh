@@ -1,10 +1,8 @@
 #!/bin/bash
 
 # Configuration
-TESTDIR="./$(dirname $0)/"
-RETURNCODE_SEPARATOR="_"
+TESTDIR="./$(dirname $0)/testcases"
 SRC_NFT="$(dirname $0)/../../src/nft"
-POSITIVE_RET=0
 DIFF=$(which diff)
 
 msg_error() {
@@ -56,12 +54,8 @@ if [ "$1" == "-g" ] ; then
 fi
 
 for arg in "$@"; do
-	if grep ^.*${RETURNCODE_SEPARATOR}[0-9]\\+$ <<< $arg >/dev/null ; then
-		SINGLE+=" $arg"
-		VERBOSE=y
-	else
-		msg_error "unknown parameter '$arg'"
-	fi
+	SINGLE+=" $arg"
+	VERBOSE=y
 done
 
 kernel_cleanup() {
@@ -72,13 +66,16 @@ kernel_cleanup() {
 	nft_dup_ipv4 nft_dup_ipv6 nft_dup nft_nat \
 	nft_masq_ipv4 nft_masq_ipv6 nft_masq \
 	nft_exthdr nft_payload nft_cmp nft_range \
-	nft_quota nft_queue nft_numgen \
+	nft_quota nft_queue nft_numgen nft_osf nft_socket nft_tproxy \
 	nft_meta nft_meta_bridge nft_counter nft_log nft_limit \
+	nft_fib nft_fib_ipv4 nft_fib_ipv6 \
 	nft_hash nft_ct nft_compat nft_rt nft_objref \
 	nft_set_hash nft_set_rbtree nft_set_bitmap \
 	nft_chain_nat_ipv4 nft_chain_nat_ipv6 \
-	nf_tables_inet nf_tables_bridge nf_tables_arp \
-	nf_tables_ipv4 nf_tables_ipv6 nf_tables \
+	nft_chain_route_ipv4 nft_chain_route_ipv6 \
+	nft_dup_netdev nft_fwd_netdev \
+	nft_reject nft_reject_inet \
+	nf_tables_set nf_tables \
 	nf_flow_table nf_flow_table_ipv4 nf_flow_tables_ipv6 \
 	nf_flow_table_inet nft_flow_offload
 }
@@ -88,8 +85,7 @@ find_tests() {
 		echo $SINGLE
 		return
 	fi
-	${FIND} ${TESTDIR} -executable -regex \
-		.*${RETURNCODE_SEPARATOR}[0-9]+ | sort
+	${FIND} ${TESTDIR} -type f -executable | sort
 }
 
 echo ""
@@ -99,29 +95,27 @@ for testfile in $(find_tests)
 do
 	kernel_cleanup
 
-	rc_spec=$(awk -F${RETURNCODE_SEPARATOR} '{print $NF}' <<< $testfile)
-
 	msg_info "[EXECUTING]	$testfile"
 	test_output=$(NFT=$NFT ${testfile} 2>&1)
 	rc_got=$?
 	echo -en "\033[1A\033[K" # clean the [EXECUTING] foobar line
 
-	if [ "$rc_got" == "$rc_spec" ] ; then
+	if [ "$rc_got" -eq 0 ] ; then
 		# check nft dump only for positive tests
-		rc_spec="${POSITIVE_RET}"
 		dumppath="$(dirname ${testfile})/dumps"
 		dumpfile="${dumppath}/$(basename ${testfile}).nft"
-		if [ "$rc_got" == "${POSITIVE_RET}" ] && [ -f ${dumpfile} ]; then
-			test_output=$(${DIFF} ${dumpfile} <($NFT list ruleset) 2>&1)
+		rc_spec=0
+		if [ "$rc_got" -eq 0 ] && [ -f ${dumpfile} ]; then
+			test_output=$(${DIFF} -u ${dumpfile} <($NFT list ruleset) 2>&1)
 			rc_spec=$?
 		fi
 
-		if [ "$rc_spec" == "${POSITIVE_RET}" ]; then
+		if [ "$rc_spec" -eq 0 ]; then
 			msg_info "[OK]		$testfile"
 			[ "$VERBOSE" == "y" ] && [ ! -z "$test_output" ] && echo "$test_output"
 			((ok++))
 
-			if [ "$DUMPGEN" == "y" ] && [ "$rc_got" == "${POSITIVE_RET}" ] && [ ! -f "${dumpfile}" ]; then
+			if [ "$DUMPGEN" == "y" ] && [ "$rc_got" == 0 ] && [ ! -f "${dumpfile}" ]; then
 				mkdir -p "${dumppath}"
 				nft list ruleset > "${dumpfile}"
 			fi
@@ -137,7 +131,7 @@ do
 	else
 		((failed++))
 		if [ "$VERBOSE" == "y" ] ; then
-			msg_warn "[FAILED]	$testfile: expected $rc_spec but got $rc_got"
+			msg_warn "[FAILED]	$testfile: got $rc_got"
 			[ ! -z "$test_output" ] && echo "$test_output"
 		else
 			msg_warn "[FAILED]	$testfile"
@@ -149,4 +143,4 @@ echo ""
 msg_info "results: [OK] $ok [FAILED] $failed [TOTAL] $((ok+failed))"
 
 kernel_cleanup
-exit 0
+exit $failed

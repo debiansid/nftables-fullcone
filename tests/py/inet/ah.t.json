@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 11, 23 ]
             }
@@ -22,7 +23,7 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -40,9 +41,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 11, 23 ] }
@@ -59,7 +61,7 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -79,9 +81,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     11,
@@ -100,7 +103,7 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -122,9 +125,10 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -137,7 +141,7 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -153,9 +157,10 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -170,7 +175,7 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -188,9 +193,10 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -208,7 +214,7 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -229,9 +235,10 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -248,7 +255,7 @@
             "left": {
                 "payload": {
                     "field": "reserved",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -268,9 +275,10 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": 111
         }
     }
@@ -283,7 +291,7 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -299,9 +307,10 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 111, 222 ]
             }
@@ -316,7 +325,7 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -334,9 +343,10 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     111,
@@ -354,7 +364,7 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -375,9 +385,10 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 111, 122 ] }
@@ -394,7 +405,7 @@
             "left": {
                 "payload": {
                     "field": "spi",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -414,9 +425,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": 123
         }
     }
@@ -429,7 +441,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -445,9 +457,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -466,7 +479,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -488,9 +501,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 23, 33 ] }
@@ -507,7 +521,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",
@@ -527,9 +541,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 23, 33 ]
             }
@@ -544,7 +559,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "ah"
+                    "protocol": "ah"
                 }
             },
             "op": "!=",

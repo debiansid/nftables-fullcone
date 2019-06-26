@@ -291,6 +291,14 @@ const struct ct_template ct_templates[__NFT_CT_MAX] = {
 					      BYTEORDER_HOST_ENDIAN, 16),
 	[NFT_CT_EVENTMASK]	= CT_TEMPLATE("event", &ct_event_type,
 					      BYTEORDER_HOST_ENDIAN, 32),
+	[NFT_CT_SRC_IP]		= CT_TEMPLATE("ip saddr", &ipaddr_type,
+					      BYTEORDER_BIG_ENDIAN, 0),
+	[NFT_CT_DST_IP]		= CT_TEMPLATE("ip daddr", &ipaddr_type,
+					      BYTEORDER_BIG_ENDIAN, 0),
+	[NFT_CT_SRC_IP6]	= CT_TEMPLATE("ip6 saddr", &ip6addr_type,
+					      BYTEORDER_BIG_ENDIAN, 0),
+	[NFT_CT_DST_IP6]	= CT_TEMPLATE("ip6 daddr", &ip6addr_type,
+					      BYTEORDER_BIG_ENDIAN, 0),
 };
 
 static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,
@@ -357,7 +365,7 @@ static void ct_expr_pctx_update(struct proto_ctx *ctx, const struct expr *expr)
 	proto_ctx_update(ctx, left->ct.base + 1, &expr->location, desc);
 }
 
-static const struct expr_ops ct_expr_ops = {
+const struct expr_ops ct_expr_ops = {
 	.type		= EXPR_CT,
 	.name		= "ct",
 	.print		= ct_expr_print,
@@ -368,16 +376,15 @@ static const struct expr_ops ct_expr_ops = {
 };
 
 struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,
-			   int8_t direction, uint8_t nfproto)
+			   int8_t direction)
 {
 	const struct ct_template *tmpl = &ct_templates[key];
 	struct expr *expr;
 
-	expr = expr_alloc(loc, &ct_expr_ops, tmpl->dtype,
+	expr = expr_alloc(loc, EXPR_CT, tmpl->dtype,
 			  tmpl->byteorder, tmpl->len);
 	expr->ct.key = key;
 	expr->ct.direction = direction;
-	expr->ct.nfproto = nfproto;
 
 	switch (key) {
 	case NFT_CT_SRC:
@@ -413,10 +420,10 @@ void ct_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 	case NFT_CT_SRC:
 	case NFT_CT_DST:
 		if (desc == &proto_ip) {
-			expr->dtype = &ipaddr_type;
+			datatype_set(expr, &ipaddr_type);
 			expr->ct.nfproto = NFPROTO_IPV4;
 		} else if (desc == &proto_ip6) {
-			expr->dtype = &ip6addr_type;
+			datatype_set(expr, &ip6addr_type);
 			expr->ct.nfproto = NFPROTO_IPV6;
 		}
 
@@ -426,7 +433,17 @@ void ct_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 	case NFT_CT_PROTO_DST:
 		if (desc == NULL)
 			break;
-		expr->dtype = &inet_service_type;
+		datatype_set(expr, &inet_service_type);
+		break;
+	case NFT_CT_SRC_IP:
+	case NFT_CT_DST_IP:
+		expr->dtype = &ipaddr_type;
+		expr->len = expr->dtype->size;
+		break;
+	case NFT_CT_SRC_IP6:
+	case NFT_CT_DST_IP6:
+		expr->dtype = &ip6addr_type;
+		expr->len = expr->dtype->size;
 		break;
 	default:
 		break;
@@ -440,11 +457,17 @@ static void ct_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	expr_print(stmt->ct.expr, octx);
 }
 
+static void ct_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->ct.expr);
+}
+
 static const struct stmt_ops ct_stmt_ops = {
 	.type		= STMT_CT,
 	.name		= "ct",
 	.print		= ct_stmt_print,
 	.json		= ct_stmt_json,
+	.destroy	= ct_stmt_destroy,
 };
 
 struct stmt *ct_stmt_alloc(const struct location *loc, enum nft_ct_keys key,
@@ -481,13 +504,19 @@ struct stmt *notrack_stmt_alloc(const struct location *loc)
 static void flow_offload_stmt_print(const struct stmt *stmt,
 				    struct output_ctx *octx)
 {
-	printf("flow offload @%s", stmt->flow.table_name);
+	nft_print(octx, "flow add @%s", stmt->flow.table_name);
+}
+
+static void flow_offload_stmt_destroy(struct stmt *stmt)
+{
+	xfree(stmt->flow.table_name);
 }
 
 static const struct stmt_ops flow_offload_stmt_ops = {
 	.type		= STMT_FLOW_OFFLOAD,
 	.name		= "flow_offload",
 	.print		= flow_offload_stmt_print,
+	.destroy	= flow_offload_stmt_destroy,
 };
 
 struct stmt *flow_offload_stmt_alloc(const struct location *loc,

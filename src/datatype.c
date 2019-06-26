@@ -70,6 +70,7 @@ static const struct datatype *datatypes[TYPE_MAX + 1] = {
 	[TYPE_FIB_ADDR]         = &fib_addr_type,
 	[TYPE_BOOLEAN]		= &boolean_type,
 	[TYPE_IFNAME]		= &ifname_type,
+	[TYPE_IGMP_TYPE]	= &igmp_type_type,
 };
 
 const struct datatype *datatype_lookup(enum datatypes type)
@@ -117,7 +118,7 @@ struct error_record *symbol_parse(const struct expr *sym,
 {
 	const struct datatype *dtype = sym->dtype;
 
-	assert(sym->ops->type == EXPR_SYMBOL);
+	assert(sym->etype == EXPR_SYMBOL);
 
 	if (dtype == NULL)
 		return error(&sym->location, "No symbol type information");
@@ -190,19 +191,10 @@ void symbolic_constant_print(const struct symbol_table *tbl,
 			break;
 	}
 
-	if (s->identifier == NULL)
+	if (s->identifier == NULL || nft_output_numeric_symbol(octx))
 		return expr_basetype(expr)->print(expr, octx);
 
-	if (quotes)
-		nft_print(octx, "\"");
-
-	if (octx->numeric > NFT_NUMERIC_ALL)
-		nft_print(octx, "%" PRIu64 "", val);
-	else
-		nft_print(octx, "%s", s->identifier);
-
-	if (quotes)
-		nft_print(octx, "\"");
+	nft_print(octx, quotes ? "\"%s\"" : "%s", s->identifier);
 }
 
 static void switch_byteorder(void *data, unsigned int len)
@@ -253,6 +245,8 @@ const struct datatype invalid_type = {
 
 static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 {
+	char chain[NFT_CHAIN_MAXNAMELEN];
+
 	switch (expr->verdict) {
 	case NFT_CONTINUE:
 		nft_print(octx, "continue");
@@ -261,10 +255,26 @@ static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, "break");
 		break;
 	case NFT_JUMP:
-		nft_print(octx, "jump %s", expr->chain);
+		if (expr->chain->etype == EXPR_VALUE) {
+			mpz_export_data(chain, expr->chain->value,
+					BYTEORDER_HOST_ENDIAN,
+					NFT_CHAIN_MAXNAMELEN);
+			nft_print(octx, "jump %s", chain);
+		} else {
+			nft_print(octx, "jump ");
+			expr_print(expr->chain, octx);
+		}
 		break;
 	case NFT_GOTO:
-		nft_print(octx, "goto %s", expr->chain);
+		if (expr->chain->etype == EXPR_VALUE) {
+			mpz_export_data(chain, expr->chain->value,
+					BYTEORDER_HOST_ENDIAN,
+					NFT_CHAIN_MAXNAMELEN);
+			nft_print(octx, "goto %s", chain);
+		} else {
+			nft_print(octx, "goto ");
+			expr_print(expr->chain, octx);
+		}
 		break;
 	case NFT_RETURN:
 		nft_print(octx, "return");
@@ -280,10 +290,24 @@ static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 		case NF_QUEUE:
 			nft_print(octx, "queue");
 			break;
+		case NF_STOLEN:
+			nft_print(octx, "stolen");
+			break;
 		default:
-			BUG("invalid verdict value %u\n", expr->verdict);
+			nft_print(octx, "unknown verdict value %u", expr->verdict);
+			break;
 		}
 	}
+}
+
+static struct error_record *verdict_type_parse(const struct expr *sym,
+					       struct expr **res)
+{
+	*res = constant_expr_alloc(&sym->location, &string_type,
+				   BYTEORDER_HOST_ENDIAN,
+				   (strlen(sym->identifier) + 1) * BITS_PER_BYTE,
+				   sym->identifier);
+	return NULL;
 }
 
 const struct datatype verdict_type = {
@@ -291,6 +315,7 @@ const struct datatype verdict_type = {
 	.name		= "verdict",
 	.desc		= "netfilter verdict",
 	.print		= verdict_type_print,
+	.parse		= verdict_type_parse,
 };
 
 static const struct symbol_table nfproto_tbl = {
@@ -450,7 +475,7 @@ static void ipaddr_type_print(const struct expr *expr, struct output_ctx *octx)
 	sin.sin_addr.s_addr = mpz_get_be32(expr->value);
 	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			  sizeof(buf), NULL, 0,
-			  octx->ip2name ? 0 : NI_NUMERICHOST);
+			  nft_output_reversedns(octx) ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin, sizeof(sin), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
@@ -508,7 +533,7 @@ static void ip6addr_type_print(const struct expr *expr, struct output_ctx *octx)
 
 	err = getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			  sizeof(buf), NULL, 0,
-			  octx->ip2name ? 0 : NI_NUMERICHOST);
+			  nft_output_reversedns(octx) ? 0 : NI_NUMERICHOST);
 	if (err != 0) {
 		getnameinfo((struct sockaddr *)&sin6, sizeof(sin6), buf,
 			    sizeof(buf), NULL, 0, NI_NUMERICHOST);
@@ -560,7 +585,7 @@ static void inet_protocol_type_print(const struct expr *expr,
 {
 	struct protoent *p;
 
-	if (octx->numeric < NFT_NUMERIC_ALL) {
+	if (!nft_output_numeric_proto(octx)) {
 		p = getprotobynumber(mpz_get_uint8(expr->value));
 		if (p != NULL) {
 			nft_print(octx, "%s", p->p_name);
@@ -610,23 +635,55 @@ const struct datatype inet_protocol_type = {
 	.parse		= inet_protocol_type_parse,
 };
 
-static void inet_service_type_print(const struct expr *expr,
-				     struct output_ctx *octx)
+static void inet_service_print(const struct expr *expr, struct output_ctx *octx)
 {
-	if (octx->numeric >= NFT_NUMERIC_PORT) {
-		integer_type_print(expr, octx);
+	struct sockaddr_in sin = { .sin_family = AF_INET };
+	char buf[NI_MAXSERV];
+	uint16_t port;
+	int err;
+
+	sin.sin_port = mpz_get_be16(expr->value);
+	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL, 0,
+			  buf, sizeof(buf), 0);
+	if (err != 0) {
+		nft_print(octx, "%u", ntohs(sin.sin_port));
 		return;
 	}
-	symbolic_constant_print(&inet_service_tbl, expr, false, octx);
+	port = atoi(buf);
+	/* We got a TCP service name string, display it... */
+	if (htons(port) != sin.sin_port) {
+		nft_print(octx, "\"%s\"", buf);
+		return;
+	}
+
+	/* ...otherwise, this might be a UDP service name. */
+	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL, 0,
+			  buf, sizeof(buf), NI_DGRAM);
+	if (err != 0) {
+		/* No service name, display numeric value. */
+		nft_print(octx, "%u", ntohs(sin.sin_port));
+		return;
+	}
+	nft_print(octx, "\"%s\"", buf);
+}
+
+void inet_service_type_print(const struct expr *expr, struct output_ctx *octx)
+{
+	if (nft_output_service(octx)) {
+		inet_service_print(expr, octx);
+		return;
+	}
+	integer_type_print(expr, octx);
 }
 
 static struct error_record *inet_service_type_parse(const struct expr *sym,
 						    struct expr **res)
 {
-	const struct symbolic_constant *s;
+	struct addrinfo *ai;
 	uint16_t port;
 	uintmax_t i;
 	char *end;
+	int err;
 
 	errno = 0;
 	i = strtoumax(sym->identifier, &end, 0);
@@ -636,16 +693,13 @@ static struct error_record *inet_service_type_parse(const struct expr *sym,
 
 		port = htons(i);
 	} else {
-		for (s = inet_service_tbl.symbols; s->identifier != NULL; s++) {
-			if (!strcmp(sym->identifier, s->identifier))
-				break;
-		}
+		err = getaddrinfo(NULL, sym->identifier, NULL, &ai);
+		if (err != 0)
+			return error(&sym->location, "Could not resolve service: %s",
+				     gai_strerror(err));
 
-		if (s->identifier == NULL)
-			return error(&sym->location, "Could not resolve service: "
-				     "Servname not found in nft services list");
-
-		port = s->value;
+		port = ((struct sockaddr_in *)ai->ai_addr)->sin_port;
+		freeaddrinfo(ai);
 	}
 
 	*res = constant_expr_alloc(&sym->location, &inet_service_type,
@@ -664,7 +718,6 @@ const struct datatype inet_service_type = {
 	.print		= inet_service_type_print,
 	.json		= inet_service_type_json,
 	.parse		= inet_service_type_parse,
-	.sym_tbl	= &inet_service_tbl,
 };
 
 #define RT_SYM_TAB_INITIAL_SIZE		16
@@ -1014,6 +1067,25 @@ static struct datatype *dtype_alloc(void)
 	return dtype;
 }
 
+struct datatype *datatype_get(const struct datatype *ptr)
+{
+	struct datatype *dtype = (struct datatype *)ptr;
+
+	if (!dtype)
+		return NULL;
+	if (!(dtype->flags & DTYPE_F_ALLOC))
+		return dtype;
+
+	dtype->refcnt++;
+	return dtype;
+}
+
+void datatype_set(struct expr *expr, const struct datatype *dtype)
+{
+	datatype_free(expr->dtype);
+	expr->dtype = datatype_get(dtype);
+}
+
 static struct datatype *dtype_clone(const struct datatype *orig_dtype)
 {
 	struct datatype *dtype;
@@ -1022,18 +1094,26 @@ static struct datatype *dtype_clone(const struct datatype *orig_dtype)
 	*dtype = *orig_dtype;
 	dtype->name = xstrdup(orig_dtype->name);
 	dtype->desc = xstrdup(orig_dtype->desc);
-	dtype->flags = DTYPE_F_ALLOC | DTYPE_F_CLONE;
+	dtype->flags = DTYPE_F_ALLOC | orig_dtype->flags;
+	dtype->refcnt = 0;
 
 	return dtype;
 }
 
-static void dtype_free(const struct datatype *dtype)
+void datatype_free(const struct datatype *ptr)
 {
-	if (dtype->flags & DTYPE_F_ALLOC) {
-		xfree(dtype->name);
-		xfree(dtype->desc);
-		xfree(dtype);
-	}
+	struct datatype *dtype = (struct datatype *)ptr;
+
+	if (!dtype)
+		return;
+	if (!(dtype->flags & DTYPE_F_ALLOC))
+		return;
+	if (--dtype->refcnt > 0)
+		return;
+
+	xfree(dtype->name);
+	xfree(dtype->desc);
+	xfree(dtype);
 }
 
 const struct datatype *concat_type_alloc(uint32_t type)
@@ -1073,11 +1153,6 @@ const struct datatype *concat_type_alloc(uint32_t type)
 	return dtype;
 }
 
-void concat_type_destroy(const struct datatype *dtype)
-{
-	dtype_free(dtype);
-}
-
 const struct datatype *set_datatype_alloc(const struct datatype *orig_dtype,
 					  unsigned int byteorder)
 {
@@ -1095,8 +1170,7 @@ const struct datatype *set_datatype_alloc(const struct datatype *orig_dtype,
 
 void set_datatype_destroy(const struct datatype *dtype)
 {
-	if (dtype && dtype->flags & DTYPE_F_CLONE)
-		dtype_free(dtype);
+	datatype_free(dtype);
 }
 
 static struct error_record *time_unit_parse(const struct location *loc,

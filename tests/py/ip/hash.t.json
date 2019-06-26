@@ -2,25 +2,25 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "jhash": {
                     "expr": {
                         "concat": [
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
@@ -37,25 +37,25 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "jhash": {
                     "expr": {
                         "concat": [
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
@@ -71,25 +71,25 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "jhash": {
                     "expr": {
                         "concat": [
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
@@ -106,25 +106,25 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "jhash": {
                     "expr": {
                         "concat": [
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
@@ -142,25 +142,25 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "jhash": {
                     "expr": {
                         "concat": [
                             {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
@@ -179,19 +179,19 @@
         "dnat": {
             "addr": {
                 "map": {
-                    "left": {
+                    "key": {
                         "jhash": {
                             "expr": {
                                 "payload": {
                                     "field": "saddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             },
                             "mod": 2,
                             "seed": 3735928559
                         }
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [
                                 0,
@@ -213,12 +213,12 @@
 [
     {
         "mangle": {
-            "left": {
+            "key": {
                 "ct": {
                     "key": "mark"
                 }
             },
-            "right": {
+            "value": {
                 "symhash": {
                     "mod": 2,
                     "offset": 100

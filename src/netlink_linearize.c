@@ -73,7 +73,7 @@ static void __release_register(struct netlink_linearize_ctx *ctx,
 static enum nft_registers get_register(struct netlink_linearize_ctx *ctx,
 				       const struct expr *expr)
 {
-	if (expr && expr->ops->type == EXPR_CONCAT)
+	if (expr && expr->etype == EXPR_CONCAT)
 		return __get_register(ctx, expr->len);
 	else
 		return __get_register(ctx, NFT_REG_SIZE * BITS_PER_BYTE);
@@ -82,7 +82,7 @@ static enum nft_registers get_register(struct netlink_linearize_ctx *ctx,
 static void release_register(struct netlink_linearize_ctx *ctx,
 			     const struct expr *expr)
 {
-	if (expr && expr->ops->type == EXPR_CONCAT)
+	if (expr && expr->etype == EXPR_CONCAT)
 		__release_register(ctx, expr->len);
 	else
 		__release_register(ctx, NFT_REG_SIZE * BITS_PER_BYTE);
@@ -219,6 +219,19 @@ static void netlink_gen_socket(struct netlink_linearize_ctx *ctx,
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_osf(struct netlink_linearize_ctx *ctx,
+			    const struct expr *expr,
+			    enum nft_registers dreg)
+{
+	struct nftnl_expr *nle;
+
+	nle = alloc_nft_expr("osf");
+	netlink_put_register(nle, NFTNL_EXPR_OSF_DREG, dreg);
+	nftnl_expr_set_u8(nle, NFTNL_EXPR_OSF_TTL, expr->osf.ttl);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_OSF_FLAGS, expr->osf.flags);
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_numgen(struct netlink_linearize_ctx *ctx,
 			    const struct expr *expr,
 			    enum nft_registers dreg)
@@ -257,7 +270,7 @@ static void netlink_gen_map(struct netlink_linearize_ctx *ctx,
 	enum nft_registers sreg;
 	int regspace = 0;
 
-	assert(expr->mappings->ops->type == EXPR_SET_REF);
+	assert(expr->mappings->etype == EXPR_SET_REF);
 
 	if (dreg == NFT_REG_VERDICT)
 		sreg = get_register(ctx, expr->map);
@@ -265,7 +278,7 @@ static void netlink_gen_map(struct netlink_linearize_ctx *ctx,
 		sreg = dreg;
 
 	/* suppress assert in netlink_gen_expr */
-	if (expr->map->ops->type == EXPR_CONCAT) {
+	if (expr->map->etype == EXPR_CONCAT) {
 		regspace = netlink_register_space(expr->map->len);
 		ctx->reg_low += regspace;
 	}
@@ -294,7 +307,7 @@ static void netlink_gen_lookup(struct netlink_linearize_ctx *ctx,
 	struct nftnl_expr *nle;
 	enum nft_registers sreg;
 
-	assert(expr->right->ops->type == EXPR_SET_REF);
+	assert(expr->right->etype == EXPR_SET_REF);
 	assert(dreg == NFT_REG_VERDICT);
 
 	sreg = get_register(ctx, expr->left);
@@ -478,7 +491,7 @@ static void netlink_gen_relational(struct netlink_linearize_ctx *ctx,
 		BUG("invalid relational operation %u\n", expr->op);
 	}
 
-	switch (expr->right->ops->type) {
+	switch (expr->right->etype) {
 	case EXPR_RANGE:
 		return netlink_gen_range(ctx, expr, dreg);
 	case EXPR_SET:
@@ -550,7 +563,7 @@ static void netlink_gen_binop(struct netlink_linearize_ctx *ctx,
 	mpz_init(tmp);
 
 	binops[n++] = left = (void *)expr;
-	while (left->ops->type == EXPR_BINOP && left->left != NULL)
+	while (left->etype == EXPR_BINOP && left->left != NULL)
 		binops[n++] = left = left->left;
 	n--;
 
@@ -650,7 +663,7 @@ static void netlink_gen_immediate(struct netlink_linearize_ctx *ctx,
 	nle = alloc_nft_expr("immediate");
 	netlink_put_register(nle, NFTNL_EXPR_IMM_DREG, dreg);
 	netlink_gen_data(expr, &nld);
-	switch (expr->ops->type) {
+	switch (expr->etype) {
 	case EXPR_VALUE:
 		nftnl_expr_set(nle, NFTNL_EXPR_IMM_DATA, nld.value, nld.len);
 		break;
@@ -668,13 +681,27 @@ static void netlink_gen_immediate(struct netlink_linearize_ctx *ctx,
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
 
+static void netlink_gen_xfrm(struct netlink_linearize_ctx *ctx,
+			     const struct expr *expr,
+			     enum nft_registers dreg)
+{
+	struct nftnl_expr *nle;
+
+	nle = alloc_nft_expr("xfrm");
+	netlink_put_register(nle, NFTNL_EXPR_XFRM_DREG, dreg);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_XFRM_KEY, expr->xfrm.key);
+	nftnl_expr_set_u8(nle, NFTNL_EXPR_XFRM_DIR, expr->xfrm.direction);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_XFRM_SPNUM, expr->xfrm.spnum);
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
 static void netlink_gen_expr(struct netlink_linearize_ctx *ctx,
 			     const struct expr *expr,
 			     enum nft_registers dreg)
 {
 	assert(dreg < ctx->reg_low);
 
-	switch (expr->ops->type) {
+	switch (expr->etype) {
 	case EXPR_VERDICT:
 	case EXPR_VALUE:
 		return netlink_gen_immediate(ctx, expr, dreg);
@@ -708,8 +735,12 @@ static void netlink_gen_expr(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_fib(ctx, expr, dreg);
 	case EXPR_SOCKET:
 		return netlink_gen_socket(ctx, expr, dreg);
+	case EXPR_OSF:
+		return netlink_gen_osf(ctx, expr, dreg);
+	case EXPR_XFRM:
+		return netlink_gen_xfrm(ctx, expr, dreg);
 	default:
-		BUG("unknown expression type %s\n", expr->ops->name);
+		BUG("unknown expression type %s\n", expr_name(expr));
 	}
 }
 
@@ -722,7 +753,7 @@ static void netlink_gen_objref_stmt(struct netlink_linearize_ctx *ctx,
 	uint32_t sreg_key;
 
 	nle = alloc_nft_expr("objref");
-	switch (expr->ops->type) {
+	switch (expr->etype) {
 	case EXPR_MAP:
 		sreg_key = get_register(ctx, expr->map);
 		netlink_gen_expr(ctx, expr->map, sreg_key);
@@ -742,7 +773,7 @@ static void netlink_gen_objref_stmt(struct netlink_linearize_ctx *ctx,
 				   stmt->objref.type);
 		break;
 	default:
-		BUG("unsupported expression %u\n", expr->ops->type);
+		BUG("unsupported expression %u\n", expr->etype);
 	}
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
@@ -994,7 +1025,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 		nle = alloc_nft_expr("nat");
 		nftnl_expr_set_u32(nle, NFTNL_EXPR_NAT_TYPE, stmt->nat.type);
 
-		family = nftnl_rule_get_u32(ctx->nlr, NFTNL_RULE_FAMILY);
+		family = stmt->nat.family;
 		nftnl_expr_set_u32(nle, NFTNL_EXPR_NAT_FAMILY, family);
 
 		nftnl_flag_attr = NFTNL_EXPR_NAT_FLAGS;
@@ -1027,7 +1058,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 		amin_reg = get_register(ctx, NULL);
 		registers++;
 
-		if (stmt->nat.addr->ops->type == EXPR_RANGE) {
+		if (stmt->nat.addr->etype == EXPR_RANGE) {
 			amax_reg = get_register(ctx, NULL);
 			registers++;
 
@@ -1049,7 +1080,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 		pmin_reg = get_register(ctx, NULL);
 		registers++;
 
-		if (stmt->nat.proto->ops->type == EXPR_RANGE) {
+		if (stmt->nat.proto->etype == EXPR_RANGE) {
 			pmax_reg = get_register(ctx, NULL);
 			registers++;
 
@@ -1061,6 +1092,45 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 			netlink_gen_expr(ctx, stmt->nat.proto, pmin_reg);
 			netlink_put_register(nle, nftnl_reg_pmin, pmin_reg);
 		}
+	}
+
+	while (registers > 0) {
+		release_register(ctx, NULL);
+		registers--;
+	}
+
+	nftnl_rule_add_expr(ctx->nlr, nle);
+}
+
+static void netlink_gen_tproxy_stmt(struct netlink_linearize_ctx *ctx,
+				 const struct stmt *stmt)
+{
+	struct nftnl_expr *nle;
+	enum nft_registers addr_reg;
+	enum nft_registers port_reg;
+	int registers = 0;
+	const int family = stmt->tproxy.family;
+	int nftnl_reg_port;
+
+	nle = alloc_nft_expr("tproxy");
+
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_TPROXY_FAMILY, family);
+
+	nftnl_reg_port = NFTNL_EXPR_TPROXY_REG_PORT;
+
+	if (stmt->tproxy.addr) {
+		addr_reg = get_register(ctx, NULL);
+		registers++;
+		netlink_gen_expr(ctx, stmt->tproxy.addr, addr_reg);
+		netlink_put_register(nle, NFTNL_EXPR_TPROXY_REG_ADDR,
+				     addr_reg);
+	}
+
+	if (stmt->tproxy.port) {
+		port_reg = get_register(ctx, NULL);
+		registers++;
+		netlink_gen_expr(ctx, stmt->tproxy.port, port_reg);
+		netlink_put_register(nle, nftnl_reg_port, port_reg);
 	}
 
 	while (registers > 0) {
@@ -1217,31 +1287,40 @@ static void netlink_gen_set_stmt(struct netlink_linearize_ctx *ctx,
 	nftnl_expr_set_str(nle, NFTNL_EXPR_DYNSET_SET_NAME, set->handle.set.name);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_DYNSET_SET_ID, set->handle.set_id);
 	nftnl_rule_add_expr(ctx->nlr, nle);
+
+	if (stmt->set.stmt)
+		nftnl_expr_set(nle, NFTNL_EXPR_DYNSET_EXPR,
+			       netlink_gen_stmt_stateful(ctx, stmt->set.stmt), 0);
 }
 
 static void netlink_gen_map_stmt(struct netlink_linearize_ctx *ctx,
 				 const struct stmt *stmt)
 {
-	struct nftnl_expr *nle;
-	enum nft_registers sreg_key;
+	struct set *set = stmt->map.set->set;
 	enum nft_registers sreg_data;
+	enum nft_registers sreg_key;
+	struct nftnl_expr *nle;
 
-	sreg_key = get_register(ctx, stmt->map.map->map->key);
-	netlink_gen_expr(ctx, stmt->map.map->map->key, sreg_key);
+	sreg_key = get_register(ctx, stmt->map.key);
+	netlink_gen_expr(ctx, stmt->map.key, sreg_key);
 
-	sreg_data = get_register(ctx, stmt->map.map->mappings);
-	netlink_gen_expr(ctx, stmt->map.map->mappings, sreg_data);
+	sreg_data = get_register(ctx, stmt->map.data);
+	netlink_gen_expr(ctx, stmt->map.data, sreg_data);
 
-	release_register(ctx, stmt->map.map->map->key);
-	release_register(ctx, stmt->map.map->mappings);
+	release_register(ctx, stmt->map.key);
+	release_register(ctx, stmt->map.data);
 
 	nle = alloc_nft_expr("dynset");
 	netlink_put_register(nle, NFTNL_EXPR_DYNSET_SREG_KEY, sreg_key);
 	netlink_put_register(nle, NFTNL_EXPR_DYNSET_SREG_DATA, sreg_data);
 
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_DYNSET_OP, stmt->map.op);
-	nftnl_expr_set_str(nle, NFTNL_EXPR_DYNSET_SET_NAME, stmt->map.set->identifier);
-	nftnl_expr_set_u32(nle, NFTNL_EXPR_DYNSET_SET_ID, stmt->map.set->set->handle.set_id);
+	nftnl_expr_set_str(nle, NFTNL_EXPR_DYNSET_SET_NAME, set->handle.set.name);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_DYNSET_SET_ID, set->handle.set_id);
+
+	if (stmt->map.stmt)
+		nftnl_expr_set(nle, NFTNL_EXPR_DYNSET_EXPR,
+			       netlink_gen_stmt_stateful(ctx, stmt->map.stmt), 0);
 
 	nftnl_rule_add_expr(ctx->nlr, nle);
 }
@@ -1301,6 +1380,8 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_reject_stmt(ctx, stmt);
 	case STMT_NAT:
 		return netlink_gen_nat_stmt(ctx, stmt);
+	case STMT_TPROXY:
+		return netlink_gen_tproxy_stmt(ctx, stmt);
 	case STMT_DUP:
 		return netlink_gen_dup_stmt(ctx, stmt);
 	case STMT_QUEUE:
@@ -1351,7 +1432,7 @@ void netlink_linearize_rule(struct netlink_ctx *ctx, struct nftnl_rule *nlr,
 		if (!udata)
 			memory_allocation_error();
 
-		if (!nftnl_udata_put_strz(udata, UDATA_TYPE_COMMENT,
+		if (!nftnl_udata_put_strz(udata, NFTNL_UDATA_RULE_COMMENT,
 					  rule->comment))
 			memory_allocation_error();
 		nftnl_rule_set_data(nlr, NFTNL_RULE_USERDATA,

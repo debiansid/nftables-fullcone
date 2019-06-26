@@ -30,6 +30,7 @@
                     "result": "oifname"
                 }
             },
+	    "op": "==",
             "right": "lo"
         }
     }
@@ -48,6 +49,7 @@
                     "result": "type"
                 }
             },
+	    "op": "==",
             "right": "local"
         }
     }
@@ -56,8 +58,8 @@
 # fib daddr . iif type vmap { blackhole : drop, prohibit : drop, unicast : accept }
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "fib": {
                     "flags": [
                         "daddr",
@@ -66,7 +68,7 @@
                     "result": "type"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "blackhole",
@@ -104,6 +106,7 @@
                     "result": "oif"
                 }
             },
+	    "op": "==",
             "right": true
         }
     }
@@ -121,6 +124,7 @@
                     "result": "oif"
                 }
             },
+	    "op": "==",
             "right": false
         }
     }

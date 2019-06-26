@@ -16,7 +16,7 @@ reject with icmpv6 type admin-prohibited;ok;meta nfproto ipv6 reject with icmpv6
 reject with icmpv6 type addr-unreachable;ok;meta nfproto ipv6 reject with icmpv6 type addr-unreachable
 reject with icmpv6 type port-unreachable;ok;meta nfproto ipv6 reject
 
-mark 12345 reject with tcp reset;ok;meta l4proto 6 mark 0x00003039 reject with tcp reset
+mark 12345 reject with tcp reset;ok;meta l4proto 6 meta mark 0x00003039 reject with tcp reset
 
 reject;ok
 meta nfproto ipv4 reject;ok
@@ -34,3 +34,6 @@ meta nfproto ipv6 reject with icmp type host-unreachable;fail
 meta nfproto ipv4 ip protocol icmp reject with icmpv6 type no-route;fail
 meta nfproto ipv6 ip protocol icmp reject with icmp type host-unreachable;fail
 meta l4proto udp reject with tcp reset;fail
+
+meta nfproto ipv4 reject with icmpx type admin-prohibited;ok
+meta nfproto ipv6 reject with icmpx type admin-prohibited;ok

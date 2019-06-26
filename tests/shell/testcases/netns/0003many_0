@@ -19,7 +19,7 @@ RULESET="table ip t {
 
 	chain c {
 		ct state new
-		udp dport { 12345 }
+		udp dport { 12345, 54321 }
 		ip saddr @s drop
 		jump other
 	}
@@ -35,7 +35,7 @@ table ip6 t {
 
 	chain c {
 		ct state new
-		udp dport { 12345 }
+		udp dport { 12345, 54321 }
 		ip6 saddr @s drop
 		jump other
 	}
@@ -51,7 +51,7 @@ table inet t {
 
 	chain c {
 		ct state new
-		udp dport { 12345 }
+		udp dport { 12345, 54321 }
 		ip6 saddr @s drop
 		jump other
 	}
@@ -94,7 +94,7 @@ function test_netns()
 		exit 1
 	fi
 
-	KERNEL_RULESET="$($IP netns exec $NETNS_NAME $NFT list ruleset -nn)"
+	KERNEL_RULESET="$($IP netns exec $NETNS_NAME $NFT list ruleset)"
 	if [ "$RULESET" != "$KERNEL_RULESET" ] ; then
 		echo "E: ruleset in netns $NETNS_NAME differs from the loaded" >&2
 	        DIFF="$(which diff)"

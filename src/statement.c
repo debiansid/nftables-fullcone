@@ -112,6 +112,8 @@ struct stmt *verdict_stmt_alloc(const struct location *loc, struct expr *expr)
 
 static void meter_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
+	unsigned int flags = octx->flags;
+
 	nft_print(octx, "meter ");
 	if (stmt->meter.set) {
 		expr_print(stmt->meter.set, octx);
@@ -121,9 +123,9 @@ static void meter_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	expr_print(stmt->meter.key, octx);
 	nft_print(octx, " ");
 
-	octx->stateless++;
+	octx->flags |= NFT_CTX_OUTPUT_STATELESS;
 	stmt_print(stmt->meter.stmt, octx);
-	octx->stateless--;
+	octx->flags = flags;
 
 	nft_print(octx, "} ");
 
@@ -134,6 +136,7 @@ static void meter_stmt_destroy(struct stmt *stmt)
 	expr_free(stmt->meter.key);
 	expr_free(stmt->meter.set);
 	stmt_free(stmt->meter.stmt);
+	xfree(stmt->meter.name);
 }
 
 static const struct stmt_ops meter_stmt_ops = {
@@ -159,6 +162,7 @@ static const struct stmt_ops connlimit_stmt_ops = {
 	.type		= STMT_CONNLIMIT,
 	.name		= "connlimit",
 	.print		= connlimit_stmt_print,
+	.json		= connlimit_stmt_json,
 };
 
 struct stmt *connlimit_stmt_alloc(const struct location *loc)
@@ -174,7 +178,7 @@ static void counter_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
 	nft_print(octx, "counter");
 
-	if (octx->stateless)
+	if (nft_output_stateless(octx))
 		return;
 
 	nft_print(octx, " packets %" PRIu64 " bytes %" PRIu64,
@@ -202,6 +206,8 @@ static const char *objref_type[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_QUOTA]	= "quota",
 	[NFT_OBJECT_CT_HELPER]	= "ct helper",
 	[NFT_OBJECT_LIMIT]	= "limit",
+	[NFT_OBJECT_CT_TIMEOUT] = "ct timeout",
+	[NFT_OBJECT_SECMARK]	= "secmark",
 };
 
 const char *objref_type_name(uint32_t type)
@@ -218,6 +224,9 @@ static void objref_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	case NFT_OBJECT_CT_HELPER:
 		nft_print(octx, "ct helper set ");
 		break;
+	case NFT_OBJECT_CT_TIMEOUT:
+		nft_print(octx, "ct timeout set ");
+		break;
 	default:
 		nft_print(octx, "%s name ",
 			  objref_type_name(stmt->objref.type));
@@ -226,11 +235,17 @@ static void objref_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	expr_print(stmt->objref.expr, octx);
 }
 
+static void objref_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->objref.expr);
+}
+
 static const struct stmt_ops objref_stmt_ops = {
 	.type		= STMT_OBJREF,
 	.name		= "objref",
 	.print		= objref_stmt_print,
 	.json		= objref_stmt_json,
+	.destroy	= objref_stmt_destroy,
 };
 
 struct stmt *objref_stmt_alloc(const struct location *loc)
@@ -241,21 +256,21 @@ struct stmt *objref_stmt_alloc(const struct location *loc)
 	return stmt;
 }
 
-static const char *syslog_level[LOGLEVEL_AUDIT + 1] = {
-	[LOG_EMERG]	= "emerg",
-	[LOG_ALERT]	= "alert",
-	[LOG_CRIT]	= "crit",
-	[LOG_ERR]       = "err",
-	[LOG_WARNING]	= "warn",
-	[LOG_NOTICE]	= "notice",
-	[LOG_INFO]	= "info",
-	[LOG_DEBUG]	= "debug",
-	[LOGLEVEL_AUDIT] = "audit"
+static const char *syslog_level[NFT_LOGLEVEL_MAX + 1] = {
+	[NFT_LOGLEVEL_EMERG]	= "emerg",
+	[NFT_LOGLEVEL_ALERT]	= "alert",
+	[NFT_LOGLEVEL_CRIT]	= "crit",
+	[NFT_LOGLEVEL_ERR]	= "err",
+	[NFT_LOGLEVEL_WARNING]	= "warn",
+	[NFT_LOGLEVEL_NOTICE]	= "notice",
+	[NFT_LOGLEVEL_INFO]	= "info",
+	[NFT_LOGLEVEL_DEBUG]	= "debug",
+	[NFT_LOGLEVEL_AUDIT] 	= "audit"
 };
 
 const char *log_level(uint32_t level)
 {
-	if (level > LOGLEVEL_AUDIT)
+	if (level > NFT_LOGLEVEL_MAX)
 		return "unknown";
 
 	return syslog_level[level];
@@ -265,7 +280,7 @@ int log_level_parse(const char *level)
 {
 	int i;
 
-	for (i = 0; i <= LOGLEVEL_AUDIT; i++) {
+	for (i = 0; i <= NFT_LOGLEVEL_MAX; i++) {
 		if (syslog_level[i] &&
 		    !strcmp(level, syslog_level[i]))
 			return i;
@@ -435,11 +450,17 @@ static void queue_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 
 }
 
+static void queue_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->queue.queue);
+}
+
 static const struct stmt_ops queue_stmt_ops = {
 	.type		= STMT_QUEUE,
 	.name		= "queue",
 	.print		= queue_stmt_print,
 	.json		= queue_stmt_json,
+	.destroy	= queue_stmt_destroy,
 };
 
 struct stmt *queue_stmt_alloc(const struct location *loc)
@@ -457,7 +478,7 @@ static void quota_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	nft_print(octx, "quota %s%" PRIu64 " %s",
 		  inv ? "over " : "", bytes, data_unit);
 
-	if (!octx->stateless && stmt->quota.used) {
+	if (!nft_output_stateless(octx) && stmt->quota.used) {
 		data_unit = get_rate(stmt->quota.used, &used);
 		nft_print(octx, " used %" PRIu64 " %s", used, data_unit);
 	}
@@ -495,13 +516,15 @@ static void reject_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	case NFT_REJECT_ICMP_UNREACH:
 		switch (stmt->reject.family) {
 		case NFPROTO_IPV4:
-			if (stmt->reject.icmp_code == ICMP_PORT_UNREACH)
+			if (!stmt->reject.verbose_print &&
+			     stmt->reject.icmp_code == ICMP_PORT_UNREACH)
 				break;
 			nft_print(octx, " with icmp type ");
 			expr_print(stmt->reject.expr, octx);
 			break;
 		case NFPROTO_IPV6:
-			if (stmt->reject.icmp_code == ICMP6_DST_UNREACH_NOPORT)
+			if (!stmt->reject.verbose_print &&
+			    stmt->reject.icmp_code == ICMP6_DST_UNREACH_NOPORT)
 				break;
 			nft_print(octx, " with icmpv6 type ");
 			expr_print(stmt->reject.expr, octx);
@@ -511,11 +534,17 @@ static void reject_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	}
 }
 
+static void reject_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->reject.expr);
+}
+
 static const struct stmt_ops reject_stmt_ops = {
 	.type		= STMT_REJECT,
 	.name		= "reject",
 	.print		= reject_stmt_print,
 	.json		= reject_stmt_json,
+	.destroy	= reject_stmt_destroy,
 };
 
 struct stmt *reject_stmt_alloc(const struct location *loc)
@@ -559,18 +588,28 @@ const char *nat_etype2str(enum nft_nat_etypes type)
 static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
 	nft_print(octx, "%s", nat_etype2str(stmt->nat.type));
-	if (stmt->nat.addr || stmt->nat.proto)
+	if (stmt->nat.addr || stmt->nat.proto) {
+		switch (stmt->nat.family) {
+		case NFPROTO_IPV4:
+			nft_print(octx, " ip");
+			break;
+		case NFPROTO_IPV6:
+			nft_print(octx, " ip6");
+			break;
+		}
+
 		nft_print(octx, " to");
+	}
 
 	if (stmt->nat.addr) {
 		nft_print(octx, " ");
 		if (stmt->nat.proto) {
-			if (stmt->nat.addr->ops->type == EXPR_VALUE &&
+			if (stmt->nat.addr->etype == EXPR_VALUE &&
 			    stmt->nat.addr->dtype->type == TYPE_IP6ADDR) {
 				nft_print(octx, "[");
 				expr_print(stmt->nat.addr, octx);
 				nft_print(octx, "]");
-			} else if (stmt->nat.addr->ops->type == EXPR_RANGE &&
+			} else if (stmt->nat.addr->etype == EXPR_RANGE &&
 				   stmt->nat.addr->left->dtype->type == TYPE_IP6ADDR) {
 				nft_print(octx, "[");
 				expr_print(stmt->nat.addr->left, octx);
@@ -625,17 +664,26 @@ const char * const set_stmt_op_names[] = {
 
 static void set_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
+	unsigned int flags = octx->flags;
+
 	nft_print(octx, "%s ", set_stmt_op_names[stmt->set.op]);
 	expr_print(stmt->set.set, octx);
 	nft_print(octx, " { ");
 	expr_print(stmt->set.key, octx);
-	nft_print(octx, " } ");
+	if (stmt->set.stmt) {
+		nft_print(octx, " ");
+		octx->flags |= NFT_CTX_OUTPUT_STATELESS;
+		stmt_print(stmt->set.stmt, octx);
+		octx->flags = flags;
+	}
+	nft_print(octx, " }");
 }
 
 static void set_stmt_destroy(struct stmt *stmt)
 {
 	expr_free(stmt->set.key);
 	expr_free(stmt->set.set);
+	stmt_free(stmt->set.stmt);
 }
 
 static const struct stmt_ops set_stmt_ops = {
@@ -653,19 +701,29 @@ struct stmt *set_stmt_alloc(const struct location *loc)
 
 static void map_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
+	unsigned int flags = octx->flags;
+
 	nft_print(octx, "%s ", set_stmt_op_names[stmt->map.op]);
 	expr_print(stmt->map.set, octx);
-	nft_print(octx, "{ ");
-	expr_print(stmt->map.map->map->key, octx);
+	nft_print(octx, " { ");
+	expr_print(stmt->map.key, octx);
+	if (stmt->map.stmt) {
+		nft_print(octx, " ");
+		octx->flags |= NFT_CTX_OUTPUT_STATELESS;
+		stmt_print(stmt->map.stmt, octx);
+		octx->flags = flags;
+	}
 	nft_print(octx, " : ");
-	expr_print(stmt->map.map->mappings, octx);
-	nft_print(octx, " } ");
+	expr_print(stmt->map.data, octx);
+	nft_print(octx, " }");
 }
 
 static void map_stmt_destroy(struct stmt *stmt)
 {
-	expr_free(stmt->map.map);
+	expr_free(stmt->map.key);
+	expr_free(stmt->map.data);
 	expr_free(stmt->map.set);
+	stmt_free(stmt->map.stmt);
 }
 
 static const struct stmt_ops map_stmt_ops = {
@@ -759,16 +817,55 @@ struct stmt *fwd_stmt_alloc(const struct location *loc)
 	return stmt_alloc(loc, &fwd_stmt_ops);
 }
 
-static void xt_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+static void tproxy_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	xt_stmt_xlate(stmt);
+	nft_print(octx, "tproxy");
+
+	if (stmt->tproxy.table_family == NFPROTO_INET &&
+	    stmt->tproxy.family != NFPROTO_UNSPEC)
+		nft_print(octx, " %s", nfproto_family_name(stmt->tproxy.family));
+	nft_print(octx, " to");
+	if (stmt->tproxy.addr) {
+		nft_print(octx, " ");
+		if (stmt->tproxy.addr->etype == EXPR_VALUE &&
+		    stmt->tproxy.addr->dtype->type == TYPE_IP6ADDR) {
+			nft_print(octx, "[");
+			expr_print(stmt->tproxy.addr, octx);
+			nft_print(octx, "]");
+		} else {
+			expr_print(stmt->tproxy.addr, octx);
+		}
+	}
+	if (stmt->tproxy.port && stmt->tproxy.port->etype == EXPR_VALUE) {
+		if (!stmt->tproxy.addr)
+			nft_print(octx, " ");
+		nft_print(octx, ":");
+		expr_print(stmt->tproxy.port, octx);
+	}
 }
 
-static void xt_stmt_destroy(struct stmt *stmt)
+static void tproxy_stmt_destroy(struct stmt *stmt)
 {
-	xfree(stmt->xt.name);
-	xfree(stmt->xt.opts);
-	xt_stmt_release(stmt);
+	expr_free(stmt->tproxy.addr);
+	expr_free(stmt->tproxy.port);
+}
+
+static const struct stmt_ops tproxy_stmt_ops = {
+	.type		= STMT_TPROXY,
+	.name		= "tproxy",
+	.print		= tproxy_stmt_print,
+	.json		= tproxy_stmt_json,
+	.destroy	= tproxy_stmt_destroy,
+};
+
+struct stmt *tproxy_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &tproxy_stmt_ops);
+}
+
+static void xt_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	xt_stmt_xlate(stmt, octx);
 }
 
 static const struct stmt_ops xt_stmt_ops = {

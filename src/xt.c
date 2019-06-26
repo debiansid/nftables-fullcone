@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <xtables.h>
+#include <net/if.h>
 #include <getopt.h>
 #include <ctype.h>	/* for isspace */
 #include <statement.h>
@@ -26,15 +26,18 @@
 #include <linux/netfilter_arp/arp_tables.h>
 #include <linux/netfilter_bridge/ebtables.h>
 
-void xt_stmt_xlate(const struct stmt *stmt)
+#ifdef HAVE_LIBXTABLES
+#include <xtables.h>
+#endif
+
+void xt_stmt_xlate(const struct stmt *stmt, struct output_ctx *octx)
 {
+#ifdef HAVE_LIBXTABLES
 	struct xt_xlate *xl = xt_xlate_alloc(10240);
 
 	switch (stmt->xt.type) {
 	case NFT_XT_MATCH:
-		if (stmt->xt.match == NULL && stmt->xt.opts) {
-			printf("%s", stmt->xt.opts);
-		} else if (stmt->xt.match->xlate) {
+		if (stmt->xt.match->xlate) {
 			struct xt_xlate_mt_params params = {
 				.ip		= stmt->xt.entry,
 				.match		= stmt->xt.match->m,
@@ -42,7 +45,7 @@ void xt_stmt_xlate(const struct stmt *stmt)
 			};
 
 			stmt->xt.match->xlate(xl, &params);
-			printf("%s", xt_xlate_get(xl));
+			nft_print(octx, "%s", xt_xlate_get(xl));
 		} else if (stmt->xt.match->print) {
 			printf("#");
 			stmt->xt.match->print(&stmt->xt.entry,
@@ -51,9 +54,7 @@ void xt_stmt_xlate(const struct stmt *stmt)
 		break;
 	case NFT_XT_WATCHER:
 	case NFT_XT_TARGET:
-		if (stmt->xt.target == NULL && stmt->xt.opts) {
-			printf("%s", stmt->xt.opts);
-		} else if (stmt->xt.target->xlate) {
+		if (stmt->xt.target->xlate) {
 			struct xt_xlate_tg_params params = {
 				.ip		= stmt->xt.entry,
 				.target		= stmt->xt.target->t,
@@ -61,7 +62,7 @@ void xt_stmt_xlate(const struct stmt *stmt)
 			};
 
 			stmt->xt.target->xlate(xl, &params);
-			printf("%s", xt_xlate_get(xl));
+			nft_print(octx, "%s", xt_xlate_get(xl));
 		} else if (stmt->xt.target->print) {
 			printf("#");
 			stmt->xt.target->print(NULL, stmt->xt.target->t, 0);
@@ -72,10 +73,14 @@ void xt_stmt_xlate(const struct stmt *stmt)
 	}
 
 	xt_xlate_free(xl);
+#else
+	nft_print(octx, "# xt_%s", stmt->xt.name);
+#endif
 }
 
-void xt_stmt_release(const struct stmt *stmt)
+void xt_stmt_destroy(struct stmt *stmt)
 {
+#ifdef HAVE_LIBXTABLES
 	switch (stmt->xt.type) {
 	case NFT_XT_MATCH:
 		if (!stmt->xt.match)
@@ -95,9 +100,12 @@ void xt_stmt_release(const struct stmt *stmt)
 	default:
 		break;
 	}
+#endif
 	xfree(stmt->xt.entry);
+	xfree(stmt->xt.name);
 }
 
+#ifdef HAVE_LIBXTABLES
 static void *xt_entry_alloc(struct xt_stmt *xt, uint32_t af)
 {
 	union nft_entry {
@@ -183,6 +191,7 @@ static struct xtables_match *xt_match_clone(struct xtables_match *m)
 	memcpy(clone, m, sizeof(struct xtables_match));
 	return clone;
 }
+#endif
 
 /*
  * Delinearization
@@ -194,6 +203,7 @@ void netlink_parse_match(struct netlink_parse_ctx *ctx,
 {
 	struct stmt *stmt;
 	const char *name;
+#ifdef HAVE_LIBXTABLES
 	struct xtables_match *mt;
 	const char *mtinfo;
 	struct xt_entry_match *m;
@@ -221,7 +231,13 @@ void netlink_parse_match(struct netlink_parse_ctx *ctx,
 	stmt->xt.type = NFT_XT_MATCH;
 	stmt->xt.match = xt_match_clone(mt);
 	stmt->xt.match->m = m;
+#else
+	name = nftnl_expr_get_str(nle, NFTNL_EXPR_MT_NAME);
 
+	stmt = xt_stmt_alloc(loc);
+	stmt->xt.name = strdup(name);
+	stmt->xt.type = NFT_XT_MATCH;
+#endif
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
@@ -231,6 +247,7 @@ void netlink_parse_target(struct netlink_parse_ctx *ctx,
 {
 	struct stmt *stmt;
 	const char *name;
+#ifdef HAVE_LIBXTABLES
 	struct xtables_target *tg;
 	const void *tginfo;
 	struct xt_entry_target *t;
@@ -259,10 +276,17 @@ void netlink_parse_target(struct netlink_parse_ctx *ctx,
 	stmt->xt.type = NFT_XT_TARGET;
 	stmt->xt.target = xt_target_clone(tg);
 	stmt->xt.target->t = t;
+#else
+	name = nftnl_expr_get_str(nle, NFTNL_EXPR_TG_NAME);
 
+	stmt = xt_stmt_alloc(loc);
+	stmt->xt.name = strdup(name);
+	stmt->xt.type = NFT_XT_TARGET;
+#endif
 	list_add_tail(&stmt->list, &ctx->rule->stmts);
 }
 
+#ifdef HAVE_LIBXTABLES
 static bool is_watcher(uint32_t family, struct stmt *stmt)
 {
 	if (family != NFPROTO_BRIDGE ||
@@ -374,3 +398,4 @@ void xt_init(void)
 	/* Default to IPv4, but this changes in runtime */
 	xtables_init_all(&xt_nft_globals, NFPROTO_IPV4);
 }
+#endif

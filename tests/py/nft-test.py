@@ -18,8 +18,13 @@ import os
 import argparse
 import signal
 import json
+import traceback
 
 TESTS_PATH = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(TESTS_PATH, '../../py/'))
+
+from nftables import Nftables
+
 TESTS_DIRECTORY = ["any", "arp", "bridge", "inet", "ip", "ip6"]
 LOGFILE = "/tmp/nftables-test.log"
 log_file = None
@@ -130,32 +135,29 @@ def print_info(reason, filename=None, lineno=None):
 def color_differences(rule, other, color):
     rlen = len(rule)
     olen = len(other)
+    out = ""
 
     # find equal part at start
     for i in range(rlen):
         if i >= olen or rule[i] != other[i]:
             break
-    start_idx = i
+    if i > 0:
+        out += rule[:i]
+        rule = rule[i:]
+        other = other[i:]
+        rlen = len(rule)
+        olen = len(other)
 
     # find equal part at end
-    found = False
-    for i in range(-1, start_idx -rlen - 1, -1):
-        if i < start_idx -olen:
+    for i in range(1, rlen + 1):
+        if i > olen or rule[rlen - i] != other[olen - i]:
+            i -= 1
             break
-        if rule[i] != other[i]:
-            found = True
-            break
-    end_idx = i
-    if found:
-        end_idx += 1
+    if rlen > i:
+        out += color + rule[:rlen - i] + Colors.ENDC
+        rule = rule[rlen - i:]
 
-    out = ""
-    if start_idx > 0:
-        out += rule[:start_idx]
-    out += color + rule[start_idx:end_idx] + Colors.ENDC
-    if end_idx < 0:
-        out += rule[end_idx:]
-
+    out += rule
     return out
 
 def print_differences_warning(filename, lineno, rule1, rule2, cmd):
@@ -175,7 +177,7 @@ def table_exist(table, filename, lineno):
     Exists a table.
     '''
     cmd = "list table %s" % table
-    ret = execute_cmd(cmd, filename, lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
 
@@ -262,7 +264,7 @@ def chain_exist(chain, table, filename):
     Checks a chain
     '''
     cmd = "list chain %s %s" % (table, chain)
-    ret = execute_cmd(cmd, filename, chain.lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, chain.lineno)
 
     return True if (ret == 0) else False
 
@@ -277,7 +279,9 @@ def chain_create(chain, table, filename):
         print_error(reason, filename, chain.lineno)
         return -1
 
-    cmd = "add chain %s %s { %s; }" % (table, chain, chain.config)
+    cmd = "add chain %s %s" % (table, chain)
+    if chain.config:
+        cmd += " { %s; }" % chain.config
 
     ret = execute_cmd(cmd, filename, chain.lineno)
     if ret != 0:
@@ -307,14 +311,14 @@ def chain_delete(chain, table, filename=None, lineno=None):
     cmd = "flush chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = "I cannot flush this chain " + chain
+        reason = "I cannot " + cmd
         print_error(reason, filename, lineno)
         return -1
 
     cmd = "delete chain %s %s" % (table, chain)
     ret = execute_cmd(cmd, filename, lineno)
     if ret != 0:
-        reason = cmd + "I cannot delete this chain " + chain
+        reason = "I cannot " + cmd
         print_error(reason, filename, lineno)
         return -1
 
@@ -463,7 +467,7 @@ def set_exist(set_name, table, filename, lineno):
     Check if the set exists.
     '''
     cmd = "list set %s %s" % (table, set_name)
-    ret = execute_cmd(cmd, filename, lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
 
@@ -473,7 +477,7 @@ def _set_exist(s, filename, lineno):
     Check if the set exists.
     '''
     cmd = "list set %s %s %s" % (s.family, s.table, s.name)
-    ret = execute_cmd(cmd, filename, lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
 
@@ -581,7 +585,7 @@ def obj_exist(o, table, filename, lineno):
     Check if the object exists.
     '''
     cmd = "list %s %s %s" % (o.type, table, o.name)
-    ret = execute_cmd(cmd, filename, lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
 
@@ -591,7 +595,7 @@ def _obj_exist(o, filename, lineno):
     Check if the object exists.
     '''
     cmd = "list %s %s %s %s" % (o.type, o.family, o.table, o.name)
-    ret = execute_cmd(cmd, filename, lineno, numeric="all")
+    ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
 
@@ -650,6 +654,9 @@ def payload_check(payload_buffer, file, cmd):
     file.seek(0, 0)
     i = 0
 
+    if not payload_buffer:
+        return False
+
     for lineno, want_line in enumerate(payload_buffer):
         line = file.readline()
 
@@ -681,6 +688,13 @@ def json_dump_normalize(json_string, human_readable = False):
     else:
         return json.dumps(json_obj, sort_keys = True)
 
+def json_validate(json_string):
+    json_obj = json.loads(json_string)
+    try:
+        nftables.json_validate(json_obj)
+    except Exception:
+        print_error("schema validation failed for input '%s'" % json_string)
+        print_error(traceback.format_exc())
 
 def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
     '''
@@ -695,11 +709,12 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
         return [-1, warning, error, unit_tests]
 
     if rule[1].strip() == "ok":
+        payload_expected = None
         try:
             payload_log = open("%s.payload" % filename_path)
             payload_expected = payload_find_expected(payload_log, rule[0])
         except:
-            payload_expected = None
+            payload_log = None
 
         if enable_json_option:
             try:
@@ -741,7 +756,10 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                 payload_log = open("%s.payload.%s" % (filename_path, table.family))
                 table_payload_expected = payload_find_expected(payload_log, rule[0])
             except:
-                if not payload_expected:
+                if not payload_log:
+                    print_error("did not find any payload information",
+                                filename_path)
+                elif not payload_expected:
                     print_error("did not find payload information for "
                                 "rule '%s'" % rule[0], payload_log.name, 1)
             if not table_payload_expected:
@@ -795,11 +813,11 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                               gotf.name, 1)
 
             # Check for matching ruleset listing
-            numeric_old = nftables.set_numeric_output("all")
+            numeric_proto_old = nftables.set_numeric_proto_output(True)
             stateless_old = nftables.set_stateless_output(True)
             list_cmd = 'list table %s' % table
             rc, pre_output, err = nftables.cmd(list_cmd)
-            nftables.set_numeric_output(numeric_old)
+            nftables.set_numeric_proto_output(numeric_proto_old)
             nftables.set_stateless_output(stateless_old)
 
             output = pre_output.split(";")
@@ -813,8 +831,10 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                 continue
 
             rule_output = output_clean(pre_output, chain)
+            retest_output = False
             if len(rule) == 3:
                 teoric_exit = rule[2]
+                retest_output = True
             else:
                 teoric_exit = rule[0]
 
@@ -823,6 +843,7 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                     if set_check_element(teoric_exit.rstrip(),
                                          rule_output.rstrip()) != 0:
                         warning += 1
+                        retest_output = True
                         print_differences_warning(filename, lineno,
                                                   teoric_exit.rstrip(),
                                                   rule_output, cmd)
@@ -836,12 +857,33 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                             return [ret, warning, error, unit_tests]
 
                     warning += 1
+                    retest_output = True
                     print_differences_warning(filename, lineno,
                                               teoric_exit.rstrip(),
                                               rule_output, cmd)
 
                     if not force_all_family_option:
                         return [ret, warning, error, unit_tests]
+
+            if retest_output:
+                table_flush(table, filename, lineno)
+
+                # Add rule and check return code
+                cmd = "add rule %s %s %s" % (table, chain, rule_output.rstrip())
+                ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
+
+                if ret != 0:
+                    test_state = "Replaying rule failed."
+                    reason = cmd + ": " + test_state
+                    print_warning(reason, filename, lineno)
+                    ret = -1
+                    error += 1
+                    if not force_all_family_option:
+                        return [ret, warning, error, unit_tests]
+                # Check for matching payload
+                elif not payload_check(table_payload_expected,
+                                       payload_log, cmd):
+                    error += 1
 
             if not enable_json_option:
                 continue
@@ -878,6 +920,9 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                     "expr": json.loads(json_input),
             }}}]})
 
+            if enable_json_schema:
+                json_validate(cmd)
+
             json_old = nftables.set_json_output(True)
             ret = execute_cmd(cmd, filename, lineno, payload_log, debug="netlink")
             nftables.set_json_output(json_old)
@@ -903,13 +948,16 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
                               gotf.name, 1)
 
             # Check for matching ruleset listing
-            numeric_old = nftables.set_numeric_output("all")
+            numeric_proto_old = nftables.set_numeric_proto_output(True)
             stateless_old = nftables.set_stateless_output(True)
             json_old = nftables.set_json_output(True)
             rc, json_output, err = nftables.cmd(list_cmd)
             nftables.set_json_output(json_old)
-            nftables.set_numeric_output(numeric_old)
+            nftables.set_numeric_proto_output(numeric_proto_old)
             nftables.set_stateless_output(stateless_old)
+
+            if enable_json_schema:
+                json_validate(json_output)
 
             json_output = json.loads(json_output)
             for item in json_output["nftables"]:
@@ -956,8 +1004,7 @@ def signal_handler(signal, frame):
     signal_received = 1
 
 
-def execute_cmd(cmd, filename, lineno,
-                stdout_log=False, numeric=False, debug=False):
+def execute_cmd(cmd, filename, lineno, stdout_log=False, debug=False):
     '''
     Executes a command, checks for segfaults and returns the command exit
     code.
@@ -966,7 +1013,6 @@ def execute_cmd(cmd, filename, lineno,
     :param filename: name of the file tested (used for print_error purposes)
     :param lineno: line number being tested (used for print_error purposes)
     :param stdout_log: redirect stdout to this file instead of global log_file
-    :param numeric: turn numeric output temporarily on
     :param debug: temporarily set these debug flags
     '''
     global log_file
@@ -974,9 +1020,6 @@ def execute_cmd(cmd, filename, lineno,
     if debug_option:
         print cmd
 
-    if numeric:
-        numeric_old = nftables.get_numeric_output()
-        nftables.set_numeric_output(numeric)
     if debug:
         debug_old = nftables.get_debug()
         nftables.set_debug(debug)
@@ -991,8 +1034,6 @@ def execute_cmd(cmd, filename, lineno,
     log_file.write(err)
     log_file.flush()
 
-    if numeric:
-        nftables.set_numeric_output(numeric_old)
     if debug:
         nftables.set_debug(debug_old)
 
@@ -1076,6 +1117,10 @@ def obj_process(obj_line, filename, lineno):
 
     if obj_type == "ct" and tokens[3] == "helper":
        obj_type = "ct helper"
+       tokens[3] = ""
+
+    if obj_type == "ct" and tokens[3] == "timeout":
+       obj_type = "ct timeout"
        tokens[3] = ""
 
     if len(tokens) > 3:
@@ -1310,12 +1355,17 @@ def main():
                         dest='enable_json',
                         help='test JSON functionality as well')
 
+    parser.add_argument('-s', '--schema', action='store_true',
+                        dest='enable_schema',
+                        help='verify json input/output against schema')
+
     args = parser.parse_args()
-    global debug_option, need_fix_option, enable_json_option
+    global debug_option, need_fix_option, enable_json_option, enable_json_schema
     debug_option = args.debug
     need_fix_option = args.need_fix_line
     force_all_family_option = args.force_all_family
     enable_json_option = args.enable_json
+    enable_json_schema = args.enable_schema
     specific_file = False
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -1328,16 +1378,17 @@ def main():
     # Change working directory to repository root
     os.chdir(TESTS_PATH + "/../..")
 
-    sys.path.append('py/')
-    from nftables import Nftables
-
     if not os.path.exists('src/.libs/libnftables.so'):
         print "The nftables library does not exist. " \
               "You need to build the project."
         return
 
+    if args.enable_schema and not args.enable_json:
+        print_error("Option --schema requires option --json")
+        return
+
     global nftables
-    nftables = Nftables('src/.libs/libnftables.so')
+    nftables = Nftables(sofile = 'src/.libs/libnftables.so')
 
     test_files = files_ok = run_total = 0
     tests = passed = warnings = errors = 0

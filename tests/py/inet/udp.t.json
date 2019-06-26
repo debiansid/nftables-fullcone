@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 80
         }
     },
@@ -23,7 +24,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -42,9 +43,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 50, 70 ]
             }
@@ -62,7 +64,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -83,9 +85,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     49,
@@ -106,7 +109,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -130,9 +133,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 12, 40 ] }
@@ -149,7 +153,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -169,9 +173,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 80
         }
     },
@@ -187,7 +192,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -206,9 +211,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 70, 75 ]
             }
@@ -226,7 +232,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -247,9 +253,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     49,
@@ -270,7 +277,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -294,9 +301,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 70, 75 ] }
@@ -316,7 +324,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -339,9 +347,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 6666
         }
     }
@@ -354,7 +363,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -370,9 +379,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 50, 65 ]
             }
@@ -390,7 +400,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -411,9 +421,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     50,
@@ -434,7 +445,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -458,9 +469,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 35, 50 ] }
@@ -477,7 +489,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -497,9 +509,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 6666
         }
     },
@@ -515,7 +528,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -539,9 +552,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -554,7 +568,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -570,9 +584,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -587,7 +602,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -605,9 +620,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -627,7 +643,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -650,9 +666,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -669,7 +686,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
             "op": "!=",
@@ -687,20 +704,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
-            "right": 0
+            "value": 0
         }
     }
 ]
@@ -710,20 +728,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "dport",
-                    "name": "udp"
+                    "protocol": "udp"
                 }
             },
-            "right": 65535
+            "value": 65535
         }
     }
 ]

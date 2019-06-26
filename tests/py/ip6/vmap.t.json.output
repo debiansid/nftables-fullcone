@@ -1,14 +1,14 @@
 # ip6 saddr vmap { ::1234:1234:1234:1234:1234:1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "0:1234:1234:1234:1234:1234:1234:1234",
@@ -25,14 +25,14 @@
 # ip6 saddr vmap { 1234::1234:1234:1234:1234:1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:0:1234:1234:1234:1234:1234:1234",
@@ -49,14 +49,14 @@
 # ip6 saddr vmap { 1234:1234::1234:1234:1234:1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:0:1234:1234:1234:1234:1234",
@@ -73,14 +73,14 @@
 # ip6 saddr vmap { 1234:1234:1234::1234:1234:1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:1234:0:1234:1234:1234:1234",
@@ -97,14 +97,14 @@
 # ip6 saddr vmap { 1234:1234:1234:1234::1234:1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:1234:1234:0:1234:1234:1234",
@@ -121,14 +121,14 @@
 # ip6 saddr vmap { 1234:1234:1234:1234:1234::1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:1234:1234:1234:0:1234:1234",
@@ -145,14 +145,14 @@
 # ip6 saddr vmap { 1234:1234:1234:1234:1234:1234::1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:1234:1234:1234:1234:0:1234",
@@ -169,14 +169,14 @@
 # ip6 saddr vmap { 1234:1234:1234:1234:1234:1234:1234:: : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "1234:1234:1234:1234:1234:1234:1234:0",
@@ -193,14 +193,14 @@
 # ip6 saddr vmap { ::1234:1234 : accept}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "::18.52.18.52",
@@ -217,14 +217,14 @@
 # ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:: : accept, ::aaaa : drop}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "::aaaa",
@@ -247,14 +247,14 @@
 # ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept, ::bbbb : drop}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "::bbbb",
@@ -277,14 +277,14 @@
 # ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept,::cccc : drop}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "::cccc",
@@ -307,14 +307,14 @@
 # ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept,::dddd: drop}
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip6"
+                    "protocol": "ip6"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "::dddd",

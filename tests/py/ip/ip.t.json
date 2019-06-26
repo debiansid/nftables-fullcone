@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "cs1"
         }
     }
@@ -20,7 +21,7 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -36,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "0x38"
         }
     }
@@ -51,7 +53,7 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -67,9 +69,10 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "cs0",
@@ -106,7 +109,7 @@
             "left": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -123,14 +126,14 @@
 # ip dscp vmap { cs1 : continue , cs4 : accept } counter
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         "cs1",
@@ -160,9 +163,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 232
         }
     }
@@ -175,7 +179,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -191,9 +195,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 333, 435 ]
             }
@@ -208,7 +213,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -226,9 +231,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     333,
@@ -248,7 +254,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -271,9 +277,10 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 333, 535 ] }
@@ -290,7 +297,7 @@
             "left": {
                 "payload": {
                     "field": "length",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -310,9 +317,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -325,7 +333,7 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -341,9 +349,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -358,7 +367,7 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -376,9 +385,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -398,7 +408,7 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -421,9 +431,10 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -440,7 +451,7 @@
             "left": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -460,9 +471,10 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 222
         }
     },
@@ -478,7 +490,7 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -494,9 +506,10 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -511,7 +524,7 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -529,9 +542,10 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -551,7 +565,7 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -574,9 +588,10 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -593,7 +608,7 @@
             "left": {
                 "payload": {
                     "field": "frag-off",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -613,9 +628,10 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     },
@@ -631,9 +647,10 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 233
         }
     }
@@ -646,9 +663,10 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 55 ]
             }
@@ -663,7 +681,7 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -681,9 +699,10 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     43,
@@ -702,7 +721,7 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -724,9 +743,10 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -743,7 +763,7 @@
             "left": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -763,9 +783,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "tcp"
         }
     }
@@ -778,7 +799,7 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -794,9 +815,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "icmp",
@@ -824,7 +846,7 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -855,9 +877,10 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 255
         }
     }
@@ -870,9 +893,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 13172
         }
     },
@@ -888,9 +912,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -903,7 +928,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -919,9 +944,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -936,7 +962,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -954,9 +980,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -976,7 +1003,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -999,9 +1026,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -1018,7 +1046,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1038,9 +1066,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "prefix": {
                     "addr": "192.168.2.0",
@@ -1058,7 +1087,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1079,9 +1108,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "192.168.3.1"
         }
     },
@@ -1090,9 +1120,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "192.168.3.100"
         }
     }
@@ -1105,7 +1136,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1121,9 +1152,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "1.1.1.1"
         }
     }
@@ -1136,9 +1168,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "192.168.0.1", "192.168.0.250" ]
             }
@@ -1153,9 +1186,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "10.0.0.0", "10.255.255.255" ]
             }
@@ -1170,9 +1204,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "172.16.0.0", "172.31.255.255" ]
             }
@@ -1187,9 +1222,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "192.168.3.1", "192.168.4.250" ]
             }
@@ -1204,7 +1240,7 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1222,9 +1258,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ "192.168.0.1", "192.168.0.250" ] }
@@ -1241,7 +1278,7 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1261,9 +1298,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "192.168.5.1",
@@ -1285,7 +1323,7 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1310,9 +1348,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "192.168.1.2", "192.168.1.55" ]
             }
@@ -1327,7 +1366,7 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1345,9 +1384,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "192.168.1.3", "192.168.33.55" ]
             }
@@ -1362,7 +1402,7 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
             "op": "!=",
@@ -1380,9 +1420,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "192.168.0.1"
         }
     }
@@ -1395,9 +1436,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "192.168.0.1"
         }
     },
@@ -1413,9 +1455,10 @@
             "left": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "192.168.0.2"
         }
     }
@@ -1430,7 +1473,7 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
                     "0xff"
@@ -1451,7 +1494,7 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
                     "0.0.0.255"
@@ -1472,12 +1515,13 @@
                     {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     },
 		    "0xffff0000"
                 ]
             },
+	    "op": "==",
             "right": "0xffff0000"
         }
     }
@@ -1490,9 +1534,10 @@
             "left": {
                 "payload": {
                     "field": "version",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 4
         }
     },
@@ -1501,9 +1546,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 5
         }
     }
@@ -1516,9 +1562,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -1531,9 +1578,10 @@
             "left": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 15
         }
     }
@@ -1542,14 +1590,14 @@
 # ip hdrlength vmap { 0-4 : drop, 5 : accept, 6 : continue } counter
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "hdrlength",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         { "range": [ 0, 4 ] },
@@ -1577,20 +1625,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "daddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": "127.0.0.1"
+            "value": "127.0.0.1"
         }
     }
 ]
@@ -1600,20 +1649,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "checksum",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": 0
+            "value": 0
         }
     }
 ]
@@ -1623,20 +1673,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "id",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": 0
+            "value": 0
         }
     }
 ]
@@ -1646,20 +1697,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "ecn",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": 1
+            "value": 1
         }
     }
 ]
@@ -1669,20 +1721,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "ecn",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": "ce"
+            "value": "ce"
         }
     }
 ]
@@ -1692,20 +1745,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "ttl",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": 23
+            "value": 23
         }
     }
 ]
@@ -1715,20 +1769,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": 1
+            "value": 1
         }
     }
 ]
@@ -1738,20 +1793,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": "af23"
+            "value": "af23"
         }
     }
 ]
@@ -1761,20 +1817,21 @@
     {
         "match": {
             "left": {
-                "meta": "iif"
+                "meta": { "key": "iif" }
             },
+	    "op": "==",
             "right": "lo"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "field": "dscp",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
-            "right": "cs0"
+            "value": "cs0"
         }
     }
 ]

@@ -3,10 +3,10 @@ Section: net
 Priority: optional
 Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
-Build-Depends: automake,
+Build-Depends: asciidoc-base,
+               automake,
                bison,
                debhelper (>= 11),
-               docbook2x,
                flex,
                libgmp-dev,
                libmnl-dev (>= 1.0.3),
@@ -15,6 +15,7 @@ Build-Depends: automake,
 	       libxtables-dev (>= 1.6.1),
                libtool (>=2.2.6),
 	       libjansson-dev,
+               xsltproc
 Standards-Version: 4.1.4
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables

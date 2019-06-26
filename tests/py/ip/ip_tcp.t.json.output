@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -20,18 +21,19 @@
             "left": {
                 "payload": {
                     "field": "protocol",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": 6
         }
     },
     {
         "mangle": {
-            "left": {
-                "meta": "mark"
+            "key": {
+                "meta": { "key": "mark" }
             },
-            "right": 1
+            "value": 1
         }
     },
     {
@@ -39,9 +41,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }

@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -16,6 +17,7 @@
                     "key": "saddr"
                 }
             },
+	    "op": "==",
             "right": "1.2.3.4"
         }
     }
@@ -28,10 +30,10 @@
             "left": {
                 "ct": {
                     "dir": "original",
-                    "family": "ip6",
-                    "key": "saddr"
+                    "key": "ip6 saddr"
                 }
             },
+	    "op": "==",
             "right": "::1"
         }
     }

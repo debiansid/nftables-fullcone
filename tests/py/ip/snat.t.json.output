@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -13,9 +14,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -37,8 +39,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -47,7 +50,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",

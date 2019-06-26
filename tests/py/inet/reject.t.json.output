@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -21,8 +22,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -39,8 +41,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -57,8 +60,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -72,8 +76,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -90,8 +95,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -108,8 +114,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -126,8 +133,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -144,8 +152,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -162,8 +171,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -180,8 +190,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -195,16 +206,18 @@
     {
         "match": {
             "left": {
-                "meta": "l4proto"
+                "meta": { "key": "l4proto" }
             },
+	    "op": "==",
             "right": 6
         }
     },
     {
         "match": {
             "left": {
-                "meta": "mark"
+                "meta": { "key": "mark" }
             },
+	    "op": "==",
             "right": 12345
         }
     },

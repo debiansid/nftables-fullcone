@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "l4proto"
+                "meta": { "key": "l4proto" }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     6,
@@ -20,10 +21,10 @@
                 "payload": {
                     "base": "th",
                     "len": 16,
-                    "name": "raw",
                     "offset": 16
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -42,9 +43,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -66,7 +68,6 @@
                         "payload": {
                             "base": "ll",
                             "len": 8,
-                            "name": "raw",
                             "offset": 0
                         }
                     },
@@ -89,7 +90,6 @@
                         "payload": {
                             "base": "ll",
                             "len": 8,
-                            "name": "raw",
                             "offset": 0
                         }
                     },

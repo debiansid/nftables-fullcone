@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": 23
         }
     }
@@ -20,7 +21,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -36,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 23, 44 ]
             }
@@ -53,7 +55,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -71,9 +73,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -92,7 +95,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -114,9 +117,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 23, 44 ] }
@@ -133,7 +137,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -153,9 +157,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": 23
         }
     }
@@ -168,7 +173,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -184,9 +189,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 23, 44 ]
             }
@@ -201,7 +207,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -219,9 +225,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -240,7 +247,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -262,9 +269,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 23, 44 ] }
@@ -281,7 +289,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -301,9 +309,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": 1111
         }
     }
@@ -316,7 +325,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -332,9 +341,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 21, 333 ]
             }
@@ -349,7 +359,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -367,9 +377,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -388,7 +399,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -410,9 +421,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 22, 44 ] }
@@ -429,7 +441,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -449,9 +461,10 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -464,7 +477,7 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -480,9 +493,10 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -497,7 +511,7 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -515,9 +529,10 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -537,7 +552,7 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",
@@ -560,9 +575,10 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -579,7 +595,7 @@
             "left": {
                 "payload": {
                     "field": "vtag",
-                    "name": "sctp"
+                    "protocol": "sctp"
                 }
             },
             "op": "!=",

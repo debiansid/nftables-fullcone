@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     }
@@ -20,7 +21,7 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -36,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -51,7 +53,7 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -67,9 +69,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -84,7 +87,7 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -102,9 +105,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -124,7 +128,7 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -147,9 +151,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -166,7 +171,7 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -186,9 +191,10 @@
             "left": {
                 "payload": {
                     "field": "ptype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "0x0800"
         }
     }
@@ -201,9 +207,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -216,7 +223,7 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -232,9 +239,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -249,7 +257,7 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -267,9 +275,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -289,7 +298,7 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -312,9 +321,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -331,7 +341,7 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -351,9 +361,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -366,7 +377,7 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -382,9 +393,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -399,7 +411,7 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -417,9 +429,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -439,7 +452,7 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -462,9 +475,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -481,7 +495,7 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -501,9 +515,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "nak",
@@ -526,7 +541,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -545,6 +560,27 @@
     }
 ]
 
+# arp operation 1-2
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "operation",
+                    "protocol": "arp"
+                }
+            },
+            "op": "==",
+            "right": {
+                "range": [
+                    "request",
+                    "reply"
+                ]
+            }
+        }
+    }
+]
+
 # arp operation request
 [
     {
@@ -552,9 +588,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "request"
         }
     }
@@ -567,9 +604,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "reply"
         }
     }
@@ -582,9 +620,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "rrequest"
         }
     }
@@ -597,9 +636,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "rreply"
         }
     }
@@ -612,9 +652,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "inrequest"
         }
     }
@@ -627,9 +668,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "inreply"
         }
     }
@@ -642,9 +684,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "nak"
         }
     }
@@ -657,9 +700,10 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "reply"
         }
     }
@@ -672,7 +716,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -688,7 +732,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -704,7 +748,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -720,7 +764,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -736,7 +780,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -752,7 +796,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -768,7 +812,7 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
@@ -784,11 +828,75 @@
             "left": {
                 "payload": {
                     "field": "operation",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
             "op": "!=",
             "right": "reply"
+        }
+    }
+]
+
+# arp saddr ip 1.2.3.4
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr ip",
+                    "protocol": "arp"
+                }
+            },
+            "op": "==",
+            "right": "1.2.3.4"
+        }
+    }
+]
+
+# arp daddr ip 4.3.2.1
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "daddr ip",
+                    "protocol": "arp"
+                }
+            },
+            "op": "==",
+            "right": "4.3.2.1"
+        }
+    }
+]
+
+# arp saddr ether aa:bb:cc:aa:bb:cc
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr ether",
+                    "protocol": "arp"
+                }
+            },
+            "op": "==",
+            "right": "aa:bb:cc:aa:bb:cc"
+        }
+    }
+]
+
+# arp daddr ether aa:bb:cc:aa:bb:cc
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "daddr ether",
+                    "protocol": "arp"
+                }
+            },
+            "op": "==",
+            "right": "aa:bb:cc:aa:bb:cc"
         }
     }
 ]
@@ -798,8 +906,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "invalid"
         }
     },
@@ -808,9 +917,10 @@
             "left": {
                 "payload": {
                     "field": "ptype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": "0x0800"
         }
     },
@@ -819,9 +929,10 @@
             "left": {
                 "payload": {
                     "field": "htype",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 1
         }
     },
@@ -830,9 +941,10 @@
             "left": {
                 "payload": {
                     "field": "hlen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 6
         }
     },
@@ -841,9 +953,10 @@
             "left": {
                 "payload": {
                     "field": "plen",
-                    "name": "arp"
+                    "protocol": "arp"
                 }
             },
+	    "op": "==",
             "right": 4
         }
     },
@@ -853,24 +966,23 @@
                 "payload": {
                     "base": "nh",
                     "len": 32,
-                    "name": "raw",
                     "offset": 192
                 }
             },
+	    "op": "==",
             "right": "0xc0a88f10"
         }
     },
     {
         "mangle": {
-            "left": {
+            "key": {
                 "payload": {
                     "base": "nh",
                     "len": 48,
-                    "name": "raw",
                     "offset": 144
                 }
             },
-            "right": "0x112233445566"
+            "value": "0x112233445566"
         }
     }
 ]

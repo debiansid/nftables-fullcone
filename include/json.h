@@ -7,13 +7,18 @@ struct chain;
 struct cmd;
 struct expr;
 struct netlink_ctx;
+struct nlmsghdr;
 struct rule;
 struct set;
+struct obj;
 struct stmt;
 struct symbol_table;
 struct table;
+struct netlink_mon_handler;
 
 #ifdef HAVE_LIBJANSSON
+
+#define JSON_SCHEMA_VERSION 1
 
 #include <jansson.h>
 
@@ -39,6 +44,9 @@ json_t *numgen_expr_json(const struct expr *expr, struct output_ctx *octx);
 json_t *hash_expr_json(const struct expr *expr, struct output_ctx *octx);
 json_t *fib_expr_json(const struct expr *expr, struct output_ctx *octx);
 json_t *constant_expr_json(const struct expr *expr, struct output_ctx *octx);
+json_t *socket_expr_json(const struct expr *expr, struct output_ctx *octx);
+json_t *osf_expr_json(const struct expr *expr, struct output_ctx *octx);
+json_t *xfrm_expr_json(const struct expr *expr, struct output_ctx *octx);
 
 json_t *integer_type_json(const struct expr *expr, struct output_ctx *octx);
 json_t *string_type_json(const struct expr *expr, struct output_ctx *octx);
@@ -73,13 +81,32 @@ json_t *objref_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *meter_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *queue_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *verdict_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+json_t *connlimit_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+json_t *tproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 
 int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd);
 
-int nft_parse_json_buffer(struct nft_ctx *nft, char *buf, size_t buflen,
+int nft_parse_json_buffer(struct nft_ctx *nft, const char *buf,
 			  struct list_head *msgs, struct list_head *cmds);
 int nft_parse_json_filename(struct nft_ctx *nft, const char *filename,
 			    struct list_head *msgs, struct list_head *cmds);
+
+void monitor_print_table_json(struct netlink_mon_handler *monh,
+			      const char *cmd, struct table *t);
+void monitor_print_chain_json(struct netlink_mon_handler *monh,
+			      const char *cmd, struct chain *c);
+void monitor_print_set_json(struct netlink_mon_handler *monh,
+			    const char *cmd, struct set *s);
+void monitor_print_element_json(struct netlink_mon_handler *monh,
+				const char *cmd, struct set *s);
+void monitor_print_obj_json(struct netlink_mon_handler *monh,
+			    const char *cmd, struct obj *o);
+void monitor_print_rule_json(struct netlink_mon_handler *monh,
+			     const char *cmd, struct rule *r);
+
+int json_events_cb(const struct nlmsghdr *nlh,
+		   struct netlink_mon_handler *monh);
+void json_print_echo(struct nft_ctx *ctx);
 
 #else /* ! HAVE_LIBJANSSON */
 
@@ -115,6 +142,9 @@ EXPR_PRINT_STUB(numgen_expr)
 EXPR_PRINT_STUB(hash_expr)
 EXPR_PRINT_STUB(fib_expr)
 EXPR_PRINT_STUB(constant_expr)
+EXPR_PRINT_STUB(socket_expr)
+EXPR_PRINT_STUB(osf_expr)
+EXPR_PRINT_STUB(xfrm_expr)
 
 EXPR_PRINT_STUB(integer_type)
 EXPR_PRINT_STUB(string_type)
@@ -147,16 +177,12 @@ STMT_PRINT_STUB(objref)
 STMT_PRINT_STUB(meter)
 STMT_PRINT_STUB(queue)
 STMT_PRINT_STUB(verdict)
+STMT_PRINT_STUB(connlimit)
+STMT_PRINT_STUB(tproxy)
 
 #undef STMT_PRINT_STUB
 #undef EXPR_PRINT_STUB
 #undef JSON_PRINT_STUB
-
-static inline json_t *symbolic_constant_json(const struct symbol_table *tbl,
-					     const struct expr *expr)
-{
-	return NULL;
-}
 
 static inline int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 {
@@ -164,16 +190,64 @@ static inline int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 }
 
 static inline int
-nft_parse_json_buffer(struct nft_ctx *nft, char *buf, size_t buflen,
+nft_parse_json_buffer(struct nft_ctx *nft, const char *buf,
 		      struct list_head *msgs, struct list_head *cmds)
 {
 	return -EINVAL;
 }
+
 static inline int
 nft_parse_json_filename(struct nft_ctx *nft, const char *filename,
 			struct list_head *msgs, struct list_head *cmds)
 {
 	return -EINVAL;
+}
+
+static inline void monitor_print_table_json(struct netlink_mon_handler *monh,
+					    const char *cmd, struct table *t)
+{
+	/* empty */
+}
+
+static inline void monitor_print_chain_json(struct netlink_mon_handler *monh,
+					    const char *cmd, struct chain *c)
+{
+	/* empty */
+}
+
+static inline void monitor_print_set_json(struct netlink_mon_handler *monh,
+					  const char *cmd, struct set *s)
+{
+	/* empty */
+}
+
+static inline void monitor_print_element_json(struct netlink_mon_handler *monh,
+					      const char *cmd, struct set *s)
+{
+	/* empty */
+}
+
+static inline void monitor_print_obj_json(struct netlink_mon_handler *monh,
+					  const char *cmd, struct obj *o)
+{
+	/* empty */
+}
+
+static inline void monitor_print_rule_json(struct netlink_mon_handler *monh,
+					   const char *cmd, struct rule *r)
+{
+	/* empty */
+}
+
+static inline int json_events_cb(const struct nlmsghdr *nlh,
+                                 struct netlink_mon_handler *monh)
+{
+	return -1;
+}
+
+static inline void json_print_echo(struct nft_ctx *ctx)
+{
+	/* empty */
 }
 
 #endif /* HAVE_LIBJANSSON */

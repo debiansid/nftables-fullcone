@@ -79,6 +79,11 @@ const struct rt_template rt_templates[] = {
 					      2 * BITS_PER_BYTE,
 					      BYTEORDER_HOST_ENDIAN,
 					      false),
+	[NFT_RT_XFRM]		= RT_TEMPLATE("ipsec",
+					      &boolean_type,
+					      BITS_PER_BYTE,
+					      BYTEORDER_HOST_ENDIAN,
+					      false),
 };
 
 static void rt_expr_print(const struct expr *expr, struct output_ctx *octx)
@@ -109,7 +114,7 @@ static void rt_expr_clone(struct expr *new, const struct expr *expr)
 	new->rt.key = expr->rt.key;
 }
 
-static const struct expr_ops rt_expr_ops = {
+const struct expr_ops rt_expr_ops = {
 	.type		= EXPR_RT,
 	.name		= "rt",
 	.print		= rt_expr_print,
@@ -125,10 +130,10 @@ struct expr *rt_expr_alloc(const struct location *loc, enum nft_rt_keys key,
 	struct expr *expr;
 
 	if (invalid && tmpl->invalid)
-		expr = expr_alloc(loc, &rt_expr_ops, &invalid_type,
+		expr = expr_alloc(loc, EXPR_RT, &invalid_type,
 				  tmpl->byteorder, 0);
 	else
-		expr = expr_alloc(loc, &rt_expr_ops, tmpl->dtype,
+		expr = expr_alloc(loc, EXPR_RT, tmpl->dtype,
 				  tmpl->byteorder, tmpl->len);
 	expr->rt.key = key;
 
@@ -143,10 +148,10 @@ void rt_expr_update_type(struct proto_ctx *ctx, struct expr *expr)
 	case NFT_RT_NEXTHOP4:
 		desc = ctx->protocol[PROTO_BASE_NETWORK_HDR].desc;
 		if (desc == &proto_ip)
-			expr->dtype = &ipaddr_type;
+			datatype_set(expr, &ipaddr_type);
 		else if (desc == &proto_ip6) {
 			expr->rt.key++;
-			expr->dtype = &ip6addr_type;
+			datatype_set(expr, &ip6addr_type);
 		}
 		expr->len = expr->dtype->size;
 		break;

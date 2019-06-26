@@ -113,8 +113,9 @@
     {
         "match": {
             "left": {
-                "meta": "mark"
+                "meta": { "key": "mark" }
             },
+	    "op": "==",
             "right": 12345
         }
     },
@@ -137,8 +138,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -152,8 +154,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -207,8 +210,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -225,8 +229,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -234,6 +239,48 @@
         "reject": {
             "expr": "no-route",
             "type": "icmpv6"
+        }
+    }
+]
+
+# meta nfproto ipv4 reject with icmpx type admin-prohibited
+[
+    {
+        "match": {
+            "left": {
+                "meta": {
+                    "key": "nfproto"
+                }
+            },
+            "op": "==",
+            "right": "ipv4"
+        }
+    },
+    {
+        "reject": {
+            "expr": "admin-prohibited",
+            "type": "icmpx"
+        }
+    }
+]
+
+# meta nfproto ipv6 reject with icmpx type admin-prohibited
+[
+    {
+        "match": {
+            "left": {
+                "meta": {
+                    "key": "nfproto"
+                }
+            },
+            "op": "==",
+            "right": "ipv6"
+        }
+    },
+    {
+        "reject": {
+            "expr": "admin-prohibited",
+            "type": "icmpx"
         }
     }
 ]

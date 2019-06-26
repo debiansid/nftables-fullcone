@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "obrname"
+                "meta": { "key": "obrname" }
             },
+	    "op": "==",
             "right": "br0"
         }
     }
@@ -15,8 +16,9 @@
     {
         "match": {
             "left": {
-                "meta": "ibrname"
+                "meta": { "key": "ibrname" }
             },
+	    "op": "==",
             "right": "br0"
         }
     }

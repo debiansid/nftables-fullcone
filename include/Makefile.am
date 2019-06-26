@@ -2,6 +2,7 @@ SUBDIRS =		linux		\
 			nftables
 
 noinst_HEADERS = 	cli.h		\
+			cache.h		\
 			datatype.h	\
 			expression.h	\
 			fib.h		\
@@ -22,12 +23,15 @@ noinst_HEADERS = 	cli.h		\
 			headers.h	\
 			list.h		\
 			meta.h		\
+			misspell.h	\
 			numgen.h	\
 			netlink.h	\
+			osf.h		\
 			parser.h	\
 			proto.h		\
 			socket.h	\
 			rule.h		\
 			rt.h		\
 			utils.h		\
+			xfrm.h		\
 			xt.h

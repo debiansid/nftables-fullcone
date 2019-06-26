@@ -1,10 +1,8 @@
 #ifndef NFTABLES_SOCKET_H
 #define NFTABLES_SOCKET_H
 
-//#include <parser.h>
-
 /**
- * struct rt_template - template for routing expressions
+ * struct socket_template - template for routing expressions
  *
  * @token:	parser token for the expression
  * @dtype:	data type of the expression
@@ -17,6 +15,8 @@ struct socket_template {
 	unsigned int		len;
 	enum byteorder		byteorder;
 };
+
+extern const struct socket_template socket_templates[];
 
 extern struct expr *socket_expr_alloc(const struct location *loc,
 				    enum nft_socket_keys key);

@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "icmp"
+                    "protocol": "icmp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "echo-reply",
@@ -34,6 +35,30 @@
     }
 ]
 
+# icmp code { 2, 4, 54, 33, 56}
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "code",
+                    "protocol": "icmp"
+                }
+            },
+            "op": "==",
+            "right": {
+                "set": [
+                    "prot-unreachable",
+                    4,
+                    33,
+                    54,
+                    56
+                ]
+            }
+        }
+    }
+]
+
 # icmp checksum { 1111, 222, 343} accept
 [
     {
@@ -41,9 +66,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "icmp"
+                    "protocol": "icmp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     222,
@@ -65,7 +91,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "icmp"
+                    "protocol": "icmp"
                 }
             },
             "op": "!=",

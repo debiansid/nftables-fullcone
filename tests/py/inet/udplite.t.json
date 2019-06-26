@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": 80
         }
     },
@@ -23,7 +24,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -42,9 +43,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 50, 70 ]
             }
@@ -62,7 +64,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -83,9 +85,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     49,
@@ -106,7 +109,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -130,9 +133,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 12, 40 ] }
@@ -149,7 +153,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -169,9 +173,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": 80
         }
     },
@@ -187,7 +192,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -206,9 +211,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 70, 75 ]
             }
@@ -226,7 +232,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -247,9 +253,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     49,
@@ -270,7 +277,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -294,9 +301,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 70, 75 ] }
@@ -316,7 +324,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -339,9 +347,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": 6666
         }
     },
@@ -357,7 +366,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -381,9 +390,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -396,7 +406,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -412,9 +422,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -429,7 +440,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -447,9 +458,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -469,7 +481,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",
@@ -492,9 +504,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -511,7 +524,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "udplite"
+                    "protocol": "udplite"
                 }
             },
             "op": "!=",

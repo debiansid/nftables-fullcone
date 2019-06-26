@@ -10,8 +10,9 @@
     {
         "match": {
             "left": {
-                "meta": "mark"
+                "meta": { "key": "mark" }
             },
+	    "op": "==",
             "right": 2147483648
         }
     },

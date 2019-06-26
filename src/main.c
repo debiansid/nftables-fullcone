@@ -35,13 +35,16 @@ enum opt_vals {
 	OPT_NUMERIC		= 'n',
 	OPT_STATELESS		= 's',
 	OPT_IP2NAME		= 'N',
+	OPT_SERVICE		= 'S',
 	OPT_DEBUG		= 'd',
 	OPT_HANDLE_OUTPUT	= 'a',
 	OPT_ECHO		= 'e',
+	OPT_GUID		= 'u',
+	OPT_NUMERIC_PRIO	= 'y',
+	OPT_NUMERIC_PROTO	= 'p',
 	OPT_INVALID		= '?',
 };
-
-#define OPTSTRING	"hvcf:iI:jvnsNae"
+#define OPTSTRING	"hvcf:iI:jvnsNaeSupyp"
 
 static const struct option options[] = {
 	{
@@ -78,6 +81,10 @@ static const struct option options[] = {
 		.val		= OPT_IP2NAME,
 	},
 	{
+		.name		= "service",
+		.val		= OPT_SERVICE,
+	},
+	{
 		.name		= "includepath",
 		.val		= OPT_INCLUDEPATH,
 		.has_arg	= 1,
@@ -100,6 +107,14 @@ static const struct option options[] = {
 		.val		= OPT_JSON,
 	},
 	{
+		.name		= "guid",
+		.val		= OPT_GUID,
+	},
+	{
+		.name		= "numeric-priority",
+		.val		= OPT_NUMERIC_PRIO,
+	},
+	{
 		.name		= NULL
 	}
 };
@@ -118,11 +133,13 @@ static void show_help(const char *name)
 "  -i, --interactive		Read input from interactive CLI\n"
 "\n"
 "  -j, --json			Format output in JSON\n"
-"  -n, --numeric			When specified once, show network addresses numerically (default behaviour).\n"
-"  				Specify twice to also show Internet services (port numbers) numerically.\n"
-"				Specify three times to also show protocols, user IDs, and group IDs numerically.\n"
+"  -n, --numeric			Print fully numerical output.\n"
 "  -s, --stateless		Omit stateful information of ruleset.\n"
+"  -u, --guid			Print UID/GID as defined in /etc/passwd and /etc/group.\n"
 "  -N				Translate IP addresses to names.\n"
+"  -S, --service			Translate ports to service names as described in /etc/services.\n"
+"  -p, --numeric-protocol	Print layer 4 protocols numerically.\n"
+"  -y, --numeric-priority	Print chain priority numerically.\n"
 "  -a, --handle			Output rule handle.\n"
 "  -e, --echo			Echo what has been added, inserted or replaced.\n"
 "  -I, --includepath <directory>	Add <directory> to the paths searched for include files. Default is: %s\n"
@@ -172,7 +189,7 @@ static const struct {
 int main(int argc, char * const *argv)
 {
 	char *buf = NULL, *filename = NULL;
-	enum nft_numeric_level numeric;
+	unsigned int output_flags = 0;
 	bool interactive = false;
 	unsigned int debug_mask;
 	unsigned int len;
@@ -211,20 +228,16 @@ int main(int argc, char * const *argv)
 			}
 			break;
 		case OPT_NUMERIC:
-			numeric = nft_ctx_output_get_numeric(nft);
-			if (numeric == NFT_NUMERIC_ALL) {
-				fprintf(stderr, "Too many numeric options "
-						"used, max. %u\n",
-					NFT_NUMERIC_ALL);
-				exit(EXIT_FAILURE);
-			}
-			nft_ctx_output_set_numeric(nft, numeric + 1);
+			output_flags |= NFT_CTX_OUTPUT_NUMERIC_ALL;
 			break;
 		case OPT_STATELESS:
-			nft_ctx_output_set_stateless(nft, true);
+			output_flags |= NFT_CTX_OUTPUT_STATELESS;
 			break;
 		case OPT_IP2NAME:
-			nft_ctx_output_set_ip2name(nft, true);
+			output_flags |= NFT_CTX_OUTPUT_REVERSEDNS;
+			break;
+		case OPT_SERVICE:
+			output_flags |= NFT_CTX_OUTPUT_SERVICE;
 			break;
 		case OPT_DEBUG:
 			debug_mask = nft_ctx_output_get_debug(nft);
@@ -256,18 +269,31 @@ int main(int argc, char * const *argv)
 			nft_ctx_output_set_debug(nft, debug_mask);
 			break;
 		case OPT_HANDLE_OUTPUT:
-			nft_ctx_output_set_handle(nft, true);
+			output_flags |= NFT_CTX_OUTPUT_HANDLE;
 			break;
 		case OPT_ECHO:
-			nft_ctx_output_set_echo(nft, true);
+			output_flags |= NFT_CTX_OUTPUT_ECHO;
 			break;
 		case OPT_JSON:
-			nft_ctx_output_set_json(nft, true);
+#ifdef HAVE_LIBJANSSON
+			output_flags |= NFT_CTX_OUTPUT_JSON;
+#endif
+			break;
+		case OPT_GUID:
+			output_flags |= NFT_CTX_OUTPUT_GUID;
+			break;
+		case OPT_NUMERIC_PRIO:
+			output_flags |= NFT_CTX_OUTPUT_NUMERIC_PRIO;
+			break;
+		case OPT_NUMERIC_PROTO:
+			output_flags |= NFT_CTX_OUTPUT_NUMERIC_PROTO;
 			break;
 		case OPT_INVALID:
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	nft_ctx_output_set_flags(nft, output_flags);
 
 	if (optind != argc) {
 		for (len = 0, i = optind; i < argc; i++)
@@ -279,7 +305,7 @@ int main(int argc, char * const *argv)
 			if (i + 1 < argc)
 				strcat(buf, " ");
 		}
-		rc = !!nft_run_cmd_from_buffer(nft, buf, len);
+		rc = !!nft_run_cmd_from_buffer(nft, buf);
 	} else if (filename != NULL) {
 		rc = !!nft_run_cmd_from_filename(nft, filename);
 	} else if (interactive) {

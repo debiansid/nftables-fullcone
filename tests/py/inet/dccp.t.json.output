@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 20, 50 ]
             }

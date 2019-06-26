@@ -38,10 +38,11 @@
 #include <utils.h>
 #include <erec.h>
 #include <iface.h>
+#include <json.h>
 
-#define nft_mon_print(monh, ...) nft_print(monh->ctx->octx, __VA_ARGS__)
+#define nft_mon_print(monh, ...) nft_print(&monh->ctx->nft->output, __VA_ARGS__)
 
-static struct nftnl_table *netlink_table_alloc(const struct nlmsghdr *nlh)
+struct nftnl_table *netlink_table_alloc(const struct nlmsghdr *nlh)
 {
 	struct nftnl_table *nlt;
 
@@ -54,7 +55,7 @@ static struct nftnl_table *netlink_table_alloc(const struct nlmsghdr *nlh)
 	return nlt;
 }
 
-static struct nftnl_chain *netlink_chain_alloc(const struct nlmsghdr *nlh)
+struct nftnl_chain *netlink_chain_alloc(const struct nlmsghdr *nlh)
 {
 	struct nftnl_chain *nlc;
 
@@ -67,7 +68,7 @@ static struct nftnl_chain *netlink_chain_alloc(const struct nlmsghdr *nlh)
 	return nlc;
 }
 
-static struct nftnl_set *netlink_set_alloc(const struct nlmsghdr *nlh)
+struct nftnl_set *netlink_set_alloc(const struct nlmsghdr *nlh)
 {
 	struct nftnl_set *nls;
 
@@ -93,7 +94,7 @@ static struct nftnl_set *netlink_setelem_alloc(const struct nlmsghdr *nlh)
 	return nls;
 }
 
-static struct nftnl_rule *netlink_rule_alloc(const struct nlmsghdr *nlh)
+struct nftnl_rule *netlink_rule_alloc(const struct nlmsghdr *nlh)
 {
 	struct nftnl_rule *nlr;
 
@@ -106,7 +107,7 @@ static struct nftnl_rule *netlink_rule_alloc(const struct nlmsghdr *nlh)
 	return nlr;
 }
 
-static struct nftnl_obj *netlink_obj_alloc(const struct nlmsghdr *nlh)
+struct nftnl_obj *netlink_obj_alloc(const struct nlmsghdr *nlh)
 {
 	struct nftnl_obj *nlo;
 
@@ -127,16 +128,37 @@ static uint32_t netlink_msg2nftnl_of(uint32_t msg)
 	case NFT_MSG_NEWSET:
 	case NFT_MSG_NEWSETELEM:
 	case NFT_MSG_NEWRULE:
+	case NFT_MSG_NEWOBJ:
+	case NFT_MSG_NEWFLOWTABLE:
 		return NFTNL_OF_EVENT_NEW;
 	case NFT_MSG_DELTABLE:
 	case NFT_MSG_DELCHAIN:
 	case NFT_MSG_DELSET:
 	case NFT_MSG_DELSETELEM:
 	case NFT_MSG_DELRULE:
+	case NFT_MSG_DELOBJ:
+	case NFT_MSG_DELFLOWTABLE:
 		return NFTNL_OF_EVENT_DEL;
 	}
 
 	return 0;
+}
+
+static const char *nftnl_of2cmd(uint32_t of)
+{
+	switch (of) {
+	case NFTNL_OF_EVENT_NEW:
+		return "add";
+	case NFTNL_OF_EVENT_DEL:
+		return "delete";
+	default:
+		return "???";
+	}
+}
+
+static const char *netlink_msg2cmd(uint32_t msg)
+{
+	return nftnl_of2cmd(netlink_msg2nftnl_of(msg));
 }
 
 static void nlr_for_each_set(struct nftnl_rule *nlr,
@@ -179,38 +201,29 @@ static int netlink_events_table_cb(const struct nlmsghdr *nlh, int type,
 				   struct netlink_mon_handler *monh)
 {
 	struct nftnl_table *nlt;
-	uint32_t family;
+	struct table *t;
+	const char *cmd;
 
 	nlt = netlink_table_alloc(nlh);
+	t = netlink_delinearize_table(monh->ctx, nlt);
+	cmd = netlink_msg2cmd(type);
 
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
-		if (type == NFT_MSG_NEWTABLE) {
-			if (nlh->nlmsg_flags & NLM_F_EXCL)
-				nft_mon_print(monh, "update table ");
-			else
-				nft_mon_print(monh, "add table ");
-		} else {
-			nft_mon_print(monh, "delete table ");
-		}
+		nft_mon_print(monh, "%s table ", cmd);
 
-		family = nftnl_table_get_u32(nlt, NFTNL_TABLE_FAMILY);
-
-		nft_mon_print(monh, "%s %s", family2str(family),
-		       nftnl_table_get_str(nlt, NFTNL_TABLE_NAME));
-		if (monh->ctx->octx->handle > 0)
+		nft_mon_print(monh, "%s %s", family2str(t->handle.family),
+			      t->handle.table.name);
+		if (nft_output_handle(&monh->ctx->nft->output))
 			nft_mon_print(monh, " # handle %" PRIu64 "",
-				      nftnl_table_get_u64(nlt, NFTNL_TABLE_HANDLE));
-		nft_mon_print(monh, "\n");
+				      t->handle.handle.id);
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_table_fprintf(monh->ctx->octx->output_fp, nlt,
-				    monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		monitor_print_table_json(monh, cmd, t);
 		break;
 	}
-
+	nft_mon_print(monh, "\n");
+	table_free(t);
 	nftnl_table_free(nlt);
 	return MNL_CB_OK;
 }
@@ -220,39 +233,34 @@ static int netlink_events_chain_cb(const struct nlmsghdr *nlh, int type,
 {
 	struct nftnl_chain *nlc;
 	struct chain *c;
-	uint32_t family;
+	const char *cmd;
 
 	nlc = netlink_chain_alloc(nlh);
+	c = netlink_delinearize_chain(monh->ctx, nlc);
+	cmd = netlink_msg2cmd(type);
 
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
+		nft_mon_print(monh, "%s ", cmd);
+
 		switch (type) {
 		case NFT_MSG_NEWCHAIN:
-			if (nlh->nlmsg_flags & NLM_F_EXCL)
-				nft_mon_print(monh, "update ");
-			else
-				nft_mon_print(monh, "add ");
-
-			c = netlink_delinearize_chain(monh->ctx, nlc);
-			chain_print_plain(c, monh->ctx->octx);
-			chain_free(c);
+			chain_print_plain(c, &monh->ctx->nft->output);
 			break;
 		case NFT_MSG_DELCHAIN:
-			family = nftnl_chain_get_u32(nlc, NFTNL_CHAIN_FAMILY);
-			nft_mon_print(monh, "delete chain %s %s %s\n", family2str(family),
-			       nftnl_chain_get_str(nlc, NFTNL_CHAIN_TABLE),
-			       nftnl_chain_get_str(nlc, NFTNL_CHAIN_NAME));
+			nft_mon_print(monh, "chain %s %s %s",
+				      family2str(c->handle.family),
+				      c->handle.table.name,
+				      c->handle.chain.name);
 			break;
 		}
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_chain_fprintf(monh->ctx->octx->output_fp, nlc,
-				    monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		monitor_print_chain_json(monh, cmd, c);
 		break;
 	}
-
+	nft_mon_print(monh, "\n");
+	chain_free(c);
 	nftnl_chain_free(nlc);
 	return MNL_CB_OK;
 }
@@ -261,44 +269,44 @@ static int netlink_events_set_cb(const struct nlmsghdr *nlh, int type,
 				 struct netlink_mon_handler *monh)
 {
 	struct nftnl_set *nls;
+	const char *family, *cmd;
 	struct set *set;
-	uint32_t family, flags;
+	uint32_t flags;
 
 	nls = netlink_set_alloc(nlh);
 	flags = nftnl_set_get_u32(nls, NFTNL_SET_FLAGS);
 	if (flags & NFT_SET_ANONYMOUS)
 		goto out;
 
+	set = netlink_delinearize_set(monh->ctx, nls);
+	if (set == NULL) {
+		nftnl_set_free(nls);
+		return MNL_CB_ERROR;
+	}
+	family = family2str(set->handle.family);
+	cmd = netlink_msg2cmd(type);
+
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
+		nft_mon_print(monh, "%s ", cmd);
+
 		switch (type) {
 		case NFT_MSG_NEWSET:
-			nft_mon_print(monh, "add ");
-			set = netlink_delinearize_set(monh->ctx, nls);
-			if (set == NULL) {
-				nftnl_set_free(nls);
-				return MNL_CB_ERROR;
-			}
-			set_print_plain(set, monh->ctx->octx);
-			set_free(set);
-			nft_mon_print(monh, "\n");
+			set_print_plain(set, &monh->ctx->nft->output);
 			break;
 		case NFT_MSG_DELSET:
-			family = nftnl_set_get_u32(nls, NFTNL_SET_FAMILY);
-			nft_mon_print(monh, "delete set %s %s %s\n",
-			       family2str(family),
-			       nftnl_set_get_str(nls, NFTNL_SET_TABLE),
-			       nftnl_set_get_str(nls, NFTNL_SET_NAME));
+			nft_mon_print(monh, "set %s %s %s", family,
+				      set->handle.table.name,
+				      set->handle.set.name);
 			break;
 		}
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_set_fprintf(monh->ctx->octx->output_fp, nls,
-				  monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		monitor_print_set_json(monh, cmd, set);
 		break;
 	}
+	nft_mon_print(monh, "\n");
+	set_free(set);
 out:
 	nftnl_set_free(nls);
 	return MNL_CB_OK;
@@ -322,9 +330,9 @@ static bool netlink_event_ignore_range_event(struct nftnl_set_elem *nlse)
 
 static bool set_elem_is_open_interval(struct expr *elem)
 {
-	switch (elem->ops->type) {
+	switch (elem->etype) {
 	case EXPR_SET_ELEM:
-		return elem->elem_flags & SET_ELEM_F_INTERVAL_OPEN;
+		return elem->elem_flags & NFTNL_SET_ELEM_F_INTERVAL_OPEN;
 	case EXPR_MAPPING:
 		return set_elem_is_open_interval(elem->left);
 	default:
@@ -369,85 +377,78 @@ static int netlink_events_setelem_cb(const struct nlmsghdr *nlh, int type,
 	struct nftnl_set *nls;
 	struct set *dummyset;
 	struct set *set;
-	const char *setname, *table;
+	const char *setname, *table, *cmd;
 	uint32_t family;
 
 	nls = netlink_setelem_alloc(nlh);
 	table = nftnl_set_get_str(nls, NFTNL_SET_TABLE);
 	setname = nftnl_set_get_str(nls, NFTNL_SET_NAME);
 	family = nftnl_set_get_u32(nls, NFTNL_SET_FAMILY);
+	cmd = netlink_msg2cmd(type);
 
-	set = set_lookup_global(family, table, setname, monh->cache);
+	set = set_lookup_global(family, table, setname, &monh->ctx->nft->cache);
 	if (set == NULL) {
 		fprintf(stderr, "W: Received event for an unknown set.");
 		goto out;
 	}
 
+	if (set->flags & NFT_SET_ANONYMOUS)
+		goto out;
+
+	/* we want to 'delinearize' the set_elem, but don't
+	 * modify the original cached set. This path is only
+	 * used by named sets, so use a dummy set.
+	 */
+	dummyset = set_alloc(monh->loc);
+	dummyset->key = expr_clone(set->key);
+	dummyset->datatype = set->datatype;
+	dummyset->flags = set->flags;
+	dummyset->init = set_expr_alloc(monh->loc, set);
+
+	nlsei = nftnl_set_elems_iter_create(nls);
+	if (nlsei == NULL)
+		memory_allocation_error();
+
+	nlse = nftnl_set_elems_iter_next(nlsei);
+	while (nlse != NULL) {
+		if (netlink_event_ignore_range_event(nlse)) {
+			set_free(dummyset);
+			nftnl_set_elems_iter_destroy(nlsei);
+			goto out;
+		}
+		if (netlink_delinearize_setelem(nlse, dummyset,
+						&monh->ctx->nft->cache) < 0) {
+			set_free(dummyset);
+			nftnl_set_elems_iter_destroy(nlsei);
+			goto out;
+		}
+		nlse = nftnl_set_elems_iter_next(nlsei);
+	}
+	nftnl_set_elems_iter_destroy(nlsei);
+
+	if (netlink_event_range_cache(set, dummyset)) {
+		set_free(dummyset);
+		goto out;
+	}
+
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
-		if (set->flags & NFT_SET_ANONYMOUS)
-			goto out;
-
-		/* we want to 'delinearize' the set_elem, but don't
-		 * modify the original cached set. This path is only
-		 * used by named sets, so use a dummy set.
-		 */
-		dummyset = set_alloc(monh->loc);
-		dummyset->key = expr_clone(set->key);
-		dummyset->datatype = set->datatype;
-		dummyset->flags = set->flags;
-		dummyset->init = set_expr_alloc(monh->loc, set);
-
-		nlsei = nftnl_set_elems_iter_create(nls);
-		if (nlsei == NULL)
-			memory_allocation_error();
-
-		nlse = nftnl_set_elems_iter_next(nlsei);
-		while (nlse != NULL) {
-			if (netlink_event_ignore_range_event(nlse)) {
-				set_free(dummyset);
-				nftnl_set_elems_iter_destroy(nlsei);
-				goto out;
-			}
-			if (netlink_delinearize_setelem(nlse, dummyset,
-							monh->cache) < 0) {
-				set_free(dummyset);
-				nftnl_set_elems_iter_destroy(nlsei);
-				goto out;
-			}
-			nlse = nftnl_set_elems_iter_next(nlsei);
-		}
-		nftnl_set_elems_iter_destroy(nlsei);
-
-		if (netlink_event_range_cache(set, dummyset)) {
-			set_free(dummyset);
-			goto out;
-		}
-
-		switch (type) {
-		case NFT_MSG_NEWSETELEM:
-			nft_mon_print(monh, "add ");
-			break;
-		case NFT_MSG_DELSETELEM:
-			nft_mon_print(monh, "delete ");
-			break;
-		default:
-			set_free(dummyset);
-			goto out;
-		}
-		nft_mon_print(monh, "element %s %s %s ", family2str(family), table, setname);
-		expr_print(dummyset->init, monh->ctx->octx);
-		nft_mon_print(monh, "\n");
-
-		set_free(dummyset);
+		nft_mon_print(monh, "%s element %s %s %s ",
+			      cmd, family2str(family), table, setname);
+		expr_print(dummyset->init, &monh->ctx->nft->output);
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_set_fprintf(monh->ctx->octx->output_fp, nls,
-				  monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		dummyset->handle.family = family;
+		dummyset->handle.set.name = setname;
+		dummyset->handle.table.name = table;
+		monitor_print_element_json(monh, cmd, dummyset);
+		/* prevent set_free() from trying to free those */
+		dummyset->handle.set.name = NULL;
+		dummyset->handle.table.name = NULL;
 		break;
 	}
+	nft_mon_print(monh, "\n");
+	set_free(dummyset);
 out:
 	nftnl_set_free(nls);
 	return MNL_CB_OK;
@@ -456,44 +457,43 @@ out:
 static int netlink_events_obj_cb(const struct nlmsghdr *nlh, int type,
 				 struct netlink_mon_handler *monh)
 {
+	const char *family, *cmd;
 	struct nftnl_obj *nlo;
-	uint32_t family;
 	struct obj *obj;
 
 	nlo = netlink_obj_alloc(nlh);
 
+	obj = netlink_delinearize_obj(monh->ctx, nlo);
+	if (obj == NULL) {
+		nftnl_obj_free(nlo);
+		return MNL_CB_ERROR;
+	}
+	family = family2str(obj->handle.family);
+	cmd = netlink_msg2cmd(type);
+
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
+		nft_mon_print(monh, "%s ", cmd);
+
 		switch (type) {
 		case NFT_MSG_NEWOBJ:
-			nft_mon_print(monh, "add ");
-			obj = netlink_delinearize_obj(monh->ctx, nlo);
-			if (obj == NULL) {
-				nftnl_obj_free(nlo);
-				return MNL_CB_ERROR;
-			}
-			obj_print_plain(obj, monh->ctx->octx);
-			obj_free(obj);
-			nft_mon_print(monh, "\n");
+			obj_print_plain(obj, &monh->ctx->nft->output);
 			break;
 		case NFT_MSG_DELOBJ:
-			family = nftnl_obj_get_u32(nlo, NFTNL_OBJ_FAMILY);
-			nft_mon_print(monh, "delete %s %s %s %s\n",
-			       obj_type_name(nftnl_obj_get_u32(nlo, NFTNL_OBJ_TYPE)),
-			       family2str(family),
-			       nftnl_obj_get_str(nlo, NFTNL_OBJ_TABLE),
-			       nftnl_obj_get_str(nlo, NFTNL_OBJ_NAME));
+			nft_mon_print(monh, "%s %s %s %s",
+			       obj_type_name(obj->type),
+			       family,
+			       obj->handle.table.name,
+			       obj->handle.obj.name);
 			break;
 		}
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_obj_fprintf(monh->ctx->octx->output_fp, nlo,
-				  monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		monitor_print_obj_json(monh, cmd, obj);
 		break;
 	}
-
+	nft_mon_print(monh, "\n");
+	obj_free(obj);
 	nftnl_obj_free(nlo);
 	return MNL_CB_OK;
 }
@@ -507,49 +507,43 @@ static void rule_map_decompose_cb(struct set *s, void *data)
 static int netlink_events_rule_cb(const struct nlmsghdr *nlh, int type,
 				  struct netlink_mon_handler *monh)
 {
+	const char *family, *cmd;
 	struct nftnl_rule *nlr;
-	const char *family;
-	const char *table;
-	const char *chain;
 	struct rule *r;
-	uint64_t handle;
-	uint32_t fam;
 
 	nlr = netlink_rule_alloc(nlh);
+	r = netlink_delinearize_rule(monh->ctx, nlr);
+	nlr_for_each_set(nlr, rule_map_decompose_cb, NULL,
+			 &monh->ctx->nft->cache);
+	cmd = netlink_msg2cmd(type);
+
 	switch (monh->format) {
 	case NFTNL_OUTPUT_DEFAULT:
-		fam = nftnl_rule_get_u32(nlr, NFTNL_RULE_FAMILY);
-		family = family2str(fam);
-		table = nftnl_rule_get_str(nlr, NFTNL_RULE_TABLE);
-		chain = nftnl_rule_get_str(nlr, NFTNL_RULE_CHAIN);
-		handle = nftnl_rule_get_u64(nlr, NFTNL_RULE_HANDLE);
+		family = family2str(r->handle.family);
+
+		nft_mon_print(monh, "%s rule %s %s %s ",
+			      cmd,
+			      family,
+			      r->handle.table.name,
+			      r->handle.chain.name);
 
 		switch (type) {
 		case NFT_MSG_NEWRULE:
-			r = netlink_delinearize_rule(monh->ctx, nlr);
-			nlr_for_each_set(nlr, rule_map_decompose_cb, NULL,
-					 monh->cache);
+			rule_print(r, &monh->ctx->nft->output);
 
-			nft_mon_print(monh, "add rule %s %s %s ", family, table, chain);
-			rule_print(r, monh->ctx->octx);
-			nft_mon_print(monh, "\n");
-
-			rule_free(r);
 			break;
 		case NFT_MSG_DELRULE:
-			nft_mon_print(monh, "delete rule %s %s %s handle %u\n",
-			       family, table, chain, (unsigned int)handle);
+			nft_mon_print(monh, "handle %" PRIu64,
+				      r->handle.handle.id);
 			break;
 		}
 		break;
-	case NFTNL_OUTPUT_XML:
 	case NFTNL_OUTPUT_JSON:
-		nftnl_rule_fprintf(monh->ctx->octx->output_fp, nlr,
-				   monh->format, netlink_msg2nftnl_of(type));
-		nft_mon_print(monh, "\n");
+		monitor_print_rule_json(monh, cmd, r);
 		break;
 	}
-
+	nft_mon_print(monh, "\n");
+	rule_free(r);
 	nftnl_rule_free(nlr);
 	return MNL_CB_OK;
 }
@@ -564,7 +558,7 @@ static void netlink_events_cache_addtable(struct netlink_mon_handler *monh,
 	t = netlink_delinearize_table(monh->ctx, nlt);
 	nftnl_table_free(nlt);
 
-	table_add_hash(t, monh->cache);
+	table_add_hash(t, &monh->ctx->nft->cache);
 }
 
 static void netlink_events_cache_deltable(struct netlink_mon_handler *monh,
@@ -578,7 +572,7 @@ static void netlink_events_cache_deltable(struct netlink_mon_handler *monh,
 	h.family = nftnl_table_get_u32(nlt, NFTNL_TABLE_FAMILY);
 	h.table.name  = nftnl_table_get_str(nlt, NFTNL_TABLE_NAME);
 
-	t = table_lookup(&h, monh->cache);
+	t = table_lookup(&h, &monh->ctx->nft->cache);
 	if (t == NULL)
 		goto out;
 
@@ -608,7 +602,7 @@ static void netlink_events_cache_addset(struct netlink_mon_handler *monh,
 		goto out;
 	s->init = set_expr_alloc(monh->loc, s);
 
-	t = table_lookup(&s->handle, monh->cache);
+	t = table_lookup(&s->handle, &monh->ctx->nft->cache);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache set: table not found.\n");
 		set_free(s);
@@ -635,7 +629,7 @@ static void netlink_events_cache_addsetelem(struct netlink_mon_handler *monh,
 	table   = nftnl_set_get_str(nls, NFTNL_SET_TABLE);
 	setname = nftnl_set_get_str(nls, NFTNL_SET_NAME);
 
-	set = set_lookup_global(family, table, setname, monh->cache);
+	set = set_lookup_global(family, table, setname, &monh->ctx->nft->cache);
 	if (set == NULL) {
 		fprintf(stderr,
 			"W: Unable to cache set_elem. Set not found.\n");
@@ -648,7 +642,8 @@ static void netlink_events_cache_addsetelem(struct netlink_mon_handler *monh,
 
 	nlse = nftnl_set_elems_iter_next(nlsei);
 	while (nlse != NULL) {
-		if (netlink_delinearize_setelem(nlse, set, monh->cache) < 0) {
+		if (netlink_delinearize_setelem(nlse, set,
+						&monh->ctx->nft->cache) < 0) {
 			fprintf(stderr,
 				"W: Unable to cache set_elem. "
 				"Delinearize failed.\n");
@@ -675,7 +670,7 @@ static void netlink_events_cache_delsets(struct netlink_mon_handler *monh,
 	struct nftnl_rule *nlr = netlink_rule_alloc(nlh);
 
 	nlr_for_each_set(nlr, netlink_events_cache_delset_cb, NULL,
-			 monh->cache);
+			 &monh->ctx->nft->cache);
 	nftnl_rule_free(nlr);
 }
 
@@ -698,7 +693,7 @@ static void netlink_events_cache_addobj(struct netlink_mon_handler *monh,
 	if (obj == NULL)
 		goto out;
 
-	t = table_lookup(&obj->handle, monh->cache);
+	t = table_lookup(&obj->handle, &monh->ctx->nft->cache);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache object: table not found.\n");
 		obj_free(obj);
@@ -728,7 +723,7 @@ static void netlink_events_cache_delobj(struct netlink_mon_handler *monh,
 	type	 = nftnl_obj_get_u32(nlo, NFTNL_OBJ_TYPE);
 	h.handle.id	= nftnl_obj_get_u64(nlo, NFTNL_OBJ_HANDLE);
 
-	t = table_lookup(&h, monh->cache);
+	t = table_lookup(&h, &monh->ctx->nft->cache);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache object: table not found.\n");
 		goto out;
@@ -840,11 +835,9 @@ static int netlink_events_newgen_cb(const struct nlmsghdr *nlh, int type,
 	}
 	if (genid >= 0) {
 		nft_mon_print(monh, "# new generation %d", genid);
-		if (pid >= 0) {
-			nft_mon_print(monh, " by process %d", pid);
-			if (!monh->ctx->octx->numeric)
-				nft_mon_print(monh, " (%s)", name);
-		}
+		if (pid >= 0)
+			nft_mon_print(monh, " by process %d (%s)", pid, name);
+
 		nft_mon_print(monh, "\n");
 	}
 
@@ -857,7 +850,7 @@ static int netlink_events_cb(const struct nlmsghdr *nlh, void *data)
 	uint16_t type = NFNL_MSG_TYPE(nlh->nlmsg_type);
 	struct netlink_mon_handler *monh = (struct netlink_mon_handler *)data;
 
-	netlink_events_debug(type, monh->debug_mask);
+	netlink_events_debug(type, monh->ctx->nft->debug_mask);
 	netlink_events_cache_update(monh, nlh, type);
 
 	if (!(monh->monitor_flags & (1 << type)))
@@ -908,12 +901,13 @@ int netlink_echo_callback(const struct nlmsghdr *nlh, void *data)
 		.loc = &netlink_location,
 		.monitor_flags = 0xffffffff,
 		.cache_needed = true,
-		.cache = ctx->cache,
-		.debug_mask = ctx->debug_mask,
 	};
 
-	if (!echo_monh.ctx->octx->echo)
+	if (!nft_output_echo(&echo_monh.ctx->nft->output))
 		return MNL_CB_OK;
+
+	if (nft_output_json(&ctx->nft->output))
+		return json_events_cb(nlh, &echo_monh);
 
 	return netlink_events_cb(nlh, &echo_monh);
 }
@@ -936,7 +930,7 @@ int netlink_monitor(struct netlink_mon_handler *monhandler,
 			return -1;
 	}
 
-	return mnl_nft_event_listener(nf_sock, monhandler->debug_mask,
-				      monhandler->ctx->octx, netlink_events_cb,
-				      monhandler);
+	return mnl_nft_event_listener(nf_sock, monhandler->ctx->nft->debug_mask,
+				      &monhandler->ctx->nft->output,
+				      netlink_events_cb, monhandler);
 }

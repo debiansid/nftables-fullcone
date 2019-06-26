@@ -25,6 +25,7 @@
  * @EXPR_EXTHDR:	exthdr expression
  * @EXPR_META:		meta expression
  * @EXPR_SOCKET:	socket expression
+ * @EXPR_OSF:		osf expression
  * @EXPR_CT:		conntrack expression
  * @EXPR_CONCAT:	concatenation
  * @EXPR_LIST:		list of expressions
@@ -52,6 +53,7 @@ enum expr_types {
 	EXPR_EXTHDR,
 	EXPR_META,
 	EXPR_SOCKET,
+	EXPR_OSF,
 	EXPR_CT,
 	EXPR_CONCAT,
 	EXPR_LIST,
@@ -67,6 +69,7 @@ enum expr_types {
 	EXPR_HASH,
 	EXPR_RT,
 	EXPR_FIB,
+	EXPR_XFRM,
 };
 
 enum ops {
@@ -165,6 +168,8 @@ struct expr_ops {
 					       const struct expr *expr);
 };
 
+const struct expr_ops *expr_ops(const struct expr *e);
+
 /**
  * enum expr_flags
  *
@@ -191,6 +196,8 @@ enum expr_flags {
 #include <hash.h>
 #include <ct.h>
 #include <socket.h>
+#include <osf.h>
+#include <xfrm.h>
 
 /**
  * struct expr
@@ -214,11 +221,11 @@ struct expr {
 	unsigned int		flags;
 
 	const struct datatype	*dtype;
-	enum byteorder		byteorder;
+	enum byteorder		byteorder:8;
+	enum expr_types		etype:8;
+	enum ops		op:8;
 	unsigned int		len;
 
-	const struct expr_ops	*ops;
-	enum ops		op;
 	union {
 		struct {
 			/* EXPR_SYMBOL */
@@ -233,7 +240,7 @@ struct expr {
 		struct {
 			/* EXPR_VERDICT */
 			int			verdict;
-			const char		*chain;
+			struct expr		*chain;
 		};
 		struct {
 			/* EXPR_VALUE */
@@ -334,11 +341,22 @@ struct expr {
 			uint32_t		flags;
 			uint32_t		result;
 		} fib;
+		struct {
+			/* EXPR_XFRM */
+			enum nft_xfrm_keys	key;
+			uint8_t		direction;
+			uint8_t		spnum;
+		} xfrm;
+		struct {
+			/* EXPR_OSF */
+			uint8_t			ttl;
+			uint32_t		flags;
+		} osf;
 	};
 };
 
 extern struct expr *expr_alloc(const struct location *loc,
-			       const struct expr_ops *ops,
+			       enum expr_types etype,
 			       const struct datatype *dtype,
 			       enum byteorder byteorder, unsigned int len);
 extern struct expr *expr_clone(const struct expr *expr);
@@ -385,17 +403,19 @@ extern void relational_expr_pctx_update(struct proto_ctx *ctx,
 					const struct expr *expr);
 
 extern struct expr *verdict_expr_alloc(const struct location *loc,
-				       int verdict, const char *chain);
+				       int verdict, struct expr *chain);
 
 extern struct expr *symbol_expr_alloc(const struct location *loc,
 				      enum symbol_types type, struct scope *scope,
 				      const char *identifier);
 
+const char *expr_name(const struct expr *e);
+
 static inline void symbol_expr_set_type(struct expr *expr,
 					const struct datatype *dtype)
 {
-	if (expr->ops->type == EXPR_SYMBOL)
-		expr->dtype = dtype;
+	if (expr->etype == EXPR_SYMBOL)
+		datatype_set(expr, dtype);
 }
 
 struct expr *variable_expr_alloc(const struct location *loc,
@@ -423,7 +443,7 @@ extern struct expr *range_expr_alloc(const struct location *loc,
 				     struct expr *low, struct expr *high);
 
 extern struct expr *compound_expr_alloc(const struct location *loc,
-					const struct expr_ops *ops);
+					enum expr_types etypes);
 extern void compound_expr_add(struct expr *compound, struct expr *expr);
 extern void compound_expr_remove(struct expr *compound, struct expr *expr);
 extern void list_expr_sort(struct list_head *head);
@@ -436,13 +456,14 @@ extern struct expr *set_expr_alloc(const struct location *loc,
 				   const struct set *set);
 extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add,
-			    unsigned int debug_mask, bool merge);
+			    unsigned int debug_mask, bool merge,
+			    struct output_ctx *octx);
 extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *get_set_intervals(const struct set *set,
 				      const struct expr *init);
 struct table;
-extern void get_set_decompose(struct table *table, struct set *set);
+extern int get_set_decompose(struct table *table, struct set *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,
 				       struct expr *from, struct expr *to);

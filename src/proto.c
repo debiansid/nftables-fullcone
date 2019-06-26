@@ -347,12 +347,61 @@ const struct proto_desc proto_icmp = {
 	.checksum_key	= ICMPHDR_CHECKSUM,
 	.templates	= {
 		[ICMPHDR_TYPE]		= ICMPHDR_TYPE("type", &icmp_type_type, type),
-		[ICMPHDR_CODE]		= ICMPHDR_FIELD("code", code),
+		[ICMPHDR_CODE]		= ICMPHDR_TYPE("code", &icmp_code_type, code),
 		[ICMPHDR_CHECKSUM]	= ICMPHDR_FIELD("checksum", checksum),
 		[ICMPHDR_ID]		= ICMPHDR_FIELD("id", un.echo.id),
 		[ICMPHDR_SEQ]		= ICMPHDR_FIELD("sequence", un.echo.sequence),
 		[ICMPHDR_GATEWAY]	= ICMPHDR_FIELD("gateway", un.gateway),
 		[ICMPHDR_MTU]		= ICMPHDR_FIELD("mtu", un.frag.mtu),
+	},
+};
+
+/*
+ * IGMP
+ */
+
+#include <netinet/igmp.h>
+
+#ifndef IGMP_V3_MEMBERSHIP_REPORT
+#define IGMP_V3_MEMBERSHIP_REPORT	0x22
+#endif
+
+static const struct symbol_table igmp_type_tbl = {
+	.base		= BASE_DECIMAL,
+	.symbols	= {
+		SYMBOL("membership-query",		IGMP_MEMBERSHIP_QUERY),
+		SYMBOL("membership-report-v1",		IGMP_V1_MEMBERSHIP_REPORT),
+		SYMBOL("membership-report-v2",		IGMP_V2_MEMBERSHIP_REPORT),
+		SYMBOL("membership-report-v3",		IGMP_V3_MEMBERSHIP_REPORT),
+		SYMBOL("leave-group",			IGMP_V2_LEAVE_GROUP),
+		SYMBOL_LIST_END
+	},
+};
+
+const struct datatype igmp_type_type = {
+	.type		= TYPE_IGMP_TYPE,
+	.name		= "igmp_type",
+	.desc		= "IGMP type",
+	.byteorder	= BYTEORDER_BIG_ENDIAN,
+	.size		= BITS_PER_BYTE,
+	.basetype	= &integer_type,
+	.sym_tbl	= &igmp_type_tbl,
+};
+
+#define IGMPHDR_FIELD(__name, __member) \
+	HDR_FIELD(__name, struct igmp, __member)
+#define IGMPHDR_TYPE(__name, __type, __member) \
+	HDR_TYPE(__name, __type, struct igmp, __member)
+
+const struct proto_desc proto_igmp = {
+	.name		= "igmp",
+	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= IGMPHDR_CHECKSUM,
+	.templates	= {
+		[IGMPHDR_TYPE]		= IGMPHDR_TYPE("type", &igmp_type_type, igmp_type),
+		[IGMPHDR_MRT]		= IGMPHDR_FIELD("mrt", igmp_code),
+		[IGMPHDR_CHECKSUM]	= IGMPHDR_FIELD("checksum", igmp_cksum),
+		[IGMPHDR_GROUP]		= IGMPHDR_FIELD("group", igmp_group),
 	},
 };
 
@@ -591,6 +640,7 @@ const struct proto_desc proto_ip = {
 	.checksum_key	= IPHDR_CHECKSUM,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
+		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 		PROTO_LINK(IPPROTO_ESP,		&proto_esp),
 		PROTO_LINK(IPPROTO_AH,		&proto_ah),
@@ -686,7 +736,7 @@ const struct proto_desc proto_icmp6 = {
 	.checksum_key	= ICMP6HDR_CHECKSUM,
 	.templates	= {
 		[ICMP6HDR_TYPE]		= ICMP6HDR_TYPE("type", &icmp6_type_type, icmp6_type),
-		[ICMP6HDR_CODE]		= ICMP6HDR_FIELD("code", icmp6_code),
+		[ICMP6HDR_CODE]		= ICMP6HDR_TYPE("code", &icmpv6_code_type, icmp6_code),
 		[ICMP6HDR_CHECKSUM]	= ICMP6HDR_FIELD("checksum", icmp6_cksum),
 		[ICMP6HDR_PPTR]		= ICMP6HDR_FIELD("parameter-problem", icmp6_pptr),
 		[ICMP6HDR_MTU]		= ICMP6HDR_FIELD("mtu", icmp6_mtu),
@@ -720,6 +770,7 @@ const struct proto_desc proto_ip6 = {
 		PROTO_LINK(IPPROTO_DCCP,	&proto_dccp),
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
+		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 	},
 	.templates	= {
@@ -784,6 +835,7 @@ const struct proto_desc proto_inet_service = {
 		PROTO_LINK(IPPROTO_DCCP,	&proto_dccp),
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
+		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
 	},
 	.templates	= {
@@ -822,23 +874,29 @@ const struct datatype arpop_type = {
 };
 
 #define ARPHDR_TYPE(__name, __type, __member) \
-	HDR_TYPE(__name, __type, struct arphdr, __member)
+	HDR_TYPE(__name, __type, struct arp_hdr, __member)
 #define ARPHDR_FIELD(__name, __member) \
-	HDR_FIELD(__name, struct arphdr, __member)
+	HDR_FIELD(__name, struct arp_hdr, __member)
 
 const struct proto_desc proto_arp = {
 	.name		= "arp",
 	.base		= PROTO_BASE_NETWORK_HDR,
 	.templates	= {
-		[ARPHDR_HRD]		= ARPHDR_FIELD("htype",	ar_hrd),
-		[ARPHDR_PRO]		= ARPHDR_TYPE("ptype", &ethertype_type, ar_pro),
-		[ARPHDR_HLN]		= ARPHDR_FIELD("hlen", ar_hln),
-		[ARPHDR_PLN]		= ARPHDR_FIELD("plen", ar_pln),
-		[ARPHDR_OP]		= ARPHDR_TYPE("operation", &arpop_type, ar_op),
+		[ARPHDR_HRD]		= ARPHDR_FIELD("htype",	htype),
+		[ARPHDR_PRO]		= ARPHDR_TYPE("ptype", &ethertype_type, ptype),
+		[ARPHDR_HLN]		= ARPHDR_FIELD("hlen", hlen),
+		[ARPHDR_PLN]		= ARPHDR_FIELD("plen", plen),
+		[ARPHDR_OP]		= ARPHDR_TYPE("operation", &arpop_type, oper),
+		[ARPHDR_SADDR_ETHER]	= ARPHDR_TYPE("saddr ether", &etheraddr_type, sha),
+		[ARPHDR_DADDR_ETHER]	= ARPHDR_TYPE("daddr ether", &etheraddr_type, tha),
+		[ARPHDR_SADDR_IP]	= ARPHDR_TYPE("saddr ip", &ipaddr_type, spa),
+		[ARPHDR_DADDR_IP]	= ARPHDR_TYPE("daddr ip", &ipaddr_type, tpa),
 	},
 	.format		= {
 		.filter	= (1 << ARPHDR_HRD) | (1 << ARPHDR_PRO) |
-			  (1 << ARPHDR_HLN) | (1 << ARPHDR_PLN),
+			  (1 << ARPHDR_HLN) | (1 << ARPHDR_PLN) |
+			  (1 << ARPHDR_SADDR_ETHER) | (1 << ARPHDR_DADDR_ETHER) |
+			  (1 << ARPHDR_SADDR_IP) | (1 << ARPHDR_DADDR_IP),
 	},
 };
 

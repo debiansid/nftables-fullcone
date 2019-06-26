@@ -44,6 +44,7 @@
  * @TYPE_DEVGROUP:	devgroup code (integer subtype)
  * @TYPE_DSCP:		Differentiated Services Code Point (integer subtype)
  * @TYPE_IFNAME:	interface name (string subtype)
+ * @TYPE_IGMP:		IGMP type (integer subtype)
  */
 enum datatypes {
 	TYPE_INVALID,
@@ -88,6 +89,7 @@ enum datatypes {
 	TYPE_BOOLEAN,
 	TYPE_CT_EVENTBIT,
 	TYPE_IFNAME,
+	TYPE_IGMP_TYPE,
 	__TYPE_MAX
 };
 #define TYPE_MAX		(__TYPE_MAX - 1)
@@ -115,12 +117,10 @@ struct expr;
  *
  * @DTYPE_F_ALLOC:		datatype is dynamically allocated
  * @DTYPE_F_PREFIX:		preferred representation for ranges is a prefix
- * @DTYPE_F_CLONE:		this is an instance from original datatype
  */
 enum datatype_flags {
 	DTYPE_F_ALLOC		= (1 << 0),
 	DTYPE_F_PREFIX		= (1 << 1),
-	DTYPE_F_CLONE		= (1 << 2),
 };
 
 /**
@@ -138,6 +138,7 @@ enum datatype_flags {
  * @print:	function to print a constant of this type
  * @parse:	function to parse a symbol and return an expression
  * @sym_tbl:	symbol table for this type
+ * @refcnt:	reference counter (only for DTYPE_F_ALLOC)
  */
 struct datatype {
 	uint32_t			type;
@@ -156,10 +157,14 @@ struct datatype {
 	struct error_record		*(*parse)(const struct expr *sym,
 						  struct expr **res);
 	const struct symbol_table	*sym_tbl;
+	unsigned int			refcnt;
 };
 
 extern const struct datatype *datatype_lookup(enum datatypes type);
 extern const struct datatype *datatype_lookup_byname(const char *name);
+extern struct datatype *datatype_get(const struct datatype *dtype);
+extern void datatype_set(struct expr *expr, const struct datatype *dtype);
+extern void datatype_free(const struct datatype *dtype);
 
 extern struct error_record *symbol_parse(const struct expr *sym,
 					 struct expr **res);
@@ -169,6 +174,12 @@ static inline bool datatype_equal(const struct datatype *d1,
 				  const struct datatype *d2)
 {
 	return d1->type == d2->type;
+}
+
+static inline const struct datatype *
+datatype_basetype(const struct datatype *dtype)
+{
+	return dtype->basetype ? dtype->basetype : dtype;
 }
 
 /**
@@ -221,7 +232,6 @@ extern void symbol_table_print(const struct symbol_table *tbl,
 extern struct symbol_table *rt_symbol_table_init(const char *filename);
 extern void rt_symbol_table_free(struct symbol_table *tbl);
 
-extern const struct symbol_table inet_service_tbl;
 extern struct symbol_table *mark_tbl;
 
 extern const struct datatype invalid_type;
@@ -243,11 +253,13 @@ extern const struct datatype icmp_type_type;
 extern const struct datatype icmp_code_type;
 extern const struct datatype icmpv6_code_type;
 extern const struct datatype icmpx_code_type;
+extern const struct datatype igmp_type_type;
 extern const struct datatype time_type;
 extern const struct datatype boolean_type;
 
+void inet_service_type_print(const struct expr *expr, struct output_ctx *octx);
+
 extern const struct datatype *concat_type_alloc(uint32_t type);
-extern void concat_type_destroy(const struct datatype *dtype);
 
 static inline uint32_t concat_subtype_add(uint32_t type, uint32_t subtype)
 {

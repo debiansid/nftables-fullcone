@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     }
@@ -15,8 +16,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     }
@@ -27,8 +29,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "ipv4",
@@ -44,7 +47,7 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
             "op": "!=",
             "right": {
@@ -62,8 +65,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
@@ -72,9 +76,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -85,8 +90,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -95,9 +101,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -108,8 +115,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -118,9 +126,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "1.2.3.4"
         }
     }
@@ -131,16 +140,18 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
     {
         "match": {
             "left": {
-                "meta": "l4proto"
+                "meta": { "key": "l4proto" }
             },
+	    "op": "==",
             "right": "tcp"
         }
     }
@@ -151,8 +162,9 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv4"
         }
     },
@@ -164,21 +176,25 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "1.2.3.4"
         }
     }
 ]
 
-# meta secpath exists
+# meta ipsec exists
 [
     {
         "match": {
             "left": {
-                "meta": "secpath"
+                "meta": {
+                    "key": "ipsec"
+                }
             },
+            "op": "==",
             "right": true
         }
     }
@@ -189,8 +205,9 @@
     {
         "match": {
             "left": {
-                "meta": "secpath"
+                "meta": { "key": "secpath" }
             },
+	    "op": "==",
             "right": false
         }
     }

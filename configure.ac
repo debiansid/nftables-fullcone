@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.0], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Fearless Fosdick"], [Release name])
+AC_INIT([nftables], [0.9.1], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Headless Horseman"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -13,22 +13,13 @@ AC_CONFIG_HEADER([config.h])
 
 AC_ARG_ENABLE([debug],
 	      AS_HELP_STRING([--disable-debug], [Disable debugging symbols]),
-	      AS_IF([test "x$enable_debug" = "xno"], [with_debug=no], [with_debug=yes]),
-	      [with_debug=yes])
-AC_SUBST(with_debug)
-AM_CONDITIONAL([BUILD_DEBUG], [test "x$with_debug" != xno])
+	      [], [enable_debug=yes])
+AM_CONDITIONAL([BUILD_DEBUG], [test "x$enable_debug" != xno])
 
 AC_ARG_ENABLE([man-doc],
 	      AS_HELP_STRING([--disable-man-doc], [Disable man page documentation]),
-	      AS_IF([test "x$enable_man_doc" = "xno"], [enable_man_doc=no],
-	      [enable_man_doc=yes]), [enable_man_doc=yes])
-AM_CONDITIONAL([BUILD_MAN], [test "x$enable_man_doc" == "xyes" ])
-
-AC_ARG_ENABLE([pdf-doc],
-	      AS_HELP_STRING([--enable-pdf-doc], [Enable PDF documentation]),
-	      AS_IF([test "x$enable_pdf_doc" = "xno"], [enable_pdf_doc=no],
-	      [enable_pdf_doc=yes]), [enable_pdf_doc=no])
-AM_CONDITIONAL([BUILD_PDF], [test "x$enable_pdf_doc" == "xyes" ])
+	      [], [enable_man_doc=yes])
+AM_CONDITIONAL([BUILD_MAN], [test "x$enable_man_doc" = "xyes" ])
 
 # Checks for programs.
 AC_PROG_CC
@@ -54,37 +45,22 @@ fi
 AM_PROG_AR
 AM_PROG_LIBTOOL
 
-AM_COND_IF([BUILD_MAN], [
-	AC_CHECK_PROG(DOCBOOK2X_MAN, [docbook2x-man], [docbook2x-man], [no])
-	AC_CHECK_PROG(DOCBOOK2MAN, [docbook2man], [docbook2man], [no])
-	AC_CHECK_PROG(DB2X_DOCBOOK2MAN, [db2x_docbook2man], [db2x_docbook2man], [no])
-	AS_IF([test "$DOCBOOK2X_MAN" != "no"], [DB2MAN="$DOCBOOK2X_MAN"],
-	      [AS_IF([test "$DOCBOOK2MAN" != "no"], [DB2MAN="$DOCBOOK2MAN"],
-		     [AS_IF([test "$DB2X_DOCBOOK2MAN" != "no"],
-			    [DB2MAN="$DB2X_DOCBOOK2MAN"],
-			    [AC_MSG_ERROR([docbook2x-man/db2x_docbook2man not found, required for building man pages])]
-		     )]
-	     )]
-	)
-	AC_SUBST(DB2MAN)
-])
-
-AM_COND_IF([BUILD_PDF], [
-	AC_CHECK_PROG(DBLATEX, [dblatex], [found], [no])
-	AS_IF([test "$DBLATEX" == "no"],
-	      [AC_MSG_ERROR([dblatex not found])])
+AS_IF([test "x$enable_man_doc" = "xyes"], [
+       AC_CHECK_PROG(A2X, [a2x], [a2x], [no])
+       AS_IF([test "$A2X" = "no"],
+	     [AC_MSG_ERROR([a2x not found, please install asciidoc])])
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.1])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.3])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
-            [Use builtin mini-gmp (for embedded builds)])], [],
-            [with_mini_gmp=no])
+            [Use builtin mini-gmp (for embedded builds)])],
+	    [], [with_mini_gmp=no])
 AS_IF([test "x$with_mini_gmp" != xyes], [
 AC_CHECK_LIB([gmp],[__gmpz_init], , AC_MSG_ERROR([No suitable version of libgmp found]))
 ])
-AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" == xyes])
+AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" = xyes])
 
 AC_ARG_WITH([cli], [AS_HELP_STRING([--without-cli],
             [disable interactive CLI (libreadline support)])],
@@ -98,17 +74,16 @@ AC_SUBST(with_cli)
 AM_CONDITIONAL([BUILD_CLI], [test "x$with_cli" != xno])
 
 AC_ARG_WITH([xtables], [AS_HELP_STRING([--with-xtables],
-            [Use libxtables for iptables interaction)])],
-	    [with_libxtables=$withval], [with_libxtables=no])
-AS_IF([test "x$with_libxtables" != xno], [
+            [Use libxtables for iptables interaction])],
+	    [], [with_xtables=no])
+AS_IF([test "x$with_xtables" != xno], [
 PKG_CHECK_MODULES([XTABLES], [xtables >= 1.6.1])
 AC_DEFINE([HAVE_LIBXTABLES], [1], [0])
 ])
-AC_SUBST(with_libxtables)
-AM_CONDITIONAL([BUILD_XTABLES], [test "x$with_libxtables" == xyes])
+AM_CONDITIONAL([BUILD_XTABLES], [test "x$with_xtables" = xyes])
 
 AC_ARG_WITH([json], [AS_HELP_STRING([--with-json],
-            [Enable JSON output support)])],
+            [Enable JSON output support])],
 	    [], [with_json=no])
 AS_IF([test "x$with_json" != xno], [
 AC_CHECK_LIB([jansson], [json_object], ,
@@ -117,6 +92,22 @@ AC_DEFINE([HAVE_LIBJANSSON], [1], [Define if you have libjansson])
 ])
 AC_SUBST(with_json)
 AM_CONDITIONAL([BUILD_JSON], [test "x$with_json" != xno])
+
+AC_ARG_ENABLE(python,
+       AS_HELP_STRING([--enable-python], [Enable python]),,[enable_python=check]
+       )
+
+AC_ARG_WITH([python_bin],
+            [AS_HELP_STRING([--with-python-bin], [Specify Python binary to use])],
+	    [PYTHON_BIN="$withval"], [AC_PATH_PROGS(PYTHON_BIN, python python2 python2.7)]
+	   )
+
+AS_IF([test "x$PYTHON_BIN" = "x"], [
+	AS_IF([test "x$enable_python" = "xyes"], [AC_MSG_ERROR([Python asked but not found])])
+	AS_IF([test "x$enable_python" = "xcheck"], [AC_MSG_WARN([Python not found, continuing anyway])])
+	])
+
+AM_CONDITIONAL([HAVE_PYTHON], [test "x$PYTHON_BIN" != "x"])
 
 AC_CONFIG_FILES([					\
 		Makefile				\
@@ -132,16 +123,24 @@ AC_CONFIG_FILES([					\
 		include/linux/netfilter_ipv6/Makefile	\
 		files/Makefile				\
 		files/nftables/Makefile			\
+		files/osf/Makefile			\
 		doc/Makefile				\
+		py/Makefile				\
 		])
 AC_OUTPUT
 
 echo "
 nft configuration:
   cli support:			${with_cli}
-  enable debugging symbols:	${with_debug}
+  enable debugging symbols:	${enable_debug}
   use mini-gmp:			${with_mini_gmp}
   enable man page:              ${enable_man_doc}
-  enable pdf documentation:	${enable_pdf_doc}
-  libxtables support:		${with_libxtables}
+  libxtables support:		${with_xtables}
   json output support:          ${with_json}"
+
+AS_IF([test "x$PYTHON_BIN" != "x"], [
+	echo "  enable Python:		yes (with $PYTHON_BIN)"
+	], [
+	echo "  enable Python:		no"
+	]
+	)

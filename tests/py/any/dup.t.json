@@ -7,16 +7,16 @@
     }
 ]
 
-# dup to mark map { 0x00000001 : "lo", 0x00000002 : "lo"}
+# dup to meta mark map { 0x00000001 : "lo", 0x00000002 : "lo"}
 [
     {
         "dup": {
             "addr": {
                 "map": {
-                    "left": {
-                        "meta": "mark"
+                    "key": {
+                        "meta": { "key": "mark" }
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [ 1, "lo" ],
                             [ 2, "lo" ]

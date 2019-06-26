@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ip"
+                    "protocol": "ip"
                 }
             },
+	    "op": "==",
             "right": "1.2.3.4"
         }
     }
@@ -18,17 +19,34 @@
     {
         "match": {
             "left": {
-                "meta": "nfproto"
+                "meta": { "key": "nfproto" }
             },
+	    "op": "==",
             "right": "ipv6"
         }
     },
     {
         "match": {
             "left": {
-                "meta": "l4proto"
+                "meta": { "key": "l4proto" }
             },
+	    "op": "==",
             "right": 6
+        }
+    }
+]
+
+# meta secpath missing
+[
+    {
+        "match": {
+            "left": {
+                "meta": {
+                    "key": "ipsec"
+                }
+            },
+            "op": "==",
+            "right": false
         }
     }
 ]

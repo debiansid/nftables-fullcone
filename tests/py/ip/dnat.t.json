@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -13,9 +14,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 80, 90 ]
             }
@@ -33,8 +35,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -43,7 +46,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -64,8 +67,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -74,9 +78,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -98,8 +103,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -108,7 +114,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -133,8 +139,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -143,7 +150,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -164,8 +171,9 @@
     {
         "match": {
             "left": {
-                "meta": "iifname"
+                "meta": { "key": "iifname" }
             },
+	    "op": "==",
             "right": "eth0"
         }
     },
@@ -174,9 +182,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 81
         }
     },
@@ -194,12 +203,12 @@
         "dnat": {
             "addr": {
                 "map": {
-                    "left": {
+                    "key": {
                         "ct": {
                             "key": "mark"
                         }
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [
                                 "0x00000014",
@@ -219,7 +228,7 @@
         "dnat": {
             "addr": {
                 "map": {
-                    "left": {
+                    "key": {
                         "concat": [
                             {
                                 "ct": {
@@ -229,12 +238,12 @@
                             {
                                 "payload": {
                                     "field": "daddr",
-                                    "name": "ip"
+                                    "protocol": "ip"
                                 }
                             }
                         ]
                     },
-                    "right": {
+                    "data": {
                         "set": [
                             [
                                 {

@@ -1,31 +1,46 @@
 # fwd to "lo"
 [
     {
-        "fwd": "lo"
+        "fwd": {
+            "dev": "lo"
+	}
     }
 ]
 
-# fwd to mark map { 0x00000001 : "lo", 0x00000002 : "lo"}
+# fwd to meta mark map { 0x00000001 : "lo", 0x00000002 : "lo"}
 [
     {
         "fwd": {
-            "map": {
-                "left": {
-                    "meta": "mark"
-                },
-                "right": {
-                    "set": [
-                        [
-                            "0x00000001",
-                            "lo"
-                        ],
-                        [
-                            "0x00000002",
-                            "lo"
+            "dev": {
+                "map": {
+                    "key": {
+                        "meta": { "key": "mark" }
+                    },
+                    "data": {
+                        "set": [
+                            [
+                                "0x00000001",
+                                "lo"
+                            ],
+                            [
+                                "0x00000002",
+                                "lo"
+                            ]
                         ]
-                    ]
+                    }
                 }
             }
+        }
+    }
+]
+
+# fwd ip to 192.168.2.200 device "lo"
+[
+    {
+        "fwd": {
+            "addr": "192.168.2.200",
+            "dev": "lo",
+            "family": "ip"
         }
     }
 ]

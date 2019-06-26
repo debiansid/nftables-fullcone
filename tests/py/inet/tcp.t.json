@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -20,7 +21,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -36,9 +37,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -53,7 +55,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -71,9 +73,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -93,7 +96,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -116,9 +119,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -135,7 +139,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -155,9 +159,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "telnet",
@@ -175,14 +180,14 @@
 # tcp dport vmap { 22 : accept, 23 : drop }
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         22,
@@ -205,14 +210,14 @@
 # tcp dport vmap { 25:accept, 28:drop }
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         25,
@@ -239,9 +244,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -261,7 +267,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -284,9 +290,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -299,7 +306,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -315,9 +322,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -332,7 +340,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -350,9 +358,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -372,7 +381,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -395,9 +404,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -414,7 +424,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -430,14 +440,14 @@
 # tcp sport vmap { 25:accept, 28:drop }
 [
     {
-        "map": {
-            "left": {
+        "vmap": {
+            "key": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
-            "right": {
+            "data": {
                 "set": [
                     [
                         25,
@@ -464,9 +474,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 8080
         }
     },
@@ -482,9 +493,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 1024
         }
     },
@@ -493,9 +505,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -508,9 +521,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 1024
         }
     },
@@ -519,9 +533,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     },
@@ -530,9 +545,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -545,9 +561,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     },
@@ -556,9 +573,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 1024
         }
     },
@@ -567,9 +585,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -582,9 +601,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 0
         }
     },
@@ -593,9 +613,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     1024,
@@ -609,9 +630,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -624,9 +646,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -639,7 +662,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -655,9 +678,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -672,7 +696,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -690,9 +714,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -712,7 +737,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -735,9 +760,10 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -754,7 +780,7 @@
             "left": {
                 "payload": {
                     "field": "sequence",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -774,9 +800,10 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 42949672
         }
     },
@@ -792,9 +819,10 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -807,7 +835,7 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -823,9 +851,10 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -840,7 +869,7 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -858,9 +887,10 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -880,7 +910,7 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -903,9 +933,10 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -922,7 +953,7 @@
             "left": {
                 "payload": {
                     "field": "ackseq",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -942,9 +973,10 @@
             "left": {
                 "payload": {
                     "field": "flags",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "fin",
@@ -971,7 +1003,7 @@
             "left": {
                 "payload": {
                     "field": "flags",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -997,9 +1029,10 @@
             "left": {
                 "payload": {
                     "field": "flags",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "in",
             "right": "cwr"
         }
     }
@@ -1012,7 +1045,7 @@
             "left": {
                 "payload": {
                     "field": "flags",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1028,7 +1061,7 @@
             "left": {
                 "payload": {
                     "field": "flags",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "==",
@@ -1046,7 +1079,7 @@
                     {
                         "payload": {
                             "field": "flags",
-                            "name": "tcp"
+                            "protocol": "tcp"
                         }
                     },
                     {
@@ -1068,6 +1101,29 @@
     }
 ]
 
+# tcp flags & (fin | syn | rst | psh | ack | urg | ecn | cwr) == fin | syn | rst | psh | ack | urg | ecn | cwr
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    {
+                        "|": [ "fin", { "|": [ "syn", { "|": [ "rst", { "|": [ "psh", { "|": [ "ack", { "|": [ "urg", { "|": [ "ecn", "cwr" ] } ] } ] } ] } ] } ] } ]
+                    }
+                ]
+            },
+            "op": "==",
+            "right": { "|": [ "fin", { "|": [ "syn", { "|": [ "rst", { "|": [ "psh", { "|": [ "ack", { "|": [ "urg", { "|": [ "ecn", "cwr" ] } ] } ] } ] } ] } ] } ] }
+        }
+    }
+]
+
 # tcp window 22222
 [
     {
@@ -1075,9 +1131,10 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22222
         }
     }
@@ -1090,9 +1147,10 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -1105,7 +1163,7 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1121,9 +1179,10 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -1138,7 +1197,7 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1156,9 +1215,10 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -1178,7 +1238,7 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1201,9 +1261,10 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -1220,7 +1281,7 @@
             "left": {
                 "payload": {
                     "field": "window",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1240,9 +1301,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -1255,7 +1317,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1271,9 +1333,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -1288,7 +1351,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1306,9 +1369,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -1328,7 +1392,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1351,9 +1415,10 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -1370,7 +1435,7 @@
             "left": {
                 "payload": {
                     "field": "checksum",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1390,9 +1455,10 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 1234
         }
     },
@@ -1408,9 +1474,10 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     }
@@ -1423,7 +1490,7 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1439,9 +1506,10 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 33, 45 ]
             }
@@ -1456,7 +1524,7 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1474,9 +1542,10 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     33,
@@ -1496,7 +1565,7 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1519,9 +1588,10 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 33, 55 ] }
@@ -1538,7 +1608,7 @@
             "left": {
                 "payload": {
                     "field": "urgptr",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
             "op": "!=",
@@ -1558,9 +1628,10 @@
             "left": {
                 "payload": {
                     "field": "doff",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 8
         }
     }

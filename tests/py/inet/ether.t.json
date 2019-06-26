@@ -5,17 +5,19 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     },
     {
         "match": {
             "left": {
-                "meta": "iiftype"
+                "meta": { "key": "iiftype" }
             },
+	    "op": "==",
             "right": "ether"
         }
     },
@@ -24,9 +26,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ether"
+                    "protocol": "ether"
                 }
             },
+	    "op": "==",
             "right": "00:0f:54:0c:11:04"
         }
     },
@@ -42,9 +45,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
         }
     },
@@ -53,9 +57,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ether"
+                    "protocol": "ether"
                 }
             },
+	    "op": "==",
             "right": "00:0f:54:0c:11:04"
         }
     },
@@ -71,9 +76,10 @@
             "left": {
                 "payload": {
                     "field": "saddr",
-                    "name": "ether"
+                    "protocol": "ether"
                 }
             },
+	    "op": "==",
             "right": "00:0f:54:0c:11:04"
         }
     },

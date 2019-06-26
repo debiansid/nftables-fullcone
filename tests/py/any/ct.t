@@ -55,8 +55,8 @@ ct mark set 0x11 xor 0x1331;ok;ct mark set 0x00001320
 ct mark set 0x11333 and 0x11;ok;ct mark set 0x00000011
 ct mark set 0x12 or 0x11;ok;ct mark set 0x00000013
 ct mark set 0x11;ok;ct mark set 0x00000011
-ct mark set mark;ok;ct mark set mark
-ct mark set mark map { 1 : 10, 2 : 20, 3 : 30 };ok;ct mark set mark map { 0x00000003 : 0x0000001e, 0x00000002 : 0x00000014, 0x00000001 : 0x0000000a}
+ct mark set mark;ok;ct mark set meta mark
+ct mark set mark map { 1 : 10, 2 : 20, 3 : 30 };ok;ct mark set meta mark map { 0x00000003 : 0x0000001e, 0x00000002 : 0x00000014, 0x00000001 : 0x0000000a}
 
 ct mark set {0x11333, 0x11};fail
 ct zone set {123, 127};fail
@@ -73,17 +73,16 @@ ct expiration 33-45;ok;ct expiration 33s-45s
 ct expiration != 33-45;ok;ct expiration != 33s-45s
 ct expiration {33, 55, 67, 88};ok;ct expiration { 1m7s, 33s, 55s, 1m28s}
 ct expiration != {33, 55, 67, 88};ok;ct expiration != { 1m7s, 33s, 55s, 1m28s}
-ct expiration {33-55};ok;ct expiration { 33s-55s}
-ct expiration != {33-55};ok;ct expiration != { 33s-55s}
+ct expiration {33-55, 66-88};ok;ct expiration { 33s-55s, 1m6s-1m28s}
+ct expiration != {33-55, 66-88};ok;ct expiration != { 33s-55s, 1m6s-1m28s}
 
 ct helper "ftp";ok
 ct helper "12345678901234567";fail
 ct helper "";fail
 
-ct state . ct mark { new . 0x12345678};ok
 ct state . ct mark { new . 0x12345678, new . 0x34127856, established . 0x12785634};ok
-ct direction . ct mark { original . 0x12345678};ok
-ct state . ct mark vmap { new . 0x12345678 : drop};ok
+ct direction . ct mark { original . 0x12345678, reply . 0x87654321};ok
+ct state . ct mark vmap { new . 0x12345678 : drop, established . 0x87654321 : accept};ok
 
 ct original bytes > 100000;ok
 ct reply packets < 100;ok
@@ -98,10 +97,10 @@ ct both bytes gt 1;fail
 ct bytes original reply;fail
 
 # missing direction
-ct saddr 1.2.3.4;fail
+ct ip saddr 1.2.3.4;fail
 
 # wrong base (ip6 but ipv4 address given)
-meta nfproto ipv6 ct original saddr 1.2.3.4;fail
+meta nfproto ipv6 ct original ip saddr 1.2.3.4;fail
 
 # direction, but must be used without
 ct original mark 42;fail
@@ -130,7 +129,7 @@ ct reply zone 1;ok
 ct zone set 1;ok
 ct original zone set 1;ok
 ct reply zone set 1;ok
-ct zone set mark map { 1 : 1,  2 : 2 };ok;ct zone set mark map { 0x00000001 : 1, 0x00000002 : 2}
+ct zone set mark map { 1 : 1,  2 : 2 };ok;ct zone set meta mark map { 0x00000001 : 1, 0x00000002 : 2}
 ct both zone set 1;fail
 
 ct invalid;fail

@@ -8,12 +8,13 @@
                     "val": {
                         "payload": {
                             "field": "saddr",
-                            "name": "ip"
+                            "protocol": "ip"
                         }
                     }
                 }
             },
             "name": "xyz",
+            "size": 8192,
             "stmt": {
                 "counter": null
             }

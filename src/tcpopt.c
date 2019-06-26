@@ -181,7 +181,7 @@ struct expr *tcpopt_expr_alloc(const struct location *loc, uint8_t type,
 
 	optnum = tcpopt_find_optnum(type);
 
-	expr = expr_alloc(loc, &exthdr_expr_ops, tmpl->dtype,
+	expr = expr_alloc(loc, EXPR_EXTHDR, tmpl->dtype,
 			  BYTEORDER_BIG_ENDIAN, tmpl->len);
 	expr->exthdr.desc   = desc;
 	expr->exthdr.tmpl   = tmpl;
@@ -197,7 +197,7 @@ void tcpopt_init_raw(struct expr *expr, uint8_t type, unsigned int offset,
 	const struct proto_hdr_template *tmpl;
 	unsigned int i, off;
 
-	assert(expr->ops->type == EXPR_EXTHDR);
+	assert(expr->etype == EXPR_EXTHDR);
 
 	expr->len = len;
 	expr->exthdr.flags = flags;
@@ -218,9 +218,9 @@ void tcpopt_init_raw(struct expr *expr, uint8_t type, unsigned int offset,
 			continue;
 
 		if (flags & NFT_EXTHDR_F_PRESENT)
-			expr->dtype = &boolean_type;
+			datatype_set(expr, &boolean_type);
 		else
-			expr->dtype = tmpl->dtype;
+			datatype_set(expr, tmpl->dtype);
 		expr->exthdr.tmpl = tmpl;
 		expr->exthdr.op   = NFT_EXTHDR_OP_TCPOPT;
 		break;

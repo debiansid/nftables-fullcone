@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -22,53 +23,29 @@
     }
 ]
 
-# tcp sequence 0 tcp sport 1024 tcp dport 22
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sport",
-                    "name": "tcp"
-                }
-            },
-            "right": 1024
-        }
-    },
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "dport",
-                    "name": "tcp"
-                }
-            },
-            "right": 22
-        }
-    },
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sequence",
-                    "name": "tcp"
-                }
-            },
-            "right": 0
-        }
-    }
-]
-
 # tcp sequence 0 tcp sport { 1024, 1022} tcp dport 22
 [
     {
         "match": {
             "left": {
                 "payload": {
-                    "field": "sport",
-                    "name": "tcp"
+                    "field": "sequence",
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
+            "right": 0
+        }
+    },
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "sport",
+                    "protocol": "tcp"
+                }
+            },
+	    "op": "==",
             "right": {
                 "set": [
                     1022,
@@ -82,21 +59,11 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "tcp"
+                    "protocol": "tcp"
                 }
             },
+	    "op": "==",
             "right": 22
-        }
-    },
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sequence",
-                    "name": "tcp"
-                }
-            },
-            "right": 0
         }
     }
 ]
@@ -110,7 +77,7 @@
                     {
                         "payload": {
                             "field": "flags",
-                            "name": "tcp"
+                            "protocol": "tcp"
                         }
                     },
                     {
@@ -128,6 +95,22 @@
                     "syn"
                 ]
             }
+        }
+    }
+]
+
+# tcp flags & (fin | syn | rst | psh | ack | urg | ecn | cwr) == fin | syn | rst | psh | ack | urg | ecn | cwr
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "flags",
+                    "protocol": "tcp"
+                }
+            },
+            "op": "==",
+            "right": 255
         }
     }
 ]

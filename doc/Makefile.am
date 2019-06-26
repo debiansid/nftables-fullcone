@@ -1,19 +1,31 @@
 if BUILD_MAN
-man_MANS = nft.8
+man_MANS = nft.8 libnftables-json.5 libnftables.3
 endif
 
-if BUILD_PDF
-pdf_DATA = nft.pdf
-endif
+A2X_OPTS_MANPAGE = --doctype manpage --format manpage -D ${builddir}
 
-pdfdir=${docdir}/pdf
+ASCIIDOC_MAIN = nft.txt
+ASCIIDOC_INCLUDES = \
+       data-types.txt \
+       payload-expression.txt \
+       primary-expression.txt \
+       stateful-objects.txt \
+       statements.txt
+ASCIIDOCS = ${ASCIIDOC_MAIN} ${ASCIIDOC_INCLUDES}
 
-.xml.pdf:
-	${AM_V_GEN}dblatex -q -t pdf -o $@ $<
+nft.8: ${ASCIIDOCS}
+	${AM_V_GEN}${A2X} ${A2X_OPTS_MANPAGE} $<
 
-.xml.8:
-	${AM_V_GEN}${DB2MAN} --xinclude $<
+.adoc.3:
+	${AM_V_GEN}${A2X} ${A2X_OPTS_MANPAGE} $<
 
-EXTRA_DIST = nft.xml
+.adoc.5:
+	${AM_V_GEN}${A2X} ${A2X_OPTS_MANPAGE} $<
 
-CLEANFILES = nft.pdf nft.8 *~
+EXTRA_DIST = ${ASCIIDOCS} libnftables-json.adoc libnftables.adoc
+
+CLEANFILES = \
+	nft.8 \
+	libnftables-json.5 \
+	libnftables.3 \
+	*~

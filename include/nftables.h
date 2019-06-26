@@ -16,12 +16,7 @@ struct cookie {
 };
 
 struct output_ctx {
-	unsigned int numeric;
-	unsigned int stateless;
-	unsigned int ip2name;
-	unsigned int handle;
-	unsigned int echo;
-	unsigned int json;
+	unsigned int flags;
 	union {
 		FILE *output_fp;
 		struct cookie output_cookie;
@@ -32,14 +27,67 @@ struct output_ctx {
 	};
 };
 
+static inline bool nft_output_reversedns(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_REVERSEDNS;
+}
+
+static inline bool nft_output_service(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_SERVICE;
+}
+
+static inline bool nft_output_stateless(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_STATELESS;
+}
+
+static inline bool nft_output_handle(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_HANDLE;
+}
+
+static inline bool nft_output_json(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_JSON;
+}
+
+static inline bool nft_output_echo(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_ECHO;
+}
+
+static inline bool nft_output_guid(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_GUID;
+}
+
+static inline bool nft_output_numeric_proto(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_PROTO;
+}
+
+static inline bool nft_output_numeric_prio(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_PRIO;
+}
+
+static inline bool nft_output_numeric_symbol(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_SYMBOL;
+}
+
 struct nft_cache {
-	uint16_t		genid;
+	uint32_t		genid;
 	struct list_head	list;
 	uint32_t		seqnum;
+	uint32_t		flags;
 };
 
 struct mnl_socket;
 struct parser_state;
+
+#define MAX_INCLUDE_DEPTH	16
 
 struct nft_ctx {
 	struct mnl_socket	*nf_sock;
@@ -53,6 +101,8 @@ struct nft_ctx {
 	uint32_t		flags;
 	struct parser_state	*state;
 	void			*scanner;
+	void			*json_root;
+	FILE			*f[MAX_INCLUDE_DEPTH];
 };
 
 enum nftables_exit_codes {
@@ -115,6 +165,7 @@ enum input_descriptor_types {
  * @line_offset:	offset of the current line to the beginning
  */
 struct input_descriptor {
+	struct list_head		list;
 	struct location			location;
 	enum input_descriptor_types	type;
 	const char			*name;

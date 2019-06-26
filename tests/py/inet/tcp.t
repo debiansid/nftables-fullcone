@@ -38,8 +38,8 @@ tcp sport 8080 drop;ok
 tcp sport 1024 tcp dport 22;ok
 tcp sport 1024 tcp dport 22 tcp sequence 0;ok
 
-tcp sequence 0 tcp sport 1024 tcp dport 22;ok;tcp sport 1024 tcp dport 22 tcp sequence 0
-tcp sequence 0 tcp sport { 1024, 1022} tcp dport 22;ok;tcp sport { 1022, 1024} tcp dport 22 tcp sequence 0
+tcp sequence 0 tcp sport 1024 tcp dport 22;ok
+tcp sequence 0 tcp sport { 1024, 1022} tcp dport 22;ok;tcp sequence 0 tcp sport { 1022, 1024} tcp dport 22
 
 tcp sequence 22;ok
 tcp sequence != 233;ok
@@ -78,6 +78,7 @@ tcp flags cwr;ok
 tcp flags != cwr;ok
 tcp flags == syn;ok
 tcp flags & (syn|fin) == (syn|fin);ok;tcp flags & (fin | syn) == fin | syn
+tcp flags & (fin | syn | rst | psh | ack | urg | ecn | cwr) == fin | syn | rst | psh | ack | urg | ecn | cwr;ok;tcp flags == 0xff
 
 tcp window 22222;ok
 tcp window 22;ok

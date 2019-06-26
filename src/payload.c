@@ -18,6 +18,7 @@
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
+#include <linux/if_ether.h>
 
 #include <rule.h>
 #include <expression.h>
@@ -54,7 +55,7 @@ static void payload_expr_print(const struct expr *expr, struct output_ctx *octx)
 			  expr->payload.offset, expr->len);
 }
 
-static bool payload_expr_cmp(const struct expr *e1, const struct expr *e2)
+bool payload_expr_cmp(const struct expr *e1, const struct expr *e2)
 {
 	return e1->payload.desc   == e2->payload.desc &&
 	       e1->payload.tmpl   == e2->payload.tmpl &&
@@ -104,7 +105,7 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	proto_ctx_update(ctx, desc->base, &expr->location, desc);
 }
 
-static const struct expr_ops payload_expr_ops = {
+const struct expr_ops payload_expr_ops = {
 	.type		= EXPR_PAYLOAD,
 	.name		= "payload",
 	.print		= payload_expr_print,
@@ -156,7 +157,7 @@ struct expr *payload_expr_alloc(const struct location *loc,
 		desc = &proto_unknown;
 	}
 
-	expr = expr_alloc(loc, &payload_expr_ops, tmpl->dtype,
+	expr = expr_alloc(loc, EXPR_PAYLOAD, tmpl->dtype,
 			  tmpl->byteorder, tmpl->len);
 	expr->flags |= flags;
 
@@ -189,11 +190,18 @@ static void payload_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	expr_print(stmt->payload.val, octx);
 }
 
+static void payload_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->payload.expr);
+	expr_free(stmt->payload.val);
+}
+
 static const struct stmt_ops payload_stmt_ops = {
 	.type		= STMT_PAYLOAD,
 	.name		= "payload",
 	.print		= payload_stmt_print,
 	.json		= payload_stmt_json,
+	.destroy	= payload_stmt_destroy,
 };
 
 struct stmt *payload_stmt_alloc(const struct location *loc,
@@ -269,7 +277,8 @@ payload_gen_special_dependency(struct eval_ctx *ctx, const struct expr *expr)
 		return payload_get_get_ll_hdr(ctx);
 	case PROTO_BASE_TRANSPORT_HDR:
 		if (expr->payload.desc == &proto_icmp ||
-		    expr->payload.desc == &proto_icmp6) {
+		    expr->payload.desc == &proto_icmp6 ||
+		    expr->payload.desc == &proto_igmp) {
 			const struct proto_desc *desc, *desc_upper;
 			struct stmt *nstmt;
 
@@ -281,7 +290,8 @@ payload_gen_special_dependency(struct eval_ctx *ctx, const struct expr *expr)
 			}
 
 			desc_upper = &proto_ip6;
-			if (expr->payload.desc == &proto_icmp)
+			if (expr->payload.desc == &proto_icmp ||
+			    expr->payload.desc == &proto_igmp)
 				desc_upper = &proto_ip;
 
 			if (payload_add_dependency(ctx, desc, desc_upper,
@@ -360,6 +370,23 @@ int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 				  "no %s protocol specified",
 				  proto_base_names[expr->payload.base - 1]);
 
+	if (ctx->pctx.family == NFPROTO_BRIDGE && desc == &proto_eth) {
+		/* prefer netdev proto, which adds dependencies based
+		 * on skb->protocol.
+		 *
+		 * This has the advantage that we will also match
+		 * vlan encapsulated traffic.
+		 *
+		 * eth_hdr(skb)->type would not match, as nft_payload
+		 * will pretend vlan tag was not offloaded, i.e.
+		 * type is ETH_P_8021Q in such a case, but skb->protocol
+		 * would still match the l3 header type.
+		 */
+		if (expr->payload.desc == &proto_ip ||
+		    expr->payload.desc == &proto_ip6)
+			desc = &proto_netdev;
+	}
+
 	return payload_add_dependency(ctx, desc, expr->payload.desc, expr, res);
 }
 
@@ -404,7 +431,7 @@ bool payload_is_stacked(const struct proto_desc *desc, const struct expr *expr)
 {
 	const struct proto_desc *next;
 
-	if (expr->left->ops->type != EXPR_PAYLOAD ||
+	if (expr->left->etype != EXPR_PAYLOAD ||
 	    !(expr->left->flags & EXPR_F_PROTOCOL) ||
 	    expr->op != OP_EQ)
 		return false;
@@ -473,7 +500,7 @@ static bool payload_may_dependency_kill(struct payload_dep_ctx *ctx,
 	case NFPROTO_BRIDGE:
 	case NFPROTO_NETDEV:
 	case NFPROTO_INET:
-		if (dep->left->ops->type == EXPR_PAYLOAD &&
+		if (dep->left->etype == EXPR_PAYLOAD &&
 		    dep->left->payload.base == PROTO_BASE_NETWORK_HDR &&
 		    (dep->left->payload.desc == &proto_ip ||
 		     dep->left->payload.desc == &proto_ip6) &&
@@ -535,7 +562,7 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 	const struct proto_hdr_template *tmpl;
 	unsigned int i;
 
-	assert(expr->ops->type == EXPR_PAYLOAD);
+	assert(expr->etype == EXPR_PAYLOAD);
 
 	desc = ctx->protocol[expr->payload.base].desc;
 	if (desc == NULL || desc == &proto_inet)
@@ -594,7 +621,7 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 	const struct proto_desc *desc;
 	unsigned int off, i, len = 0;
 
-	assert(expr->ops->type == EXPR_PAYLOAD);
+	assert(expr->etype == EXPR_PAYLOAD);
 
 	desc = ctx->protocol[expr->payload.base].desc;
 	if (desc == NULL)
@@ -657,7 +684,7 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 	struct expr *new;
 	unsigned int i;
 
-	assert(expr->ops->type == EXPR_PAYLOAD);
+	assert(expr->etype == EXPR_PAYLOAD);
 
 	desc = ctx->protocol[expr->payload.base].desc;
 	if (desc == NULL)
@@ -719,7 +746,33 @@ bool payload_can_merge(const struct expr *e1, const struct expr *e2)
 	if (total < e1->len || total > (NFT_REG_SIZE * BITS_PER_BYTE))
 		return false;
 
-	return true;
+	/* could return true after this, the expressions are mergeable.
+	 *
+	 * However, there are some caveats.
+	 *
+	 * Loading anything <= sizeof(u32) with base >= network header
+	 * is fast, because its handled directly from eval loop in the
+	 * kernel.
+	 *
+	 * We thus restrict merging a bit more.
+	 */
+
+	/* can still be handled by fastpath after merge */
+	if (total <= NFT_REG32_SIZE * BITS_PER_BYTE)
+		return true;
+
+	/* Linklayer base is not handled in fastpath, merge */
+	if (e1->payload.base == PROTO_BASE_LL_HDR)
+		return true;
+
+	/* Also merge if at least one expression is already
+	 * above REG32 size, in this case merging is faster.
+	 */
+	if (e1->len > (NFT_REG32_SIZE * BITS_PER_BYTE) ||
+	    e2->len > (NFT_REG32_SIZE * BITS_PER_BYTE))
+		return true;
+
+	return false;
 }
 
 /**

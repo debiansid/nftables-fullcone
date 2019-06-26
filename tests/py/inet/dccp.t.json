@@ -5,9 +5,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 21, 35 ]
             }
@@ -22,7 +23,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -40,9 +41,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -61,7 +63,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -83,9 +85,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 20, 50 ] }
@@ -102,9 +105,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ "ftp-data", "re-mail-ck" ]
             }
@@ -119,9 +123,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "range": [ 20, 50 ]
             }
@@ -136,9 +141,10 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 20, 50 ] }
@@ -155,7 +161,7 @@
             "left": {
                 "payload": {
                     "field": "sport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -175,9 +181,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     23,
@@ -196,7 +203,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -218,9 +225,10 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     { "range": [ 20, 50 ] }
@@ -237,7 +245,7 @@
             "left": {
                 "payload": {
                     "field": "dport",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -257,9 +265,10 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "request",
@@ -285,7 +294,7 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",
@@ -314,9 +323,10 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
+	    "op": "==",
             "right": "request"
         }
     }
@@ -329,7 +339,7 @@
             "left": {
                 "payload": {
                     "field": "type",
-                    "name": "dccp"
+                    "protocol": "dccp"
                 }
             },
             "op": "!=",

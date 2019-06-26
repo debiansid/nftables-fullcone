@@ -3,8 +3,9 @@
     {
         "match": {
             "left": {
-                "meta": "l4proto"
+                "meta": { "key": "l4proto" }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     "tcp",
@@ -20,10 +21,10 @@
                 "payload": {
                     "base": "th",
                     "len": 16,
-                    "name": "raw",
                     "offset": 16
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -39,7 +40,8 @@
 [
     {
         "match": {
-	    "left": { "meta": "l4proto" },
+	    "left": { "meta": { "key": "l4proto" } },
+	    "op": "==",
 	    "right": "tcp"
 	}
     },
@@ -49,10 +51,10 @@
                 "payload": {
                     "base": "th",
 		    "len": 16,
-		    "offset": 16,
-		    "name": "raw"
+		    "offset": 16
                 }
             },
+	    "op": "==",
             "right": {
                 "set": [
                     22,
@@ -72,10 +74,10 @@
                 "payload": {
                     "base": "nh",
                     "len": 8,
-                    "name": "raw",
                     "offset": 8
                 }
             },
+	    "op": "==",
             "right": 255
         }
     }
@@ -89,10 +91,10 @@
                 "payload": {
                     "base": "nh",
                     "len": 16,
-                    "name": "raw",
                     "offset": 8
                 }
             },
+	    "op": "==",
             "right": 0
         }
     }
@@ -106,10 +108,10 @@
                 "payload": {
                     "base": "ll",
                     "len": 1,
-                    "name": "raw",
                     "offset": 0
                 }
             },
+	    "op": "==",
             "right": 1
         }
     }
@@ -125,7 +127,6 @@
                         "payload": {
                             "base": "ll",
                             "len": 8,
-                            "name": "raw",
                             "offset": 0
                         }
                     },
@@ -146,10 +147,10 @@
                 "payload": {
                     "base": "ll",
                     "len": 128,
-                    "name": "raw",
                     "offset": 0
                 }
             },
+	    "op": "==",
             "right": "0xfedcba987654321001234567890abcde"
         }
     }

@@ -6,6 +6,18 @@ Files: *
 Copyright: 2008 Patrick McHardy <kaber@trash.net>
 License: GPL-2
 
+Files: tests/py/nft-test.py
+Copyright: 2014 Ana Rey Botello <anarey@gmail.com>
+License: GPL-2+
+
+Files: src/nfnl_osf.c
+Copyright:  2005 Evgeniy Polyakov <johnpol@2ka.mxt.ru>
+License: GPL-2+
+
+Files: py/nftables.py
+Copyright: 2018 Phil Sutter <phil@nwl.cc>
+License: GPL-2
+
 Files: src/libnftables.c include/nftables/nftables.h
 Copyright: 2017 Eric Leblond <eric@regit.org>
 License: GPL-2
@@ -32,7 +44,7 @@ Files: src/hash.c
 Copyright: 2016 Pablo Neira Ayuso <pablo@netfilter.org>
 License: GPL-2
 
-Files: src/mini-gmp.c
+Files: src/mini-gmp.c include/mini-gmp.h
 Copyright: 1991-1997, 1999-2014, Free Software Foundation, Inc
 License: GPL-2+
 
@@ -76,7 +88,12 @@ Copyright: 1999 Andrea Arcangelli <andrea@suse.de>
 	   2002 David Woodhouse <dwmw2@infradead.org>
 License: GPL-2+
 
-Files: doc/nft.xml
+Files: files/osf/pf.os
+Copyright: 2000-2003 by Michal Zalewski <lcamtuf@coredump.cx>
+           2003 by Mike Frantzen <frantzen@w4g.org>
+License: GPL-2
+
+Files: doc/nft.txt
 Copyright: 2008-2014 Patrick McHardy <kaber@trash.net>
 License: CC-BY-SA-4.0
 

@@ -8,12 +8,11 @@ From the nft utility you control which rules are loaded into the kernel.
 The Debian package comes with some example ruleset you may use as a starting
 point. Check them at /usr/share/doc/nftables/examples/
 
-user@debian:~$ sudo cp /usr/share/doc/nftables/examples/syntax/workstation /etc/nftables.conf
-user@debian:~# sudo nft -f /etc/nftables.conf
-
-Extensive documentation is available at:
+Extensive online documentation is available at:
 
  https://wiki.nftables.org
+
+The default rules file in debian is /etc/nftables.conf
 
 Some basic commands
 ===================
@@ -30,10 +29,10 @@ user@debian:~$ sudo nft list ruleset
 System service (auto-load at boot)
 ==================================
 
-This package includes pre-configured a systemd service file which you can
+This package includes a pre-configured systemd service file which you can
 optionally enable to auto-load your firewall at boot time.
 
-This is 'nftables.service' and is disabled by default.
+user@debian:~$ sudo systemctl enable nftables.service
 
 Migrating from iptables
 =======================

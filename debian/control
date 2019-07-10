@@ -19,7 +19,7 @@ Build-Depends: asciidoc-base,
                dh-python,
                python3-all,
                python3-setuptools
-Standards-Version: 4.1.4
+Standards-Version: 4.4.0
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables

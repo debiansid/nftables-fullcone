@@ -1,3 +1,9 @@
+nftables (0.9.1-2) unstable; urgency=medium
+
+  * [9dc1bd1] d/control: bump std-version to 4.4.0
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 10 Jul 2019 11:19:29 +0200
+
 nftables (0.9.1-1~exp1) experimental; urgency=medium
 
   * [683e6f1] src:nftables: add salsa CI support

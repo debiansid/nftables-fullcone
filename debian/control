@@ -1,6 +1,6 @@
 Source: nftables
 Section: net
-Priority: optional
+Priority: important
 Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: asciidoc-base,
@@ -45,6 +45,7 @@ Description: Program to control packet filtering rules by Netfilter project
 
 Package: libnftables-dev
 Section: libdevel
+Priority: optional
 Architecture: linux-any
 Multi-Arch: same
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}
@@ -64,6 +65,7 @@ Description: Development files for libnftables
 
 Package: libnftables1
 Section: libs
+Priority: optional
 Architecture: linux-any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends}
@@ -82,6 +84,7 @@ Description: Netfilter nftables high level userspace API library
  This package contains the libnftables library.
 
 Package: python3-nftables
+Priority: optional
 Section: python
 Architecture: linux-any
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${python3:Depends}

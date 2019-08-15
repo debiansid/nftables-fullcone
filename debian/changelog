@@ -1,3 +1,15 @@
+nftables (0.9.1-3) unstable; urgency=medium
+
+  * [609ee76] d/README.Debian: refresh file
+  * [3255aaa] src:nftables: run wrap-and-sort
+  * [5337001] nftables: raise package priority to important
+  * [09b720f] src:nftables: add docbook-xsl build-dep
+  * [9db946c] src:nftables: bump debhelper compat to 12
+  * [4f0bb1d] nftables.maintscript: introduce file
+  * [1b54808] d/patches: add BE fixtures (Closes: #934740)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 15 Aug 2019 15:01:49 +0200
+
 nftables (0.9.1-2) unstable; urgency=medium
 
   * [9dc1bd1] d/control: bump std-version to 4.4.0

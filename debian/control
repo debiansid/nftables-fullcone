@@ -6,7 +6,7 @@ Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: asciidoc-base,
                automake,
                bison,
-               debhelper (>= 11),
+               debhelper (>= 12~),
                dh-python,
                docbook-xsl,
                flex,

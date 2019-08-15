@@ -1,1 +1,4 @@
 build_docs.patch
+big-endian-1.patch
+big-endian-2.patch
+big-endian-3.patch

@@ -224,7 +224,7 @@ static int cache_init(struct netlink_ctx *ctx, unsigned int flags)
 	return 0;
 }
 
-bool cache_is_complete(struct nft_cache *cache, unsigned int flags)
+static bool cache_is_complete(struct nft_cache *cache, unsigned int flags)
 {
 	return (cache->flags & flags) == flags;
 }
@@ -234,16 +234,20 @@ static bool cache_is_updated(struct nft_cache *cache, uint16_t genid)
 	return genid && genid == cache->genid;
 }
 
+bool cache_needs_update(struct nft_cache *cache)
+{
+	return cache->flags & NFT_CACHE_UPDATE;
+}
+
 int cache_update(struct nft_ctx *nft, unsigned int flags, struct list_head *msgs)
 {
 	struct netlink_ctx ctx = {
 		.list		= LIST_HEAD_INIT(ctx.list),
 		.nft		= nft,
 		.msgs		= msgs,
-		.nft		= nft,
 	};
 	struct nft_cache *cache = &nft->cache;
-	uint32_t genid, genid_stop;
+	uint32_t genid, genid_stop, oldflags;
 	int ret;
 replay:
 	ctx.seqnum = cache->seqnum++;
@@ -254,6 +258,14 @@ replay:
 
 	if (cache->genid)
 		cache_release(cache);
+
+	if (flags & NFT_CACHE_FLUSHED) {
+		oldflags = flags;
+		flags = NFT_CACHE_EMPTY;
+		if (oldflags & NFT_CACHE_UPDATE)
+			flags |= NFT_CACHE_UPDATE;
+		goto skip;
+	}
 
 	ret = cache_init(&ctx, flags);
 	if (ret < 0) {
@@ -270,7 +282,7 @@ replay:
 		cache_release(cache);
 		goto replay;
 	}
-
+skip:
 	cache->genid = genid;
 	cache->flags = flags;
 	return 0;
@@ -284,20 +296,6 @@ static void __cache_flush(struct list_head *table_list)
 		list_del(&table->list);
 		table_free(table);
 	}
-}
-
-void cache_flush(struct nft_ctx *nft, struct list_head *msgs)
-{
-	struct netlink_ctx ctx = {
-		.list		= LIST_HEAD_INIT(ctx.list),
-		.nft		= nft,
-		.msgs		= msgs,
-	};
-	struct nft_cache *cache = &nft->cache;
-
-	__cache_flush(&cache->list);
-	cache->genid = mnl_genid_get(&ctx);
-	cache->flags = NFT_CACHE_FULL;
 }
 
 void cache_release(struct nft_cache *cache)
@@ -388,7 +386,7 @@ struct set *set_lookup_fuzzy(const char *set_name,
 
 	list_for_each_entry(table, &cache->list, list) {
 		list_for_each_entry(set, &table->sets, list) {
-			if (set->flags & NFT_SET_ANONYMOUS)
+			if (set_is_anonymous(set->flags))
 				continue;
 			if (!strcmp(set->handle.set.name, set_name)) {
 				*t = table;
@@ -449,7 +447,7 @@ static void set_print_declaration(const struct set *set,
 	if ((set->flags & (NFT_SET_EVAL | NFT_SET_ANONYMOUS)) ==
 				(NFT_SET_EVAL | NFT_SET_ANONYMOUS))
 		type = "meter";
-	else if (set->flags & (NFT_SET_MAP | NFT_SET_OBJECT))
+	else if (set_is_map(set->flags))
 		type = "map";
 	else
 		type = "set";
@@ -469,9 +467,9 @@ static void set_print_declaration(const struct set *set,
 	nft_print(octx, "%s", opts->nl);
 	nft_print(octx, "%s%stype %s",
 		  opts->tab, opts->tab, set->key->dtype->name);
-	if (set->flags & NFT_SET_MAP)
+	if (set_is_datamap(set->flags))
 		nft_print(octx, " : %s", set->datatype->name);
-	else if (set->flags & NFT_SET_OBJECT)
+	else if (set_is_objmap(set->flags))
 		nft_print(octx, " : %s", obj_type_name(set->objtype));
 
 	nft_print(octx, "%s", opts->stmt_separator);
@@ -800,7 +798,7 @@ struct chain *chain_alloc(const char *name)
 	if (name != NULL)
 		chain->handle.chain.name = xstrdup(name);
 
-	chain->policy = -1;
+	chain->policy = NULL;
 	return chain;
 }
 
@@ -823,7 +821,8 @@ void chain_free(struct chain *chain)
 	xfree(chain->type);
 	if (chain->dev != NULL)
 		xfree(chain->dev);
-	xfree(chain->priority.str);
+	expr_free(chain->priority.expr);
+	expr_free(chain->policy);
 	xfree(chain);
 }
 
@@ -1053,14 +1052,15 @@ int std_prio_lookup(const char *std_prio_name, int family, int hook)
 
 static const char *prio2str(const struct output_ctx *octx,
 			    char *buf, size_t bufsize, int family, int hook,
-			    int prio)
+			    const struct expr *expr)
 {
 	const struct prio_tag *prio_arr;
+	int std_prio, offset, prio;
 	const char *std_prio_str;
 	const int reach = 10;
-	int std_prio, offset;
 	size_t i, arr_size;
 
+	mpz_export_data(&prio, expr->value, BYTEORDER_HOST_ENDIAN, sizeof(int));
 	if (family == NFPROTO_BRIDGE) {
 		prio_arr = bridge_std_prios;
 		arr_size = array_size(bridge_std_prios);
@@ -1099,12 +1099,15 @@ static void chain_print_declaration(const struct chain *chain,
 				    struct output_ctx *octx)
 {
 	char priobuf[STD_PRIO_BUFSIZE];
+	int policy;
 
 	nft_print(octx, "\tchain %s {", chain->handle.chain.name);
 	if (nft_output_handle(octx))
 		nft_print(octx, " # handle %" PRIu64, chain->handle.handle.id);
 	nft_print(octx, "\n");
 	if (chain->flags & CHAIN_F_BASECHAIN) {
+		mpz_export_data(&policy, chain->policy->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
 		nft_print(octx, "\t\ttype %s hook %s", chain->type,
 			  hooknum2str(chain->handle.family, chain->hooknum));
 		if (chain->dev != NULL)
@@ -1112,8 +1115,8 @@ static void chain_print_declaration(const struct chain *chain,
 		nft_print(octx, " priority %s; policy %s;\n",
 			  prio2str(octx, priobuf, sizeof(priobuf),
 				   chain->handle.family, chain->hooknum,
-				   chain->priority.num),
-			  chain_policy2str(chain->policy));
+				   chain->priority.expr),
+			  chain_policy2str(policy));
 	}
 }
 
@@ -1134,17 +1137,20 @@ static void chain_print(const struct chain *chain, struct output_ctx *octx)
 void chain_print_plain(const struct chain *chain, struct output_ctx *octx)
 {
 	char priobuf[STD_PRIO_BUFSIZE];
+	int policy;
 
 	nft_print(octx, "chain %s %s %s", family2str(chain->handle.family),
 		  chain->handle.table.name, chain->handle.chain.name);
 
 	if (chain->flags & CHAIN_F_BASECHAIN) {
+		mpz_export_data(&policy, chain->policy->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
 		nft_print(octx, " { type %s hook %s priority %s; policy %s; }",
 			  chain->type, chain->hookstr,
 			  prio2str(octx, priobuf, sizeof(priobuf),
 				   chain->handle.family, chain->hooknum,
-				   chain->priority.num),
-			  chain_policy2str(chain->policy));
+				   chain->priority.expr),
+			  chain_policy2str(policy));
 	}
 	if (nft_output_handle(octx))
 		nft_print(octx, " # handle %" PRIu64, chain->handle.handle.id);
@@ -1272,7 +1278,7 @@ static void table_print(const struct table *table, struct output_ctx *octx)
 		delim = "\n";
 	}
 	list_for_each_entry(set, &table->sets, list) {
-		if (set->flags & NFT_SET_ANONYMOUS)
+		if (set_is_anonymous(set->flags))
 			continue;
 		nft_print(octx, "%s", delim);
 		set_print(set, octx);
@@ -1442,6 +1448,7 @@ void cmd_free(struct cmd *cmd)
 		case CMD_OBJ_QUOTA:
 		case CMD_OBJ_CT_HELPER:
 		case CMD_OBJ_CT_TIMEOUT:
+		case CMD_OBJ_CT_EXPECT:
 		case CMD_OBJ_LIMIT:
 		case CMD_OBJ_SECMARK:
 			obj_free(cmd->object);
@@ -1532,6 +1539,7 @@ static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd, bool excl)
 	case CMD_OBJ_QUOTA:
 	case CMD_OBJ_CT_HELPER:
 	case CMD_OBJ_CT_TIMEOUT:
+	case CMD_OBJ_CT_EXPECT:
 	case CMD_OBJ_LIMIT:
 	case CMD_OBJ_SECMARK:
 		return mnl_nft_obj_add(ctx, cmd, flags);
@@ -1613,6 +1621,8 @@ static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 		return mnl_nft_obj_del(ctx, cmd, NFT_OBJECT_CT_HELPER);
 	case CMD_OBJ_CT_TIMEOUT:
 		return mnl_nft_obj_del(ctx, cmd, NFT_OBJECT_CT_TIMEOUT);
+	case CMD_OBJ_CT_EXPECT:
+		return mnl_nft_obj_del(ctx, cmd, NFT_OBJECT_CT_EXPECT);
 	case CMD_OBJ_LIMIT:
 		return mnl_nft_obj_del(ctx, cmd, NFT_OBJECT_LIMIT);
 	case CMD_OBJ_SECMARK:
@@ -1652,14 +1662,13 @@ static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 
 		list_for_each_entry(set, &table->sets, list) {
 			if (cmd->obj == CMD_OBJ_SETS &&
-			    (set->flags & NFT_SET_ANONYMOUS ||
-			    set->flags & NFT_SET_MAP))
+			    !set_is_literal(set->flags))
 				continue;
 			if (cmd->obj == CMD_OBJ_METERS &&
 			    !(set->flags & NFT_SET_EVAL))
 				continue;
 			if (cmd->obj == CMD_OBJ_MAPS &&
-			    !(set->flags & NFT_SET_MAP))
+			    !map_is_literal(set->flags))
 				continue;
 			set_print_declaration(set, &opts, &ctx->nft->output);
 			nft_print(&ctx->nft->output, "%s}%s", opts.tab, opts.nl);
@@ -1760,7 +1769,7 @@ static void print_proto_timeout_policy(uint8_t l4, const uint32_t *timeout,
 		if (timeout[i] != timeout_protocol[l4].dflt_timeout[i]) {
 			if (comma)
 				nft_print(octx, ", ");
-			nft_print(octx, "%s: %u",
+			nft_print(octx, "%s : %u",
 				  timeout_protocol[l4].state_to_name[i],
 				  timeout[i]);
 			comma = true;
@@ -1834,13 +1843,37 @@ static void obj_print_data(const struct obj *obj,
 		nft_print(octx, "%s", opts->nl);
 		nft_print(octx, "%s%sprotocol ", opts->tab, opts->tab);
 		print_proto_name_proto(obj->ct_timeout.l4proto, octx);
-		nft_print(octx, ";%s", opts->nl);
+		nft_print(octx, "%s", opts->nl);
 		nft_print(octx, "%s%sl3proto %s%s",
 			  opts->tab, opts->tab,
 			  family2str(obj->ct_timeout.l3proto),
 			  opts->stmt_separator);
 		print_proto_timeout_policy(obj->ct_timeout.l4proto,
 					   obj->ct_timeout.timeout, opts, octx);
+		break;
+	case NFT_OBJECT_CT_EXPECT:
+		nft_print(octx, " %s {", obj->handle.obj.name);
+		if (nft_output_handle(octx))
+			nft_print(octx, " # handle %" PRIu64, obj->handle.handle.id);
+		nft_print(octx, "%s", opts->nl);
+		nft_print(octx, "%s%sprotocol ", opts->tab, opts->tab);
+		print_proto_name_proto(obj->ct_expect.l4proto, octx);
+		nft_print(octx, "%s", opts->stmt_separator);
+		nft_print(octx, "%s%sdport %d%s",
+			  opts->tab, opts->tab,
+			  obj->ct_expect.dport,
+			  opts->stmt_separator);
+		nft_print(octx, "%s%stimeout ", opts->tab, opts->tab);
+		time_print(obj->ct_expect.timeout, octx);
+		nft_print(octx, "%s", opts->stmt_separator);
+		nft_print(octx, "%s%ssize %d%s",
+			  opts->tab, opts->tab,
+			  obj->ct_expect.size,
+			  opts->stmt_separator);
+		nft_print(octx, "%s%sl3proto %s%s",
+			  opts->tab, opts->tab,
+			  family2str(obj->ct_expect.l3proto),
+			  opts->stmt_separator);
 		break;
 	case NFT_OBJECT_LIMIT: {
 		bool inv = obj->limit.flags & NFT_LIMIT_F_INV;
@@ -1891,6 +1924,7 @@ static const char * const obj_type_name_array[] = {
 	[NFT_OBJECT_LIMIT]	= "limit",
 	[NFT_OBJECT_CT_TIMEOUT] = "ct timeout",
 	[NFT_OBJECT_SECMARK]	= "secmark",
+	[NFT_OBJECT_CT_EXPECT]	= "ct expectation",
 };
 
 const char *obj_type_name(enum stmt_types type)
@@ -1907,6 +1941,7 @@ static uint32_t obj_type_cmd_array[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_LIMIT]	= CMD_OBJ_LIMIT,
 	[NFT_OBJECT_CT_TIMEOUT] = CMD_OBJ_CT_TIMEOUT,
 	[NFT_OBJECT_SECMARK]	= CMD_OBJ_SECMARK,
+	[NFT_OBJECT_CT_EXPECT]	= CMD_OBJ_CT_EXPECT,
 };
 
 uint32_t obj_type_to_cmd(uint32_t type)
@@ -2020,7 +2055,7 @@ void flowtable_free(struct flowtable *flowtable)
 	if (--flowtable->refcnt > 0)
 		return;
 	handle_free(&flowtable->handle);
-	xfree(flowtable->priority.str);
+	expr_free(flowtable->priority.expr);
 	xfree(flowtable);
 }
 
@@ -2050,7 +2085,7 @@ static void flowtable_print_declaration(const struct flowtable *flowtable,
 		  opts->tab, opts->tab,
 		  hooknum2str(NFPROTO_NETDEV, flowtable->hooknum),
 		  prio2str(octx, priobuf, sizeof(priobuf), NFPROTO_NETDEV,
-			   flowtable->hooknum, flowtable->priority.num),
+			   flowtable->hooknum, flowtable->priority.expr),
 		  opts->stmt_separator);
 
 	nft_print(octx, "%s%sdevices = { ", opts->tab, opts->tab);
@@ -2265,6 +2300,8 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_HELPER);
 	case CMD_OBJ_CT_TIMEOUT:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_TIMEOUT);
+	case CMD_OBJ_CT_EXPECT:
+		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_EXPECT);
 	case CMD_OBJ_LIMIT:
 	case CMD_OBJ_LIMITS:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_LIMIT);
@@ -2455,6 +2492,9 @@ struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type, const struct handle *h,
 		break;
 	case NFT_OBJECT_CT_TIMEOUT:
 		cmd_obj = CMD_OBJ_CT_TIMEOUT;
+		break;
+	case NFT_OBJECT_CT_EXPECT:
+		cmd_obj = CMD_OBJ_CT_EXPECT;
 		break;
 	default:
 		BUG("missing type mapping");

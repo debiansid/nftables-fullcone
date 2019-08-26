@@ -1,8 +1,8 @@
 table ip filter {
 	ct timeout cttime {
-		protocol tcp;
+		protocol tcp
 		l3proto ip
-		policy = { established: 123, close: 12 }
+		policy = { established : 123, close : 12 }
 	}
 
 	chain c {

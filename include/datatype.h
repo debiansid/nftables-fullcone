@@ -123,6 +123,7 @@ enum datatype_flags {
 	DTYPE_F_PREFIX		= (1 << 1),
 };
 
+struct parse_ctx;
 /**
  * struct datatype
  *
@@ -154,7 +155,8 @@ struct datatype {
 						 struct output_ctx *octx);
 	json_t				*(*json)(const struct expr *expr,
 						 struct output_ctx *octx);
-	struct error_record		*(*parse)(const struct expr *sym,
+	struct error_record		*(*parse)(struct parse_ctx *ctx,
+						  const struct expr *sym,
 						  struct expr **res);
 	const struct symbol_table	*sym_tbl;
 	unsigned int			refcnt;
@@ -166,7 +168,12 @@ extern struct datatype *datatype_get(const struct datatype *dtype);
 extern void datatype_set(struct expr *expr, const struct datatype *dtype);
 extern void datatype_free(const struct datatype *dtype);
 
-extern struct error_record *symbol_parse(const struct expr *sym,
+struct parse_ctx {
+	struct symbol_tables	*tbl;
+};
+
+extern struct error_record *symbol_parse(struct parse_ctx *ctx,
+					 const struct expr *sym,
 					 struct expr **res);
 extern void datatype_print(const struct expr *expr, struct output_ctx *octx);
 
@@ -218,7 +225,8 @@ struct symbol_table {
 	struct symbolic_constant	symbols[];
 };
 
-extern struct error_record *symbolic_constant_parse(const struct expr *sym,
+extern struct error_record *symbolic_constant_parse(struct parse_ctx *ctx,
+						    const struct expr *sym,
 						    const struct symbol_table *tbl,
 						    struct expr **res);
 extern void symbolic_constant_print(const struct symbol_table *tbl,
@@ -230,9 +238,7 @@ extern void symbol_table_print(const struct symbol_table *tbl,
 			       struct output_ctx *octx);
 
 extern struct symbol_table *rt_symbol_table_init(const char *filename);
-extern void rt_symbol_table_free(struct symbol_table *tbl);
-
-extern struct symbol_table *mark_tbl;
+extern void rt_symbol_table_free(const struct symbol_table *tbl);
 
 extern const struct datatype invalid_type;
 extern const struct datatype verdict_type;
@@ -256,6 +262,8 @@ extern const struct datatype icmpx_code_type;
 extern const struct datatype igmp_type_type;
 extern const struct datatype time_type;
 extern const struct datatype boolean_type;
+extern const struct datatype priority_type;
+extern const struct datatype policy_type;
 
 void inet_service_type_print(const struct expr *expr, struct output_ctx *octx);
 

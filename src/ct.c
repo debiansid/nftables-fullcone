@@ -141,11 +141,10 @@ static const struct datatype ct_event_type = {
 	.sym_tbl	= &ct_events_tbl,
 };
 
-static struct symbol_table *ct_label_tbl;
-
 #define CT_LABEL_BIT_SIZE 128
 
-const char *ct_label2str(unsigned long value)
+const char *ct_label2str(const struct symbol_table *ct_label_tbl,
+			 unsigned long value)
 {
 	const struct symbolic_constant *s;
 
@@ -161,7 +160,7 @@ static void ct_label_type_print(const struct expr *expr,
 				 struct output_ctx *octx)
 {
 	unsigned long bit = mpz_scan1(expr->value, 0);
-	const char *labelstr = ct_label2str(bit);
+	const char *labelstr = ct_label2str(octx->tbl.ct_label, bit);
 
 	if (labelstr) {
 		nft_print(octx, "\"%s\"", labelstr);
@@ -171,7 +170,8 @@ static void ct_label_type_print(const struct expr *expr,
 	nft_print(octx, "%lu", bit);
 }
 
-static struct error_record *ct_label_type_parse(const struct expr *sym,
+static struct error_record *ct_label_type_parse(struct parse_ctx *ctx,
+						const struct expr *sym,
 						struct expr **res)
 {
 	const struct symbolic_constant *s;
@@ -180,7 +180,7 @@ static struct error_record *ct_label_type_parse(const struct expr *sym,
 	uint64_t bit;
 	mpz_t value;
 
-	for (s = ct_label_tbl->symbols; s->identifier != NULL; s++) {
+	for (s = ctx->tbl->ct_label->symbols; s->identifier != NULL; s++) {
 		if (!strcmp(sym->identifier, s->identifier))
 			break;
 	}
@@ -229,14 +229,14 @@ static const struct datatype ct_label_type = {
 	.parse		= ct_label_type_parse,
 };
 
-void ct_label_table_init(void)
+void ct_label_table_init(struct nft_ctx *ctx)
 {
-	ct_label_tbl = rt_symbol_table_init(CONNLABEL_CONF);
+	ctx->output.tbl.ct_label = rt_symbol_table_init(CONNLABEL_CONF);
 }
 
-void ct_label_table_exit(void)
+void ct_label_table_exit(struct nft_ctx *ctx)
 {
-	rt_symbol_table_free(ct_label_tbl);
+	rt_symbol_table_free(ctx->output.tbl.ct_label);
 }
 
 #ifndef NF_CT_HELPER_NAME_LEN
@@ -292,13 +292,13 @@ const struct ct_template ct_templates[__NFT_CT_MAX] = {
 	[NFT_CT_EVENTMASK]	= CT_TEMPLATE("event", &ct_event_type,
 					      BYTEORDER_HOST_ENDIAN, 32),
 	[NFT_CT_SRC_IP]		= CT_TEMPLATE("ip saddr", &ipaddr_type,
-					      BYTEORDER_BIG_ENDIAN, 0),
+					      BYTEORDER_BIG_ENDIAN, 32),
 	[NFT_CT_DST_IP]		= CT_TEMPLATE("ip daddr", &ipaddr_type,
-					      BYTEORDER_BIG_ENDIAN, 0),
+					      BYTEORDER_BIG_ENDIAN, 32),
 	[NFT_CT_SRC_IP6]	= CT_TEMPLATE("ip6 saddr", &ip6addr_type,
-					      BYTEORDER_BIG_ENDIAN, 0),
+					      BYTEORDER_BIG_ENDIAN, 128),
 	[NFT_CT_DST_IP6]	= CT_TEMPLATE("ip6 daddr", &ip6addr_type,
-					      BYTEORDER_BIG_ENDIAN, 0),
+					      BYTEORDER_BIG_ENDIAN, 128),
 };
 
 static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,

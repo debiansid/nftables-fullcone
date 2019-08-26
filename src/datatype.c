@@ -113,7 +113,7 @@ void datatype_print(const struct expr *expr, struct output_ctx *octx)
 	    expr->dtype->name);
 }
 
-struct error_record *symbol_parse(const struct expr *sym,
+struct error_record *symbol_parse(struct parse_ctx *ctx, const struct expr *sym,
 				  struct expr **res)
 {
 	const struct datatype *dtype = sym->dtype;
@@ -124,9 +124,9 @@ struct error_record *symbol_parse(const struct expr *sym,
 		return error(&sym->location, "No symbol type information");
 	do {
 		if (dtype->parse != NULL)
-			return dtype->parse(sym, res);
+			return dtype->parse(ctx, sym, res);
 		if (dtype->sym_tbl != NULL)
-			return symbolic_constant_parse(sym, dtype->sym_tbl,
+			return symbolic_constant_parse(ctx, sym, dtype->sym_tbl,
 						       res);
 	} while ((dtype = dtype->basetype));
 
@@ -135,7 +135,8 @@ struct error_record *symbol_parse(const struct expr *sym,
 		     sym->dtype->desc);
 }
 
-struct error_record *symbolic_constant_parse(const struct expr *sym,
+struct error_record *symbolic_constant_parse(struct parse_ctx *ctx,
+					     const struct expr *sym,
 					     const struct symbol_table *tbl,
 					     struct expr **res)
 {
@@ -155,7 +156,7 @@ struct error_record *symbolic_constant_parse(const struct expr *sym,
 	*res = NULL;
 	do {
 		if (dtype->basetype->parse) {
-			erec = dtype->basetype->parse(sym, res);
+			erec = dtype->basetype->parse(ctx, sym, res);
 			if (erec != NULL)
 				return erec;
 			if (*res)
@@ -243,10 +244,25 @@ const struct datatype invalid_type = {
 	.print		= invalid_type_print,
 };
 
-static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
+static void verdict_jump_chain_print(const char *what, const struct expr *e,
+				     struct output_ctx *octx)
 {
 	char chain[NFT_CHAIN_MAXNAMELEN];
+	unsigned int len;
 
+	memset(chain, 0, sizeof(chain));
+
+	len = e->len / BITS_PER_BYTE;
+	if (len >= sizeof(chain))
+		BUG("verdict expression length %u is too large (%lu bits max)",
+		    e->len, (unsigned long)sizeof(chain) * BITS_PER_BYTE);
+
+	mpz_export_data(chain, e->value, BYTEORDER_HOST_ENDIAN, len);
+	nft_print(octx, "%s %s", what, chain);
+}
+
+static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
+{
 	switch (expr->verdict) {
 	case NFT_CONTINUE:
 		nft_print(octx, "continue");
@@ -256,10 +272,7 @@ static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 		break;
 	case NFT_JUMP:
 		if (expr->chain->etype == EXPR_VALUE) {
-			mpz_export_data(chain, expr->chain->value,
-					BYTEORDER_HOST_ENDIAN,
-					NFT_CHAIN_MAXNAMELEN);
-			nft_print(octx, "jump %s", chain);
+			verdict_jump_chain_print("jump", expr->chain, octx);
 		} else {
 			nft_print(octx, "jump ");
 			expr_print(expr->chain, octx);
@@ -267,10 +280,7 @@ static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 		break;
 	case NFT_GOTO:
 		if (expr->chain->etype == EXPR_VALUE) {
-			mpz_export_data(chain, expr->chain->value,
-					BYTEORDER_HOST_ENDIAN,
-					NFT_CHAIN_MAXNAMELEN);
-			nft_print(octx, "goto %s", chain);
+			verdict_jump_chain_print("goto", expr->chain, octx);
 		} else {
 			nft_print(octx, "goto ");
 			expr_print(expr->chain, octx);
@@ -300,7 +310,8 @@ static void verdict_type_print(const struct expr *expr, struct output_ctx *octx)
 	}
 }
 
-static struct error_record *verdict_type_parse(const struct expr *sym,
+static struct error_record *verdict_type_parse(struct parse_ctx *ctx,
+					       const struct expr *sym,
 					       struct expr **res)
 {
 	*res = constant_expr_alloc(&sym->location, &string_type,
@@ -359,7 +370,8 @@ static void integer_type_print(const struct expr *expr, struct output_ctx *octx)
 	nft_gmp_print(octx, fmt, expr->value);
 }
 
-static struct error_record *integer_type_parse(const struct expr *sym,
+static struct error_record *integer_type_parse(struct parse_ctx *ctx,
+					       const struct expr *sym,
 					       struct expr **res)
 {
 	mpz_t v;
@@ -397,7 +409,8 @@ static void string_type_print(const struct expr *expr, struct output_ctx *octx)
 	nft_print(octx, "\"%s\"", data);
 }
 
-static struct error_record *string_type_parse(const struct expr *sym,
+static struct error_record *string_type_parse(struct parse_ctx *ctx,
+					      const struct expr *sym,
 	      				      struct expr **res)
 {
 	*res = constant_expr_alloc(&sym->location, &string_type,
@@ -432,7 +445,8 @@ static void lladdr_type_print(const struct expr *expr, struct output_ctx *octx)
 	}
 }
 
-static struct error_record *lladdr_type_parse(const struct expr *sym,
+static struct error_record *lladdr_type_parse(struct parse_ctx *ctx,
+					      const struct expr *sym,
 					      struct expr **res)
 {
 	char buf[strlen(sym->identifier) + 1], *p;
@@ -483,7 +497,8 @@ static void ipaddr_type_print(const struct expr *expr, struct output_ctx *octx)
 	nft_print(octx, "%s", buf);
 }
 
-static struct error_record *ipaddr_type_parse(const struct expr *sym,
+static struct error_record *ipaddr_type_parse(struct parse_ctx *ctx,
+					      const struct expr *sym,
 					      struct expr **res)
 {
 	struct addrinfo *ai, hints = { .ai_family = AF_INET,
@@ -541,7 +556,8 @@ static void ip6addr_type_print(const struct expr *expr, struct output_ctx *octx)
 	nft_print(octx, "%s", buf);
 }
 
-static struct error_record *ip6addr_type_parse(const struct expr *sym,
+static struct error_record *ip6addr_type_parse(struct parse_ctx *ctx,
+					       const struct expr *sym,
 					       struct expr **res)
 {
 	struct addrinfo *ai, hints = { .ai_family = AF_INET6,
@@ -595,7 +611,8 @@ static void inet_protocol_type_print(const struct expr *expr,
 	integer_type_print(expr, octx);
 }
 
-static struct error_record *inet_protocol_type_parse(const struct expr *sym,
+static struct error_record *inet_protocol_type_parse(struct parse_ctx *ctx,
+						     const struct expr *sym,
 						     struct expr **res)
 {
 	struct protoent *p;
@@ -676,7 +693,8 @@ void inet_service_type_print(const struct expr *expr, struct output_ctx *octx)
 	integer_type_print(expr, octx);
 }
 
-static struct error_record *inet_service_type_parse(const struct expr *sym,
+static struct error_record *inet_service_type_parse(struct parse_ctx *ctx,
+						    const struct expr *sym,
 						    struct expr **res)
 {
 	struct addrinfo *ai;
@@ -770,7 +788,7 @@ out:
 	return tbl;
 }
 
-void rt_symbol_table_free(struct symbol_table *tbl)
+void rt_symbol_table_free(const struct symbol_table *tbl)
 {
 	const struct symbolic_constant *s;
 
@@ -779,27 +797,26 @@ void rt_symbol_table_free(struct symbol_table *tbl)
 	xfree(tbl);
 }
 
-struct symbol_table *mark_tbl = NULL;
-
-void mark_table_init(void)
+void mark_table_init(struct nft_ctx *ctx)
 {
-	mark_tbl = rt_symbol_table_init("/etc/iproute2/rt_marks");
+	ctx->output.tbl.mark = rt_symbol_table_init("/etc/iproute2/rt_marks");
 }
 
-void mark_table_exit(void)
+void mark_table_exit(struct nft_ctx *ctx)
 {
-	rt_symbol_table_free(mark_tbl);
+	rt_symbol_table_free(ctx->output.tbl.mark);
 }
 
 static void mark_type_print(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_print(mark_tbl, expr, true, octx);
+	return symbolic_constant_print(octx->tbl.mark, expr, true, octx);
 }
 
-static struct error_record *mark_type_parse(const struct expr *sym,
+static struct error_record *mark_type_parse(struct parse_ctx *ctx,
+					    const struct expr *sym,
 					    struct expr **res)
 {
-	return symbolic_constant_parse(sym, mark_tbl, res);
+	return symbolic_constant_parse(ctx, sym, ctx->tbl->mark, res);
 }
 
 const struct datatype mark_type = {
@@ -1019,7 +1036,8 @@ static void time_type_print(const struct expr *expr, struct output_ctx *octx)
 	time_print(mpz_get_uint64(expr->value), octx);
 }
 
-static struct error_record *time_type_parse(const struct expr *sym,
+static struct error_record *time_type_parse(struct parse_ctx *ctx,
+					    const struct expr *sym,
 					    struct expr **res)
 {
 	struct error_record *erec;
@@ -1050,7 +1068,8 @@ const struct datatype time_type = {
 	.parse		= time_type_parse,
 };
 
-static struct error_record *concat_type_parse(const struct expr *sym,
+static struct error_record *concat_type_parse(struct parse_ctx *ctx,
+					      const struct expr *sym,
 					      struct expr **res)
 {
 	return error(&sym->location, "invalid data type, expected %s",
@@ -1245,4 +1264,70 @@ const struct datatype boolean_type = {
 	.basetype	= &integer_type,
 	.sym_tbl	= &boolean_tbl,
 	.json		= boolean_type_json,
+};
+
+static struct error_record *priority_type_parse(struct parse_ctx *ctx,
+						const struct expr *sym,
+						struct expr **res)
+{
+	struct error_record *erec;
+	int num;
+
+	erec = integer_type_parse(ctx, sym, res);
+	if (!erec) {
+		num = atoi(sym->identifier);
+		expr_free(*res);
+		*res = constant_expr_alloc(&sym->location, &integer_type,
+					   BYTEORDER_HOST_ENDIAN,
+					   sizeof(int) * BITS_PER_BYTE, &num);
+	} else {
+		erec_destroy(erec);
+		*res = constant_expr_alloc(&sym->location, &string_type,
+					   BYTEORDER_HOST_ENDIAN,
+					   strlen(sym->identifier) * BITS_PER_BYTE,
+					   sym->identifier);
+	}
+
+	return NULL;
+}
+
+/* This datatype is not registered via datatype_register()
+ * since this datatype should not ever be used from either
+ * rules or elements.
+ */
+const struct datatype priority_type = {
+	.type		= TYPE_STRING,
+	.name		= "priority",
+	.desc		= "priority type",
+	.parse		= priority_type_parse,
+};
+
+static struct error_record *policy_type_parse(struct parse_ctx *ctx,
+					      const struct expr *sym,
+					      struct expr **res)
+{
+	int policy;
+
+	if (!strcmp(sym->identifier, "accept"))
+		policy = NF_ACCEPT;
+	else if (!strcmp(sym->identifier, "drop"))
+		policy = NF_DROP;
+	else
+		return error(&sym->location, "wrong policy");
+
+	*res = constant_expr_alloc(&sym->location, &integer_type,
+				   BYTEORDER_HOST_ENDIAN,
+				   sizeof(int) * BITS_PER_BYTE, &policy);
+	return NULL;
+}
+
+/* This datatype is not registered via datatype_register()
+ * since this datatype should not ever be used from either
+ * rules or elements.
+ */
+const struct datatype policy_type = {
+	.type		= TYPE_STRING,
+	.name		= "policy",
+	.desc		= "policy type",
+	.parse		= policy_type_parse,
 };

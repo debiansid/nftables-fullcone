@@ -100,10 +100,10 @@ sbin_PROGRAMS = nft$(EXEEXT)
 @BUILD_JSON_TRUE@am__append_8 = ${JANSSON_LIBS}
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/gcc4_visibility.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -160,19 +160,20 @@ libnftables_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1)
 am__libnftables_la_SOURCES_DIST = rule.c statement.c cache.c \
 	datatype.c expression.c evaluate.c proto.c payload.c exthdr.c \
-	fib.c hash.c meta.c rt.c numgen.c ct.c xfrm.c netlink.c \
-	netlink_linearize.c netlink_delinearize.c misspell.c monitor.c \
-	segtree.c rbtree.c gmputil.c utils.c erec.c mnl.c iface.c \
-	mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c libnftables.c \
-	xt.c json.c parser_json.c
+	fib.c hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c \
+	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
+	monitor.c segtree.c rbtree.c gmputil.c utils.c erec.c mnl.c \
+	iface.c mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c print.c \
+	libnftables.c libnftables.map xt.c json.c parser_json.c
 @BUILD_JSON_TRUE@am__objects_1 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo datatype.lo \
 	expression.lo evaluate.lo proto.lo payload.lo exthdr.lo fib.lo \
-	hash.lo meta.lo rt.lo numgen.lo ct.lo xfrm.lo netlink.lo \
-	netlink_linearize.lo netlink_delinearize.lo misspell.lo \
-	monitor.lo segtree.lo rbtree.lo gmputil.lo utils.lo erec.lo \
-	mnl.lo iface.lo mergesort.lo osf.lo nfnl_osf.lo tcpopt.lo \
-	socket.lo libnftables.lo xt.lo $(am__objects_1)
+	hash.lo ipopt.lo meta.lo rt.lo numgen.lo ct.lo xfrm.lo \
+	netlink.lo netlink_linearize.lo netlink_delinearize.lo \
+	misspell.lo monitor.lo segtree.lo rbtree.lo gmputil.lo \
+	utils.lo erec.lo mnl.lo iface.lo mergesort.lo osf.lo \
+	nfnl_osf.lo tcpopt.lo socket.lo print.lo libnftables.lo xt.lo \
+	$(am__objects_1)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
 libnftables_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -301,6 +302,7 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+GCC_FVISIBILITY_HIDDEN = @GCC_FVISIBILITY_HIDDEN@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -440,18 +442,18 @@ AM_CFLAGS = -Wall								\
 	    -Wdeclaration-after-statement -Wsign-compare -Winit-self		\
 	    -Wformat-nonliteral -Wformat-security -Wmissing-format-attribute	\
 	    -Wcast-align -Wundef -Wbad-function-cast				\
-	    -Waggregate-return -Wunused -Wwrite-strings
+	    -Waggregate-return -Wunused -Wwrite-strings ${GCC_FVISIBILITY_HIDDEN}
 
-AM_YFLAGS = -d
+AM_YFLAGS = -d -Wno-yacc
 BUILT_SOURCES = parser_bison.h
 lib_LTLIBRARIES = libnftables.la
 libnftables_la_SOURCES = rule.c statement.c cache.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c fib.c \
-	hash.c meta.c rt.c numgen.c ct.c xfrm.c netlink.c \
+	hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c netlink.c \
 	netlink_linearize.c netlink_delinearize.c misspell.c monitor.c \
 	segtree.c rbtree.c gmputil.c utils.c erec.c mnl.c iface.c \
-	mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c libnftables.c \
-	xt.c $(am__append_7)
+	mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c print.c \
+	libnftables.c libnftables.map xt.c $(am__append_7)
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la $(am__append_3)
@@ -466,7 +468,9 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 
 libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la \
 	$(am__append_4) $(am__append_5) $(am__append_8)
-libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION}
+libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION} \
+			 --version-script=$(srcdir)/libnftables.map
+
 @BUILD_MINIGMP_TRUE@libminigmp_la_SOURCES = mini-gmp.c
 @BUILD_MINIGMP_TRUE@libminigmp_la_CFLAGS = ${AM_CFLAGS} -Wno-sign-compare
 nft_SOURCES = main.c $(am__append_6)
@@ -636,6 +640,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ipopt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libminigmp_la-mini-gmp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnftables.Plo@am__quote@
@@ -655,6 +660,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/osf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parser_json.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/payload.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/print.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rbtree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt.Plo@am__quote@

@@ -122,6 +122,9 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	if (elem->timeout)
 		nftnl_set_elem_set_u64(nlse, NFTNL_SET_ELEM_TIMEOUT,
 				       elem->timeout);
+	if (elem->expiration)
+		nftnl_set_elem_set_u64(nlse, NFTNL_SET_ELEM_EXPIRATION,
+				       elem->expiration);
 	if (elem->comment || expr->elem_flags) {
 		udbuf = nftnl_udata_buf_alloc(NFT_USERDATA_MAXLEN);
 		if (!udbuf)
@@ -143,7 +146,7 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 				   nftnl_udata_buf_len(udbuf));
 		nftnl_udata_buf_free(udbuf);
 	}
-	if (set->set_flags & NFT_SET_MAP && data != NULL) {
+	if (set_is_datamap(set->set_flags) && data != NULL) {
 		netlink_gen_data(data, &nld);
 		switch (data->etype) {
 		case EXPR_VERDICT:
@@ -162,7 +165,7 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 			break;
 		}
 	}
-	if (set->set_flags & NFT_SET_OBJECT && data != NULL) {
+	if (set_is_objmap(set->set_flags) && data != NULL) {
 		netlink_gen_data(data, &nld);
 		nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_OBJREF,
 				   nld.value, nld.len);
@@ -219,17 +222,27 @@ static void netlink_gen_verdict(const struct expr *expr,
 				struct nft_data_linearize *data)
 {
 	char chain[NFT_CHAIN_MAXNAMELEN];
+	unsigned int len;
 
 	data->verdict = expr->verdict;
 
 	switch (expr->verdict) {
 	case NFT_JUMP:
 	case NFT_GOTO:
+		len = expr->chain->len / BITS_PER_BYTE;
+
+		if (!len)
+			BUG("chain length is 0");
+
+		if (len > sizeof(chain))
+			BUG("chain is too large (%u, %u max)",
+			    len, (unsigned int)sizeof(chain));
+
+		memset(chain, 0, sizeof(chain));
+
 		mpz_export_data(chain, expr->chain->value,
-				BYTEORDER_HOST_ENDIAN,
-				NFT_CHAIN_MAXNAMELEN);
+				BYTEORDER_HOST_ENDIAN, len);
 		snprintf(data->chain, NFT_CHAIN_MAXNAMELEN, "%s", chain);
-		data->chain[NFT_CHAIN_MAXNAMELEN-1] = '\0';
 		break;
 	}
 }
@@ -366,6 +379,8 @@ struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 					const struct nftnl_chain *nlc)
 {
 	struct chain *chain;
+	int priority;
+	int policy;
 
 	chain = chain_alloc(nftnl_chain_get_str(nlc, NFTNL_CHAIN_NAME));
 	chain->handle.family =
@@ -383,11 +398,21 @@ struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 			nftnl_chain_get_u32(nlc, NFTNL_CHAIN_HOOKNUM);
 		chain->hookstr       =
 			hooknum2str(chain->handle.family, chain->hooknum);
-		chain->priority.num  =
-			nftnl_chain_get_s32(nlc, NFTNL_CHAIN_PRIO);
+		priority = nftnl_chain_get_s32(nlc, NFTNL_CHAIN_PRIO);
+		chain->priority.expr =
+				constant_expr_alloc(&netlink_location,
+						    &integer_type,
+						    BYTEORDER_HOST_ENDIAN,
+						    sizeof(int) * BITS_PER_BYTE,
+						    &priority);
 		chain->type          =
 			xstrdup(nftnl_chain_get_str(nlc, NFTNL_CHAIN_TYPE));
-		chain->policy          =
+		policy = nftnl_chain_get_u32(nlc, NFTNL_CHAIN_POLICY);
+		chain->policy = constant_expr_alloc(&netlink_location,
+						    &integer_type,
+						    BYTEORDER_HOST_ENDIAN,
+						    sizeof(int) * BITS_PER_BYTE,
+						    &policy);
 			nftnl_chain_get_u32(nlc, NFTNL_CHAIN_POLICY);
 		if (nftnl_chain_is_set(nlc, NFTNL_CHAIN_DEV)) {
 			chain->dev	=
@@ -578,7 +603,7 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	}
 
 	flags = nftnl_set_get_u32(nls, NFTNL_SET_FLAGS);
-	if (flags & NFT_SET_MAP) {
+	if (set_is_datamap(flags)) {
 		data = nftnl_set_get_u32(nls, NFTNL_SET_DATA_TYPE);
 		datatype = dtype_map_from_kernel(data);
 		if (datatype == NULL) {
@@ -590,7 +615,7 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	} else
 		datatype = NULL;
 
-	if (flags & NFT_SET_OBJECT) {
+	if (set_is_objmap(flags)) {
 		objtype = nftnl_set_get_u32(nls, NFTNL_SET_OBJ_TYPE);
 		datatype = &string_type;
 	}
@@ -792,7 +817,7 @@ int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
 	if (flags & NFT_SET_ELEM_INTERVAL_END)
 		expr->flags |= EXPR_F_INTERVAL_END;
 
-	if (set->flags & NFT_SET_MAP) {
+	if (set_is_datamap(set->flags)) {
 		if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_DATA)) {
 			nld.value = nftnl_set_elem_get(nlse, NFTNL_SET_ELEM_DATA,
 						       &nld.len);
@@ -814,7 +839,7 @@ int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
 
 		expr = mapping_expr_alloc(&netlink_location, expr, data);
 	}
-	if (set->flags & NFT_SET_OBJECT) {
+	if (set_is_objmap(set->flags)) {
 		if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_OBJREF)) {
 			nld.value = nftnl_set_elem_get(nlse,
 						       NFTNL_SET_ELEM_OBJREF,
@@ -993,6 +1018,18 @@ struct obj *netlink_delinearize_obj(struct netlink_ctx *ctx,
 		obj->limit.flags =
 			nftnl_obj_get_u32(nlo, NFTNL_OBJ_LIMIT_FLAGS);
 		break;
+	case NFT_OBJECT_CT_EXPECT:
+		obj->ct_expect.l3proto =
+			nftnl_obj_get_u16(nlo, NFTNL_OBJ_CT_EXPECT_L3PROTO);
+		obj->ct_expect.l4proto =
+			nftnl_obj_get_u8(nlo, NFTNL_OBJ_CT_EXPECT_L4PROTO);
+		obj->ct_expect.dport =
+			nftnl_obj_get_u16(nlo, NFTNL_OBJ_CT_EXPECT_DPORT);
+		obj->ct_expect.timeout =
+			nftnl_obj_get_u32(nlo, NFTNL_OBJ_CT_EXPECT_TIMEOUT);
+		obj->ct_expect.size =
+			nftnl_obj_get_u8(nlo, NFTNL_OBJ_CT_EXPECT_SIZE);
+		break;
 	}
 	obj->type = type;
 
@@ -1065,7 +1102,7 @@ netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 {
 	struct flowtable *flowtable;
 	const char * const *dev_array;
-	int len = 0, i;
+	int len = 0, i, priority;
 
 	flowtable = flowtable_alloc(&netlink_location);
 	flowtable->handle.family =
@@ -1084,8 +1121,14 @@ netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 
 	flowtable->dev_array_len = len;
 
-	flowtable->priority.num =
-		nftnl_flowtable_get_u32(nlo, NFTNL_FLOWTABLE_PRIO);
+	priority = nftnl_flowtable_get_u32(nlo, NFTNL_FLOWTABLE_PRIO);
+	flowtable->priority.expr =
+				constant_expr_alloc(&netlink_location,
+						    &integer_type,
+						    BYTEORDER_HOST_ENDIAN,
+						    sizeof(int) *
+						    BITS_PER_BYTE,
+						    &priority);
 	flowtable->hooknum =
 		nftnl_flowtable_get_u32(nlo, NFTNL_FLOWTABLE_HOOKNUM);
 

@@ -1,7 +1,5 @@
 EXTRA_DIST = setup.py __init__.py nftables.py schema.json
 
-if HAVE_PYTHON
-
 all-local:
 	cd $(srcdir) && \
 		$(PYTHON_BIN) setup.py build --build-base $(abs_builddir)
@@ -24,8 +22,7 @@ clean-local:
 		$(PYTHON_BIN) setup.py clean \
 		--build-base $(abs_builddir)
 	rm -rf scripts-* lib* build dist bdist.* nftables.egg-info
-	find . -name \*.pyc -print0 | xargs -0 rm -f
+	find . -name \*.pyc -delete
 
 distclean-local:
 	rm -f version
-endif

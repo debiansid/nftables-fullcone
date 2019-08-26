@@ -89,10 +89,10 @@ build_triplet = x86_64-pc-linux-gnu
 host_triplet = x86_64-pc-linux-gnu
 subdir = files
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/gcc4_visibility.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
@@ -183,13 +183,13 @@ am__relativize = \
   done; \
   reldir="$$dir2"
 A2X = a2x
-ACLOCAL = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing aclocal-1.15
+ACLOCAL = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing autoconf
-AUTOHEADER = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing autoheader
-AUTOMAKE = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing automake-1.15
+AUTOCONF = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing autoconf
+AUTOHEADER = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing autoheader
+AUTOMAKE = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing automake-1.15
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -208,6 +208,7 @@ ECHO_T =
 EGREP = /bin/grep -E
 EXEEXT = 
 FGREP = /bin/grep -F
+GCC_FVISIBILITY_HIDDEN = -fvisibility=hidden
 GREP = /bin/grep
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
@@ -230,7 +231,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
-MAKEINFO = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/missing makeinfo
+MAKEINFO = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -242,10 +243,10 @@ OTOOL64 =
 PACKAGE = nftables
 PACKAGE_BUGREPORT = netfilter-devel@vger.kernel.org
 PACKAGE_NAME = nftables
-PACKAGE_STRING = nftables 0.9.1
+PACKAGE_STRING = nftables 0.9.2
 PACKAGE_TARNAME = nftables
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.9.1
+PACKAGE_VERSION = 0.9.2
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -256,15 +257,15 @@ SED = /bin/sed
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = strip
-VERSION = 0.9.1
+VERSION = 0.9.2
 XTABLES_CFLAGS = 
 XTABLES_LIBS = 
 YACC = bison -y
 YFLAGS = 
-abs_builddir = /tmp/tmp.oKn4z6YV6r/files
-abs_srcdir = /tmp/tmp.oKn4z6YV6r/files
-abs_top_builddir = /tmp/tmp.oKn4z6YV6r
-abs_top_srcdir = /tmp/tmp.oKn4z6YV6r
+abs_builddir = /tmp/tmp.uUKS8h0mMl/files
+abs_srcdir = /tmp/tmp.uUKS8h0mMl/files
+abs_top_builddir = /tmp/tmp.uUKS8h0mMl
+abs_top_srcdir = /tmp/tmp.uUKS8h0mMl
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -293,7 +294,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /tmp/tmp.oKn4z6YV6r/build-aux/install-sh
+install_sh = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale

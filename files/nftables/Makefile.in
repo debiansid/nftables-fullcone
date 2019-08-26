@@ -90,10 +90,10 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = files/nftables
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/gcc4_visibility.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(dist_pkgsysconf_DATA) \
@@ -179,6 +179,7 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+GCC_FVISIBILITY_HIDDEN = @GCC_FVISIBILITY_HIDDEN@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -292,6 +293,7 @@ dist_pkgsysconf_DATA = all-in-one.nft		\
 			arp-filter.nft		\
 			bridge-filter.nft	\
 			inet-filter.nft		\
+			inet-nat.nft		\
 			ipv4-filter.nft		\
 			ipv4-mangle.nft		\
 			ipv4-nat.nft		\
@@ -299,7 +301,8 @@ dist_pkgsysconf_DATA = all-in-one.nft		\
 			ipv6-filter.nft		\
 			ipv6-mangle.nft		\
 			ipv6-nat.nft		\
-			ipv6-raw.nft
+			ipv6-raw.nft		\
+			netdev-ingress.nft
 
 all: all-am
 

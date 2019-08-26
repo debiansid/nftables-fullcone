@@ -24,14 +24,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include <nftables.h>
-#include <parser.h>
-#include <erec.h>
-#include <utils.h>
-#include <iface.h>
 #include <cli.h>
-
-#include <libmnl/libmnl.h>
+#include <list.h>
 
 #define CMDLINE_HISTFILE	".nft.history"
 
@@ -63,9 +57,15 @@ static char *cli_append_multiline(char *line)
 		rl_set_prompt(".... ");
 	} else {
 		len += strlen(multiline);
-		s = xmalloc(len + 1);
+		s = malloc(len + 1);
+		if (!s) {
+			fprintf(stderr, "%s:%u: Memory allocation failure\n",
+				__FILE__, __LINE__);
+			cli_exit();
+			exit(EXIT_FAILURE);
+		}
 		snprintf(s, len + 1, "%s%s", multiline, line);
-		xfree(multiline);
+		free(multiline);
 		multiline = s;
 	}
 	line = NULL;
@@ -111,7 +111,7 @@ static void cli_complete(char *line)
 		add_history(line);
 
 	nft_run_cmd_from_buffer(cli_nft, line);
-	xfree(line);
+	free(line);
 }
 
 static char **cli_completion(const char *text, int start, int end)

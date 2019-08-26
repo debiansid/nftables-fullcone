@@ -23,6 +23,7 @@
 #include <linux/netfilter/nf_nat.h>
 #include <linux/netfilter/nf_log.h>
 #include <linux/netfilter/nfnetlink_osf.h>
+#include <linux/netfilter/nf_synproxy.h>
 #include <linux/xfrm.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
@@ -115,12 +116,12 @@ int nft_lex(void *, void *, void *);
 
 %name-prefix "nft_"
 %debug
-%pure-parser
+%define api.pure
 %parse-param		{ struct nft_ctx *nft }
 %parse-param		{ void *scanner }
 %parse-param		{ struct parser_state *state }
 %lex-param		{ scanner }
-%error-verbose
+%define parse.error verbose
 %locations
 
 %initial-action {
@@ -133,6 +134,7 @@ int nft_lex(void *, void *, void *);
 
 %union {
 	uint64_t		val;
+	uint32_t		val32;
 	const char *		string;
 
 	struct list_head	*list;
@@ -200,6 +202,11 @@ int nft_lex(void *, void *, void *);
 
 %token OSF			"osf"
 
+%token SYNPROXY			"synproxy"
+%token MSS			"mss"
+%token WSCALE			"wscale"
+%token SACKPERM			"sack-perm"
+
 %token HOOK			"hook"
 %token DEVICE			"device"
 %token DEVICES			"devices"
@@ -255,6 +262,7 @@ int nft_lex(void *, void *, void *);
 %token TIMEOUT			"timeout"
 %token GC_INTERVAL		"gc-interval"
 %token ELEMENTS			"elements"
+%token EXPIRES			"expires"
 
 %token POLICY			"policy"
 %token MEMORY			"memory"
@@ -307,6 +315,14 @@ int nft_lex(void *, void *, void *);
 %token TTL			"ttl"
 %token PROTOCOL			"protocol"
 %token CHECKSUM			"checksum"
+
+%token PTR			"ptr"
+%token VALUE			"value"
+
+%token LSRR			"lsrr"
+%token RR			"rr"
+%token SSRR			"ssrr"
+%token RA			"ra"
 
 %token ICMP			"icmp"
 %token CODE			"code"
@@ -426,6 +442,7 @@ int nft_lex(void *, void *, void *);
 %token ZONE			"zone"
 %token DIRECTION		"direction"
 %token EVENT			"event"
+%token EXPECTATION		"expectation"
 %token EXPIRATION		"expiration"
 %token HELPER			"helper"
 %token LABEL			"label"
@@ -545,7 +562,8 @@ int nft_lex(void *, void *, void *);
 %destructor { handle_free(&$$); } table_spec tableid_spec chain_spec chainid_spec flowtable_spec chain_identifier ruleid_spec handle_spec position_spec rule_position ruleset_spec index_spec
 %type <handle>			set_spec setid_spec set_identifier flowtable_identifier obj_spec objid_spec obj_identifier
 %destructor { handle_free(&$$); } set_spec setid_spec set_identifier obj_spec objid_spec obj_identifier
-%type <val>			family_spec family_spec_explicit chain_policy int_num
+%type <val>			family_spec family_spec_explicit
+%type <val32>			int_num	chain_policy
 %type <prio_spec>		extended_prio_spec prio_spec
 %type <string>			extended_prio_name
 %destructor { xfree($$); }	extended_prio_name
@@ -573,7 +591,7 @@ int nft_lex(void *, void *, void *);
 %type <flowtable>		flowtable_block_alloc flowtable_block
 %destructor { flowtable_free($$); }	flowtable_block_alloc
 
-%type <obj>			obj_block_alloc counter_block quota_block ct_helper_block ct_timeout_block limit_block secmark_block
+%type <obj>			obj_block_alloc counter_block quota_block ct_helper_block ct_timeout_block ct_expect_block limit_block secmark_block
 %destructor { obj_free($$); }	obj_block_alloc
 
 %type <list>			stmt_list
@@ -601,6 +619,9 @@ int nft_lex(void *, void *, void *);
 %type <val>			nf_nat_flags nf_nat_flag offset_opt
 %type <stmt>			tproxy_stmt
 %destructor { stmt_free($$); }	tproxy_stmt
+%type <stmt>			synproxy_stmt synproxy_stmt_alloc
+%destructor { stmt_free($$); }	synproxy_stmt synproxy_stmt_alloc
+
 
 %type <stmt>			queue_stmt queue_stmt_alloc
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
@@ -617,8 +638,8 @@ int nft_lex(void *, void *, void *);
 %type <stmt>			meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
 %destructor { stmt_free($$); }	meter_stmt meter_stmt_alloc flow_stmt_legacy_alloc
 
-%type <expr>			symbol_expr verdict_expr integer_expr variable_expr chain_expr
-%destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr variable_expr chain_expr
+%type <expr>			symbol_expr verdict_expr integer_expr variable_expr chain_expr policy_expr
+%destructor { expr_free($$); }	symbol_expr verdict_expr integer_expr variable_expr chain_expr policy_expr
 %type <expr>			primary_expr shift_expr and_expr
 %destructor { expr_free($$); }	primary_expr shift_expr and_expr
 %type <expr>			exclusive_or_expr inclusive_or_expr
@@ -697,6 +718,7 @@ int nft_lex(void *, void *, void *);
 %type <expr>			ip_hdr_expr	icmp_hdr_expr		igmp_hdr_expr numgen_expr	hash_expr
 %destructor { expr_free($$); }	ip_hdr_expr	icmp_hdr_expr		igmp_hdr_expr numgen_expr	hash_expr
 %type <val>			ip_hdr_field	icmp_hdr_field		igmp_hdr_field
+%type <val>			ip_option_type	ip_option_field
 %type <expr>			ip6_hdr_expr    icmp6_hdr_expr
 %destructor { expr_free($$); }	ip6_hdr_expr	icmp6_hdr_expr
 %type <val>			ip6_hdr_field   icmp6_hdr_field
@@ -709,6 +731,9 @@ int nft_lex(void *, void *, void *);
 %type <expr>			dccp_hdr_expr	sctp_hdr_expr
 %destructor { expr_free($$); }	dccp_hdr_expr	sctp_hdr_expr
 %type <val>			dccp_hdr_field	sctp_hdr_field
+%type <expr>			th_hdr_expr
+%destructor { expr_free($$); }	th_hdr_expr
+%type <val>			th_hdr_field
 
 %type <expr>			exthdr_expr
 %destructor { expr_free($$); }	exthdr_expr
@@ -974,6 +999,10 @@ add_cmd			:	TABLE		table_spec
 			{
 				$$ = cmd_alloc_obj_ct(CMD_ADD, NFT_OBJECT_CT_TIMEOUT, &$3, &@$, $4);
 			}
+			|	CT	EXPECTATION	obj_spec	ct_obj_alloc	'{' ct_expect_block '}'
+			{
+				$$ = cmd_alloc_obj_ct(CMD_ADD, NFT_OBJECT_CT_EXPECT, &$3, &@$, $4);
+			}
 			|	LIMIT		obj_spec	limit_obj
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_LIMIT, &$2, &@$, $3);
@@ -1062,6 +1091,10 @@ create_cmd		:	TABLE		table_spec
 			|	CT	TIMEOUT obj_spec	ct_obj_alloc	'{' ct_timeout_block '}'
 			{
 				$$ = cmd_alloc_obj_ct(CMD_CREATE, NFT_OBJECT_CT_TIMEOUT, &$3, &@$, $4);
+			}
+			|	CT	EXPECTATION obj_spec	ct_obj_alloc	'{' ct_expect_block '}'
+			{
+				$$ = cmd_alloc_obj_ct(CMD_CREATE, NFT_OBJECT_CT_EXPECT, &$3, &@$, $4);
 			}
 			|	LIMIT		obj_spec	limit_obj
 			{
@@ -1282,6 +1315,10 @@ list_cmd		:	TABLE		table_spec
 			|	CT		TIMEOUT		TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_CT_TIMEOUT, &$4, &@$, NULL);
+			}
+			|	CT		EXPECTATION		TABLE		table_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_CT_EXPECT, &$4, &@$, NULL);
 			}
 			;
 
@@ -1518,6 +1555,15 @@ table_block		:	/* empty */	{ $$ = $<table>-1; }
 			{
 				$5->location = @4;
 				$5->type = NFT_OBJECT_CT_TIMEOUT;
+				handle_merge(&$5->handle, &$4);
+				handle_free(&$4);
+				list_add_tail(&$5->list, &$1->objs);
+				$$ = $1;
+			}
+			|	table_block	CT	EXPECTATION obj_identifier obj_block_alloc '{'	ct_expect_block	'}' stmt_separator
+			{
+				$5->location = @4;
+				$5->type = NFT_OBJECT_CT_EXPECT;
 				handle_merge(&$5->handle, &$4);
 				handle_free(&$4);
 				list_add_tail(&$5->list, &$1->objs);
@@ -1847,6 +1893,15 @@ ct_timeout_block	:	/*empty */	{ $$ = $<obj>-1; }
 			}
 			;
 
+ct_expect_block		:	/*empty */	{ $$ = $<obj>-1; }
+			|	ct_expect_block     common_block
+			|	ct_expect_block     stmt_separator
+			|	ct_expect_block     ct_expect_config
+			{
+				$$ = $1;
+			}
+			;
+
 limit_block		:	/* empty */	{ $$ = $<obj>-1; }
 			|       limit_block     common_block
 			|       limit_block     stmt_separator
@@ -1919,32 +1974,60 @@ extended_prio_name	:	OUT
 extended_prio_spec	:	int_num
 			{
 				struct prio_spec spec = {0};
-				spec.num = $1;
+
+				spec.expr = constant_expr_alloc(&@$, &integer_type,
+								BYTEORDER_HOST_ENDIAN,
+								sizeof(int) *
+								BITS_PER_BYTE, &$1);
+				$$ = spec;
+			}
+			|	variable_expr
+			{
+				struct prio_spec spec = {0};
+
+				datatype_set($1->sym->expr, &priority_type);
+				spec.expr = $1;
 				$$ = spec;
 			}
 			|	extended_prio_name
 			{
 				struct prio_spec spec = {0};
-				spec.str = $1;
+
+				spec.expr = constant_expr_alloc(&@$, &string_type,
+								BYTEORDER_HOST_ENDIAN,
+								strlen($1) * BITS_PER_BYTE,
+								$1);
+				xfree($1);
 				$$ = spec;
 			}
 			|	extended_prio_name PLUS NUM
 			{
 				struct prio_spec spec = {0};
-				spec.num = $3;
-				spec.str = $1;
+
+				char str[NFT_NAME_MAXLEN];
+				snprintf(str, sizeof(str), "%s + %" PRIu64, $1, $3);
+				spec.expr = constant_expr_alloc(&@$, &string_type,
+								BYTEORDER_HOST_ENDIAN,
+								strlen(str) * BITS_PER_BYTE,
+								str);
+				xfree($1);
 				$$ = spec;
 			}
 			|	extended_prio_name DASH NUM
 			{
 				struct prio_spec spec = {0};
-				spec.num = -$3;
-				spec.str = $1;
+				char str[NFT_NAME_MAXLEN];
+
+				snprintf(str, sizeof(str), "%s - %" PRIu64, $1, $3);
+				spec.expr = constant_expr_alloc(&@$, &string_type,
+								BYTEORDER_HOST_ENDIAN,
+								strlen(str) * BITS_PER_BYTE,
+								str);
 				$$ = spec;
 			}
 			;
 
-int_num		:	NUM			{ $$ = $1; }
+int_num			:	NUM			{ $$ = $1; }
 			|	DASH	NUM		{ $$ = -$2; }
 			;
 
@@ -1952,14 +2035,29 @@ dev_spec		:	DEVICE	string		{ $$ = $2; }
 			|	/* empty */		{ $$ = NULL; }
 			;
 
-policy_spec		:	POLICY		chain_policy
+policy_spec		:	POLICY		policy_expr
 			{
-				if ($<chain>0->policy != -1) {
+				if ($<chain>0->policy) {
 					erec_queue(error(&@$, "you cannot set chain policy twice"),
 						   state->msgs);
+					expr_free($2);
 					YYERROR;
 				}
 				$<chain>0->policy	= $2;
+			}
+			;
+
+policy_expr		:	variable_expr
+			{
+				datatype_set($1->sym->expr, &policy_type);
+				$$ = $1;
+			}
+			|	chain_policy
+			{
+				$$ = constant_expr_alloc(&@$, &integer_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(int) *
+							 BITS_PER_BYTE, &$1);
 			}
 			;
 
@@ -2245,6 +2343,7 @@ stmt			:	verdict_stmt
 			|	fwd_stmt
 			|	set_stmt
 			|	map_stmt
+			|	synproxy_stmt
 			;
 
 verdict_stmt		:	verdict_expr
@@ -2672,6 +2771,43 @@ tproxy_stmt		:	TPROXY TO stmt_expr
 				$$ = tproxy_stmt_alloc(&@$);
 				$$->tproxy.family = $2;
 				$$->tproxy.port = $5;
+			}
+			;
+
+synproxy_stmt		:	synproxy_stmt_alloc
+			|	synproxy_stmt_alloc	synproxy_args
+			;
+
+synproxy_stmt_alloc	:	SYNPROXY
+			{
+				$$ = synproxy_stmt_alloc(&@$);
+			}
+			;
+
+synproxy_args		:	synproxy_arg
+			{
+				$<stmt>$	= $<stmt>0;
+			}
+			|	synproxy_args	synproxy_arg
+			;
+
+synproxy_arg		:	MSS	NUM
+			{
+				$<stmt>0->synproxy.mss = $2;
+				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_MSS;
+			}
+			|	WSCALE	NUM
+			{
+				$<stmt>0->synproxy.wscale = $2;
+				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_WSCALE;
+			}
+			|	TIMESTAMP
+			{
+				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_TIMESTAMP;
+			}
+			|	SACKPERM
+			{
+				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_SACK_PERM;
 			}
 			;
 
@@ -3367,6 +3503,10 @@ set_elem_option		:	TIMEOUT			time_spec
 			{
 				$<expr>0->timeout = $2;
 			}
+			|	EXPIRES		time_spec
+			{
+				$<expr>0->expiration = $2;
+			}
 			|	comment_spec
 			{
 				$<expr>0->comment = $1;
@@ -3457,6 +3597,7 @@ secmark_obj		:	secmark_config
 
 ct_obj_type		:	HELPER		{ $$ = NFT_OBJECT_CT_HELPER; }
 			|	TIMEOUT		{ $$ = NFT_OBJECT_CT_TIMEOUT; }
+			|	EXPECTATION	{ $$ = NFT_OBJECT_CT_EXPECT; }
 			;
 
 ct_l4protoname		:	TCP	{ $$ = IPPROTO_TCP; }
@@ -3511,7 +3652,7 @@ timeout_state		:	STRING	COLON	NUM
 			}
 			;
 
-ct_timeout_config	:	PROTOCOL	ct_l4protoname	SEMICOLON
+ct_timeout_config	:	PROTOCOL	ct_l4protoname	stmt_separator
 			{
 				struct ct_timeout *ct;
 				int l4proto = $2;
@@ -3530,6 +3671,28 @@ ct_timeout_config	:	PROTOCOL	ct_l4protoname	SEMICOLON
 			|	L3PROTOCOL	family_spec_explicit	stmt_separator
 			{
 				$<obj>0->ct_timeout.l3proto = $2;
+			}
+			;
+
+ct_expect_config	:	PROTOCOL	ct_l4protoname	stmt_separator
+			{
+				$<obj>0->ct_expect.l4proto = $2;
+			}
+			|	DPORT	NUM	stmt_separator
+			{
+				$<obj>0->ct_expect.dport = $2;
+			}
+			|	TIMEOUT	time_spec	stmt_separator
+			{
+				$<obj>0->ct_expect.timeout = $2;
+			}
+			|	SIZE	NUM	stmt_separator
+			{
+				$<obj>0->ct_expect.size = $2;
+			}
+			|	L3PROTOCOL	family_spec_explicit	stmt_separator
+			{
+				$<obj>0->ct_expect.l3proto = $2;
 			}
 			;
 
@@ -4152,6 +4315,12 @@ ct_stmt			:	CT	ct_key		SET	stmt_expr
 				$$->objref.expr = $4;
 
 			}
+			|	CT	EXPECTATION	SET	stmt_expr
+			{
+				$$ = objref_stmt_alloc(&@$);
+				$$->objref.type = NFT_OBJECT_CT_EXPECT;
+				$$->objref.expr = $4;
+			}
 			|	CT	ct_dir	ct_key_dir_optional SET	stmt_expr
 			{
 				$$ = ct_stmt_alloc(&@$, $3, $2, $5);
@@ -4184,6 +4353,7 @@ payload_expr		:	payload_raw_expr
 			|	tcp_hdr_expr
 			|	dccp_hdr_expr
 			|	sctp_hdr_expr
+			|	th_hdr_expr
 			;
 
 payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
@@ -4244,6 +4414,15 @@ ip_hdr_expr		:	IP	ip_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_ip, $2);
 			}
+			|	IP	OPTION	ip_option_type ip_option_field
+			{
+				$$ = ipopt_expr_alloc(&@$, $3, $4, 0);
+			}
+			|	IP	OPTION	ip_option_type
+			{
+				$$ = ipopt_expr_alloc(&@$, $3, IPOPT_FIELD_TYPE, 0);
+				$$->exthdr.flags = NFT_EXTHDR_F_PRESENT;
+			}
 			;
 
 ip_hdr_field		:	HDRVERSION	{ $$ = IPHDR_VERSION; }
@@ -4258,6 +4437,19 @@ ip_hdr_field		:	HDRVERSION	{ $$ = IPHDR_VERSION; }
 			|	CHECKSUM	{ $$ = IPHDR_CHECKSUM; }
 			|	SADDR		{ $$ = IPHDR_SADDR; }
 			|	DADDR		{ $$ = IPHDR_DADDR; }
+			;
+
+ip_option_type		:	LSRR		{ $$ = IPOPT_LSRR; }
+			|	RR		{ $$ = IPOPT_RR; }
+			|	SSRR		{ $$ = IPOPT_SSRR; }
+			|	RA		{ $$ = IPOPT_RA; }
+			;
+
+ip_option_field		:	TYPE		{ $$ = IPOPT_FIELD_TYPE; }
+			|	LENGTH		{ $$ = IPOPT_FIELD_LENGTH; }
+			|	VALUE		{ $$ = IPOPT_FIELD_VALUE; }
+			|	PTR		{ $$ = IPOPT_FIELD_PTR; }
+			|	ADDR		{ $$ = IPOPT_FIELD_ADDR_0; }
 			;
 
 icmp_hdr_expr		:	ICMP	icmp_hdr_field
@@ -4449,6 +4641,18 @@ sctp_hdr_field		:	SPORT		{ $$ = SCTPHDR_SPORT; }
 			|	DPORT		{ $$ = SCTPHDR_DPORT; }
 			|	VTAG		{ $$ = SCTPHDR_VTAG; }
 			|	CHECKSUM	{ $$ = SCTPHDR_CHECKSUM; }
+			;
+
+th_hdr_expr		:	TRANSPORT_HDR 	th_hdr_field
+			{
+				$$ = payload_expr_alloc(&@$, &proto_th, $2);
+				if ($$)
+					$$->payload.is_raw = true;
+			}
+			;
+
+th_hdr_field		:	SPORT		{ $$ = THDR_SPORT; }
+			|	DPORT		{ $$ = THDR_DPORT; }
 			;
 
 exthdr_expr		:	hbh_hdr_expr

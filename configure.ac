@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.1], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Headless Horseman"], [Release name])
+AC_INIT([nftables], [0.9.2], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Scram"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -44,6 +44,11 @@ fi
 
 AM_PROG_AR
 AM_PROG_LIBTOOL
+LT_INIT
+AM_PROG_CC_C_O
+AC_EXEEXT
+AC_DISABLE_STATIC
+CHECK_GCC_FVISIBILITY
 
 AS_IF([test "x$enable_man_doc" = "xyes"], [
        AC_CHECK_PROG(A2X, [a2x], [a2x], [no])
@@ -52,7 +57,7 @@ AS_IF([test "x$enable_man_doc" = "xyes"], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.3])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.4])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],
@@ -103,11 +108,14 @@ AC_ARG_WITH([python_bin],
 	   )
 
 AS_IF([test "x$PYTHON_BIN" = "x"], [
-	AS_IF([test "x$enable_python" = "xyes"], [AC_MSG_ERROR([Python asked but not found])])
-	AS_IF([test "x$enable_python" = "xcheck"], [AC_MSG_WARN([Python not found, continuing anyway])])
+	AS_IF([test "x$enable_python" = "xyes"], [AC_MSG_ERROR([Python asked but not found])],
+	[test "x$enable_python" = "xcheck"], [
+		AC_MSG_WARN([Python not found, continuing anyway])
+		enable_python=no
 	])
+])
 
-AM_CONDITIONAL([HAVE_PYTHON], [test "x$PYTHON_BIN" != "x"])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$enable_python" != "no"])
 
 AC_CONFIG_FILES([					\
 		Makefile				\
@@ -138,7 +146,7 @@ nft configuration:
   libxtables support:		${with_xtables}
   json output support:          ${with_json}"
 
-AS_IF([test "x$PYTHON_BIN" != "x"], [
+AS_IF([test "$enable_python" != "no"], [
 	echo "  enable Python:		yes (with $PYTHON_BIN)"
 	], [
 	echo "  enable Python:		no"

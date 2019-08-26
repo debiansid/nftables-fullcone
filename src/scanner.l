@@ -36,23 +36,28 @@
  */
 #define YY_INPUT(buf,result,max_size)						\
 {										\
-	long n = 0;								\
+	result = 0;								\
 	errno = 0;								\
-	while ((result = fread(buf, 1, max_size, yyin)) == 0 &&			\
-		ferror(yyin)) {							\
-		if (errno != EINTR) {						\
-			YY_FATAL_ERROR("input in flex scanner failed");		\
-			break;							\
+										\
+	while (result < max_size) {						\
+		int chr = fgetc(yyin);						\
+										\
+		if (chr != EOF) {						\
+			buf[result++] = chr;					\
+			if (chr == '\n' || chr == ' ')				\
+				break;						\
+			continue;						\
 		}								\
-		errno = 0;							\
-		clearerr(yyin);							\
-	}									\
-	if (result > 1 && !feof(yyin)) {					\
-		while (result > 1 && 						\
-		       (buf[result - 1] != '\n' &&  buf[result - 1] != ' '))	\
-			result--, n++;						\
-		result--, n++;							\
-		fseek(yyin, -n, SEEK_CUR);					\
+										\
+		if (ferror(yyin)) {						\
+			if (errno != EINTR) {					\
+				YY_FATAL_ERROR("input in flex scanner failed");	\
+				break;						\
+			}							\
+			errno = 0;						\
+			clearerr(yyin);						\
+		}								\
+		break;								\
 	}									\
 }
 
@@ -302,6 +307,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "timeout"		{ return TIMEOUT; }
 "gc-interval"		{ return GC_INTERVAL; }
 "elements"		{ return ELEMENTS; }
+"expires"		{ return EXPIRES; }
 
 "policy"		{ return POLICY; }
 "size"			{ return SIZE; }
@@ -400,6 +406,14 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "ttl"			{ return TTL; }
 "protocol"		{ return PROTOCOL; }
 "checksum"		{ return CHECKSUM; }
+
+"lsrr"			{ return LSRR; }
+"rr"			{ return RR; }
+"ssrr"			{ return SSRR; }
+"ra"			{ return RA; }
+
+"value"			{ return VALUE; }
+"ptr"			{ return PTR; }
 
 "echo"			{ return ECHO; }
 "eol"			{ return EOL; }
@@ -520,6 +534,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "reply"			{ return REPLY; }
 "direction"		{ return DIRECTION; }
 "event"			{ return EVENT; }
+"expectation"		{ return EXPECTATION; }
 "expiration"		{ return EXPIRATION; }
 "helper"		{ return HELPER; }
 "helpers"		{ return HELPERS; }
@@ -542,6 +557,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "fib"			{ return FIB; }
 
 "osf"			{ return OSF; }
+
+"synproxy"		{ return SYNPROXY; }
+"mss"			{ return MSS; }
+"wscale"		{ return WSCALE; }
+"sack-perm"		{ return SACKPERM; }
 
 "notrack"		{ return NOTRACK; }
 

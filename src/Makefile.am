@@ -19,10 +19,10 @@ AM_CFLAGS = -Wall								\
 	    -Wdeclaration-after-statement -Wsign-compare -Winit-self		\
 	    -Wformat-nonliteral -Wformat-security -Wmissing-format-attribute	\
 	    -Wcast-align -Wundef -Wbad-function-cast				\
-	    -Waggregate-return -Wunused -Wwrite-strings
+	    -Waggregate-return -Wunused -Wwrite-strings ${GCC_FVISIBILITY_HIDDEN}
 
 
-AM_YFLAGS = -d
+AM_YFLAGS = -d -Wno-yacc
 
 BUILT_SOURCES = parser_bison.h
 
@@ -40,6 +40,7 @@ libnftables_la_SOURCES =			\
 		exthdr.c			\
 		fib.c				\
 		hash.c				\
+		ipopt.c				\
 		meta.c				\
 		rt.c				\
 		numgen.c			\
@@ -62,7 +63,9 @@ libnftables_la_SOURCES =			\
 		nfnl_osf.c			\
 		tcpopt.c			\
 		socket.c			\
-		libnftables.c
+		print.c				\
+		libnftables.c			\
+		libnftables.map
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la
@@ -76,7 +79,8 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 		      -Wno-redundant-decls
 
 libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la
-libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION}
+libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION} \
+			 --version-script=$(srcdir)/libnftables.map
 
 if BUILD_MINIGMP
 noinst_LTLIBRARIES += libminigmp.la

@@ -23,6 +23,7 @@
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
 #include <linux/netfilter/nf_log.h>
 #include <linux/netfilter/nf_nat.h>
+#include <linux/netfilter/nf_synproxy.h>
 #include <linux/netfilter/nf_tables.h>
 #include <jansson.h>
 
@@ -303,7 +304,7 @@ static struct expr *json_parse_constant(struct json_ctx *ctx, const char *name)
 		return constant_expr_alloc(int_loc,
 					   constant_tbl[i].dtype,
 					   BYTEORDER_HOST_ENDIAN,
-					   8 * BITS_PER_BYTE,
+					   BITS_PER_BYTE,
 					   &constant_tbl[i].data);
 	}
 	json_error(ctx, "Unknown constant '%s'.", name);
@@ -502,7 +503,8 @@ static const struct proto_desc *proto_lookup_byname(const char *name)
 		&proto_udplite,
 		&proto_tcp,
 		&proto_dccp,
-		&proto_sctp
+		&proto_sctp,
+		&proto_th,
 	};
 	unsigned int i;
 
@@ -518,11 +520,10 @@ static struct expr *json_parse_payload_expr(struct json_ctx *ctx,
 {
 	const char *protocol, *field, *base;
 	int offset, len, val;
+	struct expr *expr;
 
 	if (!json_unpack(root, "{s:s, s:i, s:i}",
 			 "base", &base, "offset", &offset, "len", &len)) {
-		struct expr *expr;
-
 		if (!strcmp(base, "ll")) {
 			val = PROTO_BASE_LL_HDR;
 		} else if (!strcmp(base, "nh")) {
@@ -552,7 +553,12 @@ static struct expr *json_parse_payload_expr(struct json_ctx *ctx,
 				   protocol, field);
 			return NULL;
 		}
-		return payload_expr_alloc(int_loc, proto, val);
+		expr = payload_expr_alloc(int_loc, proto, val);
+
+		if (proto == &proto_th)
+			expr->payload.is_raw = true;
+
+		return expr;
 	}
 	json_error(ctx, "Invalid payload expression properties.");
 	return NULL;
@@ -585,6 +591,66 @@ static struct expr *json_parse_tcp_option_expr(struct json_ctx *ctx,
 		return NULL;
 	}
 	return tcpopt_expr_alloc(int_loc, descval, fieldval);
+}
+
+static int json_parse_ip_option_type(const char *name, int *val)
+{
+	unsigned int i;
+
+	for (i = 0; i < array_size(ipopt_protocols); i++) {
+		if (ipopt_protocols[i] &&
+		    !strcmp(ipopt_protocols[i]->name, name)) {
+			if (val)
+				*val = i;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int json_parse_ip_option_field(int type, const char *name, int *val)
+{
+	unsigned int i;
+	const struct exthdr_desc *desc = ipopt_protocols[type];
+
+	for (i = 0; i < array_size(desc->templates); i++) {
+		if (desc->templates[i].token &&
+		    !strcmp(desc->templates[i].token, name)) {
+			if (val)
+				*val = i;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
+					       const char *type, json_t *root)
+{
+	const char *desc, *field;
+	int descval, fieldval;
+	struct expr *expr;
+
+	if (json_unpack_err(ctx, root, "{s:s}", "name", &desc))
+		return NULL;
+
+	if (json_parse_ip_option_type(desc, &descval)) {
+		json_error(ctx, "Unknown ip option name '%s'.", desc);
+		return NULL;
+	}
+
+	if (json_unpack(root, "{s:s}", "field", &field)) {
+		expr = ipopt_expr_alloc(int_loc, descval,
+					 IPOPT_FIELD_TYPE, 0);
+		expr->exthdr.flags = NFT_EXTHDR_F_PRESENT;
+
+		return expr;
+	}
+	if (json_parse_ip_option_field(descval, field, &fieldval)) {
+		json_error(ctx, "Unknown ip option field '%s'.", field);
+		return NULL;
+	}
+	return ipopt_expr_alloc(int_loc, descval, fieldval, 0);
 }
 
 static const struct exthdr_desc *exthdr_lookup_byname(const char *name)
@@ -1291,6 +1357,7 @@ static struct expr *json_parse_expr(struct json_ctx *ctx, json_t *root)
 		{ "payload", json_parse_payload_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_MAP },
 		{ "exthdr", json_parse_exthdr_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_SES | CTX_F_MAP },
 		{ "tcp option", json_parse_tcp_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES },
+		{ "ip option", json_parse_ip_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES },
 		{ "meta", json_parse_meta_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_MAP },
 		{ "osf", json_parse_osf_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_MAP },
 		{ "ipsec", json_parse_xfrm_expr, CTX_F_PRIMARY | CTX_F_MAP },
@@ -2119,6 +2186,98 @@ static struct stmt *json_parse_log_stmt(struct json_ctx *ctx,
 	return stmt;
 }
 
+static int json_parse_synproxy_flag(struct json_ctx *ctx,
+				    json_t *root, int *flags)
+{
+	const struct {
+		const char *flag;
+		int val;
+	} flag_tbl[] = {
+		{ "timestamp", NF_SYNPROXY_OPT_TIMESTAMP },
+		{ "sack-perm", NF_SYNPROXY_OPT_SACK_PERM },
+	};
+	const char *flag;
+	unsigned int i;
+
+	assert(flags);
+
+	if (!json_is_string(root)) {
+		json_error(ctx, "Invalid synproxy flag type %s, expected string.",
+			   json_typename(root));
+		return 1;
+	}
+	flag = json_string_value(root);
+	for (i = 0; i < array_size(flag_tbl); i++) {
+		if (!strcmp(flag, flag_tbl[i].flag)) {
+			*flags |= flag_tbl[i].val;
+			return 0;
+		}
+	}
+	json_error(ctx, "Unknown synproxy flag '%s'.", flag);
+	return 1;
+}
+
+static int json_parse_synproxy_flags(struct json_ctx *ctx, json_t *root)
+{
+	int flags = 0;
+	json_t *value;
+	size_t index;
+
+	if (json_is_string(root)) {
+		json_parse_synproxy_flag(ctx, root, &flags);
+		return flags;
+	} else if (!json_is_array(root)) {
+		json_error(ctx, "Invalid synproxy flags type %s.",
+			   json_typename(root));
+		return -1;
+	}
+	json_array_foreach(root, index, value) {
+		if (json_parse_synproxy_flag(ctx, value, &flags))
+			json_error(ctx, "Parsing synproxy flag at index %zu failed.",
+				   index);
+	}
+	return flags;
+}
+
+static struct stmt *json_parse_synproxy_stmt(struct json_ctx *ctx,
+					     const char *key, json_t *value)
+{
+	struct stmt *stmt;
+	json_t *jflags;
+	int tmp, flags;
+
+	stmt = synproxy_stmt_alloc(int_loc);
+
+	if (!json_unpack(value, "{s:i}", "mss", &tmp)) {
+		if (tmp < 0) {
+			json_error(ctx, "Invalid synproxy mss value '%d'", tmp);
+			stmt_free(stmt);
+			return NULL;
+		}
+		stmt->synproxy.mss = tmp;
+		stmt->synproxy.flags |= NF_SYNPROXY_OPT_MSS;
+	}
+	if (!json_unpack(value, "{s:i}", "wscale", &tmp)) {
+		if (tmp < 0) {
+			json_error(ctx, "Invalid synproxy wscale value '%d'", tmp);
+			stmt_free(stmt);
+			return NULL;
+		}
+		stmt->synproxy.wscale = tmp;
+		stmt->synproxy.flags |= NF_SYNPROXY_OPT_WSCALE;
+	}
+	if (!json_unpack(value, "{s:o}", "flags", &jflags)) {
+		flags = json_parse_synproxy_flags(ctx, jflags);
+
+		if (flags < 0) {
+			stmt_free(stmt);
+			return NULL;
+		}
+		stmt->synproxy.flags |= flags;
+	}
+	return stmt;
+}
+
 static struct stmt *json_parse_cthelper_stmt(struct json_ctx *ctx,
 					     const char *key, json_t *value)
 {
@@ -2143,6 +2302,21 @@ static struct stmt *json_parse_cttimeout_stmt(struct json_ctx *ctx,
 	stmt->objref.expr = json_parse_stmt_expr(ctx, value);
 	if (!stmt->objref.expr) {
 		json_error(ctx, "Invalid ct timeout reference.");
+		stmt_free(stmt);
+		return NULL;
+	}
+	return stmt;
+}
+
+static struct stmt *json_parse_ctexpect_stmt(struct json_ctx *ctx,
+					     const char *key, json_t *value)
+{
+	struct stmt *stmt = objref_stmt_alloc(int_loc);
+
+	stmt->objref.type = NFT_OBJECT_CT_EXPECT;
+	stmt->objref.expr = json_parse_stmt_expr(ctx, value);
+	if (!stmt->objref.expr) {
+		json_error(ctx, "Invalid ct expectation reference.");
 		stmt_free(stmt);
 		return NULL;
 	}
@@ -2294,10 +2468,12 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "log", json_parse_log_stmt },
 		{ "ct helper", json_parse_cthelper_stmt },
 		{ "ct timeout", json_parse_cttimeout_stmt },
+		{ "ct expectation", json_parse_ctexpect_stmt },
 		{ "meter", json_parse_meter_stmt },
 		{ "queue", json_parse_queue_stmt },
 		{ "ct count", json_parse_connlimit_stmt },
 		{ "tproxy", json_parse_tproxy_stmt },
+		{ "synproxy", json_parse_synproxy_stmt },
 	};
 	const char *type;
 	unsigned int i;
@@ -2359,13 +2535,20 @@ static struct cmd *json_parse_cmd_add_table(struct json_ctx *ctx, json_t *root,
 	return cmd_alloc(op, obj, &h, int_loc, NULL);
 }
 
-static int parse_policy(const char *policy)
+static struct expr *parse_policy(const char *policy)
 {
+	int policy_num;
+
 	if (!strcmp(policy, "accept"))
-		return NF_ACCEPT;
-	if (!strcmp(policy, "drop"))
-		return NF_DROP;
-	return -1;
+		policy_num = NF_ACCEPT;
+	else if (!strcmp(policy, "drop"))
+		policy_num = NF_DROP;
+	else
+		return NULL;
+
+	return constant_expr_alloc(int_loc, &integer_type,
+				   BYTEORDER_HOST_ENDIAN,
+				   sizeof(int) * BITS_PER_BYTE, &policy_num);
 }
 
 static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
@@ -2409,7 +2592,10 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 	chain = chain_alloc(NULL);
 	chain->flags |= CHAIN_F_BASECHAIN;
 	chain->type = xstrdup(type);
-	chain->priority.num = prio;
+	chain->priority.expr = constant_expr_alloc(int_loc, &integer_type,
+						   BYTEORDER_HOST_ENDIAN,
+						   sizeof(int) * BITS_PER_BYTE,
+						   &prio);
 	chain->hookstr = chain_hookname_lookup(hookstr);
 	if (!chain->hookstr) {
 		json_error(ctx, "Invalid chain hook '%s'.", hookstr);
@@ -2776,7 +2962,10 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 
 	flowtable = flowtable_alloc(int_loc);
 	flowtable->hookstr = hookstr;
-	flowtable->priority.num = prio;
+	flowtable->priority.expr =
+		constant_expr_alloc(int_loc, &integer_type,
+				    BYTEORDER_HOST_ENDIAN,
+				    sizeof(int) * BITS_PER_BYTE, &prio);
 
 	flowtable->dev_expr = json_parse_flowtable_devs(ctx, devs);
 	if (!flowtable->dev_expr) {
@@ -2953,6 +3142,33 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 			return NULL;
 		}
 		break;
+	case NFT_OBJECT_CT_EXPECT:
+		cmd_obj = CMD_OBJ_CT_EXPECT;
+		obj->type = NFT_OBJECT_CT_EXPECT;
+		if (!json_unpack(root, "{s:s}", "l3proto", &tmp) &&
+		    parse_family(tmp, &l3proto)) {
+			json_error(ctx, "Invalid ct expectation l3proto '%s'.", tmp);
+			obj_free(obj);
+			return NULL;
+		}
+		obj->ct_expect.l3proto = l3proto;
+		if (!json_unpack(root, "{s:s}", "protocol", &tmp)) {
+			if (!strcmp(tmp, "tcp")) {
+				obj->ct_expect.l4proto = IPPROTO_TCP;
+			} else if (!strcmp(tmp, "udp")) {
+				obj->ct_expect.l4proto = IPPROTO_UDP;
+			} else {
+				json_error(ctx, "Invalid ct expectation protocol '%s'.", tmp);
+				obj_free(obj);
+				return NULL;
+			}
+		}
+		if (!json_unpack(root, "{s:o}", "dport", &tmp))
+			obj->ct_expect.dport = atoi(tmp);
+		json_unpack(root, "{s:I}", "timeout", &obj->ct_expect.timeout);
+		if (!json_unpack(root, "{s:o}", "size", &tmp))
+			obj->ct_expect.size = atoi(tmp);
+		break;
 	case CMD_OBJ_LIMIT:
 		obj->type = NFT_OBJECT_LIMIT;
 		if (json_unpack_err(ctx, root, "{s:I, s:s}",
@@ -3008,6 +3224,7 @@ static struct cmd *json_parse_cmd_add(struct json_ctx *ctx,
 		{ "quota", CMD_OBJ_QUOTA, json_parse_cmd_add_object },
 		{ "ct helper", NFT_OBJECT_CT_HELPER, json_parse_cmd_add_object },
 		{ "ct timeout", NFT_OBJECT_CT_TIMEOUT, json_parse_cmd_add_object },
+		{ "ct expectation", NFT_OBJECT_CT_EXPECT, json_parse_cmd_add_object },
 		{ "limit", CMD_OBJ_LIMIT, json_parse_cmd_add_object },
 		{ "secmark", CMD_OBJ_SECMARK, json_parse_cmd_add_object }
 	};
@@ -3173,6 +3390,7 @@ static struct cmd *json_parse_cmd_list(struct json_ctx *ctx,
 		{ "ct helper", NFT_OBJECT_CT_HELPER, json_parse_cmd_add_object },
 		{ "ct helpers", CMD_OBJ_CT_HELPERS, json_parse_cmd_list_multiple },
 		{ "ct timeout", NFT_OBJECT_CT_TIMEOUT, json_parse_cmd_add_object },
+		{ "ct expectation", NFT_OBJECT_CT_EXPECT, json_parse_cmd_add_object },
 		{ "limit", CMD_OBJ_LIMIT, json_parse_cmd_add_object },
 		{ "limits", CMD_OBJ_LIMIT, json_parse_cmd_list_multiple },
 		{ "ruleset", CMD_OBJ_RULESET, json_parse_cmd_list_multiple },
@@ -3537,7 +3755,7 @@ static uint64_t handle_from_nlmsg(const struct nlmsghdr *nlh)
 	case NFT_MSG_NEWSET:
 		nls = netlink_set_alloc(nlh);
 		flags = nftnl_set_get_u32(nls, NFTNL_SET_FLAGS);
-		if (!(flags & NFT_SET_ANONYMOUS))
+		if (!set_is_anonymous(flags))
 			handle = nftnl_set_get_u64(nls, NFTNL_SET_HANDLE);
 		nftnl_set_free(nls);
 		break;

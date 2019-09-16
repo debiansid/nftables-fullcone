@@ -1,6 +1,8 @@
 #!/usr/bin/make -f
 
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
 export DH_VERBOSE=1
+endif
 export PYBUILD_NAME = nftables
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 

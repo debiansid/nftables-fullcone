@@ -16,6 +16,7 @@
 #include <linux/netfilter/nf_log.h>
 #include <linux/netfilter/nf_nat.h>
 #include <linux/netfilter/nf_tables.h>
+#include <linux/netfilter/nf_synproxy.h>
 #include <linux/xfrm.h>
 #include <pwd.h>
 #include <grp.h>
@@ -79,10 +80,10 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 	json_t *root, *tmp;
 	const char *type, *datatype_ext = NULL;
 
-	if (set->flags & NFT_SET_MAP) {
+	if (set_is_datamap(set->flags)) {
 		type = "map";
 		datatype_ext = set->datatype->name;
-	} else if (set->flags & NFT_SET_OBJECT) {
+	} else if (set_is_objmap(set->flags)) {
 		type = "map";
 		datatype_ext = obj_type_name(set->objtype);
 	} else if (set->flags & NFT_SET_EVAL) {
@@ -222,6 +223,8 @@ static json_t *rule_print_json(struct output_ctx *octx,
 static json_t *chain_print_json(const struct chain *chain)
 {
 	json_t *root, *tmp;
+	int priority;
+	int policy;
 
 	root = json_pack("{s:s, s:s, s:s, s:I}",
 			 "family", family2str(chain->handle.family),
@@ -230,12 +233,16 @@ static json_t *chain_print_json(const struct chain *chain)
 			 "handle", chain->handle.handle.id);
 
 	if (chain->flags & CHAIN_F_BASECHAIN) {
+		mpz_export_data(&priority, chain->priority.expr->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
+		mpz_export_data(&policy, chain->policy->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
 		tmp = json_pack("{s:s, s:s, s:i, s:s}",
 				"type", chain->type,
 				"hook", hooknum2str(chain->handle.family,
 						    chain->hooknum),
-				"prio", chain->priority.num,
-				"policy", chain_policy2str(chain->policy));
+				"prio", priority,
+				"policy", chain_policy2str(policy));
 		if (chain->dev)
 			json_object_set_new(tmp, "dev", json_string(chain->dev));
 		json_object_update(root, tmp);
@@ -265,8 +272,8 @@ static json_t *timeout_policy_json(uint8_t l4, const uint32_t *timeout)
 
 		if (!root)
 			root = json_object();
-		json_object_set(root, timeout_protocol[l4].state_to_name[i],
-				json_integer(timeout[i]));
+		json_object_set_new(root, timeout_protocol[l4].state_to_name[i],
+				    json_integer(timeout[i]));
 	}
 	return root ? : json_null();
 }
@@ -325,6 +332,17 @@ static json_t *obj_print_json(const struct obj *obj)
 		json_object_update(root, tmp);
 		json_decref(tmp);
 		break;
+	case NFT_OBJECT_CT_EXPECT:
+		tmp = json_pack("{s:o, s:I, s:I, s:s, s:I}",
+				"protocol",
+				proto_name_json(obj->ct_expect.l4proto),
+				"dport", obj->ct_expect.dport,
+				"timeout", obj->ct_expect.timeout,
+				"size", obj->ct_expect.size,
+				"l3proto", family2str(obj->ct_expect.l3proto));
+		json_object_update(root, tmp);
+		json_decref(tmp);
+		break;
 	case NFT_OBJECT_LIMIT:
 		rate = obj->limit.rate;
 		burst = obj->limit.burst;
@@ -361,14 +379,16 @@ static json_t *obj_print_json(const struct obj *obj)
 static json_t *flowtable_print_json(const struct flowtable *ftable)
 {
 	json_t *root, *devs = NULL;
-	int i;
+	int i, priority;
 
+	mpz_export_data(&priority, ftable->priority.expr->value,
+			BYTEORDER_HOST_ENDIAN, sizeof(int));
 	root = json_pack("{s:s, s:s, s:s, s:s, s:i}",
 			"family", family2str(ftable->handle.family),
 			"name", ftable->handle.flowtable,
 			"table", ftable->handle.table.name,
 			"hook", hooknum2str(NFPROTO_NETDEV, ftable->hooknum),
-			"prio", ftable->priority.num);
+			"prio", priority);
 
 	for (i = 0; i < ftable->dev_array_len; i++) {
 		const char *dev = ftable->dev_array[i];
@@ -522,7 +542,7 @@ json_t *set_expr_json(const struct expr *expr, struct output_ctx *octx)
 
 json_t *set_ref_expr_json(const struct expr *expr, struct output_ctx *octx)
 {
-	if (expr->set->flags & NFT_SET_ANONYMOUS) {
+	if (set_is_anonymous(expr->set->flags)) {
 		return expr_print_json(expr->set->init, octx);
 	} else {
 		return json_pack("s+", "@", expr->set->handle.set.name);
@@ -633,6 +653,14 @@ json_t *exthdr_expr_json(const struct expr *expr, struct output_ctx *octx)
 			json_object_set_new(root, "field", json_string(field));
 
 		return json_pack("{s:o}", "tcp option", root);
+	}
+	if (expr->exthdr.op == NFT_EXTHDR_OP_IPV4) {
+		root = json_pack("{s:s}", "name", desc);
+
+		if (!is_exists)
+			json_object_set_new(root, "field", json_string(field));
+
+		return json_pack("{s:o}", "ip option", root);
 	}
 
 	root = json_pack("{s:s}",
@@ -986,18 +1014,18 @@ json_t *inet_service_type_json(const struct expr *expr, struct output_ctx *octx)
 
 json_t *mark_type_json(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_json(mark_tbl, expr, octx);
+	return symbolic_constant_json(octx->tbl.mark, expr, octx);
 }
 
 json_t *devgroup_type_json(const struct expr *expr, struct output_ctx *octx)
 {
-	return symbolic_constant_json(devgroup_tbl, expr, octx);
+	return symbolic_constant_json(octx->tbl.devgroup, expr, octx);
 }
 
 json_t *ct_label_type_json(const struct expr *expr, struct output_ctx *octx)
 {
 	unsigned long bit = mpz_scan1(expr->value, 0);
-	const char *labelstr = ct_label2str(bit);
+	const char *labelstr = ct_label2str(octx->tbl.ct_label, bit);
 
 	if (labelstr)
 		return json_string(labelstr);
@@ -1447,6 +1475,34 @@ json_t *tproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 	return json_pack("{s:o}", "tproxy", root);
 }
 
+json_t *synproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	json_t *root = json_object(), *flags = json_array();
+
+	if (stmt->synproxy.flags & NF_SYNPROXY_OPT_MSS)
+		json_object_set_new(root, "mss",
+				    json_integer(stmt->synproxy.mss));
+	if (stmt->synproxy.flags & NF_SYNPROXY_OPT_WSCALE)
+		json_object_set_new(root, "wscale",
+				    json_integer(stmt->synproxy.wscale));
+	if (stmt->synproxy.flags & NF_SYNPROXY_OPT_TIMESTAMP)
+		json_array_append_new(flags, json_string("timestamp"));
+	if (stmt->synproxy.flags & NF_SYNPROXY_OPT_SACK_PERM)
+		json_array_append_new(flags, json_string("sack-perm"));
+
+	if (json_array_size(flags) > 0)
+		json_object_set_new(root, "flags", flags);
+	else
+		json_decref(flags);
+
+	if (!json_object_size(root)) {
+		json_decref(root);
+		root = json_null();
+	}
+
+	return json_pack("{s:o}", "synproxy", root);
+}
+
 static json_t *table_print_json_full(struct netlink_ctx *ctx,
 				     struct table *table)
 {
@@ -1465,7 +1521,7 @@ static json_t *table_print_json_full(struct netlink_ctx *ctx,
 		json_array_append_new(root, tmp);
 	}
 	list_for_each_entry(set, &table->sets, list) {
-		if (set->flags & NFT_SET_ANONYMOUS)
+		if (set_is_anonymous(set->flags))
 			continue;
 		tmp = set_print_json(&ctx->nft->output, set);
 		json_array_append_new(root, tmp);
@@ -1597,14 +1653,13 @@ static json_t *do_list_sets_json(struct netlink_ctx *ctx, struct cmd *cmd)
 
 		list_for_each_entry(set, &table->sets, list) {
 			if (cmd->obj == CMD_OBJ_SETS &&
-			    (set->flags & NFT_SET_ANONYMOUS ||
-			    set->flags & NFT_SET_MAP))
+			    !set_is_literal(set->flags))
 				continue;
 			if (cmd->obj == CMD_OBJ_METERS &&
 			    !(set->flags & NFT_SET_EVAL))
 				continue;
 			if (cmd->obj == CMD_OBJ_MAPS &&
-			    !(set->flags & NFT_SET_MAP))
+			    !map_is_literal(set->flags))
 				continue;
 			json_array_append_new(root, set_print_json(octx, set));
 		}
@@ -1752,6 +1807,8 @@ int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	root = json_pack("{s:o}", "nftables", root);
 	json_dumpf(root, ctx->nft->output.output_fp, 0);
 	json_decref(root);
+	fprintf(ctx->nft->output.output_fp, "\n");
+	fflush(ctx->nft->output.output_fp);
 	return 0;
 }
 

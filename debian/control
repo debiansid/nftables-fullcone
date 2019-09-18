@@ -1,24 +1,25 @@
 Source: nftables
 Section: net
-Priority: optional
+Priority: important
 Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: asciidoc-base,
                automake,
                bison,
-               debhelper (>= 11),
+               debhelper (>= 12~),
+               dh-python,
+               docbook-xsl,
                flex,
                libgmp-dev,
+               libjansson-dev,
                libmnl-dev (>= 1.0.3),
-               libnftnl-dev (>= 1.1.3),
+               libnftnl-dev (>= 1.1.4),
                libreadline-dev,
-	       libxtables-dev (>= 1.6.1),
                libtool (>=2.2.6),
-	       libjansson-dev,
-               xsltproc,
-               dh-python,
+               libxtables-dev (>= 1.6.1),
                python3-all,
-               python3-setuptools
+               python3-setuptools,
+               xsltproc
 Standards-Version: 4.4.0
 Homepage: http://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
@@ -45,6 +46,7 @@ Description: Program to control packet filtering rules by Netfilter project
 
 Package: libnftables-dev
 Section: libdevel
+Priority: optional
 Architecture: linux-any
 Multi-Arch: same
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}
@@ -64,6 +66,7 @@ Description: Development files for libnftables
 
 Package: libnftables1
 Section: libs
+Priority: optional
 Architecture: linux-any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends}
@@ -82,6 +85,7 @@ Description: Netfilter nftables high level userspace API library
  This package contains the libnftables library.
 
 Package: python3-nftables
+Priority: optional
 Section: python
 Architecture: linux-any
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${python3:Depends}

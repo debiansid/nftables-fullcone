@@ -29,6 +29,7 @@
 #include <netinet/in.h>
 #include <linux/netfilter/nf_nat.h>
 #include <linux/netfilter/nf_log.h>
+#include <linux/netfilter/nf_synproxy.h>
 
 struct stmt *stmt_alloc(const struct location *loc,
 			const struct stmt_ops *ops)
@@ -208,6 +209,7 @@ static const char *objref_type[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_LIMIT]	= "limit",
 	[NFT_OBJECT_CT_TIMEOUT] = "ct timeout",
 	[NFT_OBJECT_SECMARK]	= "secmark",
+	[NFT_OBJECT_CT_EXPECT]	= "ct expectation",
 };
 
 const char *objref_type_name(uint32_t type)
@@ -226,6 +228,9 @@ static void objref_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 		break;
 	case NFT_OBJECT_CT_TIMEOUT:
 		nft_print(octx, "ct timeout set ");
+		break;
+	case NFT_OBJECT_CT_EXPECT:
+		nft_print(octx, "ct expectation set ");
 		break;
 	default:
 		nft_print(octx, "%s name ",
@@ -878,4 +883,54 @@ static const struct stmt_ops xt_stmt_ops = {
 struct stmt *xt_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &xt_stmt_ops);
+}
+
+static const char *synproxy_sack_to_str(const uint32_t flags)
+{
+	if (flags & NF_SYNPROXY_OPT_SACK_PERM)
+		return " sack-perm";
+
+	return "";
+}
+
+static const char *synproxy_timestamp_to_str(const uint32_t flags)
+{
+	if (flags & NF_SYNPROXY_OPT_TIMESTAMP)
+		return " timestamp";
+
+	return "";
+}
+
+static void synproxy_stmt_print(const struct stmt *stmt,
+				struct output_ctx *octx)
+{
+	uint32_t flags = stmt->synproxy.flags;
+	const char *ts_str = synproxy_timestamp_to_str(flags);
+	const char *sack_str = synproxy_sack_to_str(flags);
+
+	if (flags & (NF_SYNPROXY_OPT_MSS | NF_SYNPROXY_OPT_WSCALE))
+		nft_print(octx, "synproxy mss %u wscale %u%s%s",
+			  stmt->synproxy.mss, stmt->synproxy.wscale,
+			  ts_str, sack_str);
+	else if (flags & NF_SYNPROXY_OPT_MSS)
+		nft_print(octx, "synproxy mss %u%s%s", stmt->synproxy.mss,
+			  ts_str, sack_str);
+	else if (flags & NF_SYNPROXY_OPT_WSCALE)
+		nft_print(octx, "synproxy wscale %u%s%s", stmt->synproxy.wscale,
+			  ts_str, sack_str);
+	else
+		nft_print(octx, "synproxy%s%s", ts_str, sack_str);
+
+}
+
+static const struct stmt_ops synproxy_stmt_ops = {
+	.type		= STMT_SYNPROXY,
+	.name		= "synproxy",
+	.print		= synproxy_stmt_print,
+	.json		= synproxy_stmt_json,
+};
+
+struct stmt *synproxy_stmt_alloc(const struct location *loc)
+{
+	return stmt_alloc(loc, &synproxy_stmt_ops);
 }

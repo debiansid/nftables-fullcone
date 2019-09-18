@@ -277,6 +277,9 @@ int main(int argc, char * const *argv)
 		case OPT_JSON:
 #ifdef HAVE_LIBJANSSON
 			output_flags |= NFT_CTX_OUTPUT_JSON;
+#else
+			fprintf(stderr, "JSON support not compiled-in\n");
+			exit(EXIT_FAILURE);
 #endif
 			break;
 		case OPT_GUID:
@@ -299,7 +302,12 @@ int main(int argc, char * const *argv)
 		for (len = 0, i = optind; i < argc; i++)
 			len += strlen(argv[i]) + strlen(" ");
 
-		buf = xzalloc(len);
+		buf = calloc(1, len);
+		if (buf == NULL) {
+			fprintf(stderr, "%s:%u: Memory allocation failure\n",
+				__FILE__, __LINE__);
+			exit(EXIT_FAILURE);
+		}
 		for (i = optind; i < argc; i++) {
 			strcat(buf, argv[i]);
 			if (i + 1 < argc)
@@ -320,7 +328,7 @@ int main(int argc, char * const *argv)
 		exit(EXIT_FAILURE);
 	}
 
-	xfree(buf);
+	free(buf);
 	nft_ctx_free(nft);
 
 	return rc;

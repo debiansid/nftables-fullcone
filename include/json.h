@@ -15,6 +15,10 @@ struct stmt;
 struct symbol_table;
 struct table;
 struct netlink_mon_handler;
+struct nft_ctx;
+struct location;
+struct output_ctx;
+struct list_head;
 
 #ifdef HAVE_LIBJANSSON
 
@@ -83,6 +87,7 @@ json_t *queue_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *verdict_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *connlimit_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *tproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+json_t *synproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 
 int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd);
 
@@ -179,6 +184,7 @@ STMT_PRINT_STUB(queue)
 STMT_PRINT_STUB(verdict)
 STMT_PRINT_STUB(connlimit)
 STMT_PRINT_STUB(tproxy)
+STMT_PRINT_STUB(synproxy)
 
 #undef STMT_PRINT_STUB
 #undef EXPR_PRINT_STUB

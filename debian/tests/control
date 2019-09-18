@@ -3,7 +3,7 @@ Depends: @
 Restrictions: needs-root
 
 Tests: internaltest-shell.sh
-Depends: @, kmod
+Depends: kmod, @
 Restrictions: needs-root, allow-stderr, isolation-container, flaky
 
 Tests: internaltest-monitor.sh
@@ -16,5 +16,5 @@ Restrictions: needs-root, allow-stderr, isolation-container, flaky
 #Restrictions: needs-root, allow-stderr, isolation-container, build-needed
 
 Tests: systemd-service-test.sh
-Depends: @, systemd
+Depends: systemd, @
 Restrictions: needs-root, allow-stderr, isolation-container

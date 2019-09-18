@@ -6,6 +6,7 @@
 #include <list.h>
 #include <netinet/in.h>
 #include <libnftnl/object.h>	/* For NFTNL_CTTIMEOUT_ARRAY_MAX. */
+#include <linux/netfilter/nf_tables.h>
 
 /**
  * struct handle_spec - handle ID
@@ -173,14 +174,11 @@ enum chain_flags {
  * struct prio_spec - extendend priority specification for mixed
  *                    textual/numerical parsing.
  *
- * @str:  name of the standard priority value
- * @num:  Numerical value. This MUST contain the parsed value of str after
- *        evaluation.
+ * @expr:  expr of the standard priority value
  */
 struct prio_spec {
-	const char  *str;
-	int          num;
 	struct location loc;
+	struct expr	*expr;
 };
 
 /**
@@ -208,7 +206,7 @@ struct chain {
 	const char		*hookstr;
 	unsigned int		hooknum;
 	struct prio_spec	priority;
-	int			policy;
+	struct expr		*policy;
 	const char		*type;
 	const char		*dev;
 	struct scope		scope;
@@ -321,6 +319,36 @@ extern const char *set_policy2str(uint32_t policy);
 extern void set_print(const struct set *set, struct output_ctx *octx);
 extern void set_print_plain(const struct set *s, struct output_ctx *octx);
 
+static inline bool set_is_datamap(uint32_t set_flags)
+{
+	return set_flags & NFT_SET_MAP;
+}
+
+static inline bool set_is_objmap(uint32_t set_flags)
+{
+	return set_flags & NFT_SET_OBJECT;
+}
+
+static inline bool set_is_map(uint32_t set_flags)
+{
+	return set_is_datamap(set_flags) || set_is_objmap(set_flags);
+}
+
+static inline bool set_is_anonymous(uint32_t set_flags)
+{
+	return set_flags & NFT_SET_ANONYMOUS;
+}
+
+static inline bool set_is_literal(uint32_t set_flags)
+{
+	return !(set_is_anonymous(set_flags) || set_is_map(set_flags));
+}
+
+static inline bool map_is_literal(uint32_t set_flags)
+{
+	return !(set_is_anonymous(set_flags) || !set_is_map(set_flags));
+}
+
 #include <statement.h>
 
 struct counter {
@@ -353,6 +381,14 @@ struct ct_timeout {
 	uint8_t l4proto;
 	uint32_t timeout[NFTNL_CTTIMEOUT_ARRAY_MAX];
 	struct list_head timeout_list;
+};
+
+struct ct_expect {
+	uint16_t l3proto;
+	uint8_t l4proto;
+	uint16_t dport;
+	uint32_t timeout;
+	uint8_t size;
 };
 
 struct limit {
@@ -389,6 +425,7 @@ struct obj {
 		struct limit		limit;
 		struct ct_timeout	ct_timeout;
 		struct secmark		secmark;
+		struct ct_expect	ct_expect;
 	};
 };
 
@@ -523,6 +560,7 @@ enum cmd_obj {
 	CMD_OBJ_CT_TIMEOUT,
 	CMD_OBJ_SECMARK,
 	CMD_OBJ_SECMARKS,
+	CMD_OBJ_CT_EXPECT,
 };
 
 struct markup {
@@ -638,9 +676,8 @@ extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
 extern unsigned int cache_evaluate(struct nft_ctx *nft, struct list_head *cmds);
 extern int cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
 			struct list_head *msgs);
-extern void cache_flush(struct nft_ctx *ctx, struct list_head *msgs);
+extern bool cache_needs_update(struct nft_cache *cache);
 extern void cache_release(struct nft_cache *cache);
-extern bool cache_is_complete(struct nft_cache *cache, enum cmd_ops cmd);
 
 struct timeout_protocol {
 	uint32_t array_size;

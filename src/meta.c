@@ -37,17 +37,6 @@
 #include <iface.h>
 #include <json.h>
 
-static struct symbol_table *realm_tbl;
-void realm_table_meta_init(void)
-{
-	realm_tbl = rt_symbol_table_init("/etc/iproute2/rt_realms");
-}
-
-void realm_table_meta_exit(void)
-{
-	rt_symbol_table_free(realm_tbl);
-}
-
 static void tchandle_type_print(const struct expr *expr,
 				struct output_ctx *octx)
 {
@@ -68,7 +57,8 @@ static void tchandle_type_print(const struct expr *expr,
 	}
 }
 
-static struct error_record *tchandle_type_parse(const struct expr *sym,
+static struct error_record *tchandle_type_parse(struct parse_ctx *ctx,
+						const struct expr *sym,
 						struct expr **res)
 {
 	uint32_t handle;
@@ -142,7 +132,8 @@ static void ifindex_type_print(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, "%d", ifindex);
 }
 
-static struct error_record *ifindex_type_parse(const struct expr *sym,
+static struct error_record *ifindex_type_parse(struct parse_ctx *ctx,
+					       const struct expr *sym,
 					       struct expr **res)
 {
 	int ifindex;
@@ -220,7 +211,8 @@ static void uid_type_print(const struct expr *expr, struct output_ctx *octx)
 	expr_basetype(expr)->print(expr, octx);
 }
 
-static struct error_record *uid_type_parse(const struct expr *sym,
+static struct error_record *uid_type_parse(struct parse_ctx *ctx,
+					   const struct expr *sym,
 					   struct expr **res)
 {
 	struct passwd *pw;
@@ -273,7 +265,8 @@ static void gid_type_print(const struct expr *expr, struct output_ctx *octx)
 	expr_basetype(expr)->print(expr, octx);
 }
 
-static struct error_record *gid_type_parse(const struct expr *sym,
+static struct error_record *gid_type_parse(struct parse_ctx *ctx,
+					   const struct expr *sym,
 					   struct expr **res)
 {
 	struct group *gr;
@@ -337,28 +330,27 @@ const struct datatype pkttype_type = {
 	.sym_tbl	= &pkttype_type_tbl,
 };
 
-struct symbol_table *devgroup_tbl = NULL;
-
-void devgroup_table_init(void)
+void devgroup_table_init(struct nft_ctx *ctx)
 {
-	devgroup_tbl = rt_symbol_table_init("/etc/iproute2/group");
+	ctx->output.tbl.devgroup = rt_symbol_table_init("/etc/iproute2/group");
 }
 
-void devgroup_table_exit(void)
+void devgroup_table_exit(struct nft_ctx *ctx)
 {
-	rt_symbol_table_free(devgroup_tbl);
+	rt_symbol_table_free(ctx->output.tbl.devgroup);
 }
 
 static void devgroup_type_print(const struct expr *expr,
-				 struct output_ctx *octx)
+				struct output_ctx *octx)
 {
-	return symbolic_constant_print(devgroup_tbl, expr, true, octx);
+	return symbolic_constant_print(octx->tbl.devgroup, expr, true, octx);
 }
 
-static struct error_record *devgroup_type_parse(const struct expr *sym,
+static struct error_record *devgroup_type_parse(struct parse_ctx *ctx,
+						const struct expr *sym,
 						struct expr **res)
 {
-	return symbolic_constant_parse(sym, devgroup_tbl, res);
+	return symbolic_constant_parse(ctx, sym, ctx->tbl->devgroup, res);
 }
 
 const struct datatype devgroup_type = {

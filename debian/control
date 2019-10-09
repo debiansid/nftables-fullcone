@@ -29,6 +29,7 @@ Package: nftables
 Architecture: linux-any
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Suggests: firewalld
 Description: Program to control packet filtering rules by Netfilter project
  This software provides an in-kernel packet classification framework that is
  based on a network-specific Virtual Machine (VM) and the nft userspace

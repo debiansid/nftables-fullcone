@@ -1,3 +1,16 @@
+nftables (0.9.2-2) unstable; urgency=medium
+
+  [ Konstantin Demin ]
+  * [9c626fc] d/rules: build less verbose if requested
+
+  [ Arturo Borrero Gonzalez ]
+  * [ba5d4d0] nftables: add Suggests: firewalld
+  * [f8bea94] nftables: add upstream patches to address firewalld testsuite
+    failures (Closes: #939838)
+  * [35f35af] src:nftables: bump std-version to 4.4.1
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 09 Oct 2019 19:40:31 +0200
+
 nftables (0.9.2-1) unstable; urgency=medium
 
   * [d29de9d] New upstream version 0.9.2

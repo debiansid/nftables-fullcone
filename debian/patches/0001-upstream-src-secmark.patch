@@ -1,0 +1,47 @@
+commit 03478af1bea03eafd43df94334cb001ed26145a3
+Author: Eric Jallot <ejallot@gmail.com>
+Date:   Tue Aug 20 17:50:05 2019 +0200
+
+    src: secmark: fix brace indentation and missing quotes in selctx output
+    
+    Before patch:
+     # nft list secmarks | tee rules.nft
+     table inet t {
+            secmark s {
+                    system_u:object_r:ssh_server_packet_t:s0        }
+     }
+     # nft flush ruleset
+     # nft -f rules.nft
+     rules.nft:3:11-11: Error: syntax error, unexpected colon
+                    system_u:object_r:ssh_server_packet_t:s0
+    
+    Colon is not allowed in strings and breaks nft -f.
+    So move to quoted string in selctx output.
+    
+    After patch:
+     # nft list secmarks | tee rules.nft
+     table inet t {
+             secmark s {
+                     "system_u:object_r:ssh_server_packet_t:s0"
+             }
+     }
+     # nft flush ruleset
+     # nft -f rules.nft
+    
+    Fixes: 3bc84e5c ("src: add support for setting secmark")
+    Signed-off-by: Eric Jallot <ejallot@gmail.com>
+    Signed-off-by: Florian Westphal <fw@strlen.de>
+
+diff --git a/src/rule.c b/src/rule.c
+index 5655e8c..1912513 100644
+--- a/src/rule.c
++++ b/src/rule.c
+@@ -1820,7 +1820,7 @@ static void obj_print_data(const struct obj *obj,
+ 		if (nft_output_handle(octx))
+ 			nft_print(octx, " # handle %" PRIu64, obj->handle.handle.id);
+ 		nft_print(octx, "%s%s%s", opts->nl, opts->tab, opts->tab);
+-		nft_print(octx, "%s", obj->secmark.ctx);
++		nft_print(octx, "\"%s\"%s", obj->secmark.ctx, opts->nl);
+ 		break;
+ 	case NFT_OBJECT_CT_HELPER:
+ 		nft_print(octx, " %s {", obj->handle.obj.name);

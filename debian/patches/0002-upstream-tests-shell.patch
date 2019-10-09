@@ -1,0 +1,42 @@
+commit 1e2aae7d73ce733650d78da452d45d6c5498cc33
+Author: Eric Garver <eric@garver.life>
+Date:   Thu Sep 5 20:33:02 2019 -0400
+
+    tests: shell: check that rule add with index works with echo
+    
+    Signed-off-by: Eric Garver <eric@garver.life>
+    Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+
+diff --git a/tests/shell/testcases/cache/0007_echo_cache_init_0 b/tests/shell/testcases/cache/0007_echo_cache_init_0
+new file mode 100755
+index 0000000..280a0d0
+--- /dev/null
++++ b/tests/shell/testcases/cache/0007_echo_cache_init_0
+@@ -0,0 +1,14 @@
++#!/bin/bash
++
++set -e
++
++$NFT -i >/dev/null <<EOF
++add table inet t
++add chain inet t c
++add rule inet t c accept comment "first"
++add rule inet t c accept comment "third"
++EOF
++
++# make sure the rule cache gets initialized when using echo option
++#
++$NFT --echo add rule inet t c index 0 accept comment '"second"' >/dev/null
+diff --git a/tests/shell/testcases/cache/dumps/0007_echo_cache_init_0.nft b/tests/shell/testcases/cache/dumps/0007_echo_cache_init_0.nft
+new file mode 100644
+index 0000000..c774ee7
+--- /dev/null
++++ b/tests/shell/testcases/cache/dumps/0007_echo_cache_init_0.nft
+@@ -0,0 +1,7 @@
++table inet t {
++	chain c {
++		accept comment "first"
++		accept comment "second"
++		accept comment "third"
++	}
++}

@@ -1041,6 +1041,8 @@ static void netlink_parse_tproxy(struct netlink_parse_ctx *ctx,
 	reg = netlink_parse_register(nle, NFTNL_EXPR_TPROXY_REG_ADDR);
 	if (reg) {
 		addr = netlink_get_register(ctx, loc, reg);
+		if (addr == NULL)
+			goto err;
 
 		switch (stmt->tproxy.family) {
 		case NFPROTO_IPV4:
@@ -1060,6 +1062,8 @@ static void netlink_parse_tproxy(struct netlink_parse_ctx *ctx,
 	reg = netlink_parse_register(nle, NFTNL_EXPR_TPROXY_REG_PORT);
 	if (reg) {
 		port = netlink_get_register(ctx, loc, reg);
+		if (port == NULL)
+			goto err;
 		expr_set_type(port, &inet_service_type, BYTEORDER_BIG_ENDIAN);
 		stmt->tproxy.port = port;
 	}
@@ -2550,7 +2554,8 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 			if (stmt->ct.expr != NULL) {
 				expr_postprocess(&rctx, &stmt->ct.expr);
 
-				if (stmt->ct.expr->etype == EXPR_BINOP)
+				if (stmt->ct.expr->etype == EXPR_BINOP &&
+				    stmt->ct.key == NFT_CT_EVENTMASK)
 					stmt->ct.expr = binop_tree_to_list(NULL,
 									   stmt->ct.expr);
 			}

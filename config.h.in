@@ -12,6 +12,9 @@
 /* Define if you have libjansson */
 #undef HAVE_LIBJANSSON
 
+/* Define to 1 if you have the `linenoise' library (-llinenoise). */
+#undef HAVE_LIBLINENOISE
+
 /* Define to 1 if you have the `readline' library (-lreadline). */
 #undef HAVE_LIBREADLINE
 

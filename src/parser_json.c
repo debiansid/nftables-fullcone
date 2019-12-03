@@ -17,6 +17,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <net/if.h>
 #include <linux/xfrm.h>
 
 #include <linux/netfilter.h>
@@ -351,7 +352,8 @@ static struct expr *json_parse_immediate(struct json_ctx *ctx, json_t *root)
 	case JSON_FALSE:
 		buf[0] = json_is_true(root);
 		return constant_expr_alloc(int_loc, &boolean_type,
-					   BYTEORDER_HOST_ENDIAN, 1, buf);
+					   BYTEORDER_HOST_ENDIAN,
+					   BITS_PER_BYTE, buf);
 	default:
 		json_error(ctx, "Unexpected JSON type %s for immediate value.",
 			   json_typename(root));
@@ -2055,6 +2057,8 @@ static struct stmt *json_parse_set_stmt(struct json_ctx *ctx,
 		op = NFT_DYNSET_OP_ADD;
 	} else if (!strcmp(opstr, "update")) {
 		op = NFT_DYNSET_OP_UPDATE;
+	} else if (!strcmp(opstr, "delete")) {
+		op = NFT_DYNSET_OP_DELETE;
 	} else {
 		json_error(ctx, "Unknown set statement op '%s'.", opstr);
 		return NULL;
@@ -2242,13 +2246,18 @@ static int json_parse_synproxy_flags(struct json_ctx *ctx, json_t *root)
 static struct stmt *json_parse_synproxy_stmt(struct json_ctx *ctx,
 					     const char *key, json_t *value)
 {
-	struct stmt *stmt;
+	struct stmt *stmt = NULL;
 	json_t *jflags;
 	int tmp, flags;
 
-	stmt = synproxy_stmt_alloc(int_loc);
+	if (json_typeof(value) == JSON_NULL) {
+		stmt = synproxy_stmt_alloc(int_loc);
+		return stmt;
+	}
 
 	if (!json_unpack(value, "{s:i}", "mss", &tmp)) {
+		if (!stmt)
+			stmt = synproxy_stmt_alloc(int_loc);
 		if (tmp < 0) {
 			json_error(ctx, "Invalid synproxy mss value '%d'", tmp);
 			stmt_free(stmt);
@@ -2258,6 +2267,8 @@ static struct stmt *json_parse_synproxy_stmt(struct json_ctx *ctx,
 		stmt->synproxy.flags |= NF_SYNPROXY_OPT_MSS;
 	}
 	if (!json_unpack(value, "{s:i}", "wscale", &tmp)) {
+		if (!stmt)
+			stmt = synproxy_stmt_alloc(int_loc);
 		if (tmp < 0) {
 			json_error(ctx, "Invalid synproxy wscale value '%d'", tmp);
 			stmt_free(stmt);
@@ -2267,6 +2278,8 @@ static struct stmt *json_parse_synproxy_stmt(struct json_ctx *ctx,
 		stmt->synproxy.flags |= NF_SYNPROXY_OPT_WSCALE;
 	}
 	if (!json_unpack(value, "{s:o}", "flags", &jflags)) {
+		if (!stmt)
+			stmt = synproxy_stmt_alloc(int_loc);
 		flags = json_parse_synproxy_flags(ctx, jflags);
 
 		if (flags < 0) {
@@ -2274,6 +2287,17 @@ static struct stmt *json_parse_synproxy_stmt(struct json_ctx *ctx,
 			return NULL;
 		}
 		stmt->synproxy.flags |= flags;
+	}
+
+	if (!stmt) {
+		stmt = objref_stmt_alloc(int_loc);
+		stmt->objref.type = NFT_OBJECT_SYNPROXY;
+		stmt->objref.expr = json_parse_stmt_expr(ctx, value);
+		if (!stmt->objref.expr) {
+			json_error(ctx, "Invalid synproxy reference");
+			stmt_free(stmt);
+			return NULL;
+		}
 	}
 	return stmt;
 }
@@ -2558,8 +2582,9 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 		.table.location = *int_loc,
 	};
 	const char *family = "", *policy = "", *type, *hookstr;
-	int prio;
+	const char name[IFNAMSIZ];
 	struct chain *chain;
+	int prio;
 
 	if (json_unpack_err(ctx, root, "{s:s, s:s}",
 			    "family", &family,
@@ -2603,11 +2628,21 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 		return NULL;
 	}
 
-	if (!json_unpack(root, "{s:s}", "dev", &chain->dev))
-		chain->dev = xstrdup(chain->dev);
+	if (!json_unpack(root, "{s:s}", "dev", &name)) {
+		struct expr *dev_expr, *expr;
+
+		dev_expr = compound_expr_alloc(int_loc, EXPR_LIST);
+		expr = constant_expr_alloc(int_loc, &integer_type,
+					   BYTEORDER_HOST_ENDIAN,
+					   strlen(name) * BITS_PER_BYTE,
+					   name);
+		compound_expr_add(dev_expr, expr);
+		chain->dev_expr = dev_expr;
+	}
+
 	if (!json_unpack(root, "{s:s}", "policy", &policy)) {
 		chain->policy = parse_policy(policy);
-		if (chain->policy < 0) {
+		if (!chain->policy) {
 			json_error(ctx, "Unknown policy '%s'.", policy);
 			chain_free(chain);
 			return NULL;
@@ -2891,7 +2926,7 @@ static struct cmd *json_parse_cmd_add_element(struct json_ctx *ctx,
 static struct expr *json_parse_flowtable_devs(struct json_ctx *ctx,
 					      json_t *root)
 {
-	struct expr *tmp, *expr = compound_expr_alloc(int_loc, EXPR_INVALID);
+	struct expr *tmp, *expr = compound_expr_alloc(int_loc, EXPR_LIST);
 	const char *dev;
 	json_t *value;
 	size_t index;
@@ -2929,20 +2964,30 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 	json_t *devs;
 	int prio;
 
-	if (json_unpack_err(ctx, root, "{s:s, s:s, s:s}",
+	if (json_unpack_err(ctx, root, "{s:s, s:s}",
 			    "family", &family,
-			    "table", &h.table.name,
-			    "name", &h.flowtable))
+			    "table", &h.table.name))
 		return NULL;
+
+	if (op != CMD_DELETE &&
+	    json_unpack_err(ctx, root, "{s:s}", "name", &h.flowtable.name)) {
+		return NULL;
+	} else if (op == CMD_DELETE &&
+		   json_unpack(root, "{s:s}", "name", &h.flowtable.name) &&
+		   json_unpack(root, "{s:I}", "handle", &h.handle.id)) {
+		json_error(ctx, "Either name or handle required to delete a flowtable.");
+		return NULL;
+	}
 
 	if (parse_family(family, &h.family)) {
 		json_error(ctx, "Unknown family '%s'.", family);
 		return NULL;
 	}
 	h.table.name = xstrdup(h.table.name);
-	h.flowtable = xstrdup(h.flowtable);
+	if (h.flowtable.name)
+		h.flowtable.name = xstrdup(h.flowtable.name);
 
-	if (op == CMD_DELETE)
+	if (op == CMD_DELETE || op == CMD_LIST)
 		return cmd_alloc(op, cmd_obj, &h, int_loc, NULL);
 
 	if (json_unpack_err(ctx, root, "{s:s, s:I, s:o}",
@@ -3017,8 +3062,9 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 	const char *family, *tmp, *rate_unit = "packets", *burst_unit = "bytes";
 	uint32_t l3proto = NFPROTO_UNSPEC;
 	struct handle h = { 0 };
+	int inv = 0, flags = 0;
 	struct obj *obj;
-	int inv = 0;
+	json_t *jflags;
 
 	if (json_unpack_err(ctx, root, "{s:s, s:s}",
 			    "family", &family,
@@ -3069,7 +3115,7 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 		break;
 	case CMD_OBJ_SECMARK:
 		obj->type = NFT_OBJECT_SECMARK;
-		if (!json_unpack(root, "{s:s}", "context", tmp)) {
+		if (!json_unpack(root, "{s:s}", "context", &tmp)) {
 			int ret;
 			ret = snprintf(obj->secmark.ctx, sizeof(obj->secmark.ctx), "%s", tmp);
 			if (ret < 0 || ret >= (int)sizeof(obj->secmark.ctx)) {
@@ -3194,6 +3240,25 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 		obj->limit.unit = seconds_from_unit(tmp);
 		obj->limit.flags = inv ? NFT_LIMIT_F_INV : 0;
 		break;
+	case CMD_OBJ_SYNPROXY:
+		obj->type = NFT_OBJECT_SYNPROXY;
+		if (json_unpack_err(ctx, root, "{s:i, s:i}",
+				    "mss", &obj->synproxy.mss,
+				    "wscale", &obj->synproxy.wscale)) {
+			obj_free(obj);
+			return NULL;
+		}
+		obj->synproxy.flags |= NF_SYNPROXY_OPT_MSS;
+		obj->synproxy.flags |= NF_SYNPROXY_OPT_WSCALE;
+		if (!json_unpack(root, "{s:o}", "flags", &jflags)) {
+			flags = json_parse_synproxy_flags(ctx, jflags);
+			if (flags < 0) {
+				obj_free(obj);
+				return NULL;
+			}
+			obj->synproxy.flags |= flags;
+		}
+		break;
 	default:
 		BUG("Invalid CMD '%d'", cmd_obj);
 	}
@@ -3256,7 +3321,11 @@ static struct cmd *json_parse_cmd_add(struct json_ctx *ctx,
 static struct cmd *json_parse_cmd_replace(struct json_ctx *ctx,
 					  json_t *root, enum cmd_ops op)
 {
-	struct handle h = { 0 };
+	struct handle h = {
+		.table.location = *int_loc,
+		.chain.location = *int_loc,
+		.index.location = *int_loc,
+	};
 	json_t *tmp, *value;
 	const char *family;
 	struct rule *rule;

@@ -409,8 +409,6 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-with_cli = @with_cli@
-with_json = @with_json@
 
 # This is _NOT_ the library release version, it's an API version.
 # Extracted from Chapter 6 "Library interface versions" of the libtool docs.

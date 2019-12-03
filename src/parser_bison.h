@@ -274,96 +274,98 @@ extern int nft_debug;
     IIFGROUP = 479,
     OIFGROUP = 480,
     CGROUP = 481,
-    CLASSID = 482,
-    NEXTHOP = 483,
-    CT = 484,
-    L3PROTOCOL = 485,
-    PROTO_SRC = 486,
-    PROTO_DST = 487,
-    ZONE = 488,
-    DIRECTION = 489,
-    EVENT = 490,
-    EXPECTATION = 491,
-    EXPIRATION = 492,
-    HELPER = 493,
-    LABEL = 494,
-    STATE = 495,
-    STATUS = 496,
-    ORIGINAL = 497,
-    REPLY = 498,
-    COUNTER = 499,
-    NAME = 500,
-    PACKETS = 501,
-    BYTES = 502,
-    AVGPKT = 503,
-    COUNTERS = 504,
-    QUOTAS = 505,
-    LIMITS = 506,
-    HELPERS = 507,
-    LOG = 508,
-    PREFIX = 509,
-    GROUP = 510,
-    SNAPLEN = 511,
-    QUEUE_THRESHOLD = 512,
-    LEVEL = 513,
-    LIMIT = 514,
-    RATE = 515,
-    BURST = 516,
-    OVER = 517,
-    UNTIL = 518,
-    QUOTA = 519,
-    USED = 520,
-    SECMARK = 521,
-    SECMARKS = 522,
-    NANOSECOND = 523,
-    MICROSECOND = 524,
-    MILLISECOND = 525,
-    SECOND = 526,
-    MINUTE = 527,
-    HOUR = 528,
-    DAY = 529,
-    WEEK = 530,
-    _REJECT = 531,
-    WITH = 532,
-    ICMPX = 533,
-    SNAT = 534,
-    DNAT = 535,
-    MASQUERADE = 536,
-    REDIRECT = 537,
-    RANDOM = 538,
-    FULLY_RANDOM = 539,
-    PERSISTENT = 540,
-    QUEUE = 541,
-    QUEUENUM = 542,
-    BYPASS = 543,
-    FANOUT = 544,
-    DUP = 545,
-    FWD = 546,
-    NUMGEN = 547,
-    INC = 548,
-    MOD = 549,
-    OFFSET = 550,
-    JHASH = 551,
-    SYMHASH = 552,
-    SEED = 553,
-    POSITION = 554,
-    INDEX = 555,
-    COMMENT = 556,
-    XML = 557,
-    JSON = 558,
-    VM = 559,
-    NOTRACK = 560,
-    EXISTS = 561,
-    MISSING = 562,
-    EXTHDR = 563,
-    IPSEC = 564,
-    MODE = 565,
-    REQID = 566,
-    SPNUM = 567,
-    TRANSPORT = 568,
-    TUNNEL = 569,
-    IN = 570,
-    OUT = 571
+    TIME = 482,
+    CLASSID = 483,
+    NEXTHOP = 484,
+    CT = 485,
+    L3PROTOCOL = 486,
+    PROTO_SRC = 487,
+    PROTO_DST = 488,
+    ZONE = 489,
+    DIRECTION = 490,
+    EVENT = 491,
+    EXPECTATION = 492,
+    EXPIRATION = 493,
+    HELPER = 494,
+    LABEL = 495,
+    STATE = 496,
+    STATUS = 497,
+    ORIGINAL = 498,
+    REPLY = 499,
+    COUNTER = 500,
+    NAME = 501,
+    PACKETS = 502,
+    BYTES = 503,
+    AVGPKT = 504,
+    COUNTERS = 505,
+    QUOTAS = 506,
+    LIMITS = 507,
+    SYNPROXYS = 508,
+    HELPERS = 509,
+    LOG = 510,
+    PREFIX = 511,
+    GROUP = 512,
+    SNAPLEN = 513,
+    QUEUE_THRESHOLD = 514,
+    LEVEL = 515,
+    LIMIT = 516,
+    RATE = 517,
+    BURST = 518,
+    OVER = 519,
+    UNTIL = 520,
+    QUOTA = 521,
+    USED = 522,
+    SECMARK = 523,
+    SECMARKS = 524,
+    NANOSECOND = 525,
+    MICROSECOND = 526,
+    MILLISECOND = 527,
+    SECOND = 528,
+    MINUTE = 529,
+    HOUR = 530,
+    DAY = 531,
+    WEEK = 532,
+    _REJECT = 533,
+    WITH = 534,
+    ICMPX = 535,
+    SNAT = 536,
+    DNAT = 537,
+    MASQUERADE = 538,
+    REDIRECT = 539,
+    RANDOM = 540,
+    FULLY_RANDOM = 541,
+    PERSISTENT = 542,
+    QUEUE = 543,
+    QUEUENUM = 544,
+    BYPASS = 545,
+    FANOUT = 546,
+    DUP = 547,
+    FWD = 548,
+    NUMGEN = 549,
+    INC = 550,
+    MOD = 551,
+    OFFSET = 552,
+    JHASH = 553,
+    SYMHASH = 554,
+    SEED = 555,
+    POSITION = 556,
+    INDEX = 557,
+    COMMENT = 558,
+    XML = 559,
+    JSON = 560,
+    VM = 561,
+    NOTRACK = 562,
+    EXISTS = 563,
+    MISSING = 564,
+    EXTHDR = 565,
+    IPSEC = 566,
+    MODE = 567,
+    REQID = 568,
+    SPNUM = 569,
+    TRANSPORT = 570,
+    TUNNEL = 571,
+    IN = 572,
+    OUT = 573
   };
 #endif
 /* Tokens.  */
@@ -592,96 +594,98 @@ extern int nft_debug;
 #define IIFGROUP 479
 #define OIFGROUP 480
 #define CGROUP 481
-#define CLASSID 482
-#define NEXTHOP 483
-#define CT 484
-#define L3PROTOCOL 485
-#define PROTO_SRC 486
-#define PROTO_DST 487
-#define ZONE 488
-#define DIRECTION 489
-#define EVENT 490
-#define EXPECTATION 491
-#define EXPIRATION 492
-#define HELPER 493
-#define LABEL 494
-#define STATE 495
-#define STATUS 496
-#define ORIGINAL 497
-#define REPLY 498
-#define COUNTER 499
-#define NAME 500
-#define PACKETS 501
-#define BYTES 502
-#define AVGPKT 503
-#define COUNTERS 504
-#define QUOTAS 505
-#define LIMITS 506
-#define HELPERS 507
-#define LOG 508
-#define PREFIX 509
-#define GROUP 510
-#define SNAPLEN 511
-#define QUEUE_THRESHOLD 512
-#define LEVEL 513
-#define LIMIT 514
-#define RATE 515
-#define BURST 516
-#define OVER 517
-#define UNTIL 518
-#define QUOTA 519
-#define USED 520
-#define SECMARK 521
-#define SECMARKS 522
-#define NANOSECOND 523
-#define MICROSECOND 524
-#define MILLISECOND 525
-#define SECOND 526
-#define MINUTE 527
-#define HOUR 528
-#define DAY 529
-#define WEEK 530
-#define _REJECT 531
-#define WITH 532
-#define ICMPX 533
-#define SNAT 534
-#define DNAT 535
-#define MASQUERADE 536
-#define REDIRECT 537
-#define RANDOM 538
-#define FULLY_RANDOM 539
-#define PERSISTENT 540
-#define QUEUE 541
-#define QUEUENUM 542
-#define BYPASS 543
-#define FANOUT 544
-#define DUP 545
-#define FWD 546
-#define NUMGEN 547
-#define INC 548
-#define MOD 549
-#define OFFSET 550
-#define JHASH 551
-#define SYMHASH 552
-#define SEED 553
-#define POSITION 554
-#define INDEX 555
-#define COMMENT 556
-#define XML 557
-#define JSON 558
-#define VM 559
-#define NOTRACK 560
-#define EXISTS 561
-#define MISSING 562
-#define EXTHDR 563
-#define IPSEC 564
-#define MODE 565
-#define REQID 566
-#define SPNUM 567
-#define TRANSPORT 568
-#define TUNNEL 569
-#define IN 570
-#define OUT 571
+#define TIME 482
+#define CLASSID 483
+#define NEXTHOP 484
+#define CT 485
+#define L3PROTOCOL 486
+#define PROTO_SRC 487
+#define PROTO_DST 488
+#define ZONE 489
+#define DIRECTION 490
+#define EVENT 491
+#define EXPECTATION 492
+#define EXPIRATION 493
+#define HELPER 494
+#define LABEL 495
+#define STATE 496
+#define STATUS 497
+#define ORIGINAL 498
+#define REPLY 499
+#define COUNTER 500
+#define NAME 501
+#define PACKETS 502
+#define BYTES 503
+#define AVGPKT 504
+#define COUNTERS 505
+#define QUOTAS 506
+#define LIMITS 507
+#define SYNPROXYS 508
+#define HELPERS 509
+#define LOG 510
+#define PREFIX 511
+#define GROUP 512
+#define SNAPLEN 513
+#define QUEUE_THRESHOLD 514
+#define LEVEL 515
+#define LIMIT 516
+#define RATE 517
+#define BURST 518
+#define OVER 519
+#define UNTIL 520
+#define QUOTA 521
+#define USED 522
+#define SECMARK 523
+#define SECMARKS 524
+#define NANOSECOND 525
+#define MICROSECOND 526
+#define MILLISECOND 527
+#define SECOND 528
+#define MINUTE 529
+#define HOUR 530
+#define DAY 531
+#define WEEK 532
+#define _REJECT 533
+#define WITH 534
+#define ICMPX 535
+#define SNAT 536
+#define DNAT 537
+#define MASQUERADE 538
+#define REDIRECT 539
+#define RANDOM 540
+#define FULLY_RANDOM 541
+#define PERSISTENT 542
+#define QUEUE 543
+#define QUEUENUM 544
+#define BYPASS 545
+#define FANOUT 546
+#define DUP 547
+#define FWD 548
+#define NUMGEN 549
+#define INC 550
+#define MOD 551
+#define OFFSET 552
+#define JHASH 553
+#define SYMHASH 554
+#define SEED 555
+#define POSITION 556
+#define INDEX 557
+#define COMMENT 558
+#define XML 559
+#define JSON 560
+#define VM 561
+#define NOTRACK 562
+#define EXISTS 563
+#define MISSING 564
+#define EXTHDR 565
+#define IPSEC 566
+#define MODE 567
+#define REQID 568
+#define SPNUM 569
+#define TRANSPORT 570
+#define TUNNEL 571
+#define IN 572
+#define OUT 573
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
@@ -692,6 +696,7 @@ union YYSTYPE
 
 	uint64_t		val;
 	uint32_t		val32;
+	uint8_t			val8;
 	const char *		string;
 
 	struct list_head	*list;
@@ -705,18 +710,14 @@ union YYSTYPE
 	struct set		*set;
 	struct obj		*obj;
 	struct flowtable	*flowtable;
-	struct counter		*counter;
-	struct quota		*quota;
-	struct secmark		*secmark;
 	struct ct		*ct;
-	struct limit		*limit;
 	const struct datatype	*datatype;
 	struct handle_spec	handle_spec;
 	struct position_spec	position_spec;
 	struct prio_spec	prio_spec;
 	const struct exthdr_desc *exthdr_desc;
 
-#line 720 "parser_bison.h" /* yacc.c:1921  */
+#line 721 "parser_bison.h" /* yacc.c:1921  */
 };
 
 typedef union YYSTYPE YYSTYPE;

@@ -70,6 +70,11 @@ static inline bool nft_output_guid(const struct output_ctx *octx)
 	return octx->flags & NFT_CTX_OUTPUT_GUID;
 }
 
+static inline bool nft_output_seconds(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_TIME;
+}
+
 static inline bool nft_output_numeric_proto(const struct output_ctx *octx)
 {
 	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_PROTO;
@@ -85,6 +90,11 @@ static inline bool nft_output_numeric_symbol(const struct output_ctx *octx)
 	return octx->flags & NFT_CTX_OUTPUT_NUMERIC_SYMBOL;
 }
 
+static inline bool nft_output_terse(const struct output_ctx *octx)
+{
+	return octx->flags & NFT_CTX_OUTPUT_TERSE;
+}
+
 struct nft_cache {
 	uint32_t		genid;
 	struct list_head	list;
@@ -94,6 +104,7 @@ struct nft_cache {
 
 struct mnl_socket;
 struct parser_state;
+struct scope;
 
 #define MAX_INCLUDE_DEPTH	16
 
@@ -109,6 +120,7 @@ struct nft_ctx {
 	uint32_t		flags;
 	struct parser_state	*state;
 	void			*scanner;
+	struct scope		*top_scope;
 	void			*json_root;
 	FILE			*f[MAX_INCLUDE_DEPTH];
 };

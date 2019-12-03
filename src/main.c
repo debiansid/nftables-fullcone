@@ -42,9 +42,11 @@ enum opt_vals {
 	OPT_GUID		= 'u',
 	OPT_NUMERIC_PRIO	= 'y',
 	OPT_NUMERIC_PROTO	= 'p',
+	OPT_NUMERIC_TIME	= 'T',
+	OPT_TERSE		= 't',
 	OPT_INVALID		= '?',
 };
-#define OPTSTRING	"hvcf:iI:jvnsNaeSupyp"
+#define OPTSTRING	"hvcf:iI:jvnsNaeSupypTt"
 
 static const struct option options[] = {
 	{
@@ -115,6 +117,18 @@ static const struct option options[] = {
 		.val		= OPT_NUMERIC_PRIO,
 	},
 	{
+		.name		= "numeric-protocol",
+		.val		= OPT_NUMERIC_PROTO,
+	},
+	{
+		.name		= "numeric-time",
+		.val		= OPT_NUMERIC_TIME,
+	},
+	{
+		.name		= "terse",
+		.val		= OPT_TERSE,
+	},
+	{
 		.name		= NULL
 	}
 };
@@ -135,11 +149,13 @@ static void show_help(const char *name)
 "  -j, --json			Format output in JSON\n"
 "  -n, --numeric			Print fully numerical output.\n"
 "  -s, --stateless		Omit stateful information of ruleset.\n"
+"  -t, --terse			Omit contents of sets.\n"
 "  -u, --guid			Print UID/GID as defined in /etc/passwd and /etc/group.\n"
 "  -N				Translate IP addresses to names.\n"
 "  -S, --service			Translate ports to service names as described in /etc/services.\n"
 "  -p, --numeric-protocol	Print layer 4 protocols numerically.\n"
 "  -y, --numeric-priority	Print chain priority numerically.\n"
+"  -T, --numeric-time		Print time values numerically.\n"
 "  -a, --handle			Output rule handle.\n"
 "  -e, --echo			Echo what has been added, inserted or replaced.\n"
 "  -I, --includepath <directory>	Add <directory> to the paths searched for include files. Default is: %s\n"
@@ -290,6 +306,12 @@ int main(int argc, char * const *argv)
 			break;
 		case OPT_NUMERIC_PROTO:
 			output_flags |= NFT_CTX_OUTPUT_NUMERIC_PROTO;
+			break;
+		case OPT_NUMERIC_TIME:
+			output_flags |= NFT_CTX_OUTPUT_NUMERIC_TIME;
+			break;
+		case OPT_TERSE:
+			output_flags |= NFT_CTX_OUTPUT_TERSE;
 			break;
 		case OPT_INVALID:
 			exit(EXIT_FAILURE);

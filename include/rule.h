@@ -45,6 +45,11 @@ struct set_spec {
 	const char		*name;
 };
 
+struct flowtable_spec {
+	struct location		location;
+	const char		*name;
+};
+
 struct obj_spec {
 	struct location		location;
 	const char		*name;
@@ -69,7 +74,7 @@ struct handle {
 	struct chain_spec	chain;
 	struct set_spec		set;
 	struct obj_spec		obj;
-	const char		*flowtable;
+	struct flowtable_spec	flowtable;
 	struct handle_spec	handle;
 	struct position_spec	position;
 	struct position_spec	index;
@@ -92,8 +97,10 @@ struct scope {
 	struct list_head	symbols;
 };
 
+extern struct scope *scope_alloc(void);
 extern struct scope *scope_init(struct scope *scope, const struct scope *parent);
 extern void scope_release(const struct scope *scope);
+extern void scope_free(struct scope *scope);
 
 /**
  * struct symbol
@@ -208,7 +215,9 @@ struct chain {
 	struct prio_spec	priority;
 	struct expr		*policy;
 	const char		*type;
-	const char		*dev;
+	const char		**dev_array;
+	struct expr		*dev_expr;
+	int			dev_array_len;
 	struct scope		scope;
 	struct list_head	rules;
 };
@@ -349,6 +358,11 @@ static inline bool map_is_literal(uint32_t set_flags)
 	return !(set_is_anonymous(set_flags) || !set_is_map(set_flags));
 }
 
+static inline bool set_is_meter(uint32_t set_flags)
+{
+	return set_is_anonymous(set_flags) && (set_flags & NFT_SET_EVAL);
+}
+
 #include <statement.h>
 
 struct counter {
@@ -399,6 +413,12 @@ struct limit {
 	uint32_t	flags;
 };
 
+struct synproxy {
+	uint16_t	mss;
+	uint8_t		wscale;
+	uint32_t	flags;
+};
+
 struct secmark {
 	char		ctx[NFT_SECMARK_CTX_MAXLEN];
 };
@@ -426,6 +446,7 @@ struct obj {
 		struct ct_timeout	ct_timeout;
 		struct secmark		secmark;
 		struct ct_expect	ct_expect;
+		struct synproxy		synproxy;
 	};
 };
 
@@ -461,6 +482,10 @@ extern struct flowtable *flowtable_alloc(const struct location *loc);
 extern struct flowtable *flowtable_get(struct flowtable *flowtable);
 extern void flowtable_free(struct flowtable *flowtable);
 extern void flowtable_add_hash(struct flowtable *flowtable, struct table *table);
+extern struct flowtable *flowtable_lookup(const struct table *table, const char *name);
+extern struct flowtable *flowtable_lookup_fuzzy(const char *ft_name,
+						const struct nft_cache *cache,
+						const struct table **table);
 
 void flowtable_print(const struct flowtable *n, struct output_ctx *octx);
 
@@ -526,9 +551,10 @@ enum cmd_ops {
  * @CMD_OBJ_QUOTAS:	multiple quotas
  * @CMD_OBJ_LIMIT:	limit
  * @CMD_OBJ_LIMITS:	multiple limits
- * @CMD_OBJ_FLOWTABLES:	flow tables
  * @CMD_OBJ_SECMARK:	secmark
  * @CMD_OBJ_SECMARKS:	multiple secmarks
+ * @CMD_OBJ_SYNPROXY:	synproxy
+ * @CMD_OBJ_SYNPROXYS:	multiple synproxys
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
@@ -561,6 +587,8 @@ enum cmd_obj {
 	CMD_OBJ_SECMARK,
 	CMD_OBJ_SECMARKS,
 	CMD_OBJ_CT_EXPECT,
+	CMD_OBJ_SYNPROXY,
+	CMD_OBJ_SYNPROXYS,
 };
 
 struct markup {

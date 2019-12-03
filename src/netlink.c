@@ -378,9 +378,9 @@ void netlink_dump_chain(const struct nftnl_chain *nlc, struct netlink_ctx *ctx)
 struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 					const struct nftnl_chain *nlc)
 {
+	int priority, policy, len = 0, i;
+	const char * const *dev_array;
 	struct chain *chain;
-	int priority;
-	int policy;
 
 	chain = chain_alloc(nftnl_chain_get_str(nlc, NFTNL_CHAIN_NAME));
 	chain->handle.family =
@@ -415,8 +415,22 @@ struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 						    &policy);
 			nftnl_chain_get_u32(nlc, NFTNL_CHAIN_POLICY);
 		if (nftnl_chain_is_set(nlc, NFTNL_CHAIN_DEV)) {
-			chain->dev	=
+			chain->dev_array = xmalloc(sizeof(char *) * 2);
+			chain->dev_array_len = 1;
+			chain->dev_array[0] =
 				xstrdup(nftnl_chain_get_str(nlc, NFTNL_CHAIN_DEV));
+			chain->dev_array[1] = NULL;
+		} else if (nftnl_chain_is_set(nlc, NFTNL_CHAIN_DEVICES)) {
+			dev_array = nftnl_chain_get(nlc, NFTNL_CHAIN_DEVICES);
+			while (dev_array[len])
+				len++;
+
+			chain->dev_array = xmalloc((len + 1)* sizeof(char *));
+			for (i = 0; i < len; i++)
+				chain->dev_array[i] = xstrdup(dev_array[i]);
+
+			chain->dev_array[i] = NULL;
+			chain->dev_array_len = len;
 		}
 		chain->flags        |= CHAIN_F_BASECHAIN;
 	}
@@ -1030,6 +1044,14 @@ struct obj *netlink_delinearize_obj(struct netlink_ctx *ctx,
 		obj->ct_expect.size =
 			nftnl_obj_get_u8(nlo, NFTNL_OBJ_CT_EXPECT_SIZE);
 		break;
+	case NFT_OBJECT_SYNPROXY:
+		obj->synproxy.mss =
+			nftnl_obj_get_u16(nlo, NFTNL_OBJ_SYNPROXY_MSS);
+		obj->synproxy.wscale =
+			nftnl_obj_get_u8(nlo, NFTNL_OBJ_SYNPROXY_WSCALE);
+		obj->synproxy.flags =
+			nftnl_obj_get_u32(nlo, NFTNL_OBJ_SYNPROXY_FLAGS);
+		break;
 	}
 	obj->type = type;
 
@@ -1109,8 +1131,10 @@ netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 		nftnl_flowtable_get_u32(nlo, NFTNL_FLOWTABLE_FAMILY);
 	flowtable->handle.table.name =
 		xstrdup(nftnl_flowtable_get_str(nlo, NFTNL_FLOWTABLE_TABLE));
-	flowtable->handle.flowtable =
+	flowtable->handle.flowtable.name =
 		xstrdup(nftnl_flowtable_get_str(nlo, NFTNL_FLOWTABLE_NAME));
+	flowtable->handle.handle.id =
+		nftnl_flowtable_get_u64(nlo, NFTNL_FLOWTABLE_HANDLE);
 	dev_array = nftnl_flowtable_get(nlo, NFTNL_FLOWTABLE_DEVICES);
 	while (dev_array[len])
 		len++;

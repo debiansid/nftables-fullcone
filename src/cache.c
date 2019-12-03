@@ -63,6 +63,21 @@ static unsigned int evaluate_cache_del(struct cmd *cmd, unsigned int flags)
 	return flags;
 }
 
+static unsigned int evaluate_cache_get(struct cmd *cmd, unsigned int flags)
+{
+	switch (cmd->obj) {
+	case CMD_OBJ_SETELEM:
+		flags |= NFT_CACHE_TABLE |
+			 NFT_CACHE_SET |
+			 NFT_CACHE_SETELEM;
+		break;
+	default:
+		break;
+	}
+
+	return flags;
+}
+
 static unsigned int evaluate_cache_flush(struct cmd *cmd, unsigned int flags)
 {
 	switch (cmd->obj) {
@@ -104,11 +119,9 @@ unsigned int cache_evaluate(struct nft_ctx *nft, struct list_head *cmds)
 		case CMD_ADD:
 		case CMD_INSERT:
 		case CMD_CREATE:
-			if (nft_output_echo(&nft->output)) {
-				flags = NFT_CACHE_FULL;
-				break;
-			}
 			flags = evaluate_cache_add(cmd, flags);
+			if (nft_output_echo(&nft->output))
+				flags |= NFT_CACHE_FULL;
 			break;
 		case CMD_REPLACE:
 			flags = NFT_CACHE_FULL;
@@ -123,6 +136,8 @@ unsigned int cache_evaluate(struct nft_ctx *nft, struct list_head *cmds)
 			flags = evaluate_cache_del(cmd, flags);
 			break;
 		case CMD_GET:
+			flags = evaluate_cache_get(cmd, flags);
+			break;
 		case CMD_LIST:
 		case CMD_RESET:
 		case CMD_EXPORT:

@@ -218,6 +218,23 @@ static int set_not_found(struct eval_ctx *ctx, const struct location *loc,
 			 table->handle.table.name);
 }
 
+static int flowtable_not_found(struct eval_ctx *ctx, const struct location *loc,
+			       const char *ft_name)
+{
+	const struct table *table;
+	struct flowtable *ft;
+
+	ft = flowtable_lookup_fuzzy(ft_name, &ctx->nft->cache, &table);
+	if (ft == NULL)
+		return cmd_error(ctx, loc, "%s", strerror(ENOENT));
+
+	return cmd_error(ctx, loc,
+			"%s; did you mean flowtable ‘%s’ in table %s ‘%s’?",
+			strerror(ENOENT), ft->handle.flowtable.name,
+			family2str(ft->handle.family),
+			table->handle.table.name);
+}
+
 /*
  * Symbol expression: parse symbol and evaluate resulting expression.
  */
@@ -941,16 +958,28 @@ static int expr_evaluate_range_expr(struct eval_ctx *ctx,
 	return 0;
 }
 
-static int expr_evaluate_range(struct eval_ctx *ctx, struct expr **expr)
+static int __expr_evaluate_range(struct eval_ctx *ctx, struct expr **expr)
 {
-	struct expr *range = *expr, *left, *right;
+	struct expr *range = *expr;
 
 	if (expr_evaluate_range_expr(ctx, range, &range->left) < 0)
 		return -1;
-	left = range->left;
-
 	if (expr_evaluate_range_expr(ctx, range, &range->right) < 0)
 		return -1;
+
+	return 0;
+}
+
+static int expr_evaluate_range(struct eval_ctx *ctx, struct expr **expr)
+{
+	struct expr *range = *expr, *left, *right;
+	int rc;
+
+	rc = __expr_evaluate_range(ctx, expr);
+	if (rc)
+		return rc;
+
+	left = range->left;
 	right = range->right;
 
 	if (mpz_cmp(left->value, right->value) >= 0)
@@ -1671,13 +1700,67 @@ static int binop_transfer(struct eval_ctx *ctx, struct expr **expr)
 	return 0;
 }
 
+static bool lhs_is_meta_hour(const struct expr *meta)
+{
+	if (meta->etype != EXPR_META)
+		return false;
+
+	return meta->meta.key == NFT_META_TIME_HOUR ||
+	       meta->meta.key == NFT_META_TIME_DAY;
+}
+
+static void swap_values(struct expr *range)
+{
+	struct expr *left_tmp;
+
+	left_tmp = range->left;
+	range->left = range->right;
+	range->right = left_tmp;
+}
+
+static bool range_needs_swap(const struct expr *range)
+{
+	const struct expr *right = range->right;
+	const struct expr *left = range->left;
+
+	return mpz_cmp(left->value, right->value) > 0;
+}
+
 static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *rel = *expr, *left, *right;
+	struct expr *range;
+	int ret;
 
 	if (expr_evaluate(ctx, &rel->left) < 0)
 		return -1;
 	left = rel->left;
+
+	if (rel->right->etype == EXPR_RANGE && lhs_is_meta_hour(rel->left)) {
+		ret = __expr_evaluate_range(ctx, &rel->right);
+		if (ret)
+			return ret;
+
+		range = rel->right;
+
+		/*
+		 * We may need to do this for proper cross-day ranges,
+		 * e.g. meta hour 23:15-03:22
+		 */
+		if (range_needs_swap(range)) {
+			if (ctx->nft->debug_mask & NFT_DEBUG_EVALUATION)
+				nft_print(&ctx->nft->output,
+					  "Inverting range values for cross-day hour matching\n\n");
+
+			if (rel->op == OP_EQ || rel->op == OP_IMPLICIT) {
+				swap_values(range);
+				rel->op = OP_NEQ;
+			} else if (rel->op == OP_NEQ) {
+				swap_values(range);
+				rel->op = OP_EQ;
+			}
+		}
+	}
 
 	if (expr_evaluate(ctx, &rel->right) < 0)
 		return -1;
@@ -1700,6 +1783,18 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 					 "expression has type %s",
 					 left->dtype->desc,
 					 right->dtype->desc);
+
+	/*
+	 * Statements like 'ct secmark 12' are parsed as relational,
+	 * disallow constant value on the right hand side.
+	 */
+	if (((left->etype == EXPR_META &&
+	      left->meta.key == NFT_META_SECMARK) ||
+	     (left->etype == EXPR_CT &&
+	      left->ct.key == NFT_CT_SECMARK)) &&
+	    right->flags & EXPR_F_CONSTANT)
+		return expr_binary_error(ctx->msgs, right, left,
+					 "Cannot be used with right hand side constant value");
 
 	switch (rel->op) {
 	case OP_EQ:
@@ -1797,11 +1892,20 @@ static int expr_evaluate_meta(struct eval_ctx *ctx, struct expr **exprp)
 {
 	struct expr *meta = *exprp;
 
-	if (ctx->pctx.family != NFPROTO_INET &&
-	    meta->flags & EXPR_F_PROTOCOL &&
-	    meta->meta.key == NFT_META_NFPROTO)
-		return expr_error(ctx->msgs, meta,
+	switch (meta->meta.key) {
+	case NFT_META_NFPROTO:
+		if (ctx->pctx.family != NFPROTO_INET &&
+		    meta->flags & EXPR_F_PROTOCOL)
+			return expr_error(ctx->msgs, meta,
 					  "meta nfproto is only useful in the inet family");
+		break;
+	case NFT_META_TIME_DAY:
+		__expr_set_context(&ctx->ectx, meta->dtype, meta->byteorder,
+				   meta->len, 6);
+		return 0;
+	default:
+		break;
+	}
 
 	return expr_evaluate_primary(ctx, exprp);
 }
@@ -2227,11 +2331,19 @@ static int stmt_evaluate_meta(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_ct(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	return stmt_evaluate_arg(ctx, stmt,
+	if (stmt_evaluate_arg(ctx, stmt,
 				 stmt->ct.tmpl->dtype,
 				 stmt->ct.tmpl->len,
 				 stmt->ct.tmpl->byteorder,
-				 &stmt->ct.expr);
+				 &stmt->ct.expr) < 0)
+		return -1;
+
+	if (stmt->ct.key == NFT_CT_SECMARK &&
+	    expr_is_constant(stmt->ct.expr))
+		return stmt_error(ctx, stmt,
+				  "ct secmark must not be set to constant value");
+
+	return 0;
 }
 
 static int reject_payload_gen_dependency_tcp(struct eval_ctx *ctx,
@@ -2888,6 +3000,7 @@ static int stmt_evaluate_fwd(struct eval_ctx *ctx, struct stmt *stmt)
 	default:
 		return stmt_error(ctx, stmt, "unsupported family");
 	}
+	stmt->flags |= STMT_F_TERMINAL;
 	return 0;
 }
 
@@ -2907,6 +3020,7 @@ static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
 					  "fanout requires a range to be "
 					  "specified");
 	}
+	stmt->flags |= STMT_F_TERMINAL;
 	return 0;
 }
 
@@ -3666,6 +3780,7 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_CT_TIMEOUT:
 	case CMD_OBJ_SECMARK:
 	case CMD_OBJ_CT_EXPECT:
+	case CMD_OBJ_SYNPROXY:
 		return obj_evaluate(ctx, cmd->object);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
@@ -3689,6 +3804,7 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_LIMIT:
 	case CMD_OBJ_SECMARK:
 	case CMD_OBJ_CT_EXPECT:
+	case CMD_OBJ_SYNPROXY:
 		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
@@ -3755,6 +3871,7 @@ static int cmd_evaluate_list_obj(struct eval_ctx *ctx, const struct cmd *cmd,
 
 static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 {
+	struct flowtable *ft;
 	struct table *table;
 	struct set *set;
 
@@ -3791,8 +3908,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
-		else if (!(set->flags & NFT_SET_EVAL) ||
-			 !(set->flags & NFT_SET_ANONYMOUS))
+		else if (!set_is_meter(set->flags))
 			return cmd_error(ctx, &ctx->cmd->handle.set.location,
 					 "%s", strerror(ENOENT));
 
@@ -3820,6 +3936,17 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 			return chain_not_found(ctx);
 
 		return 0;
+	case CMD_OBJ_FLOWTABLE:
+		table = table_lookup(&cmd->handle, &ctx->nft->cache);
+		if (table == NULL)
+			return table_not_found(ctx);
+
+		ft = flowtable_lookup(table, cmd->handle.flowtable.name);
+		if (ft == NULL)
+			return flowtable_not_found(ctx, &ctx->cmd->handle.flowtable.location,
+						   ctx->cmd->handle.flowtable.name);
+
+		return 0;
 	case CMD_OBJ_QUOTA:
 		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_QUOTA);
 	case CMD_OBJ_COUNTER:
@@ -3834,6 +3961,8 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_SECMARK);
 	case CMD_OBJ_CT_EXPECT:
 		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_CT_EXPECT);
+	case CMD_OBJ_SYNPROXY:
+		return cmd_evaluate_list_obj(ctx, cmd, NFT_OBJECT_SYNPROXY);
 	case CMD_OBJ_COUNTERS:
 	case CMD_OBJ_QUOTAS:
 	case CMD_OBJ_CT_HELPERS:
@@ -3841,6 +3970,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SETS:
 	case CMD_OBJ_FLOWTABLES:
 	case CMD_OBJ_SECMARKS:
+	case CMD_OBJ_SYNPROXYS:
 		if (cmd->handle.table.name == NULL)
 			return 0;
 		if (table_lookup(&cmd->handle, &ctx->nft->cache) == NULL)
@@ -3926,8 +4056,7 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
-		else if (!(set->flags & NFT_SET_EVAL) ||
-			 !(set->flags & NFT_SET_ANONYMOUS))
+		else if (!set_is_meter(set->flags))
 			return cmd_error(ctx, &ctx->cmd->handle.set.location,
 					 "%s", strerror(ENOENT));
 

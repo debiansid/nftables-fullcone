@@ -128,7 +128,7 @@ static void meter_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	stmt_print(stmt->meter.stmt, octx);
 	octx->flags = flags;
 
-	nft_print(octx, "} ");
+	nft_print(octx, " }");
 
 }
 
@@ -209,6 +209,7 @@ static const char *objref_type[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_LIMIT]	= "limit",
 	[NFT_OBJECT_CT_TIMEOUT] = "ct timeout",
 	[NFT_OBJECT_SECMARK]	= "secmark",
+	[NFT_OBJECT_SYNPROXY]	= "synproxy",
 	[NFT_OBJECT_CT_EXPECT]	= "ct expectation",
 };
 
@@ -231,6 +232,9 @@ static void objref_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 		break;
 	case NFT_OBJECT_CT_EXPECT:
 		nft_print(octx, "ct expectation set ");
+		break;
+	case NFT_OBJECT_SECMARK:
+		nft_print(octx, "meta secmark set ");
 		break;
 	default:
 		nft_print(octx, "%s name ",
@@ -665,6 +669,7 @@ struct stmt *nat_stmt_alloc(const struct location *loc,
 const char * const set_stmt_op_names[] = {
 	[NFT_DYNSET_OP_ADD]	= "add",
 	[NFT_DYNSET_OP_UPDATE]	= "update",
+	[NFT_DYNSET_OP_DELETE]  = "delete",
 };
 
 static void set_stmt_print(const struct stmt *stmt, struct output_ctx *octx)

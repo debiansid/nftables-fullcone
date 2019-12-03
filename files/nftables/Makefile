@@ -154,13 +154,13 @@ am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 A2X = a2x
-ACLOCAL = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing aclocal-1.15
+ACLOCAL = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing autoconf
-AUTOHEADER = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing autoheader
-AUTOMAKE = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing automake-1.15
+AUTOCONF = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/missing autoconf
+AUTOHEADER = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/missing autoheader
+AUTOMAKE = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/missing automake-1.15
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -202,7 +202,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
-MAKEINFO = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/missing makeinfo
+MAKEINFO = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -214,10 +214,10 @@ OTOOL64 =
 PACKAGE = nftables
 PACKAGE_BUGREPORT = netfilter-devel@vger.kernel.org
 PACKAGE_NAME = nftables
-PACKAGE_STRING = nftables 0.9.2
+PACKAGE_STRING = nftables 0.9.3
 PACKAGE_TARNAME = nftables
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.9.2
+PACKAGE_VERSION = 0.9.3
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -228,15 +228,15 @@ SED = /bin/sed
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = strip
-VERSION = 0.9.2
+VERSION = 0.9.3
 XTABLES_CFLAGS = 
 XTABLES_LIBS = 
 YACC = bison -y
 YFLAGS = 
-abs_builddir = /tmp/tmp.uUKS8h0mMl/files/nftables
-abs_srcdir = /tmp/tmp.uUKS8h0mMl/files/nftables
-abs_top_builddir = /tmp/tmp.uUKS8h0mMl
-abs_top_srcdir = /tmp/tmp.uUKS8h0mMl
+abs_builddir = /tmp/tmp.XEYEX7RgE4/files/nftables
+abs_srcdir = /tmp/tmp.XEYEX7RgE4/files/nftables
+abs_top_builddir = /tmp/tmp.XEYEX7RgE4
+abs_top_srcdir = /tmp/tmp.XEYEX7RgE4
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -265,7 +265,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /tmp/tmp.uUKS8h0mMl/build-aux/install-sh
+install_sh = ${SHELL} /tmp/tmp.XEYEX7RgE4/build-aux/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -286,8 +286,6 @@ target_alias =
 top_build_prefix = ../../
 top_builddir = ../..
 top_srcdir = ../..
-with_cli = yes
-with_json = no
 pkgsysconfdir = ${sysconfdir}/nftables
 dist_pkgsysconf_DATA = all-in-one.nft		\
 			arp-filter.nft		\
@@ -458,8 +456,7 @@ info: info-am
 info-am:
 
 install-data-am: install-dist_pkgsysconfDATA
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
+
 install-dvi: install-dvi-am
 
 install-dvi-am:
@@ -504,26 +501,23 @@ ps-am:
 
 uninstall-am: uninstall-dist_pkgsysconfDATA
 
-.MAKE: install-am install-data-am install-strip
+.MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am \
-	install-data-hook install-dist_pkgsysconfDATA install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags-am uninstall uninstall-am uninstall-dist_pkgsysconfDATA
+	install-dist_pkgsysconfDATA install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
+	uninstall-am uninstall-dist_pkgsysconfDATA
 
 .PRECIOUS: Makefile
 
-
-install-data-hook:
-	${SED} -i 's|@sbindir[@]|${sbindir}/|g' ${DESTDIR}${pkgsysconfdir}/*.nft
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

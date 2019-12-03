@@ -30,6 +30,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <utils.h>
 #include <nftables.h>
 
@@ -218,24 +219,24 @@ void mnl_err_list_free(struct mnl_err *err)
 	xfree(err);
 }
 
-static int nlbuffsiz;
-
 static void mnl_set_sndbuffer(const struct mnl_socket *nl,
 			      struct nftnl_batch *batch)
 {
+	socklen_t len = sizeof(int);
+	int sndnlbuffsiz = 0;
 	int newbuffsiz;
 
-	if (nftnl_batch_iovec_len(batch) * BATCH_PAGE_SIZE <= nlbuffsiz)
-		return;
+	getsockopt(mnl_socket_get_fd(nl), SOL_SOCKET, SO_SNDBUF,
+		   &sndnlbuffsiz, &len);
 
 	newbuffsiz = nftnl_batch_iovec_len(batch) * BATCH_PAGE_SIZE;
+	if (newbuffsiz <= sndnlbuffsiz)
+		return;
 
 	/* Rise sender buffer length to avoid hitting -EMSGSIZE */
 	if (setsockopt(mnl_socket_get_fd(nl), SOL_SOCKET, SO_SNDBUFFORCE,
 		       &newbuffsiz, sizeof(socklen_t)) < 0)
 		return;
-
-	nlbuffsiz = newbuffsiz;
 }
 
 static unsigned int nlsndbufsiz;
@@ -304,6 +305,8 @@ static ssize_t mnl_nft_socket_sendmsg(struct netlink_ctx *ctx,
 	return sendmsg(mnl_socket_get_fd(ctx->nft->nf_sock), msg, 0);
 }
 
+#define NFT_MNL_ECHO_RCVBUFF_DEFAULT	(MNL_SOCKET_BUFFER_SIZE * 1024)
+
 int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 		   uint32_t num_cmds)
 {
@@ -311,8 +314,6 @@ int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 	int ret, fd = mnl_socket_get_fd(nl), portid = mnl_socket_get_portid(nl);
 	uint32_t iov_len = nftnl_batch_iovec_len(ctx->batch);
 	char rcv_buf[MNL_SOCKET_BUFFER_SIZE];
-	unsigned int enobuf_restarts = 0;
-	size_t avg_msg_size, batch_size;
 	const struct sockaddr_nl snl = {
 		.nl_family = AF_NETLINK
 	};
@@ -321,17 +322,24 @@ int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 		.tv_usec	= 0
 	};
 	struct iovec iov[iov_len];
-	unsigned int scale = 4;
 	struct msghdr msg = {};
+	unsigned int rcvbufsiz;
+	size_t batch_size;
 	fd_set readfds;
 
 	mnl_set_sndbuffer(ctx->nft->nf_sock, ctx->batch);
 
 	batch_size = mnl_nft_batch_to_msg(ctx, &msg, &snl, iov, iov_len);
-	avg_msg_size = div_round_up(batch_size, num_cmds);
 
-restart:
-	mnl_set_rcvbuffer(ctx->nft->nf_sock, num_cmds * avg_msg_size * scale);
+	if (nft_output_echo(&ctx->nft->output)) {
+		rcvbufsiz = num_cmds * 1024;
+		if (rcvbufsiz < NFT_MNL_ECHO_RCVBUFF_DEFAULT)
+			rcvbufsiz = NFT_MNL_ECHO_RCVBUFF_DEFAULT;
+	} else {
+		rcvbufsiz = num_cmds * div_round_up(batch_size, num_cmds) * 4;
+	}
+
+	mnl_set_rcvbuffer(ctx->nft->nf_sock, rcvbufsiz);
 
 	ret = mnl_nft_socket_sendmsg(ctx, &msg);
 	if (ret == -1)
@@ -350,13 +358,8 @@ restart:
 			break;
 
 		ret = mnl_socket_recvfrom(nl, rcv_buf, sizeof(rcv_buf));
-		if (ret == -1) {
-			if (errno == ENOBUFS && enobuf_restarts++ < 3) {
-				scale *= 2;
-				goto restart;
-			}
+		if (ret == -1)
 			return -1;
-		}
 
 		ret = mnl_cb_run(rcv_buf, ret, 0, portid, &netlink_echo_callback, ctx);
 		/* Continue on error, make sure we get all acknowledgments */
@@ -524,10 +527,12 @@ err:
 int mnl_nft_chain_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 		      unsigned int flags)
 {
+	int priority, policy, i = 0;
 	struct nftnl_chain *nlc;
+	const char **dev_array;
 	struct nlmsghdr *nlh;
-	int priority;
-	int policy;
+	struct expr *expr;
+	int dev_array_len;
 
 	nlc = nftnl_chain_alloc();
 	if (nlc == NULL)
@@ -553,9 +558,27 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 					BYTEORDER_HOST_ENDIAN, sizeof(int));
 			nftnl_chain_set_u32(nlc, NFTNL_CHAIN_POLICY, policy);
 		}
-		if (cmd->chain->dev != NULL)
-			nftnl_chain_set_str(nlc, NFTNL_CHAIN_DEV,
-					    cmd->chain->dev);
+		if (cmd->chain->dev_expr) {
+			dev_array = xmalloc(sizeof(char *) * 8);
+			dev_array_len = 8;
+			list_for_each_entry(expr, &cmd->chain->dev_expr->expressions, list) {
+				dev_array[i++] = expr->identifier;
+				if (i == dev_array_len) {
+					dev_array_len *= 2;
+					dev_array = xrealloc(dev_array,
+							     dev_array_len * sizeof(char *));
+				}
+			}
+
+			dev_array[i] = NULL;
+			if (i == 1)
+				nftnl_chain_set_str(nlc, NFTNL_CHAIN_DEV, dev_array[0]);
+			else if (i > 1)
+				nftnl_chain_set_data(nlc, NFTNL_CHAIN_DEVICES, dev_array,
+						     sizeof(char *) * dev_array_len);
+
+			xfree(dev_array);
+		}
 	}
 	netlink_dump_chain(nlc, ctx);
 
@@ -693,7 +716,7 @@ int mnl_nft_table_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 		memory_allocation_error();
 
 	nftnl_table_set_u32(nlt, NFTNL_TABLE_FAMILY, cmd->handle.family);
-	nftnl_table_set(nlt, NFTNL_TABLE_NAME, cmd->handle.table.name);
+	nftnl_table_set_str(nlt, NFTNL_TABLE_NAME, cmd->handle.table.name);
 	if (cmd->table)
 		nftnl_table_set_u32(nlt, NFTNL_TABLE_FLAGS, cmd->table->flags);
 	else
@@ -722,7 +745,8 @@ int mnl_nft_table_del(struct netlink_ctx *ctx, const struct cmd *cmd)
 
 	nftnl_table_set_u32(nlt, NFTNL_TABLE_FAMILY, cmd->handle.family);
 	if (cmd->handle.table.name)
-		nftnl_table_set(nlt, NFTNL_TABLE_NAME, cmd->handle.table.name);
+		nftnl_table_set_str(nlt, NFTNL_TABLE_NAME,
+				    cmd->handle.table.name);
 	else if (cmd->handle.handle.id)
 		nftnl_table_set_u64(nlt, NFTNL_TABLE_HANDLE,
 				    cmd->handle.handle.id);
@@ -943,7 +967,7 @@ mnl_nft_set_dump(struct netlink_ctx *ctx, int family, const char *table)
 	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETSET, family,
 				    NLM_F_DUMP, ctx->seqnum);
 	if (table != NULL)
-		nftnl_set_set(s, NFTNL_SET_TABLE, table);
+		nftnl_set_set_str(s, NFTNL_SET_TABLE, table);
 	nftnl_set_nlmsg_build_payload(nlh, s);
 	nftnl_set_free(s);
 
@@ -1014,8 +1038,9 @@ int mnl_nft_obj_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 		if (obj->ct_timeout.l3proto)
 			nftnl_obj_set_u16(nlo, NFTNL_OBJ_CT_TIMEOUT_L3PROTO,
 					  obj->ct_timeout.l3proto);
-		nftnl_obj_set(nlo, NFTNL_OBJ_CT_TIMEOUT_ARRAY,
-			      obj->ct_timeout.timeout);
+		nftnl_obj_set_data(nlo, NFTNL_OBJ_CT_TIMEOUT_ARRAY,
+				   obj->ct_timeout.timeout,
+				   sizeof(obj->ct_timeout.timeout));
 		break;
 	case NFT_OBJECT_CT_EXPECT:
 		if (obj->ct_expect.l3proto)
@@ -1033,6 +1058,14 @@ int mnl_nft_obj_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 	case NFT_OBJECT_SECMARK:
 		nftnl_obj_set_str(nlo, NFTNL_OBJ_SECMARK_CTX,
 				  obj->secmark.ctx);
+		break;
+	case NFT_OBJECT_SYNPROXY:
+		nftnl_obj_set_u16(nlo, NFTNL_OBJ_SYNPROXY_MSS,
+				  obj->synproxy.mss);
+		nftnl_obj_set_u8(nlo, NFTNL_OBJ_SYNPROXY_WSCALE,
+				 obj->synproxy.wscale);
+		nftnl_obj_set_u32(nlo, NFTNL_OBJ_SYNPROXY_FLAGS,
+				  obj->synproxy.flags);
 		break;
 	default:
 		BUG("Unknown type %d\n", obj->type);
@@ -1382,11 +1415,11 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 			  unsigned int flags)
 {
 	struct nftnl_flowtable *flo;
-	const char *dev_array[8];
+	const char **dev_array;
 	struct nlmsghdr *nlh;
+	int i = 0, len = 1;
 	struct expr *expr;
 	int priority;
-	int i = 0;
 
 	flo = nftnl_flowtable_alloc();
 	if (!flo)
@@ -1397,7 +1430,7 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 	nftnl_flowtable_set_str(flo, NFTNL_FLOWTABLE_TABLE,
 				cmd->handle.table.name);
 	nftnl_flowtable_set_str(flo, NFTNL_FLOWTABLE_NAME,
-				cmd->handle.flowtable);
+				cmd->handle.flowtable.name);
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM,
 				cmd->flowtable->hooknum);
 	mpz_export_data(&priority, cmd->flowtable->priority.expr->value,
@@ -1405,10 +1438,16 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, const struct cmd *cmd,
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, priority);
 
 	list_for_each_entry(expr, &cmd->flowtable->dev_expr->expressions, list)
+		len++;
+
+	dev_array = calloc(len, sizeof(char *));
+	list_for_each_entry(expr, &cmd->flowtable->dev_expr->expressions, list)
 		dev_array[i++] = expr->identifier;
 
 	dev_array[i] = NULL;
-	nftnl_flowtable_set(flo, NFTNL_FLOWTABLE_DEVICES, dev_array);
+	nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
+				 dev_array, sizeof(char *) * len);
+	free(dev_array);
 
 	netlink_dump_flowtable(flo, ctx);
 
@@ -1436,8 +1475,12 @@ int mnl_nft_flowtable_del(struct netlink_ctx *ctx, const struct cmd *cmd)
 				cmd->handle.family);
 	nftnl_flowtable_set_str(flo, NFTNL_FLOWTABLE_TABLE,
 				cmd->handle.table.name);
-	nftnl_flowtable_set_str(flo, NFTNL_FLOWTABLE_NAME,
-				cmd->handle.flowtable);
+	if (cmd->handle.flowtable.name)
+		nftnl_flowtable_set_str(flo, NFTNL_FLOWTABLE_NAME,
+					cmd->handle.flowtable.name);
+	else if (cmd->handle.handle.id)
+		nftnl_flowtable_set_u64(flo, NFTNL_FLOWTABLE_HANDLE,
+				        cmd->handle.handle.id);
 
 	nlh = nftnl_nlmsg_build_hdr(nftnl_batch_buffer(ctx->batch),
 				    NFT_MSG_DELFLOWTABLE, cmd->handle.family,

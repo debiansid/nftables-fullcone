@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.2], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Scram"], [Release name])
+AC_INIT([nftables], [0.9.3], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Topsy"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -68,14 +68,22 @@ AC_CHECK_LIB([gmp],[__gmpz_init], , AC_MSG_ERROR([No suitable version of libgmp 
 AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" = xyes])
 
 AC_ARG_WITH([cli], [AS_HELP_STRING([--without-cli],
-            [disable interactive CLI (libreadline support)])],
-            [], [with_cli=yes])
-AS_IF([test "x$with_cli" != xno], [
+            [disable interactive CLI (libreadline or linenoise support)])],
+            [], [with_cli=readline])
+
+AS_IF([test "x$with_cli" = xreadline], [
 AC_CHECK_LIB([readline], [readline], ,
 	     AC_MSG_ERROR([No suitable version of libreadline found]))
 AC_DEFINE([HAVE_LIBREADLINE], [1], [])
+],
+      [test "x$with_cli" = xlinenoise], [
+AC_CHECK_LIB([linenoise], [linenoise], ,
+	     AC_MSG_ERROR([No suitable version of linenoise found]))
+AC_DEFINE([HAVE_LIBLINENOISE], [1], [])
+],
+      [test "x$with_cli" != xno], [
+AC_MSG_ERROR([unexpected CLI value: $with_cli])
 ])
-AC_SUBST(with_cli)
 AM_CONDITIONAL([BUILD_CLI], [test "x$with_cli" != xno])
 
 AC_ARG_WITH([xtables], [AS_HELP_STRING([--with-xtables],
@@ -95,7 +103,6 @@ AC_CHECK_LIB([jansson], [json_object], ,
 	AC_MSG_ERROR([No suitable version of libjansson found]))
 AC_DEFINE([HAVE_LIBJANSSON], [1], [Define if you have libjansson])
 ])
-AC_SUBST(with_json)
 AM_CONDITIONAL([BUILD_JSON], [test "x$with_json" != xno])
 
 AC_ARG_ENABLE(python,
@@ -130,6 +137,7 @@ AC_CONFIG_FILES([					\
 		include/linux/netfilter_ipv4/Makefile	\
 		include/linux/netfilter_ipv6/Makefile	\
 		files/Makefile				\
+		files/examples/Makefile			\
 		files/nftables/Makefile			\
 		files/osf/Makefile			\
 		doc/Makefile				\

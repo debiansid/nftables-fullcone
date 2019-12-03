@@ -1,3 +1,15 @@
+nftables (0.9.3-1) unstable; urgency=medium
+
+  * This release was packaged and uploaded to Debian while on a 300km/h train.
+    Hope it works :-)
+  * [01e140c] New upstream version 0.9.3
+    Closes: #944669
+    Closes: #916863
+  * [1674c79] src:nftables: bump build-dep version on linftnl
+  * [7074517] d/patches: drop patches included in latest upstream release
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 03 Dec 2019 14:03:14 +0100
+
 nftables (0.9.2-2) unstable; urgency=medium
 
   [ Konstantin Demin ]

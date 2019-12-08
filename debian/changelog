@@ -5,6 +5,7 @@ nftables (0.9.3-2) UNRELEASED; urgency=medium
   * Re-export upstream signing key without extra signatures.
   * debian/copyright: use spaces rather than tabs to start continuation
     lines.
+  * Drop unnecessary dependency on dh-autoreconf.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sun, 08 Dec 2019 20:21:15 +0000
 

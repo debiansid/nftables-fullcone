@@ -6,6 +6,7 @@ nftables (0.9.3-2) UNRELEASED; urgency=medium
   * debian/copyright: use spaces rather than tabs to start continuation
     lines.
   * Drop unnecessary dependency on dh-autoreconf.
+  * Use canonical URL in Vcs-Git.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sun, 08 Dec 2019 20:21:15 +0000
 

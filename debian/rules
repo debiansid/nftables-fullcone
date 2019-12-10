@@ -27,7 +27,7 @@ override_dh_installinit:
 	dh_installinit -n
 
 override_dh_installexamples:
-	dh_installexamples
+	dh_installexamples -XMakefile
 	# upstream examples are installed in by the 'install' target to '/etc/nftables'
 	mv debian/tmp/etc/nftables/*.nft debian/nftables/usr/share/doc/nftables/examples/
 	rm -rf debian/nftables/etc/nftables

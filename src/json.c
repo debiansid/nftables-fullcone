@@ -86,7 +86,7 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 	} else if (set_is_objmap(set->flags)) {
 		type = "map";
 		datatype_ext = obj_type_name(set->objtype);
-	} else if (set->flags & NFT_SET_EVAL) {
+	} else if (set_is_meter(set->flags)) {
 		type = "meter";
 	} else {
 		type = "set";
@@ -222,9 +222,9 @@ static json_t *rule_print_json(struct output_ctx *octx,
 
 static json_t *chain_print_json(const struct chain *chain)
 {
+	int priority, policy, n = 0;
+	struct expr *dev, *expr;
 	json_t *root, *tmp;
-	int priority;
-	int policy;
 
 	root = json_pack("{s:s, s:s, s:s, s:I}",
 			 "family", family2str(chain->handle.family),
@@ -243,8 +243,17 @@ static json_t *chain_print_json(const struct chain *chain)
 						    chain->hooknum),
 				"prio", priority,
 				"policy", chain_policy2str(policy));
-		if (chain->dev)
-			json_object_set_new(tmp, "dev", json_string(chain->dev));
+		if (chain->dev_expr) {
+			list_for_each_entry(expr, &chain->dev_expr->expressions, list) {
+				dev = expr;
+				n++;
+			}
+		}
+
+		if (n == 1) {
+			json_object_set_new(tmp, "dev",
+					    json_string(dev->identifier));
+		}
 		json_object_update(root, tmp);
 		json_decref(tmp);
 	}
@@ -282,8 +291,8 @@ static json_t *obj_print_json(const struct obj *obj)
 {
 	const char *rate_unit = NULL, *burst_unit = NULL;
 	const char *type = obj_type_name(obj->type);
+	json_t *root, *tmp, *flags;
 	uint64_t rate, burst;
-	json_t *root, *tmp;
 
 	root = json_pack("{s:s, s:s, s:s, s:I}",
 			"family", family2str(obj->handle.family),
@@ -333,7 +342,7 @@ static json_t *obj_print_json(const struct obj *obj)
 		json_decref(tmp);
 		break;
 	case NFT_OBJECT_CT_EXPECT:
-		tmp = json_pack("{s:o, s:I, s:I, s:s, s:I}",
+		tmp = json_pack("{s:o, s:I, s:I, s:I, s:s}",
 				"protocol",
 				proto_name_json(obj->ct_expect.l4proto),
 				"dport", obj->ct_expect.dport,
@@ -371,6 +380,24 @@ static json_t *obj_print_json(const struct obj *obj)
 		json_object_update(root, tmp);
 		json_decref(tmp);
 		break;
+	case NFT_OBJECT_SYNPROXY:
+		flags = json_array();
+		tmp = json_pack("{s:i, s:i}",
+				"mss", obj->synproxy.mss,
+				"wscale", obj->synproxy.wscale);
+		if (obj->synproxy.flags & NF_SYNPROXY_OPT_TIMESTAMP)
+			json_array_append_new(flags, json_string("timestamp"));
+		if (obj->synproxy.flags & NF_SYNPROXY_OPT_SACK_PERM)
+			json_array_append_new(flags, json_string("sack-perm"));
+
+		if (json_array_size(flags) > 0)
+			json_object_set_new(tmp, "flags", flags);
+		else
+			json_decref(flags);
+
+		json_object_update(root, tmp);
+		json_decref(tmp);
+		break;
 	}
 
 	return json_pack("{s:o}", type, root);
@@ -383,10 +410,11 @@ static json_t *flowtable_print_json(const struct flowtable *ftable)
 
 	mpz_export_data(&priority, ftable->priority.expr->value,
 			BYTEORDER_HOST_ENDIAN, sizeof(int));
-	root = json_pack("{s:s, s:s, s:s, s:s, s:i}",
+	root = json_pack("{s:s, s:s, s:s, s:I, s:s, s:i}",
 			"family", family2str(ftable->handle.family),
-			"name", ftable->handle.flowtable,
+			"name", ftable->handle.flowtable.name,
 			"table", ftable->handle.table.name,
+			"handle", ftable->handle.handle.id,
 			"hook", hooknum2str(NFPROTO_NETDEV, ftable->hooknum),
 			"prio", priority);
 
@@ -1656,7 +1684,7 @@ static json_t *do_list_sets_json(struct netlink_ctx *ctx, struct cmd *cmd)
 			    !set_is_literal(set->flags))
 				continue;
 			if (cmd->obj == CMD_OBJ_METERS &&
-			    !(set->flags & NFT_SET_EVAL))
+			    !set_is_meter(set->flags))
 				continue;
 			if (cmd->obj == CMD_OBJ_MAPS &&
 			    !map_is_literal(set->flags))
@@ -1693,6 +1721,21 @@ static json_t *do_list_obj_json(struct netlink_ctx *ctx,
 			json_array_append_new(root, obj_print_json(obj));
 		}
 	}
+
+	return root;
+}
+
+static json_t *do_list_flowtable_json(struct netlink_ctx *ctx,
+				      struct cmd *cmd, struct table *table)
+{
+	json_t *root = json_array();
+	struct flowtable *ft;
+
+	ft = flowtable_lookup(table, cmd->handle.flowtable.name);
+	if (ft == NULL)
+		return json_null();
+
+	json_array_append_new(root, flowtable_print_json(ft));
 
 	return root;
 }
@@ -1787,6 +1830,9 @@ int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SECMARK:
 	case CMD_OBJ_SECMARKS:
 		root = do_list_obj_json(ctx, cmd, NFT_OBJECT_SECMARK);
+		break;
+	case CMD_OBJ_FLOWTABLE:
+		root = do_list_flowtable_json(ctx, cmd, table);
 		break;
 	case CMD_OBJ_FLOWTABLES:
 		root = do_list_flowtables_json(ctx, cmd);

@@ -286,8 +286,6 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-with_cli = @with_cli@
-with_json = @with_json@
 pkgsysconfdir = ${sysconfdir}/nftables
 dist_pkgsysconf_DATA = all-in-one.nft		\
 			arp-filter.nft		\
@@ -458,8 +456,7 @@ info: info-am
 info-am:
 
 install-data-am: install-dist_pkgsysconfDATA
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
+
 install-dvi: install-dvi-am
 
 install-dvi-am:
@@ -504,26 +501,23 @@ ps-am:
 
 uninstall-am: uninstall-dist_pkgsysconfDATA
 
-.MAKE: install-am install-data-am install-strip
+.MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am \
-	install-data-hook install-dist_pkgsysconfDATA install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags-am uninstall uninstall-am uninstall-dist_pkgsysconfDATA
+	install-dist_pkgsysconfDATA install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
+	uninstall-am uninstall-dist_pkgsysconfDATA
 
 .PRECIOUS: Makefile
 
-
-install-data-hook:
-	${SED} -i 's|@sbindir[@]|${sbindir}/|g' ${DESTDIR}${pkgsysconfdir}/*.nft
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

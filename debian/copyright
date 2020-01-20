@@ -24,12 +24,12 @@ License: GPL-2
 
 Files: src/netlink.c
 Copyright: 2008-2012 Patrick McHardy <kaber@trash.net>
-	   2013 Pablo Neira Ayuso <pablo@netfilter.org>
+           2013 Pablo Neira Ayuso <pablo@netfilter.org>
 License: GPL-2
 
 Files: src/netlink_delinearize.c src/netlink_linearize.c
 Copyright: 2008 Patrick McHardy <kaber@trash.net>
-	   2013 Pablo Neira Ayuso <pablo@netfilter.org>
+           2013 Pablo Neira Ayuso <pablo@netfilter.org>
 License: GPL-2
 
 Files: src/mnl.c
@@ -50,7 +50,7 @@ License: GPL-2+
 
 Files: src/xt.c
 Copyright: 2013-2015 Pablo Neira Ayuso <pablo@netfilter.org>
-	   2015 Arturo Borrero Gonzalez <arturo@debian.org>
+           2015 Arturo Borrero Gonzalez <arturo@debian.org>
 License: GPL-2
 
 Files: src/mergesort.c
@@ -71,12 +71,12 @@ License: GPL-2
 
 Files: include/linux/netfilter_decnet.h
 Copyright: 1999 Steve Whitehouse
-	   1998 Rusty Russell
+           1998 Rusty Russell
 License: GPL-2
 
 Files: include/linux/netfilter_ipv6.h
 Copyright: 1998 Rusty Russell
-	   1999 David Jeffery
+           1999 David Jeffery
 License: GPL-2
 
 Files: include/linux/netfilter_ipv4.h
@@ -85,7 +85,7 @@ License: GPL-2
 
 Files: src/rbtree.c include/rbtree.h
 Copyright: 1999 Andrea Arcangelli <andrea@suse.de>
-	   2002 David Woodhouse <dwmw2@infradead.org>
+           2002 David Woodhouse <dwmw2@infradead.org>
 License: GPL-2+
 
 Files: files/osf/pf.os

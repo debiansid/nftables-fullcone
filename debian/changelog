@@ -1,3 +1,48 @@
+nftables (0.9.3-2) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Use secure URI in Homepage field.
+  * Set debhelper-compat version in Build-Depends.
+  * Re-export upstream signing key without extra signatures.
+  * debian/copyright: use spaces rather than tabs to start continuation
+    lines.
+  * Drop unnecessary dependency on dh-autoreconf.
+  * Use canonical URL in Vcs-Git.
+
+  [ Chris Lamb ]
+  * [24184a4] nftables: don't install example Makefile (Closes: #946332)
+
+  [ Arturo Borrero Gonzalez ]
+  * [7d2cf78] d/patches: add 0001-upstream-py-load-soname.patch
+    (Closes: #946219)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 17 Dec 2019 13:49:23 +0100
+
+nftables (0.9.3-1) unstable; urgency=medium
+
+  * This release was packaged and uploaded to Debian while on a 300km/h train.
+    Hope it works :-)
+  * [01e140c] New upstream version 0.9.3
+    Closes: #944669
+    Closes: #916863
+  * [1674c79] src:nftables: bump build-dep version on linftnl
+  * [7074517] d/patches: drop patches included in latest upstream release
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 03 Dec 2019 14:03:14 +0100
+
+nftables (0.9.2-2) unstable; urgency=medium
+
+  [ Konstantin Demin ]
+  * [9c626fc] d/rules: build less verbose if requested
+
+  [ Arturo Borrero Gonzalez ]
+  * [ba5d4d0] nftables: add Suggests: firewalld
+  * [f8bea94] nftables: add upstream patches to address firewalld testsuite
+    failures (Closes: #939838)
+  * [35f35af] src:nftables: bump std-version to 4.4.1
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 09 Oct 2019 19:40:31 +0200
+
 nftables (0.9.2-1~bpo10+1) buster-backports; urgency=medium
 
   * Rebuild for buster-backports.

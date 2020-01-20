@@ -6,29 +6,30 @@ Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: asciidoc-base,
                automake,
                bison,
-               debhelper (>= 12~),
+               debhelper-compat (= 12),
                dh-python,
                docbook-xsl,
                flex,
                libgmp-dev,
                libjansson-dev,
                libmnl-dev (>= 1.0.3),
-               libnftnl-dev (>= 1.1.4),
+               libnftnl-dev (>= 1.1.5),
                libreadline-dev,
-               libtool (>=2.2.6),
+               libtool (>= 2.2.6),
                libxtables-dev (>= 1.6.1),
                python3-all,
                python3-setuptools,
                xsltproc
-Standards-Version: 4.4.0
-Homepage: http://www.netfilter.org/
-Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
+Standards-Version: 4.4.1
+Homepage: https://www.netfilter.org/
+Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables.git
 Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 
 Package: nftables
 Architecture: linux-any
 Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Suggests: firewalld
 Description: Program to control packet filtering rules by Netfilter project
  This software provides an in-kernel packet classification framework that is
  based on a network-specific Virtual Machine (VM) and the nft userspace

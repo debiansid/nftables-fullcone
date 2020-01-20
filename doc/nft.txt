@@ -9,7 +9,7 @@ nft - Administration tool of the nftables framework for packet filtering and cla
 SYNOPSIS
 --------
 [verse]
-*nft* [ *-nNscaeSupyj* ] [ *-I* 'directory' ] [ *-f* 'filename' | *-i* | 'cmd' ...]
+*nft* [ *-nNscaeSupyjt* ] [ *-I* 'directory' ] [ *-f* 'filename' | *-i* | 'cmd' ...]
 *nft* *-h*
 *nft* *-v*
 
@@ -85,13 +85,20 @@ For a full summary of options, run *nft --help*.
 
 *-f*::
 *--file 'filename'*::
-	Read input from 'filename'. If 'filename' is -, read from stdin. +
-	nft scripts must start *#!/usr/sbin/nft -f*
+	Read input from 'filename'. If 'filename' is -, read from stdin.
 
 *-i*::
 *--interactive*::
 	Read input from an interactive readline CLI. You can use quit to exit, or use the EOF marker,
 	normally this is CTRL-D.
+
+*-T*::
+*--numeric-time*::
+	Show time, day and hour values in numeric format.
+
+*-t*::
+*--terse*::
+	Omit contents of sets from output.
 
 INPUT FILE FORMATS
 ------------------
@@ -256,7 +263,7 @@ TABLES
 [verse]
 {*add* | *create*} *table* ['family'] 'table' [*{ flags* 'flags' *; }*]
 {*delete* | *list* | *flush*} *table* ['family'] 'table'
-*list tables*
+*list tables* ['family']
 *delete table* ['family'] *handle* 'handle'
 
 Tables are containers for chains, sets and stateful objects. They are identified
@@ -309,7 +316,7 @@ CHAINS
 [verse]
 {*add* | *create*} *chain* ['family'] 'table' 'chain' [*{ type* 'type' *hook* 'hook' [*device* 'device'] *priority* 'priority' *;* [*policy* 'policy' *;*] *}*]
 {*delete* | *list* | *flush*} *chain* ['family'] 'table' 'chain'
-*list chains*
+*list chains* ['family']
 *delete chain* ['family'] 'table' *handle* 'handle'
 *rename chain* ['family'] 'table' 'chain' 'newname'
 
@@ -487,7 +494,7 @@ section describes nft set syntax in more detail.
 [verse]
 *add set* ['family'] 'table' 'set' *{ type* 'type' *;* [*flags* 'flags' *;*] [*timeout* 'timeout' *;*] [*gc-interval* 'gc-interval' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] [*auto-merge ;*] *}*
 {*delete* | *list* | *flush*} *set* ['family'] 'table' 'set'
-*list sets*
+*list sets* ['family']
 *delete set* ['family'] 'table' *handle* 'handle'
 {*add* | *delete*} *element* ['family'] 'table' 'set' *{* 'element'[*,* ...] *}*
 
@@ -539,7 +546,7 @@ MAPS
 [verse]
 *add map* ['family'] 'table' 'map' *{ type* 'type' [*flags* 'flags' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] *}*
 {*delete* | *list* | *flush*} *map* ['family'] 'table' 'map'
-*list maps*
+*list maps* ['family']
 {*add* | *delete*} *element* ['family'] 'table' 'map' *{ elements = {* 'element'[*,* ...] *} ; }*
 
 Maps store data based on some specific key used as input. They are uniquely identified by a user-defined name and attached to tables.
@@ -578,7 +585,9 @@ FLOWTABLES
 -----------
 [verse]
 {*add* | *create*} *flowtable* ['family'] 'table' 'flowtable' *{ hook* 'hook' *priority* 'priority' *; devices = {* 'device'[*,* ...] *} ; }*
+*list flowtables* ['family']
 {*delete* | *list*} *flowtable* ['family'] 'table' 'flowtable'
+*delete* *flowtable* ['family'] 'table' *handle* 'handle'
 
 Flowtables allow you to accelerate packet forwarding in software. Flowtables
 entries are represented through a tuple that is composed of the input interface,
@@ -609,8 +618,8 @@ STATEFUL OBJECTS
 [verse]
 {*add* | *delete* | *list* | *reset*} 'type' ['family'] 'table' 'object'
 *delete* 'type' ['family'] 'table' *handle* 'handle'
-*list counters*
-*list quotas*
+*list counters* ['family']
+*list quotas* ['family']
 
 Stateful objects are attached to tables and are identified by an unique name.
 They group stateful information from rules, to reference them in rules the
@@ -638,9 +647,11 @@ representation of symbolic values and type compatibility with other expressions.
 DESCRIBE COMMAND
 ~~~~~~~~~~~~~~~~
 [verse]
-*describe* 'expression'
+*describe* 'expression' | 'data type'
 
 The *describe* command shows information about the type of an expression and its data type.
+A data type may also be given, in which nft will display more information
+about the type.
 
 .The describe command
 ---------------------
@@ -666,6 +677,17 @@ and type compatibility of expressions. A number of global data types exist, in
 addition some expression types define further data types specific to the
 expression type. Most data types have a fixed size, some however may have a
 dynamic size, f.i. the string type. +
+Some types also have predefined symbolic constants.  Those can be listed
+using the nft *describe* command:
+
+---------------------
+$ nft describe ct_state
+datatype ct_state (conntrack state) (basetype bitmask, integer), 32 bits
+
+pre-defined symbolic constants (in hexadecimal):
+invalid                         0x00000001
+new ...
+---------------------
 
 Types may be derived from lower order types, f.i. the IPv4 address type is
 derived from the integer type, meaning an IPv4 address can also be specified as

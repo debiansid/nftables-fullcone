@@ -1,3 +1,9 @@
+nftables (0.9.3-2~bpo10+1) buster-backports; urgency=medium
+
+  * Rebuild for buster-backports.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 20 Jan 2020 14:42:15 +0100
+
 nftables (0.9.3-2) unstable; urgency=medium
 
   [ Debian Janitor ]

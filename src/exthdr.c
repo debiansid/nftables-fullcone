@@ -23,6 +23,26 @@
 #include <expression.h>
 #include <statement.h>
 
+static const struct exthdr_desc *exthdr_definitions[PROTO_DESC_MAX + 1] = {
+	[EXTHDR_DESC_HBH]	= &exthdr_hbh,
+	[EXTHDR_DESC_RT]	= &exthdr_rt,
+	[EXTHDR_DESC_RT0]	= &exthdr_rt0,
+	[EXTHDR_DESC_RT2]	= &exthdr_rt2,
+	[EXTHDR_DESC_SRH]	= &exthdr_rt4,
+	[EXTHDR_DESC_FRAG]	= &exthdr_frag,
+	[EXTHDR_DESC_DST]	= &exthdr_dst,
+	[EXTHDR_DESC_MH]	= &exthdr_mh,
+};
+
+static const struct exthdr_desc *exthdr_find_desc(enum exthdr_desc_id desc_id)
+{
+	if (desc_id >= EXTHDR_DESC_UNKNOWN &&
+	    desc_id <= EXTHDR_DESC_MAX)
+		return exthdr_definitions[desc_id];
+
+	return NULL;
+}
+
 static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT) {
@@ -71,6 +91,78 @@ static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
 	new->exthdr.flags = expr->exthdr.flags;
 }
 
+#define NFTNL_UDATA_EXTHDR_DESC 0
+#define NFTNL_UDATA_EXTHDR_TYPE 1
+#define NFTNL_UDATA_EXTHDR_MAX 2
+
+static int exthdr_parse_udata(const struct nftnl_udata *attr, void *data)
+{
+	const struct nftnl_udata **ud = data;
+	uint8_t type = nftnl_udata_type(attr);
+	uint8_t len = nftnl_udata_len(attr);
+
+	switch (type) {
+	case NFTNL_UDATA_EXTHDR_DESC:
+	case NFTNL_UDATA_EXTHDR_TYPE:
+		if (len != sizeof(uint32_t))
+			return -1;
+		break;
+	default:
+		return 0;
+	}
+
+	ud[type] = attr;
+	return 0;
+}
+
+static struct expr *exthdr_expr_parse_udata(const struct nftnl_udata *attr)
+{
+	const struct nftnl_udata *ud[NFTNL_UDATA_EXTHDR_MAX + 1] = {};
+	const struct exthdr_desc *desc;
+	unsigned int type;
+	uint32_t desc_id;
+	int err;
+
+	err = nftnl_udata_parse(nftnl_udata_get(attr), nftnl_udata_len(attr),
+				exthdr_parse_udata, ud);
+	if (err < 0)
+		return NULL;
+
+	if (!ud[NFTNL_UDATA_EXTHDR_DESC] ||
+	    !ud[NFTNL_UDATA_EXTHDR_TYPE])
+		return NULL;
+
+	desc_id = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_DESC]);
+	desc = exthdr_find_desc(desc_id);
+	if (!desc)
+		return NULL;
+
+	type = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_TYPE]);
+
+	return exthdr_expr_alloc(&internal_location, desc, type);
+}
+
+static unsigned int expr_exthdr_type(const struct exthdr_desc *desc,
+				     const struct proto_hdr_template *tmpl)
+{
+	unsigned int offset = (unsigned int)(tmpl - &desc->templates[0]);
+
+	return offset / sizeof(*tmpl);
+}
+
+static int exthdr_expr_build_udata(struct nftnl_udata_buf *udbuf,
+				   const struct expr *expr)
+{
+	const struct proto_hdr_template *tmpl = expr->exthdr.tmpl;
+	const struct exthdr_desc *desc = expr->exthdr.desc;
+	unsigned int type = expr_exthdr_type(desc, tmpl);
+
+	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_DESC, desc->id);
+	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_TYPE, type);
+
+	return 0;
+}
+
 const struct expr_ops exthdr_expr_ops = {
 	.type		= EXPR_EXTHDR,
 	.name		= "exthdr",
@@ -78,6 +170,8 @@ const struct expr_ops exthdr_expr_ops = {
 	.json		= exthdr_expr_json,
 	.cmp		= exthdr_expr_cmp,
 	.clone		= exthdr_expr_clone,
+	.build_udata	= exthdr_expr_build_udata,
+	.parse_udata	= exthdr_expr_parse_udata,
 };
 
 static const struct proto_hdr_template exthdr_unknown_template =
@@ -281,6 +375,7 @@ bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned i
 
 const struct exthdr_desc exthdr_hbh = {
 	.name		= "hbh",
+	.id		= EXTHDR_DESC_HBH,
 	.type		= IPPROTO_HOPOPTS,
 	.templates	= {
 		[HBHHDR_NEXTHDR]	= HBH_FIELD("nexthdr", ip6h_nxt, &inet_protocol_type),
@@ -294,6 +389,7 @@ const struct exthdr_desc exthdr_hbh = {
 
 const struct exthdr_desc exthdr_rt2 = {
 	.name           = "rt2",
+	.id		= EXTHDR_DESC_RT2,
 	.type           = IPPROTO_ROUTING,
 	.proto_key	= 2,
 	.templates	= {
@@ -307,6 +403,7 @@ const struct exthdr_desc exthdr_rt2 = {
 
 const struct exthdr_desc exthdr_rt0 = {
 	.name           = "rt0",
+	.id		= EXTHDR_DESC_RT0,
 	.type           = IPPROTO_ROUTING,
 	.proto_key      = 0,
 	.templates	= {
@@ -322,6 +419,7 @@ const struct exthdr_desc exthdr_rt0 = {
 
 const struct exthdr_desc exthdr_rt4 = {
 	.name		= "srh",
+	.id		= EXTHDR_DESC_SRH,
 	.type		= IPPROTO_ROUTING,
 	.proto_key	= 4,
 	.templates      = {
@@ -340,6 +438,7 @@ const struct exthdr_desc exthdr_rt4 = {
 
 const struct exthdr_desc exthdr_rt = {
 	.name		= "rt",
+	.id		= EXTHDR_DESC_RT,
 	.type		= IPPROTO_ROUTING,
 	.proto_key      = -1,
 #if 0
@@ -366,6 +465,7 @@ const struct exthdr_desc exthdr_rt = {
 
 const struct exthdr_desc exthdr_frag = {
 	.name		= "frag",
+	.id		= EXTHDR_DESC_FRAG,
 	.type		= IPPROTO_FRAGMENT,
 	.templates	= {
 		[FRAGHDR_NEXTHDR]	= FRAG_FIELD("nexthdr", ip6f_nxt, &inet_protocol_type),
@@ -392,6 +492,7 @@ const struct exthdr_desc exthdr_frag = {
 
 const struct exthdr_desc exthdr_dst = {
 	.name		= "dst",
+	.id		= EXTHDR_DESC_DST,
 	.type		= IPPROTO_DSTOPTS,
 	.templates	= {
 		[DSTHDR_NEXTHDR]	= DST_FIELD("nexthdr", ip6d_nxt, &inet_protocol_type),
@@ -438,6 +539,7 @@ const struct datatype mh_type_type = {
 
 const struct exthdr_desc exthdr_mh = {
 	.name		= "mh",
+	.id		= EXTHDR_DESC_MH,
 	.type		= IPPROTO_MH,
 	.templates	= {
 		[MHHDR_NEXTHDR]		= MH_FIELD("nexthdr", ip6mh_proto, &inet_protocol_type),

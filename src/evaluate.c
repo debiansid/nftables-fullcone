@@ -18,6 +18,7 @@
 #include <linux/netfilter_arp.h>
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_synproxy.h>
+#include <linux/netfilter/nf_nat.h>
 #include <linux/netfilter_ipv4.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
@@ -136,13 +137,18 @@ static int byteorder_conversion(struct eval_ctx *ctx, struct expr **expr,
 
 	if ((*expr)->byteorder == byteorder)
 		return 0;
+
+	/* Conversion for EXPR_CONCAT is handled for single composing ranges */
+	if ((*expr)->etype == EXPR_CONCAT)
+		return 0;
+
 	if (expr_basetype(*expr)->type != TYPE_INTEGER)
 		return expr_error(ctx->msgs, *expr,
 			 	  "Byteorder mismatch: expected %s, got %s",
 				  byteorder_names[byteorder],
 				  byteorder_names[(*expr)->byteorder]);
 
-	if (expr_is_constant(*expr))
+	if (expr_is_constant(*expr) || (*expr)->len / BITS_PER_BYTE < 2)
 		(*expr)->byteorder = byteorder;
 	else {
 		op = byteorder_conversion_op(*expr, byteorder);
@@ -450,7 +456,7 @@ static uint8_t expr_offset_shift(const struct expr *expr, unsigned int offset,
 
 static void expr_evaluate_bits(struct eval_ctx *ctx, struct expr **exprp)
 {
-	struct expr *expr = *exprp, *and, *mask, *lshift, *off;
+	struct expr *expr = *exprp, *and, *mask, *rshift, *off;
 	unsigned masklen, len = expr->len, extra_len = 0;
 	uint8_t shift;
 	mpz_t bitmask;
@@ -478,6 +484,7 @@ static void expr_evaluate_bits(struct eval_ctx *ctx, struct expr **exprp)
 	mask = constant_expr_alloc(&expr->location, expr_basetype(expr),
 				   BYTEORDER_HOST_ENDIAN, masklen, NULL);
 	mpz_set(mask->value, bitmask);
+	mpz_clear(bitmask);
 
 	and = binop_expr_alloc(&expr->location, OP_AND, expr, mask);
 	and->dtype	= expr->dtype;
@@ -487,15 +494,15 @@ static void expr_evaluate_bits(struct eval_ctx *ctx, struct expr **exprp)
 	if (shift) {
 		off = constant_expr_alloc(&expr->location,
 					  expr_basetype(expr),
-					  BYTEORDER_BIG_ENDIAN,
+					  BYTEORDER_HOST_ENDIAN,
 					  sizeof(shift), &shift);
 
-		lshift = binop_expr_alloc(&expr->location, OP_RSHIFT, and, off);
-		lshift->dtype		= expr->dtype;
-		lshift->byteorder	= expr->byteorder;
-		lshift->len		= masklen;
+		rshift = binop_expr_alloc(&expr->location, OP_RSHIFT, and, off);
+		rshift->dtype		= expr->dtype;
+		rshift->byteorder	= expr->byteorder;
+		rshift->len		= masklen;
 
-		*exprp = lshift;
+		*exprp = rshift;
 	} else
 		*exprp = and;
 
@@ -731,6 +738,9 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
 {
 	struct expr *expr = *exprp;
 
+	if (expr->payload.evaluated)
+		return 0;
+
 	if (__expr_evaluate_payload(ctx, expr) < 0)
 		return -1;
 
@@ -739,6 +749,8 @@ static int expr_evaluate_payload(struct eval_ctx *ctx, struct expr **exprp)
 
 	if (payload_needs_adjustment(expr))
 		expr_evaluate_bits(ctx, exprp);
+
+	expr->payload.evaluated = true;
 
 	return 0;
 }
@@ -1145,7 +1157,8 @@ static int expr_evaluate_binop(struct eval_ctx *ctx, struct expr **expr)
 	left = op->left;
 
 	if (op->op == OP_LSHIFT || op->op == OP_RSHIFT)
-		expr_set_context(&ctx->ectx, &integer_type, ctx->ectx.len);
+		__expr_set_context(&ctx->ectx, &integer_type,
+				   left->byteorder, ctx->ectx.len, 0);
 	if (expr_evaluate(ctx, &op->right) < 0)
 		return -1;
 	right = op->right;
@@ -1216,6 +1229,8 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr,
 	struct expr *i, *next;
 
 	list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
+		unsigned dsize_bytes;
+
 		if (expr_is_constant(*expr) && dtype && off == 0)
 			return expr_binary_error(ctx->msgs, i, *expr,
 						 "unexpected concat component, "
@@ -1240,6 +1255,9 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr,
 						 i->dtype->name);
 
 		ntype = concat_subtype_add(ntype, i->dtype->type);
+
+		dsize_bytes = div_round_up(i->dtype->size, BITS_PER_BYTE);
+		(*expr)->field_len[(*expr)->field_count++] = dsize_bytes;
 	}
 
 	(*expr)->flags |= flags;
@@ -1289,7 +1307,24 @@ static int expr_evaluate_list(struct eval_ctx *ctx, struct expr **expr)
 
 static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 {
+	struct set *set = ctx->set;
 	struct expr *elem = *expr;
+
+	if (elem->stmt) {
+		if (set->stmt && set->stmt->ops != elem->stmt->ops) {
+			return stmt_error(ctx, elem->stmt,
+					  "statement mismatch, element expects %s, "
+					  "but %s has type %s",
+					  elem->stmt->ops->name,
+					  set_is_map(set->flags) ? "map" : "set",
+					  set->stmt->ops->name);
+		} else if (!set->stmt && !(set->flags & NFT_SET_EVAL)) {
+			return stmt_error(ctx, elem->stmt,
+					  "missing %s statement in %s definition",
+					  elem->stmt->ops->name,
+					  set_is_map(set->flags) ? "map" : "set");
+		}
+	}
 
 	if (expr_evaluate(ctx, &elem->key) < 0)
 		return -1;
@@ -1298,13 +1333,10 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 	    !(ctx->set->flags & (NFT_SET_ANONYMOUS | NFT_SET_INTERVAL))) {
 		switch (elem->key->etype) {
 		case EXPR_PREFIX:
-			return expr_error(ctx->msgs, elem,
-					  "Set member cannot be prefix, "
-					  "missing interval flag on declaration");
 		case EXPR_RANGE:
 			return expr_error(ctx->msgs, elem,
-					  "Set member cannot be range, "
-					  "missing interval flag on declaration");
+					  "You must add 'flags interval' to your %s declaration if you want to add %s elements",
+					  set_is_map(ctx->set->flags) ? "map" : "set", expr_name(elem->key));
 		default:
 			break;
 		}
@@ -1367,6 +1399,7 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr_ctx ectx = ctx->ectx;
 	struct expr *map = *expr, *mappings;
+	const struct datatype *dtype;
 	struct expr *key;
 
 	expr_set_context(&ctx->ectx, NULL, 0);
@@ -1389,10 +1422,14 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 		mappings = implicit_set_declaration(ctx, "__map%d",
 						    key,
 						    mappings);
-		mappings->set->datatype =
-			datatype_get(set_datatype_alloc(ectx.dtype,
-							ectx.byteorder));
-		mappings->set->datalen  = ectx.len;
+
+		dtype = set_datatype_alloc(ectx.dtype, ectx.byteorder);
+
+		mappings->set->data = constant_expr_alloc(&netlink_location,
+							  dtype, dtype->byteorder,
+							  ectx.len, NULL);
+		if (ectx.len && mappings->set->data->len != ectx.len)
+			BUG("%d vs %d\n", mappings->set->data->len, ectx.len);
 
 		map->mappings = mappings;
 
@@ -1428,7 +1465,7 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 					 map->mappings->set->key->dtype->desc,
 					 map->map->dtype->desc);
 
-	datatype_set(map, map->mappings->set->datatype);
+	datatype_set(map, map->mappings->set->data->dtype);
 	map->flags |= EXPR_F_CONSTANT;
 
 	/* Data for range lookups needs to be in big endian order */
@@ -1458,7 +1495,12 @@ static int expr_evaluate_mapping(struct eval_ctx *ctx, struct expr **expr)
 				  "Key must be a constant");
 	mapping->flags |= mapping->left->flags & EXPR_F_SINGLETON;
 
-	expr_set_context(&ctx->ectx, set->datatype, set->datalen);
+	if (set->data) {
+		expr_set_context(&ctx->ectx, set->data->dtype, set->data->len);
+	} else {
+		assert((set->flags & NFT_SET_MAP) == 0);
+	}
+
 	if (expr_evaluate(ctx, &mapping->right) < 0)
 		return -1;
 	if (!expr_is_constant(mapping->right))
@@ -2084,14 +2126,10 @@ static int stmt_prefix_conversion(struct eval_ctx *ctx, struct expr **expr,
 	return 0;
 }
 
-static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
-			     const struct datatype *dtype, unsigned int len,
-			     enum byteorder byteorder, struct expr **expr)
+static int __stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
+			       const struct datatype *dtype, unsigned int len,
+			       enum byteorder byteorder, struct expr **expr)
 {
-	__expr_set_context(&ctx->ectx, dtype, byteorder, len, 0);
-	if (expr_evaluate(ctx, expr) < 0)
-		return -1;
-
 	if ((*expr)->etype == EXPR_PAYLOAD &&
 	    (*expr)->dtype->type == TYPE_INTEGER &&
 	    ((*expr)->dtype->type != datatype_basetype(dtype)->type ||
@@ -2103,7 +2141,7 @@ static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 					 (*expr)->len);
 	else if ((*expr)->dtype->type != TYPE_INTEGER &&
 		 !datatype_equal((*expr)->dtype, dtype))
-		return stmt_binary_error(ctx, *expr, stmt,
+		return stmt_binary_error(ctx, *expr, stmt,		/* verdict vs invalid? */
 					 "datatype mismatch: expected %s, "
 					 "expression has type %s",
 					 dtype->desc, (*expr)->dtype->desc);
@@ -2127,6 +2165,17 @@ static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 	}
 
 	return 0;
+}
+
+static int stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
+			     const struct datatype *dtype, unsigned int len,
+			     enum byteorder byteorder, struct expr **expr)
+{
+	__expr_set_context(&ctx->ectx, dtype, byteorder, len, 0);
+	if (expr_evaluate(ctx, expr) < 0)
+		return -1;
+
+	return __stmt_evaluate_arg(ctx, stmt, dtype, len, byteorder, expr);
 }
 
 static int stmt_evaluate_verdict(struct eval_ctx *ctx, struct stmt *stmt)
@@ -2179,7 +2228,7 @@ static int stmt_evaluate_exthdr(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	struct expr *binop, *mask, *and, *payload_bytes;
+	struct expr *mask, *and, *xor, *payload_bytes;
 	unsigned int masklen, extra_len = 0;
 	unsigned int payload_byte_size, payload_byte_offset;
 	uint8_t shift_imm, data[NFT_REG_SIZE];
@@ -2193,6 +2242,11 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	payload = stmt->payload.expr;
 	if (stmt_evaluate_arg(ctx, stmt, payload->dtype, payload->len,
 			      payload->byteorder, &stmt->payload.val) < 0)
+		return -1;
+
+	if (!expr_is_constant(stmt->payload.val) &&
+	    byteorder_conversion(ctx, &stmt->payload.val,
+				 payload->byteorder) < 0)
 		return -1;
 
 	need_csum = stmt_evaluate_payload_need_csum(payload);
@@ -2211,8 +2265,8 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 
 	shift_imm = expr_offset_shift(payload, payload->payload.offset,
 				      &extra_len);
-	payload_byte_size = round_up(payload->len, BITS_PER_BYTE) / BITS_PER_BYTE;
-	payload_byte_size += (extra_len / BITS_PER_BYTE);
+	payload_byte_size = div_round_up(payload->len + extra_len,
+					 BITS_PER_BYTE);
 
 	if (need_csum && payload_byte_size & 1) {
 		payload_byte_size++;
@@ -2226,21 +2280,20 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 
 	if (shift_imm) {
-		struct expr *off;
+		struct expr *off, *lshift;
 
 		off = constant_expr_alloc(&payload->location,
 					  expr_basetype(payload),
 					  BYTEORDER_HOST_ENDIAN,
 					  sizeof(shift_imm), &shift_imm);
 
-		binop = binop_expr_alloc(&payload->location, OP_LSHIFT,
-					 stmt->payload.val, off);
-		binop->dtype		= payload->dtype;
-		binop->byteorder	= payload->byteorder;
+		lshift = binop_expr_alloc(&payload->location, OP_LSHIFT,
+					  stmt->payload.val, off);
+		lshift->dtype     = payload->dtype;
+		lshift->byteorder = payload->byteorder;
 
-		stmt->payload.val = binop;
+		stmt->payload.val = lshift;
 	}
-
 
 	masklen = payload_byte_size * BITS_PER_BYTE;
 	mpz_init_bitmask(ff, masklen);
@@ -2256,6 +2309,7 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	mpz_export_data(data, bitmask, BYTEORDER_HOST_ENDIAN, sizeof(data));
 	mask = constant_expr_alloc(&payload->location, expr_basetype(payload),
 				   BYTEORDER_HOST_ENDIAN, masklen, data);
+	mpz_clear(bitmask);
 
 	payload_bytes = payload_expr_alloc(&payload->location, NULL, 0);
 	payload_init_raw(payload_bytes, payload->payload.base,
@@ -2270,16 +2324,17 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 
 	and = binop_expr_alloc(&payload->location, OP_AND, payload_bytes, mask);
 
-	and->dtype		 = payload_bytes->dtype;
-	and->byteorder		 = payload_bytes->byteorder;
-	and->len		 = payload_bytes->len;
+	and->dtype	= payload_bytes->dtype;
+	and->byteorder	= payload_bytes->byteorder;
+	and->len	= payload_bytes->len;
 
-	binop = binop_expr_alloc(&payload->location, OP_XOR, and,
-				 stmt->payload.val);
-	binop->dtype		= payload->dtype;
-	binop->byteorder	= payload->byteorder;
-	binop->len		= mask->len;
-	stmt->payload.val = binop;
+	xor = binop_expr_alloc(&payload->location, OP_XOR, and,
+			       stmt->payload.val);
+	xor->dtype	= payload->dtype;
+	xor->byteorder	= payload->byteorder;
+	xor->len	= mask->len;
+
+	stmt->payload.val = xor;
 
 	return expr_evaluate(ctx, &stmt->payload.val);
 }
@@ -2332,14 +2387,13 @@ static int stmt_evaluate_meta(struct eval_ctx *ctx, struct stmt *stmt)
 static int stmt_evaluate_ct(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	if (stmt_evaluate_arg(ctx, stmt,
-				 stmt->ct.tmpl->dtype,
-				 stmt->ct.tmpl->len,
-				 stmt->ct.tmpl->byteorder,
-				 &stmt->ct.expr) < 0)
+			      stmt->ct.tmpl->dtype,
+			      stmt->ct.tmpl->len,
+			      stmt->ct.tmpl->byteorder,
+			      &stmt->ct.expr) < 0)
 		return -1;
 
-	if (stmt->ct.key == NFT_CT_SECMARK &&
-	    expr_is_constant(stmt->ct.expr))
+	if (stmt->ct.key == NFT_CT_SECMARK && expr_is_constant(stmt->ct.expr))
 		return stmt_error(ctx, stmt,
 				  "ct secmark must not be set to constant value");
 
@@ -2745,22 +2799,28 @@ static int nat_evaluate_family(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 }
 
+static const struct datatype *get_addr_dtype(uint8_t family)
+{
+	switch (family) {
+	case NFPROTO_IPV4:
+		return &ipaddr_type;
+	case NFPROTO_IPV6:
+		return &ip6addr_type;
+	}
+
+	return &invalid_type;
+}
+
 static int evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 			     struct expr **expr)
 {
 	struct proto_ctx *pctx = &ctx->pctx;
 	const struct datatype *dtype;
-	unsigned int len;
 
-	if (pctx->family == NFPROTO_IPV4) {
-		dtype = &ipaddr_type;
-		len   = 4 * BITS_PER_BYTE;
-	} else {
-		dtype = &ip6addr_type;
-		len   = 16 * BITS_PER_BYTE;
-	}
+	dtype = get_addr_dtype(pctx->family);
 
-	return stmt_evaluate_arg(ctx, stmt, dtype, len, BYTEORDER_BIG_ENDIAN,
+	return stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+				 BYTEORDER_BIG_ENDIAN,
 				 expr);
 }
 
@@ -2790,9 +2850,10 @@ static int stmt_evaluate_l3proto(struct eval_ctx *ctx,
 	    (nproto == &proto_ip6 && family != NFPROTO_IPV6))
 		return stmt_binary_error(ctx, stmt,
 					 &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
-					 "conflicting protocols specified: %s vs. %s. You must specify ip or ip6 family in tproxy statement",
+					 "conflicting protocols specified: %s vs. %s. You must specify ip or ip6 family in %s statement",
 					 ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc->name,
-					 family2str(stmt->tproxy.family));
+					 family2str(family),
+					 stmt->ops->name);
 	return 0;
 }
 
@@ -2801,29 +2862,77 @@ static int stmt_evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 			      struct expr **addr)
 {
 	const struct datatype *dtype;
-	unsigned int len;
 	int err;
 
 	if (ctx->pctx.family == NFPROTO_INET) {
-		switch (family) {
-		case NFPROTO_IPV4:
-			dtype = &ipaddr_type;
-			len   = 4 * BITS_PER_BYTE;
-			break;
-		case NFPROTO_IPV6:
-			dtype = &ip6addr_type;
-			len   = 16 * BITS_PER_BYTE;
-			break;
-		default:
+		dtype = get_addr_dtype(family);
+		if (dtype->size == 0)
 			return stmt_error(ctx, stmt,
 					  "ip or ip6 must be specified with address for inet tables.");
-		}
 
-		err = stmt_evaluate_arg(ctx, stmt, dtype, len,
+		err = stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
 					BYTEORDER_BIG_ENDIAN, addr);
 	} else {
 		err = evaluate_addr(ctx, stmt, addr);
 	}
+
+	return err;
+}
+
+static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	struct expr *one, *two, *data, *tmp;
+	const struct datatype *dtype;
+	int addr_type, err;
+
+	switch (stmt->nat.family) {
+	case NFPROTO_IPV4:
+		addr_type = TYPE_IPADDR;
+		break;
+	case NFPROTO_IPV6:
+		addr_type = TYPE_IP6ADDR;
+		break;
+	default:
+		return -1;
+	}
+	dtype = concat_type_alloc((addr_type << TYPE_BITS) | TYPE_INET_SERVICE);
+
+	expr_set_context(&ctx->ectx, dtype, dtype->size);
+	if (expr_evaluate(ctx, &stmt->nat.addr))
+		return -1;
+
+	data = stmt->nat.addr->mappings->set->data;
+	datatype_set(data, dtype);
+
+	if (expr_ops(data)->type != EXPR_CONCAT)
+		return __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+					   BYTEORDER_BIG_ENDIAN,
+					   &stmt->nat.addr);
+
+	one = list_first_entry(&data->expressions, struct expr, list);
+	two = list_entry(one->list.next, struct expr, list);
+
+	if (one == two || !list_is_last(&two->list, &data->expressions))
+		return __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+					   BYTEORDER_BIG_ENDIAN,
+					   &stmt->nat.addr);
+
+	dtype = get_addr_dtype(stmt->nat.family);
+	tmp = one;
+	err = __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+				  BYTEORDER_BIG_ENDIAN,
+				  &tmp);
+	if (err < 0)
+		return err;
+	if (tmp != one)
+		BUG("Internal error: Unexpected alteration of l3 expression");
+
+	tmp = two;
+	err = nat_evaluate_transport(ctx, stmt, &tmp);
+	if (err < 0)
+		return err;
+	if (tmp != two)
+		BUG("Internal error: Unexpected alteration of l4 expression");
 
 	return err;
 }
@@ -2841,6 +2950,15 @@ static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
 		if (err < 0)
 			return err;
 
+		if (stmt->nat.ipportmap) {
+			err = stmt_evaluate_nat_map(ctx, stmt);
+			if (err < 0)
+				return err;
+
+			stmt->flags |= STMT_F_TERMINAL;
+			return 0;
+		}
+
 		err = stmt_evaluate_addr(ctx, stmt, stmt->nat.family,
 					 &stmt->nat.addr);
 		if (err < 0)
@@ -2850,6 +2968,8 @@ static int stmt_evaluate_nat(struct eval_ctx *ctx, struct stmt *stmt)
 		err = nat_evaluate_transport(ctx, stmt, &stmt->nat.proto);
 		if (err < 0)
 			return err;
+
+		stmt->nat.flags |= NF_NAT_RANGE_PROTO_SPECIFIED;
 	}
 
 	stmt->flags |= STMT_F_TERMINAL;
@@ -3097,9 +3217,9 @@ static int stmt_evaluate_map(struct eval_ctx *ctx, struct stmt *stmt)
 				  "Key expression comments are not supported");
 
 	if (stmt_evaluate_arg(ctx, stmt,
-			      stmt->map.set->set->datatype,
-			      stmt->map.set->set->datalen,
-			      stmt->map.set->set->datatype->byteorder,
+			      stmt->map.set->set->data->dtype,
+			      stmt->map.set->set->data->len,
+			      stmt->map.set->set->data->byteorder,
 			      &stmt->map.data->key) < 0)
 		return -1;
 	if (expr_is_constant(stmt->map.data))
@@ -3145,8 +3265,12 @@ static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
 
 		mappings = implicit_set_declaration(ctx, "__objmap%d",
 						    key, mappings);
-		mappings->set->datatype = &string_type;
-		mappings->set->datalen  = NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE;
+
+		mappings->set->data = constant_expr_alloc(&netlink_location,
+							  &string_type,
+							  BYTEORDER_HOST_ENDIAN,
+							  NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE,
+							  NULL);
 		mappings->set->objtype  = stmt->objref.type;
 
 		map->mappings = mappings;
@@ -3181,7 +3305,7 @@ static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
 					 map->mappings->set->key->dtype->desc,
 					 map->map->dtype->desc);
 
-	datatype_set(map, map->mappings->set->datatype);
+	datatype_set(map, map->mappings->set->data->dtype);
 	map->flags |= EXPR_F_CONSTANT;
 
 	/* Data for range lookups needs to be in big endian order */
@@ -3293,6 +3417,20 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct expr **expr)
 	return 0;
 }
 
+static int set_key_data_error(struct eval_ctx *ctx, const struct set *set,
+			      const struct datatype *dtype,
+			      const char *name)
+{
+	const char *hint = "";
+
+	if (dtype->size == 0)
+		hint = ". Try \"typeof expression\" instead of \"type datatype\".";
+
+	return set_error(ctx, set, "unqualified type %s "
+			 "specified in %s definition%s",
+			 dtype->name, name, hint);
+}
+
 static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 {
 	struct table *table;
@@ -3317,26 +3455,40 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 			return -1;
 
 		if (set->key->len == 0)
-			return set_error(ctx, set, "unqualified key type %s "
-					 "specified in %s definition",
-					 set->key->dtype->name, type);
+			return set_key_data_error(ctx, set,
+						  set->key->dtype, type);
 	}
-	if (set->flags & NFT_SET_INTERVAL &&
-	    set->key->etype == EXPR_CONCAT)
-		return set_error(ctx, set, "concatenated types not supported in interval sets");
+
+	if (set->flags & NFT_SET_INTERVAL && set->key->etype == EXPR_CONCAT) {
+		memcpy(&set->desc.field_len, &set->key->field_len,
+		       sizeof(set->desc.field_len));
+		set->desc.field_count = set->key->field_count;
+	}
 
 	if (set_is_datamap(set->flags)) {
-		if (set->datatype == NULL)
+		if (set->data == NULL)
 			return set_error(ctx, set, "map definition does not "
 					 "specify mapping data type");
 
-		set->datalen = set->datatype->size;
-		if (set->datalen == 0 && set->datatype->type != TYPE_VERDICT)
-			return set_error(ctx, set, "unqualified mapping data "
-					 "type specified in map definition");
+		if (set->data->etype == EXPR_CONCAT &&
+		    expr_evaluate_concat(ctx, &set->data, false) < 0)
+			return -1;
+
+		if (set->data->len == 0 && set->data->dtype->type != TYPE_VERDICT)
+			return set_key_data_error(ctx, set,
+						  set->data->dtype, type);
 	} else if (set_is_objmap(set->flags)) {
-		set->datatype = &string_type;
-		set->datalen  = NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE;
+		if (set->data) {
+			assert(set->data->etype == EXPR_VALUE);
+			assert(set->data->dtype == &string_type);
+		}
+
+		assert(set->data == NULL);
+		set->data = constant_expr_alloc(&netlink_location, &string_type,
+						BYTEORDER_HOST_ENDIAN,
+						NFT_OBJ_MAXNAMELEN * BITS_PER_BYTE,
+						NULL);
+
 	}
 
 	ctx->set = set;
@@ -3416,11 +3568,11 @@ static int flowtable_evaluate(struct eval_ctx *ctx, struct flowtable *ft)
 	if (table == NULL)
 		return table_not_found(ctx);
 
-	ft->hooknum = str2hooknum(NFPROTO_NETDEV, ft->hookstr);
-	if (ft->hooknum == NF_INET_NUMHOOKS)
-		return chain_error(ctx, ft, "invalid hook %s", ft->hookstr);
+	ft->hook.num = str2hooknum(NFPROTO_NETDEV, ft->hook.name);
+	if (ft->hook.num == NF_INET_NUMHOOKS)
+		return chain_error(ctx, ft, "invalid hook %s", ft->hook.name);
 
-	if (!evaluate_priority(ctx, &ft->priority, NFPROTO_NETDEV, ft->hooknum))
+	if (!evaluate_priority(ctx, &ft->priority, NFPROTO_NETDEV, ft->hook.num))
 		return __stmt_binary_error(ctx, &ft->priority.loc, NULL,
 					   "invalid priority expression %s.",
 					   expr_name(ft->priority.expr));
@@ -3631,14 +3783,15 @@ static int chain_evaluate(struct eval_ctx *ctx, struct chain *chain)
 	}
 
 	if (chain->flags & CHAIN_F_BASECHAIN) {
-		chain->hooknum = str2hooknum(chain->handle.family,
-					     chain->hookstr);
-		if (chain->hooknum == NF_INET_NUMHOOKS)
-			return chain_error(ctx, chain, "invalid hook %s",
-					   chain->hookstr);
+		chain->hook.num = str2hooknum(chain->handle.family,
+					      chain->hook.name);
+		if (chain->hook.num == NF_INET_NUMHOOKS)
+			return __stmt_binary_error(ctx, &chain->hook.loc, NULL,
+						   "The %s family does not support this hook",
+						   family2str(chain->handle.family));
 
 		if (!evaluate_priority(ctx, &chain->priority,
-				       chain->handle.family, chain->hooknum))
+				       chain->handle.family, chain->hook.num))
 			return __stmt_binary_error(ctx, &chain->priority.loc, NULL,
 						   "invalid priority expression %s in this context.",
 						   expr_name(chain->priority.expr));
@@ -3646,6 +3799,15 @@ static int chain_evaluate(struct eval_ctx *ctx, struct chain *chain)
 			if (!evaluate_policy(ctx, &chain->policy))
 				return chain_error(ctx, chain, "invalid policy expression %s",
 						   expr_name(chain->policy));
+		}
+
+		if (chain->handle.family == NFPROTO_NETDEV) {
+			if (!chain->dev_expr)
+				return __stmt_binary_error(ctx, &chain->loc, NULL,
+							   "Missing `device' in this chain definition");
+		} else if (chain->dev_expr) {
+			return __stmt_binary_error(ctx, &chain->dev_expr->location, NULL,
+						   "This chain type cannot be bound to device");
 		}
 	}
 

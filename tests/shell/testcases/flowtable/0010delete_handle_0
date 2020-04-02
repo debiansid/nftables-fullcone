@@ -7,7 +7,7 @@ set -e
 $NFT add table inet t
 $NFT add flowtable inet t f { hook ingress priority filter\; devices = { lo }\; }
 
-FH=$($NFT list ruleset -a | awk '/flowtable f/ { print $NF }')
+FH=$($NFT -a list ruleset | awk '/flowtable f/ { print $NF }')
 
 $NFT delete flowtable inet t handle $FH
 
@@ -16,7 +16,6 @@ EXPECTED="table inet t {
 
 GET="$($NFT list ruleset)"
 if [ "$EXPECTED" != "$GET" ] ; then
-	DIFF="$(which diff)"
-	[ -x $DIFF ] && $DIFF -u <(echo "$EXPECTED") <(echo "$GET")
+	$DIFF -u <(echo "$EXPECTED") <(echo "$GET")
 	exit 1
 fi

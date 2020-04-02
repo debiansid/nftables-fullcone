@@ -10,6 +10,7 @@
 #include <utils.h>
 #include <list.h>
 #include <json.h>
+#include <libnftnl/udata.h>
 
 /**
  * enum expr_types
@@ -71,6 +72,7 @@ enum expr_types {
 	EXPR_FIB,
 	EXPR_XFRM,
 };
+#define EXPR_MAX EXPR_XFRM
 
 enum ops {
 	OP_INVALID,
@@ -166,9 +168,13 @@ struct expr_ops {
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
 					       const struct expr *expr);
+	int			(*build_udata)(struct nftnl_udata_buf *udbuf,
+					       const struct expr *expr);
+	struct expr *		(*parse_udata)(const struct nftnl_udata *ud);
 };
 
 const struct expr_ops *expr_ops(const struct expr *e);
+const struct expr_ops *expr_ops_by_type(enum expr_types etype);
 
 /**
  * enum expr_flags
@@ -256,6 +262,8 @@ struct expr {
 			struct list_head	expressions;
 			unsigned int		size;
 			uint32_t		set_flags;
+			uint8_t			field_len[NFT_REG32_COUNT];
+			uint8_t			field_count;
 		};
 		struct {
 			/* EXPR_SET_REF */
@@ -292,6 +300,7 @@ struct expr {
 			enum proto_bases		base;
 			unsigned int			offset;
 			bool				is_raw;
+			bool				evaluated;
 		} payload;
 		struct {
 			/* EXPR_EXTHDR */
@@ -458,6 +467,7 @@ extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add,
 			    unsigned int debug_mask, bool merge,
 			    struct output_ctx *octx);
+extern void concat_range_aggregate(struct expr *set);
 extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *get_set_intervals(const struct set *set,

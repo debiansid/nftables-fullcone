@@ -43,6 +43,11 @@ if [ ! -x "$MODPROBE" ] ; then
 	msg_error "no modprobe binary found"
 fi
 
+DIFF="$(which diff)"
+if [ ! -x "$DIFF" ] ; then
+	DIFF=true
+fi
+
 if [ "$1" == "-v" ] ; then
 	VERBOSE=y
 	shift
@@ -68,10 +73,10 @@ kernel_cleanup() {
 	nft_exthdr nft_payload nft_cmp nft_range \
 	nft_quota nft_queue nft_numgen nft_osf nft_socket nft_tproxy \
 	nft_meta nft_meta_bridge nft_counter nft_log nft_limit \
-	nft_fib nft_fib_ipv4 nft_fib_ipv6 \
+	nft_fib nft_fib_ipv4 nft_fib_ipv6 nft_fib_inet \
 	nft_hash nft_ct nft_compat nft_rt nft_objref \
 	nft_set_hash nft_set_rbtree nft_set_bitmap \
-	nft_chain_nat_ipv4 nft_chain_nat_ipv6 \
+	nft_chain_nat \
 	nft_chain_route_ipv4 nft_chain_route_ipv6 \
 	nft_dup_netdev nft_fwd_netdev \
 	nft_reject nft_reject_inet \
@@ -96,7 +101,7 @@ do
 	kernel_cleanup
 
 	msg_info "[EXECUTING]	$testfile"
-	test_output=$(NFT=$NFT ${testfile} 2>&1)
+	test_output=$(NFT=$NFT DIFF=$DIFF ${testfile} 2>&1)
 	rc_got=$?
 	echo -en "\033[1A\033[K" # clean the [EXECUTING] foobar line
 

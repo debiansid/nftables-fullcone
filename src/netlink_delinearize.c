@@ -171,7 +171,7 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 	struct expr *expr;
 
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_IMM_VERDICT)) {
-		nld.verdict = nftnl_expr_get_u32(nle, NFTNL_EXPR_IMM_VERDICT); 
+		nld.verdict = nftnl_expr_get_u32(nle, NFTNL_EXPR_IMM_VERDICT);
 		if  (nftnl_expr_is_set(nle, NFTNL_EXPR_IMM_CHAIN)) {
 			nld.chain = nftnl_expr_get(nle, NFTNL_EXPR_IMM_CHAIN,
 						   &nld.len);
@@ -274,7 +274,7 @@ static void netlink_parse_cmp(struct netlink_parse_ctx *ctx,
 {
 	struct nft_data_delinearize nld;
 	enum nft_registers sreg;
-	struct expr *expr, *left, *right;
+	struct expr *expr, *left, *right, *tmp;
 	enum ops op;
 
 	sreg = netlink_parse_register(nle, NFTNL_EXPR_CMP_SREG);
@@ -291,19 +291,26 @@ static void netlink_parse_cmp(struct netlink_parse_ctx *ctx,
 
 	if (left->len > right->len &&
 	    expr_basetype(left) != &string_type) {
-		return netlink_error(ctx, loc, "Relational expression size mismatch");
+		netlink_error(ctx, loc, "Relational expression size mismatch");
+		goto err_free;
 	} else if (left->len > 0 && left->len < right->len) {
 		expr_free(left);
 		left = netlink_parse_concat_expr(ctx, loc, sreg, right->len);
 		if (left == NULL)
-			return;
-		right = netlink_parse_concat_data(ctx, loc, sreg, right->len, right);
-		if (right == NULL)
-			return;
+			goto err_free;
+		tmp = netlink_parse_concat_data(ctx, loc, sreg, right->len, right);
+		if (tmp == NULL)
+			goto err_free;
+		expr_free(right);
+		right = tmp;
 	}
 
 	expr = relational_expr_alloc(loc, op, left, right);
 	ctx->stmt = expr_stmt_alloc(loc, expr);
+	return;
+err_free:
+	expr_free(left);
+	expr_free(right);
 }
 
 static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
@@ -356,21 +363,16 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 	ctx->stmt = expr_stmt_alloc(loc, expr);
 }
 
-static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
-				  const struct location *loc,
-				  const struct nftnl_expr *nle)
+static struct expr *netlink_parse_bitwise_bool(struct netlink_parse_ctx *ctx,
+					       const struct location *loc,
+					       const struct nftnl_expr *nle,
+					       enum nft_registers sreg,
+					       struct expr *left)
+
 {
 	struct nft_data_delinearize nld;
-	enum nft_registers sreg, dreg;
-	struct expr *expr, *left, *mask, *xor, *or;
+	struct expr *expr, *mask, *xor, *or;
 	mpz_t m, x, o;
-
-	sreg = netlink_parse_register(nle, NFTNL_EXPR_BITWISE_SREG);
-	left = netlink_get_register(ctx, loc, sreg);
-	if (left == NULL)
-		return netlink_error(ctx, loc,
-				     "Bitwise expression has no left "
-				     "hand side");
 
 	expr = left;
 
@@ -422,6 +424,63 @@ static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
 	mpz_clear(m);
 	mpz_clear(x);
 	mpz_clear(o);
+
+	return expr;
+}
+
+static struct expr *netlink_parse_bitwise_shift(struct netlink_parse_ctx *ctx,
+						const struct location *loc,
+						const struct nftnl_expr *nle,
+						enum ops op,
+						enum nft_registers sreg,
+						struct expr *left)
+{
+	struct nft_data_delinearize nld;
+	struct expr *expr, *right;
+
+	nld.value = nftnl_expr_get(nle, NFTNL_EXPR_BITWISE_DATA, &nld.len);
+	right = netlink_alloc_value(loc, &nld);
+	right->byteorder = BYTEORDER_HOST_ENDIAN;
+
+	expr = binop_expr_alloc(loc, op, left, right);
+	expr->len = left->len;
+
+	return expr;
+}
+
+static void netlink_parse_bitwise(struct netlink_parse_ctx *ctx,
+				  const struct location *loc,
+				  const struct nftnl_expr *nle)
+{
+	enum nft_registers sreg, dreg;
+	struct expr *expr, *left;
+	enum nft_bitwise_ops op;
+
+	sreg = netlink_parse_register(nle, NFTNL_EXPR_BITWISE_SREG);
+	left = netlink_get_register(ctx, loc, sreg);
+	if (left == NULL)
+		return netlink_error(ctx, loc,
+				     "Bitwise expression has no left "
+				     "hand side");
+
+	op = nftnl_expr_get_u32(nle, NFTNL_EXPR_BITWISE_OP);
+
+	switch (op) {
+	case NFT_BITWISE_BOOL:
+		expr = netlink_parse_bitwise_bool(ctx, loc, nle, sreg,
+						  left);
+		break;
+	case NFT_BITWISE_LSHIFT:
+		expr = netlink_parse_bitwise_shift(ctx, loc, nle, OP_LSHIFT,
+						   sreg, left);
+		break;
+	case NFT_BITWISE_RSHIFT:
+		expr = netlink_parse_bitwise_shift(ctx, loc, nle, OP_RSHIFT,
+						   sreg, left);
+		break;
+	default:
+		BUG("invalid bitwise operation %u\n", op);
+	}
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_BITWISE_DREG);
 	netlink_set_register(ctx, dreg, expr);
@@ -920,6 +979,35 @@ static void netlink_parse_reject(struct netlink_parse_ctx *ctx,
 	ctx->stmt = stmt;
 }
 
+static bool is_nat_proto_map(const struct expr *addr, uint8_t family)
+{
+	const struct expr *mappings, *data;
+	const struct set *set;
+
+	if (!addr ||
+	    expr_ops(addr)->type != EXPR_MAP)
+		return false;
+
+	mappings = addr->right;
+	if (expr_ops(mappings)->type != EXPR_SET_REF)
+		return false;
+
+	set = mappings->set;
+	data = set->data;
+
+	/* if we're dealing with an address:inet_service map,
+	 * the length will be bit_sizeof(addr) + 32 (one register).
+	 */
+	switch (family) {
+	case NFPROTO_IPV4:
+		return data->len == 32 + 32;
+	case NFPROTO_IPV6:
+		return data->len == 128 + 32;
+	}
+
+	return false;
+}
+
 static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 			      const struct location *loc,
 			      const struct nftnl_expr *nle)
@@ -940,6 +1028,7 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_NAT_FLAGS))
 		stmt->nat.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_FLAGS);
 
+	addr = NULL;
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN);
 	if (reg1) {
 		addr = netlink_get_register(ctx, loc, reg1);
@@ -974,6 +1063,13 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 		if (stmt->nat.addr != NULL)
 			addr = range_expr_alloc(loc, stmt->nat.addr, addr);
 		stmt->nat.addr = addr;
+	}
+
+	if (is_nat_proto_map(addr, family)) {
+		stmt->nat.family = family;
+		stmt->nat.ipportmap = true;
+		ctx->stmt = stmt;
+		return;
 	}
 
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_NAT_REG_PROTO_MIN);
@@ -1366,6 +1462,7 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 	}
 
 	if (expr_data != NULL) {
+		expr_set_type(expr_data, set->data->dtype, set->data->byteorder);
 		stmt = map_stmt_alloc(loc);
 		stmt->map.set	= set_ref_expr_alloc(loc, set);
 		stmt->map.key	= expr;
@@ -2030,7 +2127,7 @@ static bool __expr_postprocess_string(struct expr **exprp)
 
 static struct expr *expr_postprocess_string(struct expr *expr)
 {
-	struct expr *mask;
+	struct expr *mask, *out;
 
 	assert(expr_basetype(expr)->type == TYPE_STRING);
 	if (__expr_postprocess_string(&expr))
@@ -2040,14 +2137,14 @@ static struct expr *expr_postprocess_string(struct expr *expr)
 				   BYTEORDER_HOST_ENDIAN,
 				   expr->len + BITS_PER_BYTE, NULL);
 	mpz_init_bitmask(mask->value, expr->len);
-	return string_wildcard_expr_alloc(&expr->location, mask, expr);
+	out = string_wildcard_expr_alloc(&expr->location, mask, expr);
+	expr_free(mask);
+	return out;
 }
 
 static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 {
 	struct expr *expr = *exprp, *i;
-
-	//pr_debug("%s len %u\n", expr->ops->name, expr->len);
 
 	switch (expr->etype) {
 	case EXPR_MAP:
@@ -2093,8 +2190,16 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		break;
 	case EXPR_BINOP:
 		expr_postprocess(ctx, &expr->left);
-		expr_set_type(expr->right, expr->left->dtype,
-			      expr->left->byteorder);
+		switch (expr->op) {
+		case OP_LSHIFT:
+		case OP_RSHIFT:
+			expr_set_type(expr->right, &integer_type,
+				      BYTEORDER_HOST_ENDIAN);
+			break;
+		default:
+			expr_set_type(expr->right, expr->left->dtype,
+				      expr->left->byteorder);
+		}
 		expr_postprocess(ctx, &expr->right);
 
 		expr_set_type(expr, expr->left->dtype,
@@ -2352,7 +2457,7 @@ static void stmt_payload_binop_pp(struct rule_pp_ctx *ctx, struct expr *binop)
  * the original payload expression because it has an odd size or
  * a non-byte divisible offset/length.
  *
- * Of that was the case, the 'value' expression is not a value but
+ * If that was the case, the 'value' expression is not a value but
  * a binop expression with a munged payload expression on the left
  * and a mask to clear the real payload offset/length.
  *
@@ -2453,6 +2558,7 @@ static void stmt_payload_binop_postprocess(struct rule_pp_ctx *ctx)
 			mpz_init_bitmask(bitmask, payload->len);
 			mpz_xor(bitmask, bitmask, value->value);
 			mpz_set(value->value, bitmask);
+			mpz_clear(bitmask);
 			break;
 		case OP_OR: /* IIb */
 			break;

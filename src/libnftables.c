@@ -12,7 +12,7 @@
 #include <parser.h>
 #include <utils.h>
 #include <iface.h>
-
+#include <cmd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,9 +68,7 @@ static int nft_netlink(struct nft_ctx *nft,
 		list_for_each_entry(cmd, cmds, list) {
 			if (err->seqnum == cmd->seqnum ||
 			    err->seqnum == batch_seqnum) {
-				netlink_io_error(&ctx, &cmd->location,
-						 "Could not process rule: %s",
-						 strerror(err->err));
+				nft_cmd_error(&ctx, cmd, err);
 				errno = err->err;
 				if (err->seqnum == cmd->seqnum) {
 					mnl_err_list_free(err);

@@ -401,7 +401,8 @@ static int netlink_events_setelem_cb(const struct nlmsghdr *nlh, int type,
 	 */
 	dummyset = set_alloc(monh->loc);
 	dummyset->key = expr_clone(set->key);
-	dummyset->datatype = set->datatype;
+	if (set->data)
+		dummyset->data = expr_clone(set->data);
 	dummyset->flags = set->flags;
 	dummyset->init = set_expr_alloc(monh->loc, set);
 
@@ -500,7 +501,7 @@ static int netlink_events_obj_cb(const struct nlmsghdr *nlh, int type,
 
 static void rule_map_decompose_cb(struct set *s, void *data)
 {
-	if (s->flags & NFT_SET_INTERVAL)
+	if (set_is_interval(s->flags) && set_is_anonymous(s->flags))
 		interval_map_decompose(s->init);
 }
 
@@ -905,7 +906,8 @@ static int netlink_events_cb(const struct nlmsghdr *nlh, void *data)
 
 int netlink_echo_callback(const struct nlmsghdr *nlh, void *data)
 {
-	struct netlink_ctx *ctx = data;
+	struct netlink_cb_data *nl_cb_data = data;
+	struct netlink_ctx *ctx = nl_cb_data->nl_ctx;
 	struct netlink_mon_handler echo_monh = {
 		.format = NFTNL_OUTPUT_DEFAULT,
 		.ctx = ctx,

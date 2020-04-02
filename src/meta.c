@@ -700,6 +700,12 @@ const struct meta_template meta_templates[] = {
 						BYTEORDER_HOST_ENDIAN),
 	[NFT_META_SECMARK]	= META_TEMPLATE("secmark", &integer_type,
 						32, BYTEORDER_HOST_ENDIAN),
+	[NFT_META_SDIF]		= META_TEMPLATE("sdif", &ifindex_type,
+						sizeof(int) * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
+	[NFT_META_SDIFNAME]	= META_TEMPLATE("sdifname", &ifname_type,
+						IFNAMSIZ * BITS_PER_BYTE,
+						BYTEORDER_HOST_ENDIAN),
 };
 
 static bool meta_key_is_unqualified(enum nft_meta_keys key)
@@ -807,6 +813,55 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 	}
 }
 
+#define NFTNL_UDATA_META_KEY 0
+#define NFTNL_UDATA_META_MAX 1
+
+static int meta_expr_build_udata(struct nftnl_udata_buf *udbuf,
+				 const struct expr *expr)
+{
+	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_META_KEY, expr->meta.key);
+
+	return 0;
+}
+
+static int meta_parse_udata(const struct nftnl_udata *attr, void *data)
+{
+	const struct nftnl_udata **ud = data;
+	uint8_t type = nftnl_udata_type(attr);
+	uint8_t len = nftnl_udata_len(attr);
+
+	switch (type) {
+	case NFTNL_UDATA_META_KEY:
+		if (len != sizeof(uint32_t))
+			return -1;
+		break;
+	default:
+		return 0;
+	}
+
+	ud[type] = attr;
+	return 0;
+}
+
+static struct expr *meta_expr_parse_udata(const struct nftnl_udata *attr)
+{
+	const struct nftnl_udata *ud[NFTNL_UDATA_META_MAX + 1] = {};
+	uint32_t key;
+	int err;
+
+	err = nftnl_udata_parse(nftnl_udata_get(attr), nftnl_udata_len(attr),
+				meta_parse_udata, ud);
+	if (err < 0)
+		return NULL;
+
+	if (!ud[NFTNL_UDATA_META_KEY])
+		return NULL;
+
+	key = nftnl_udata_get_u32(ud[NFTNL_UDATA_META_KEY]);
+
+	return meta_expr_alloc(&internal_location, key);
+}
+
 const struct expr_ops meta_expr_ops = {
 	.type		= EXPR_META,
 	.name		= "meta",
@@ -815,6 +870,8 @@ const struct expr_ops meta_expr_ops = {
 	.cmp		= meta_expr_cmp,
 	.clone		= meta_expr_clone,
 	.pctx_update	= meta_expr_pctx_update,
+	.build_udata	= meta_expr_build_udata,
+	.parse_udata	= meta_expr_parse_udata,
 };
 
 struct expr *meta_expr_alloc(const struct location *loc, enum nft_meta_keys key)

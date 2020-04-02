@@ -120,7 +120,7 @@ numberstring	({decstring}|{hexstring})
 letter		[a-zA-Z]
 string		({letter}|[_.])({letter}|{digit}|[/\-_\.])*
 quotedstring	\"[^"]*\"
-asteriskstring	({string}\*|{string}\\\*)
+asteriskstring	({string}\*|{string}\\\*|\\\*|{string}\\\*{string})
 comment		#.*$
 slash		\/
 
@@ -385,6 +385,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "saddr"			{ return SADDR; }
 "daddr"			{ return DADDR; }
 "type"			{ return TYPE; }
+"typeof"		{ return TYPEOF; }
 
 "vlan"			{ return VLAN; }
 "id"			{ return ID; }
@@ -470,6 +471,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "udplite"		{ return UDPLITE; }
 "sport"			{ return SPORT; }
 "dport"			{ return DPORT; }
+"port"			{ return PORT; }
 
 "tcp"			{ return TCP; }
 "ackseq"		{ return ACKSEQ; }
@@ -664,22 +666,45 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 %%
 
+static void scanner_push_indesc(struct parser_state *state,
+				struct input_descriptor *indesc)
+{
+	if (!state->indesc)
+		list_add_tail(&indesc->list, &state->indesc_list);
+	else
+		list_add(&indesc->list, &state->indesc->list);
+
+	state->indesc = indesc;
+}
+
+static void scanner_pop_indesc(struct parser_state *state)
+{
+	if (!list_is_first(&state->indesc->list, &state->indesc_list)) {
+		state->indesc = list_entry(state->indesc->list.prev,
+					   struct input_descriptor, list);
+	} else {
+		state->indesc = NULL;
+	}
+}
+
 static void scanner_pop_buffer(yyscan_t scanner)
 {
 	struct parser_state *state = yyget_extra(scanner);
 
 	yypop_buffer_state(scanner);
-	state->indesc = state->indescs[--state->indesc_idx];
+	scanner_pop_indesc(state);
 }
 
 static void scanner_push_file(struct nft_ctx *nft, void *scanner,
-			      const char *filename, const struct location *loc)
+			      FILE *f, const char *filename,
+			      const struct location *loc,
+			      const struct input_descriptor *parent_indesc)
 {
 	struct parser_state *state = yyget_extra(scanner);
 	struct input_descriptor *indesc;
 	YY_BUFFER_STATE b;
 
-	b = yy_create_buffer(nft->f[state->indesc_idx], YY_BUF_SIZE, scanner);
+	b = yy_create_buffer(f, YY_BUF_SIZE, scanner);
 	yypush_buffer_state(b, scanner);
 
 	indesc = xzalloc(sizeof(struct input_descriptor));
@@ -688,21 +713,26 @@ static void scanner_push_file(struct nft_ctx *nft, void *scanner,
 		indesc->location = *loc;
 	indesc->type	= INDESC_FILE;
 	indesc->name	= xstrdup(filename);
+	indesc->f	= f;
+	if (!parent_indesc) {
+		indesc->depth = 1;
+	} else {
+		indesc->depth = parent_indesc->depth + 1;
+	}
 	init_pos(indesc);
 
-	state->indescs[state->indesc_idx] = indesc;
-	state->indesc = state->indescs[state->indesc_idx++];
-	list_add_tail(&indesc->list, &state->indesc_list);
+	scanner_push_indesc(state, indesc);
 }
 
 static int include_file(struct nft_ctx *nft, void *scanner,
-			const char *filename, const struct location *loc)
+			const char *filename, const struct location *loc,
+			const struct input_descriptor *parent_indesc)
 {
 	struct parser_state *state = yyget_extra(scanner);
 	struct error_record *erec;
 	FILE *f;
 
-	if (state->indesc_idx == MAX_INCLUDE_DEPTH) {
+	if (parent_indesc && parent_indesc->depth == MAX_INCLUDE_DEPTH) {
 		erec = error(loc, "Include nested too deeply, max %u levels",
 			     MAX_INCLUDE_DEPTH);
 		goto err;
@@ -714,8 +744,7 @@ static int include_file(struct nft_ctx *nft, void *scanner,
 			     filename, strerror(errno));
 		goto err;
 	}
-	nft->f[state->indesc_idx] = f;
-	scanner_push_file(nft, scanner, filename, loc);
+	scanner_push_file(nft, scanner, f, filename, loc, parent_indesc);
 	return 0;
 err:
 	erec_queue(erec, state->msgs);
@@ -726,6 +755,7 @@ static int include_glob(struct nft_ctx *nft, void *scanner, const char *pattern,
 			const struct location *loc)
 {
 	struct parser_state *state = yyget_extra(scanner);
+	struct input_descriptor *indesc = state->indesc;
 	struct error_record *erec = NULL;
 	bool wildcard = false;
 	glob_t glob_data;
@@ -786,7 +816,7 @@ static int include_glob(struct nft_ctx *nft, void *scanner, const char *pattern,
 			if (len == 0 || path[len - 1] == '/')
 				continue;
 
-			ret = include_file(nft, scanner, path, loc);
+			ret = include_file(nft, scanner, path, loc, indesc);
 			if (ret != 0)
 				goto err;
 		}
@@ -823,7 +853,7 @@ err:
 int scanner_read_file(struct nft_ctx *nft, const char *filename,
 		      const struct location *loc)
 {
-	return include_file(nft, nft->scanner, filename, loc);
+	return include_file(nft, nft->scanner, filename, loc, NULL);
 }
 
 static bool search_in_include_path(const char *filename)
@@ -889,16 +919,14 @@ void scanner_push_buffer(void *scanner, const struct input_descriptor *indesc,
 			 const char *buffer)
 {
 	struct parser_state *state = yyget_extra(scanner);
+	struct input_descriptor *new_indesc;
 	YY_BUFFER_STATE b;
 
-	state->indesc = xzalloc(sizeof(struct input_descriptor));
-	state->indescs[state->indesc_idx] = state->indesc;
-	state->indesc_idx++;
-
-	memcpy(state->indesc, indesc, sizeof(*state->indesc));
-	state->indesc->data = buffer;
-	state->indesc->name = NULL;
-	list_add_tail(&state->indesc->list, &state->indesc_list);
+	new_indesc = xzalloc(sizeof(struct input_descriptor));
+	memcpy(new_indesc, indesc, sizeof(*new_indesc));
+	new_indesc->data = buffer;
+	new_indesc->name = NULL;
+	scanner_push_indesc(state, new_indesc);
 
 	b = yy_scan_string(buffer, scanner);
 	assert(b != NULL);
@@ -927,6 +955,10 @@ static void input_descriptor_list_destroy(struct parser_state *state)
 	struct input_descriptor *indesc, *next;
 
 	list_for_each_entry_safe(indesc, next, &state->indesc_list, list) {
+		if (indesc->f) {
+			fclose(indesc->f);
+			indesc->f = NULL;
+		}
 		list_del(&indesc->list);
 		input_descriptor_destroy(indesc);
 	}
@@ -935,15 +967,6 @@ static void input_descriptor_list_destroy(struct parser_state *state)
 void scanner_destroy(struct nft_ctx *nft)
 {
 	struct parser_state *state = yyget_extra(nft->scanner);
-
-	do {
-		yypop_buffer_state(nft->scanner);
-
-		if (nft->f[state->indesc_idx]) {
-			fclose(nft->f[state->indesc_idx]);
-			nft->f[state->indesc_idx] = NULL;
-		}
-	} while (state->indesc_idx--);
 
 	input_descriptor_list_destroy(state);
 	yylex_destroy(nft->scanner);

@@ -82,7 +82,7 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 
 	if (set_is_datamap(set->flags)) {
 		type = "map";
-		datatype_ext = set->datatype->name;
+		datatype_ext = set->data->dtype->name;
 	} else if (set_is_objmap(set->flags)) {
 		type = "map";
 		datatype_ext = obj_type_name(set->objtype);
@@ -240,7 +240,7 @@ static json_t *chain_print_json(const struct chain *chain)
 		tmp = json_pack("{s:s, s:s, s:i, s:s}",
 				"type", chain->type,
 				"hook", hooknum2str(chain->handle.family,
-						    chain->hooknum),
+						    chain->hook.num),
 				"prio", priority,
 				"policy", chain_policy2str(policy));
 		if (chain->dev_expr) {
@@ -415,7 +415,7 @@ static json_t *flowtable_print_json(const struct flowtable *ftable)
 			"name", ftable->handle.flowtable.name,
 			"table", ftable->handle.table.name,
 			"handle", ftable->handle.handle.id,
-			"hook", hooknum2str(NFPROTO_NETDEV, ftable->hooknum),
+			"hook", hooknum2str(NFPROTO_NETDEV, ftable->hook.num),
 			"prio", priority);
 
 	for (i = 0; i < ftable->dev_array_len; i++) {
@@ -645,7 +645,7 @@ json_t *map_expr_json(const struct expr *expr, struct output_ctx *octx)
 	const char *type = "map";
 
 	if (expr->mappings->etype == EXPR_SET_REF &&
-	    expr->mappings->set->datatype->type == TYPE_VERDICT)
+	    expr->mappings->set->data->dtype->type == TYPE_VERDICT)
 		type = "vmap";
 
 	return json_pack("{s:{s:o, s:o}}", type,
@@ -1021,23 +1021,14 @@ json_t *inet_protocol_type_json(const struct expr *expr,
 
 json_t *inet_service_type_json(const struct expr *expr, struct output_ctx *octx)
 {
-	struct sockaddr_in sin = {
-		.sin_family = AF_INET,
-		.sin_port = mpz_get_be16(expr->value),
-	};
-	char buf[NI_MAXSERV];
+	uint16_t port = mpz_get_be16(expr->value);
+	const struct servent *s = NULL;
 
 	if (!nft_output_service(octx) ||
-	    getnameinfo((struct sockaddr *)&sin, sizeof(sin),
-		        NULL, 0, buf, sizeof(buf), 0))
-		return json_integer(ntohs(sin.sin_port));
+	    (s = getservbyport(port, NULL)) == NULL)
+		return json_integer(ntohs(port));
 
-	if (htons(atoi(buf)) == sin.sin_port ||
-	    getnameinfo((struct sockaddr *)&sin, sizeof(sin),
-			NULL, 0, buf, sizeof(buf), NI_DGRAM))
-		return json_integer(ntohs(sin.sin_port));
-
-	return json_string(buf);
+	return json_string(s->s_name);
 }
 
 json_t *mark_type_json(const struct expr *expr, struct output_ctx *octx)

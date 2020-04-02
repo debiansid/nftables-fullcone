@@ -16,6 +16,22 @@
 
 #define MAX_REGS	(1 + NFT_REG32_15 - NFT_REG32_00)
 
+#ifndef NETLINK_EXT_ACK
+#define NETLINK_EXT_ACK                 11
+
+enum nlmsgerr_attrs {
+	NLMSGERR_ATTR_UNUSED,
+	NLMSGERR_ATTR_MSG,
+	NLMSGERR_ATTR_OFFS,
+	NLMSGERR_ATTR_COOKIE,
+
+	__NLMSGERR_ATTR_MAX,
+	NLMSGERR_ATTR_MAX = __NLMSGERR_ATTR_MAX - 1
+};
+#define NLM_F_CAPPED	0x100	/* request was capped */
+#define NLM_F_ACK_TLVS	0x200	/* extended ACK TVLs were included */
+#endif
+
 struct netlink_parse_ctx {
 	struct list_head	*msgs;
 	struct table		*table;
@@ -97,6 +113,7 @@ extern void netlink_gen_data(const struct expr *expr,
 extern void netlink_gen_raw_data(const mpz_t value, enum byteorder byteorder,
 				 unsigned int len,
 				 struct nft_data_linearize *data);
+extern struct nftnl_expr *netlink_gen_stmt_stateful(const struct stmt *stmt);
 
 extern struct expr *netlink_alloc_value(const struct location *loc,
 				        const struct nft_data_delinearize *nld);
@@ -133,7 +150,7 @@ extern int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc, struct table *table,
 			       struct set *set, struct expr *init);
 extern int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
-				       const struct set *set,
+				       struct set *set,
 				       struct nft_cache *cache);
 
 extern int netlink_list_objs(struct netlink_ctx *ctx, const struct handle *h);
@@ -176,6 +193,10 @@ struct netlink_mon_handler {
 
 extern int netlink_monitor(struct netlink_mon_handler *monhandler,
 			    struct mnl_socket *nf_sock);
+struct netlink_cb_data {
+	struct netlink_ctx	*nl_ctx;
+	struct list_head	*err_list;
+};
 int netlink_echo_callback(const struct nlmsghdr *nlh, void *data);
 
 struct ruleset_parse {
@@ -189,6 +210,5 @@ int netlink_events_trace_cb(const struct nlmsghdr *nlh, int type,
 			    struct netlink_mon_handler *monh);
 
 enum nft_data_types dtype_map_to_kernel(const struct datatype *dtype);
-const struct datatype *dtype_map_from_kernel(enum nft_data_types type);
 
 #endif /* NFTABLES_NETLINK_H */

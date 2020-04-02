@@ -1,3 +1,11 @@
+nftables (0.9.4-1) unstable; urgency=medium
+
+  * [41441b9] New upstream version 0.9.4
+  * [9de28bb] d/patches: drop 0001-upstream-py-load-soname.patch
+  * [7c044e8] src:nftables: bump build-dep on libnftnl to 1.1.6
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 02 Apr 2020 12:30:12 +0200
+
 nftables (0.9.3-2) unstable; urgency=medium
 
   [ Debian Janitor ]

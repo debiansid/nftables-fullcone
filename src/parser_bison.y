@@ -980,7 +980,7 @@ add_cmd			:	TABLE		table_spec
 			}
 			|	ELEMENT		set_spec	set_block_expr
 			{
-				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SETELEM, &$2, &@$, $3);
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
 			}
 			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
 						'{'	flowtable_block	'}'
@@ -1077,7 +1077,7 @@ create_cmd		:	TABLE		table_spec
 			}
 			|	ELEMENT		set_spec	set_block_expr
 			{
-				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SETELEM, &$2, &@$, $3);
+				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
 			}
 			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
 						'{'	flowtable_block	'}'
@@ -1169,7 +1169,7 @@ delete_cmd		:	TABLE		table_spec
 			}
 			|	ELEMENT		set_spec	set_block_expr
 			{
-				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SETELEM, &$2, &@$, $3);
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
 			}
 			|	FLOWTABLE	flowtable_spec
 			{
@@ -1178,6 +1178,13 @@ delete_cmd		:	TABLE		table_spec
 			|	FLOWTABLE	flowtableid_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_FLOWTABLE, &$2, &@$, NULL);
+			}
+			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
+						'{'	flowtable_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_FLOWTABLE, &$2, &@$, $5);
 			}
 			|	COUNTER		obj_spec
 			{
@@ -1227,7 +1234,7 @@ delete_cmd		:	TABLE		table_spec
 
 get_cmd			:	ELEMENT		set_spec	set_block_expr
 			{
-				$$ = cmd_alloc(CMD_GET, CMD_OBJ_SETELEM, &$2, &@$, $3);
+				$$ = cmd_alloc(CMD_GET, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
 			}
 			;
 
@@ -1792,6 +1799,17 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->flags |= NFT_SET_MAP;
 				$$ = $1;
 			}
+			|	map_block	TYPE
+						data_type_expr	COLON	INTERVAL	data_type_expr
+						stmt_separator
+			{
+				$1->key = $3;
+				$1->data = $6;
+				$1->data->flags |= EXPR_F_INTERVAL;
+
+				$1->flags |= NFT_SET_MAP;
+				$$ = $1;
+			}
 			|	map_block	TYPEOF
 						typeof_expr	COLON	typeof_expr
 						stmt_separator
@@ -1799,6 +1817,18 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->key = $3;
 				datatype_set($1->key, $3->dtype);
 				$1->data = $5;
+
+				$1->flags |= NFT_SET_MAP;
+				$$ = $1;
+			}
+			|	map_block	TYPEOF
+						typeof_expr	COLON	INTERVAL	typeof_expr
+						stmt_separator
+			{
+				$1->key = $3;
+				datatype_set($1->key, $3->dtype);
+				$1->data = $6;
+				$1->data->flags |= EXPR_F_INTERVAL;
 
 				$1->flags |= NFT_SET_MAP;
 				$$ = $1;
@@ -1992,7 +2022,11 @@ ct_helper_block		:	/* empty */	{ $$ = $<obj>-1; }
 			}
 			;
 
-ct_timeout_block	:	/*empty */	{ $$ = $<obj>-1; }
+ct_timeout_block	:	/*empty */
+			{
+				$$ = $<obj>-1;
+				init_list_head(&$$->ct_timeout.timeout_list);
+			}
 			|	ct_timeout_block     common_block
 			|	ct_timeout_block     stmt_separator
 			|	ct_timeout_block     ct_timeout_config
@@ -2140,6 +2174,7 @@ extended_prio_spec	:	int_num
 								BYTEORDER_HOST_ENDIAN,
 								strlen(str) * BITS_PER_BYTE,
 								str);
+				xfree($1);
 				$$ = spec;
 			}
 			;
@@ -3165,7 +3200,35 @@ nat_stmt_args		:	stmt_expr
 			{
 				$<stmt>0->nat.family = $1;
 				$<stmt>0->nat.addr = $6;
-				$<stmt>0->nat.ipportmap = true;
+				$<stmt>0->nat.type_flags = STMT_NAT_F_CONCAT;
+			}
+			|	nf_key_proto INTERVAL TO	stmt_expr
+			{
+				$<stmt>0->nat.family = $1;
+				$<stmt>0->nat.addr = $4;
+				$<stmt>0->nat.type_flags = STMT_NAT_F_INTERVAL;
+			}
+			|	INTERVAL TO	stmt_expr
+			{
+				$<stmt>0->nat.addr = $3;
+				$<stmt>0->nat.type_flags = STMT_NAT_F_INTERVAL;
+			}
+			|	nf_key_proto PREFIX TO	stmt_expr
+			{
+				$<stmt>0->nat.family = $1;
+				$<stmt>0->nat.addr = $4;
+				$<stmt>0->nat.type_flags =
+						STMT_NAT_F_PREFIX |
+						STMT_NAT_F_INTERVAL;
+				$<stmt>0->nat.flags |= NF_NAT_RANGE_NETMAP;
+			}
+			|	PREFIX TO	stmt_expr
+			{
+				$<stmt>0->nat.addr = $3;
+				$<stmt>0->nat.type_flags =
+						STMT_NAT_F_PREFIX |
+						STMT_NAT_F_INTERVAL;
+				$<stmt>0->nat.flags |= NF_NAT_RANGE_NETMAP;
 			}
 			;
 
@@ -3847,6 +3910,7 @@ ct_helper_config		:	TYPE	QUOTED_STRING	PROTOCOL	ct_l4protoname	stmt_separator
 					erec_queue(error(&@2, "invalid name '%s', max length is %u\n", $2, (int)sizeof(ct->name)), state->msgs);
 					YYERROR;
 				}
+				xfree($2);
 
 				ct->l4proto = $4;
 			}
@@ -3896,8 +3960,8 @@ ct_timeout_config	:	PROTOCOL	ct_l4protoname	stmt_separator
 				struct ct_timeout *ct;
 
 				ct = &$<obj>0->ct_timeout;
-				init_list_head(&ct->timeout_list);
 				list_splice_tail($4, &ct->timeout_list);
+				xfree($4);
 			}
 			|	L3PROTOCOL	family_spec_explicit	stmt_separator
 			{
@@ -4496,6 +4560,7 @@ ct_key			:	L3PROTOCOL	{ $$ = NFT_CT_L3PROTOCOL; }
 			|	LABEL		{ $$ = NFT_CT_LABELS; }
 			|	EVENT		{ $$ = NFT_CT_EVENTMASK; }
 			|	SECMARK		{ $$ = NFT_CT_SECMARK; }
+			|	ID	 	{ $$ = NFT_CT_ID; }
 			|	ct_key_dir_optional
 			;
 

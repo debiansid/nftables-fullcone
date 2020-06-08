@@ -190,7 +190,8 @@ static bool segtree_debug(unsigned int debug_mask)
 static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 		     struct elementary_interval *new, bool merge)
 {
-	struct elementary_interval *lei, *rei;
+	struct elementary_interval *lei, *rei, *ei;
+	struct expr *new_expr, *expr;
 	mpz_t p;
 
 	mpz_init2(p, tree->keylen);
@@ -205,8 +206,10 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 		pr_gmp_debug("insert: [%Zx %Zx]\n", new->left, new->right);
 
 	if (lei != NULL && rei != NULL && lei == rei) {
-		if (!merge)
+		if (!merge) {
+			ei = lei;
 			goto err;
+		}
 		/*
 		 * The new interval is entirely contained in the same interval,
 		 * split it into two parts:
@@ -228,8 +231,10 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 		ei_destroy(lei);
 	} else {
 		if (lei != NULL) {
-			if (!merge)
+			if (!merge) {
+				ei = lei;
 				goto err;
+			}
 			/*
 			 * Left endpoint is within lei, adjust it so we have:
 			 *
@@ -248,8 +253,10 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 			}
 		}
 		if (rei != NULL) {
-			if (!merge)
+			if (!merge) {
+				ei = rei;
 				goto err;
+			}
 			/*
 			 * Right endpoint is within rei, adjust it so we have:
 			 *
@@ -276,7 +283,15 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 	return 0;
 err:
 	errno = EEXIST;
-	return expr_binary_error(msgs, lei->expr, new->expr,
+	if (new->expr->etype == EXPR_MAPPING) {
+		new_expr = new->expr->left;
+		expr = ei->expr->left;
+	} else {
+		new_expr = new->expr;
+		expr = ei->expr;
+	}
+
+	return expr_binary_error(msgs, new_expr, expr,
 				 "conflicting intervals specified");
 }
 
@@ -679,67 +694,32 @@ static struct expr *get_set_interval_find(const struct table *table,
 {
 	struct expr *range = NULL;
 	struct set *set;
-	mpz_t low, high;
 	struct expr *i;
+	mpz_t val;
 
 	set = set_lookup(table, set_name);
-	mpz_init2(low, set->key->len);
-	mpz_init2(high, set->key->len);
+	mpz_init2(val, set->key->len);
 
 	list_for_each_entry(i, &set->init->expressions, list) {
 		switch (i->key->etype) {
+		case EXPR_PREFIX:
 		case EXPR_RANGE:
-			range_expr_value_low(low, i);
-			range_expr_value_high(high, i);
-			if (mpz_cmp(left->key->value, low) >= 0 &&
-			    mpz_cmp(right->key->value, high) <= 0) {
-				range = range_expr_alloc(&internal_location,
-							 expr_clone(left->key),
-							 expr_clone(right->key));
-				goto out;
-			}
-			break;
+			range_expr_value_low(val, i);
+			if (left && mpz_cmp(left->key->value, val))
+				break;
+
+			range_expr_value_high(val, i);
+			if (right && mpz_cmp(right->key->value, val))
+				break;
+
+			range = expr_clone(i->key);
+			goto out;
 		default:
 			break;
 		}
 	}
 out:
-	mpz_clear(low);
-	mpz_clear(high);
-
-	return range;
-}
-
-static struct expr *get_set_interval_end(const struct table *table,
-					 const char *set_name,
-					 struct expr *left)
-{
-	struct expr *i, *range = NULL;
-	struct set *set;
-	mpz_t low, high;
-
-	set = set_lookup(table, set_name);
-	mpz_init2(low, set->key->len);
-	mpz_init2(high, set->key->len);
-
-	list_for_each_entry(i, &set->init->expressions, list) {
-		switch (i->key->etype) {
-		case EXPR_RANGE:
-			range_expr_value_low(low, i);
-			if (mpz_cmp(low, left->key->value) == 0) {
-				range = range_expr_alloc(&internal_location,
-							 expr_clone(left->key),
-							 expr_clone(i->key->right));
-				goto out;
-			}
-			break;
-		default:
-			break;
-		}
-	}
-out:
-	mpz_clear(low);
-	mpz_clear(high);
+	mpz_clear(val);
 
 	return range;
 }
@@ -764,14 +744,16 @@ int get_set_decompose(struct table *table, struct set *set)
 				errno = ENOENT;
 				return -1;
 			}
+			expr_free(left);
+			expr_free(i);
 
 			compound_expr_add(new_init, range);
 			left = NULL;
 		} else {
 			if (left) {
-				range = get_set_interval_end(table,
-							     set->handle.set.name,
-							     left);
+				range = get_set_interval_find(table,
+							      set->handle.set.name,
+							      left, NULL);
 				if (range)
 					compound_expr_add(new_init, range);
 				else
@@ -782,7 +764,8 @@ int get_set_decompose(struct table *table, struct set *set)
 		}
 	}
 	if (left) {
-		range = get_set_interval_end(table, set->handle.set.name, left);
+		range = get_set_interval_find(table, set->handle.set.name,
+					      left, NULL);
 		if (range)
 			compound_expr_add(new_init, range);
 		else
@@ -1084,7 +1067,7 @@ void interval_map_decompose(struct expr *set)
 					prefix->comment = xstrdup(low->comment);
 				if (low->timeout)
 					prefix->timeout = low->timeout;
-				if (low->left->expiration)
+				if (low->expiration)
 					prefix->expiration = low->expiration;
 			}
 

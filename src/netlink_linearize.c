@@ -1117,17 +1117,25 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 			netlink_gen_expr(ctx, stmt->nat.addr, amin_reg);
 			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN,
 					     amin_reg);
+			if (stmt->nat.addr->etype == EXPR_MAP &&
+			    stmt->nat.addr->mappings->set->data->flags & EXPR_F_INTERVAL) {
+				amax_reg = get_register(ctx, NULL);
+				registers++;
+				amin_reg += netlink_register_space(nat_addrlen(family));
+				netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
+						     amin_reg);
+			}
 		}
 
-		if (stmt->nat.ipportmap) {
+		if (stmt->nat.type_flags & STMT_NAT_F_CONCAT) {
 			/* nat_stmt evaluation step doesn't allow
-			 * stmt->nat.ipportmap && stmt->nat.proto.
+			 * STMT_NAT_F_CONCAT && stmt->nat.proto.
 			 */
 			assert(stmt->nat.proto == NULL);
 
 			pmin_reg = amin_reg;
 
-			/* if ipportmap is set, the mapped type is a
+			/* if STMT_NAT_F_CONCAT is set, the mapped type is a
 			 * concatenation of 'addr . inet_service'.
 			 * The map lookup will then return the
 			 * concatenated value, so we need to skip

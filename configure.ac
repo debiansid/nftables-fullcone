@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.4], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Jive at Five"], [Release name])
+AC_INIT([nftables], [0.9.5], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Capital Idea"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -29,13 +29,13 @@ AC_PROG_SED
 AM_PROG_LEX
 AC_PROG_YACC
 
-if test -z "$ac_cv_prog_YACC"
+if test -z "$ac_cv_prog_YACC" -a ! -f "${srcdir}/src/parser_bison.c"
 then
         echo "*** Error: No suitable bison/yacc found. ***"
         echo "    Please install the 'bison' package."
         exit 1
 fi
-if test -z "$ac_cv_prog_LEX"
+if test -z "$ac_cv_prog_LEX" -a ! -f "${srcdir}/src/scanner.c"
 then
         echo "*** Error: No suitable flex/lex found. ***"
         echo "    Please install the 'flex' package."
@@ -52,12 +52,12 @@ CHECK_GCC_FVISIBILITY
 
 AS_IF([test "x$enable_man_doc" = "xyes"], [
        AC_CHECK_PROG(A2X, [a2x], [a2x], [no])
-       AS_IF([test "$A2X" = "no"],
+       AS_IF([test "$A2X" = "no" -a ! -f "${srcdir}/doc/nft.8"],
 	     [AC_MSG_ERROR([a2x not found, please install asciidoc])])
 ])
 
-PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.3])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.6])
+PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.4])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.7])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],

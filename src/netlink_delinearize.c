@@ -15,6 +15,7 @@
 #include <limits.h>
 #include <linux/netfilter/nf_tables.h>
 #include <arpa/inet.h>
+#include <linux/netfilter/nf_nat.h>
 #include <linux/netfilter.h>
 #include <net/ethernet.h>
 #include <netlink.h>
@@ -562,8 +563,7 @@ static void netlink_parse_payload_stmt(struct netlink_parse_ctx *ctx,
 	payload_init_raw(expr, base, offset, len);
 
 	stmt = payload_stmt_alloc(loc, expr, val);
-
-	list_add_tail(&stmt->list, &ctx->rule->stmts);
+	rule_stmt_append(ctx->rule, stmt);
 }
 
 static void netlink_parse_payload(struct netlink_parse_ctx *ctx,
@@ -614,7 +614,7 @@ static void netlink_parse_exthdr(struct netlink_parse_ctx *ctx,
 		expr_set_type(val, expr->dtype, expr->byteorder);
 
 		stmt = exthdr_stmt_alloc(loc, expr, val);
-		list_add_tail(&stmt->list, &ctx->rule->stmts);
+		rule_stmt_append(ctx->rule, stmt);
 	}
 }
 
@@ -979,6 +979,38 @@ static void netlink_parse_reject(struct netlink_parse_ctx *ctx,
 	ctx->stmt = stmt;
 }
 
+static bool is_nat_addr_map(const struct expr *addr, uint8_t family)
+{
+	const struct expr *mappings, *data;
+	const struct set *set;
+
+	if (!addr ||
+	    expr_ops(addr)->type != EXPR_MAP)
+		return false;
+
+	mappings = addr->right;
+	if (expr_ops(mappings)->type != EXPR_SET_REF)
+		return false;
+
+	set = mappings->set;
+	data = set->data;
+
+	if (!(data->flags & EXPR_F_INTERVAL))
+		return false;
+
+	/* if we're dealing with an address:address map,
+	 * the length will be bit_sizeof(addr) + 32 (one register).
+	 */
+	switch (family) {
+	case NFPROTO_IPV4:
+		return data->len == 32 + 32;
+	case NFPROTO_IPV6:
+		return data->len == 128 + 128;
+	}
+
+	return false;
+}
+
 static bool is_nat_proto_map(const struct expr *addr, uint8_t family)
 {
 	const struct expr *mappings, *data;
@@ -1028,6 +1060,9 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_NAT_FLAGS))
 		stmt->nat.flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_NAT_FLAGS);
 
+	if (stmt->nat.flags & NF_NAT_RANGE_NETMAP)
+		stmt->nat.type_flags |= STMT_NAT_F_PREFIX;
+
 	addr = NULL;
 	reg1 = netlink_parse_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN);
 	if (reg1) {
@@ -1046,6 +1081,13 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 		stmt->nat.addr = addr;
 	}
 
+	if (is_nat_addr_map(addr, family)) {
+		stmt->nat.family = family;
+		stmt->nat.type_flags |= STMT_NAT_F_INTERVAL;
+		ctx->stmt = stmt;
+		return;
+	}
+
 	reg2 = netlink_parse_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX);
 	if (reg2 && reg2 != reg1) {
 		addr = netlink_get_register(ctx, loc, reg2);
@@ -1060,14 +1102,16 @@ static void netlink_parse_nat(struct netlink_parse_ctx *ctx,
 		else
 			expr_set_type(addr, &ip6addr_type,
 				      BYTEORDER_BIG_ENDIAN);
-		if (stmt->nat.addr != NULL)
+		if (stmt->nat.addr != NULL) {
 			addr = range_expr_alloc(loc, stmt->nat.addr, addr);
+			addr = range_expr_to_prefix(addr);
+		}
 		stmt->nat.addr = addr;
 	}
 
 	if (is_nat_proto_map(addr, family)) {
 		stmt->nat.family = family;
-		stmt->nat.ipportmap = true;
+		stmt->nat.type_flags |= STMT_NAT_F_CONCAT;
 		ctx->stmt = stmt;
 		return;
 	}
@@ -1627,7 +1671,7 @@ static int netlink_parse_rule_expr(struct nftnl_expr *nle, void *arg)
 	if (err < 0)
 		return err;
 	if (ctx->stmt != NULL) {
-		list_add_tail(&ctx->stmt->list, &ctx->rule->stmts);
+		rule_stmt_append(ctx->rule, ctx->stmt);
 		ctx->stmt = NULL;
 	}
 	return 0;
@@ -2253,6 +2297,8 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_RANGE:
 		expr_postprocess(ctx, &expr->left);
 		expr_postprocess(ctx, &expr->right);
+	case EXPR_PREFIX:
+		expr_postprocess(ctx, &expr->prefix);
 		break;
 	case EXPR_SET_ELEM:
 		expr_postprocess(ctx, &expr->key);

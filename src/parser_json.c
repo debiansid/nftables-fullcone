@@ -2731,8 +2731,7 @@ static struct cmd *json_parse_cmd_add_rule(struct json_ctx *ctx, json_t *root,
 			return NULL;
 		}
 
-		rule->num_stmts++;
-		list_add_tail(&stmt->list, &rule->stmts);
+		rule_stmt_append(rule, stmt);
 	}
 
 	if (op == CMD_ADD)
@@ -3294,7 +3293,7 @@ static struct cmd *json_parse_cmd_add(struct json_ctx *ctx,
 		{ "rule", CMD_OBJ_RULE, json_parse_cmd_add_rule },
 		{ "set", CMD_OBJ_SET, json_parse_cmd_add_set },
 		{ "map", CMD_OBJ_SET, json_parse_cmd_add_set },
-		{ "element", CMD_OBJ_SETELEM, json_parse_cmd_add_element },
+		{ "element", CMD_OBJ_ELEMENTS, json_parse_cmd_add_element },
 		{ "flowtable", CMD_OBJ_FLOWTABLE, json_parse_cmd_add_flowtable },
 		{ "counter", CMD_OBJ_COUNTER, json_parse_cmd_add_object },
 		{ "quota", CMD_OBJ_QUOTA, json_parse_cmd_add_object },
@@ -3404,8 +3403,7 @@ static struct cmd *json_parse_cmd_replace(struct json_ctx *ctx,
 			return NULL;
 		}
 
-		rule->num_stmts++;
-		list_add_tail(&stmt->list, &rule->stmts);
+		rule_stmt_append(rule, stmt);
 	}
 
 	if (op == CMD_REPLACE)
@@ -3849,12 +3847,15 @@ static uint64_t handle_from_nlmsg(const struct nlmsghdr *nlh)
 }
 int json_events_cb(const struct nlmsghdr *nlh, struct netlink_mon_handler *monh)
 {
-	json_t *tmp, *json = seqnum_to_json(nlh->nlmsg_seq);
 	uint64_t handle = handle_from_nlmsg(nlh);
+	json_t *tmp, *json;
 	void *iter;
 
-	/* might be anonymous set, ignore message */
-	if (!json || !handle)
+	if (!handle)
+		return MNL_CB_OK;
+
+	json = seqnum_to_json(nlh->nlmsg_seq);
+	if (!json)
 		return MNL_CB_OK;
 
 	tmp = json_object_get(json, "add");

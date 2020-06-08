@@ -825,6 +825,7 @@ static const struct symbol_table icmp_code_tbl = {
 		SYMBOL("net-prohibited",	ICMP_NET_ANO),
 		SYMBOL("host-prohibited",	ICMP_HOST_ANO),
 		SYMBOL("admin-prohibited",	ICMP_PKT_FILTERED),
+		SYMBOL("frag-needed",		ICMP_FRAG_NEEDED),
 		SYMBOL_LIST_END
 	},
 };
@@ -1083,6 +1084,8 @@ struct datatype *datatype_get(const struct datatype *ptr)
 
 void datatype_set(struct expr *expr, const struct datatype *dtype)
 {
+	if (dtype == expr->dtype)
+		return;
 	datatype_free(expr->dtype);
 	expr->dtype = datatype_get(dtype);
 }

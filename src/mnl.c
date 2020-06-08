@@ -960,6 +960,8 @@ int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		memory_allocation_error();
 
 	nftnl_set_set_u32(nls, NFTNL_SET_FAMILY, h->family);
+	nftnl_set_set_str(nls, NFTNL_SET_TABLE, h->table.name);
+	nftnl_set_set_str(nls, NFTNL_SET_NAME, h->set.name);
 	nftnl_set_set_u32(nls, NFTNL_SET_ID, h->set_id);
 
 	nftnl_set_set_u32(nls, NFTNL_SET_FLAGS, set->flags);
@@ -1012,8 +1014,11 @@ int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		memory_allocation_error();
 
 	set_key_expression(ctx, set->key, set->flags, udbuf, NFTNL_UDATA_SET_KEY_TYPEOF);
-	if (set->data)
+	if (set->data) {
 		set_key_expression(ctx, set->data, set->flags, udbuf, NFTNL_UDATA_SET_DATA_TYPEOF);
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_DATA_INTERVAL,
+				    !!(set->data->flags & EXPR_F_INTERVAL));
+	}
 
 	if (set->desc.field_len[0]) {
 		nftnl_set_set_data(nls, NFTNL_SET_DESC_CONCAT,
@@ -1032,6 +1037,9 @@ int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 	}
 
 	netlink_dump_set(nls, ctx);
+
+	nftnl_set_unset(nls, NFTNL_SET_TABLE);
+	nftnl_set_unset(nls, NFTNL_SET_NAME);
 
 	nlh = nftnl_nlmsg_build_hdr(nftnl_batch_buffer(ctx->batch),
 				    NFT_MSG_NEWSET,
@@ -1582,29 +1590,13 @@ err:
 	return NULL;
 }
 
-int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
-			  unsigned int flags)
+static const char **nft_flowtable_dev_array(struct cmd *cmd)
 {
-	struct nftnl_flowtable *flo;
 	unsigned int ifname_len;
 	const char **dev_array;
 	char ifname[IFNAMSIZ];
-	struct nlmsghdr *nlh;
 	int i = 0, len = 1;
 	struct expr *expr;
-	int priority;
-
-	flo = nftnl_flowtable_alloc();
-	if (!flo)
-		memory_allocation_error();
-
-	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FAMILY,
-				cmd->handle.family);
-	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM,
-				cmd->flowtable->hook.num);
-	mpz_export_data(&priority, cmd->flowtable->priority.expr->value,
-			BYTEORDER_HOST_ENDIAN, sizeof(int));
-	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, priority);
 
 	list_for_each_entry(expr, &cmd->flowtable->dev_expr->expressions, list)
 		len++;
@@ -1620,14 +1612,52 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 	}
 
 	dev_array[i] = NULL;
-	nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
-				 dev_array, sizeof(char *) * len);
 
-	i = 0;
+	return dev_array;
+}
+
+static void nft_flowtable_dev_array_free(const char **dev_array)
+{
+	int i = 0;
+
 	while (dev_array[i] != NULL)
 		xfree(dev_array[i++]);
 
 	free(dev_array);
+}
+
+int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
+			  unsigned int flags)
+{
+	struct nftnl_flowtable *flo;
+	const char **dev_array;
+	struct nlmsghdr *nlh;
+	int priority;
+
+	flo = nftnl_flowtable_alloc();
+	if (!flo)
+		memory_allocation_error();
+
+	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FAMILY,
+				cmd->handle.family);
+
+	if (cmd->flowtable->hook.name) {
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM,
+					cmd->flowtable->hook.num);
+		mpz_export_data(&priority, cmd->flowtable->priority.expr->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, priority);
+	} else {
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM, 0);
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, 0);
+	}
+
+	if (cmd->flowtable->dev_expr) {
+		dev_array = nft_flowtable_dev_array(cmd);
+		nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
+					 dev_array, 0);
+		nft_flowtable_dev_array_free(dev_array);
+	}
 
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FLAGS,
 				cmd->flowtable->flags);
@@ -1654,6 +1684,7 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 int mnl_nft_flowtable_del(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	struct nftnl_flowtable *flo;
+	const char **dev_array;
 	struct nlmsghdr *nlh;
 
 	flo = nftnl_flowtable_alloc();
@@ -1662,6 +1693,16 @@ int mnl_nft_flowtable_del(struct netlink_ctx *ctx, struct cmd *cmd)
 
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FAMILY,
 				cmd->handle.family);
+
+	if (cmd->flowtable && cmd->flowtable->dev_expr) {
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM, 0);
+		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, 0);
+
+		dev_array = nft_flowtable_dev_array(cmd);
+		nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
+					 dev_array, 0);
+		nft_flowtable_dev_array_free(dev_array);
+	}
 
 	nlh = nftnl_nlmsg_build_hdr(nftnl_batch_buffer(ctx->batch),
 				    NFT_MSG_DELFLOWTABLE, cmd->handle.family,

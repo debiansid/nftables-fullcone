@@ -280,6 +280,10 @@ extern void rule_print(const struct rule *rule, struct output_ctx *octx);
 extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
 extern struct rule *rule_lookup_by_index(const struct chain *chain,
 					 uint64_t index);
+void rule_stmt_append(struct rule *rule, struct stmt *stmt);
+void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
+			 struct stmt *stmt);
+
 
 /**
  * struct set - nftables set
@@ -554,9 +558,10 @@ enum cmd_ops {
  * enum cmd_obj - command objects
  *
  * @CMD_OBJ_INVALID:	invalid
- * @CMD_OBJ_SETELEM:	set element(s)
+ * @CMD_OBJ_ELEMENTS:	set element(s)
  * @CMD_OBJ_SET:	set
  * @CMD_OBJ_SETS:	multiple sets
+ * @CMD_OBJ_SETELEMS:	set elements
  * @CMD_OBJ_RULE:	rule
  * @CMD_OBJ_CHAIN:	chain
  * @CMD_OBJ_CHAINS:	multiple chains
@@ -582,8 +587,9 @@ enum cmd_ops {
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
-	CMD_OBJ_SETELEM,
+	CMD_OBJ_ELEMENTS,
 	CMD_OBJ_SET,
+	CMD_OBJ_SETELEMS,
 	CMD_OBJ_SETS,
 	CMD_OBJ_RULE,
 	CMD_OBJ_CHAIN,

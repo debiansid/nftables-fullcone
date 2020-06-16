@@ -1,3 +1,12 @@
+nftables (0.9.6-1) unstable; urgency=medium
+
+  * [e2f26f2] New upstream version 0.9.6 (Closes: #962909)
+  * [a203bd9] nftables: bump libmnl build-dep version to 1.0.4
+  * [e7a683f] tests: only run them with kernels >= 5.x
+  * [517865d] src:nftables: bump std-version to 4.5.0
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 16 Jun 2020 10:46:53 +0200
+
 nftables (0.9.5-1) unstable; urgency=medium
 
   * [15ebe06] New upstream version 0.9.5

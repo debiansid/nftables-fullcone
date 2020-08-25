@@ -175,6 +175,7 @@ extern struct table *table_lookup_fuzzy(const struct handle *h,
  */
 enum chain_flags {
 	CHAIN_F_BASECHAIN	= 0x1,
+	CHAIN_F_HW_OFFLOAD	= 0x2,
 };
 
 /**
@@ -186,6 +187,12 @@ enum chain_flags {
 struct prio_spec {
 	struct location loc;
 	struct expr	*expr;
+};
+
+struct hook_spec {
+	struct location	loc;
+	const char	*name;
+	unsigned int	num;
 };
 
 /**
@@ -210,14 +217,16 @@ struct chain {
 	struct location		location;
 	unsigned int		refcnt;
 	uint32_t		flags;
-	const char		*hookstr;
-	unsigned int		hooknum;
-	struct prio_spec	priority;
-	struct expr		*policy;
-	const char		*type;
-	const char		**dev_array;
-	struct expr		*dev_expr;
-	int			dev_array_len;
+	struct {
+		struct location		loc;
+		struct prio_spec	priority;
+		struct hook_spec	hook;
+		struct expr		*policy;
+		const char		*type;
+		const char		**dev_array;
+		struct expr		*dev_expr;
+		int			dev_array_len;
+	};
 	struct scope		scope;
 	struct list_head	rules;
 };
@@ -271,6 +280,10 @@ extern void rule_print(const struct rule *rule, struct output_ctx *octx);
 extern struct rule *rule_lookup(const struct chain *chain, uint64_t handle);
 extern struct rule *rule_lookup_by_index(const struct chain *chain,
 					 uint64_t index);
+void rule_stmt_append(struct rule *rule, struct stmt *stmt);
+void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
+			 struct stmt *stmt);
+
 
 /**
  * struct set - nftables set
@@ -283,14 +296,15 @@ extern struct rule *rule_lookup_by_index(const struct chain *chain,
  * @gc_int:	garbage collection interval
  * @timeout:	default timeout value
  * @key:	key expression (data type, length))
- * @datatype:	mapping data type
- * @datalen:	mapping data len
+ * @data:	mapping data expression
  * @objtype:	mapping object type
  * @init:	initializer
  * @rg_cache:	cached range element (left)
  * @policy:	set mechanism policy
  * @automerge:	merge adjacents and overlapping elements, if possible
- * @desc:	set mechanism desc
+ * @desc.size:		count of set elements
+ * @desc.field_len:	length of single concatenated fields, bytes
+ * @desc.field_count:	count of concatenated fields
  */
 struct set {
 	struct list_head	list;
@@ -301,15 +315,19 @@ struct set {
 	uint32_t		gc_int;
 	uint64_t		timeout;
 	struct expr		*key;
-	const struct datatype	*datatype;
-	unsigned int		datalen;
+	struct expr		*data;
 	uint32_t		objtype;
 	struct expr		*init;
 	struct expr		*rg_cache;
 	uint32_t		policy;
+	struct stmt		*stmt;
+	bool			root;
 	bool			automerge;
+	bool			key_typeof_valid;
 	struct {
 		uint32_t	size;
+		uint8_t		field_len[NFT_REG32_COUNT];
+		uint8_t		field_count;
 	} desc;
 };
 
@@ -361,6 +379,16 @@ static inline bool map_is_literal(uint32_t set_flags)
 static inline bool set_is_meter(uint32_t set_flags)
 {
 	return set_is_anonymous(set_flags) && (set_flags & NFT_SET_EVAL);
+}
+
+static inline bool set_is_interval(uint32_t set_flags)
+{
+	return set_flags & NFT_SET_INTERVAL;
+}
+
+static inline bool set_is_non_concat_range(struct set *s)
+{
+	return (s->flags & NFT_SET_INTERVAL) && s->desc.field_count <= 1;
 }
 
 #include <statement.h>
@@ -469,12 +497,12 @@ struct flowtable {
 	struct handle		handle;
 	struct scope		scope;
 	struct location		location;
-	const char *		hookstr;
-	unsigned int		hooknum;
+	struct hook_spec	hook;
 	struct prio_spec	priority;
 	const char		**dev_array;
 	struct expr		*dev_expr;
 	int			dev_array_len;
+	uint32_t		flags;
 	unsigned int		refcnt;
 };
 
@@ -530,9 +558,10 @@ enum cmd_ops {
  * enum cmd_obj - command objects
  *
  * @CMD_OBJ_INVALID:	invalid
- * @CMD_OBJ_SETELEM:	set element(s)
+ * @CMD_OBJ_ELEMENTS:	set element(s)
  * @CMD_OBJ_SET:	set
  * @CMD_OBJ_SETS:	multiple sets
+ * @CMD_OBJ_SETELEMS:	set elements
  * @CMD_OBJ_RULE:	rule
  * @CMD_OBJ_CHAIN:	chain
  * @CMD_OBJ_CHAINS:	multiple chains
@@ -558,8 +587,9 @@ enum cmd_ops {
  */
 enum cmd_obj {
 	CMD_OBJ_INVALID,
-	CMD_OBJ_SETELEM,
+	CMD_OBJ_ELEMENTS,
 	CMD_OBJ_SET,
+	CMD_OBJ_SETELEMS,
 	CMD_OBJ_SETS,
 	CMD_OBJ_RULE,
 	CMD_OBJ_CHAIN,
@@ -621,6 +651,8 @@ struct monitor {
 struct monitor *monitor_alloc(uint32_t format, uint32_t type, const char *event);
 void monitor_free(struct monitor *m);
 
+#define NFT_NLATTR_LOC_MAX 8
+
 /**
  * struct cmd - command statement
  *
@@ -652,6 +684,11 @@ struct cmd {
 		struct markup	*markup;
 		struct obj	*object;
 	};
+	struct {
+		uint16_t	offset;
+		struct location	*location;
+	} attr[NFT_NLATTR_LOC_MAX];
+	int			num_attrs;
 	const void		*arg;
 };
 
@@ -663,6 +700,8 @@ extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
 				    const struct handle *h,
 				    const struct location *loc, struct obj *obj);
 extern void cmd_free(struct cmd *cmd);
+
+void cmd_add_loc(struct cmd *cmd, uint16_t offset, struct location *loc);
 
 #include <payload.h>
 #include <expression.h>

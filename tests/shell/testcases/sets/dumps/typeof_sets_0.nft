@@ -1,0 +1,24 @@
+table inet t {
+	set s1 {
+		typeof osf name
+		elements = { "Linux" }
+	}
+
+	set s2 {
+		typeof vlan id
+		elements = { 2, 3, 103 }
+	}
+
+	set s3 {
+		typeof meta ibrpvid
+		elements = { 2, 3, 103 }
+	}
+
+	chain c1 {
+		osf name @s1 accept
+	}
+
+	chain c2 {
+		vlan id @s2 accept
+	}
+}

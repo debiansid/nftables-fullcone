@@ -6,21 +6,21 @@ Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
 Build-Depends: asciidoc-base,
                automake,
                bison,
-               debhelper-compat (= 12),
+               debhelper-compat (= 13),
                dh-python,
                docbook-xsl,
                flex,
                libgmp-dev,
                libjansson-dev,
-               libmnl-dev (>= 1.0.3),
-               libnftnl-dev (>= 1.1.5),
+               libmnl-dev (>= 1.0.4),
+               libnftnl-dev (>= 1.1.7),
                libreadline-dev,
                libtool (>= 2.2.6),
                libxtables-dev (>= 1.6.1),
                python3-all,
                python3-setuptools,
                xsltproc
-Standards-Version: 4.4.1
+Standards-Version: 4.5.0
 Homepage: https://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables.git
 Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables

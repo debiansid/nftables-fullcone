@@ -301,6 +301,8 @@ const struct ct_template ct_templates[__NFT_CT_MAX] = {
 					      BYTEORDER_BIG_ENDIAN, 128),
 	[NFT_CT_SECMARK]	= CT_TEMPLATE("secmark", &integer_type,
 					      BYTEORDER_HOST_ENDIAN, 32),
+	[NFT_CT_ID]		= CT_TEMPLATE("id", &integer_type,
+					      BYTEORDER_BIG_ENDIAN, 32),
 };
 
 static void ct_print(enum nft_ct_keys key, int8_t dir, uint8_t nfproto,
@@ -367,6 +369,60 @@ static void ct_expr_pctx_update(struct proto_ctx *ctx, const struct expr *expr)
 	proto_ctx_update(ctx, left->ct.base + 1, &expr->location, desc);
 }
 
+#define NFTNL_UDATA_CT_KEY 0
+#define NFTNL_UDATA_CT_DIR 1
+#define NFTNL_UDATA_CT_MAX 2
+
+static int ct_expr_build_udata(struct nftnl_udata_buf *udbuf,
+			       const struct expr *expr)
+{
+	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_CT_KEY, expr->ct.key);
+	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_CT_DIR, expr->ct.direction);
+
+	return 0;
+}
+
+static int ct_parse_udata(const struct nftnl_udata *attr, void *data)
+{
+	const struct nftnl_udata **ud = data;
+	uint8_t type = nftnl_udata_type(attr);
+	uint8_t len = nftnl_udata_len(attr);
+
+	switch (type) {
+	case NFTNL_UDATA_CT_KEY:
+	case NFTNL_UDATA_CT_DIR:
+		if (len != sizeof(uint32_t))
+			return -1;
+		break;
+	default:
+		return 0;
+	}
+
+	ud[type] = attr;
+	return 0;
+}
+
+static struct expr *ct_expr_parse_udata(const struct nftnl_udata *attr)
+{
+	const struct nftnl_udata *ud[NFTNL_UDATA_CT_MAX + 1] = {};
+	uint32_t key, dir;
+	int err;
+
+	err = nftnl_udata_parse(nftnl_udata_get(attr), nftnl_udata_len(attr),
+				ct_parse_udata, ud);
+	if (err < 0)
+		return NULL;
+
+	if (!ud[NFTNL_UDATA_CT_KEY] ||
+	    !ud[NFTNL_UDATA_CT_DIR])
+		return NULL;
+
+	key = nftnl_udata_get_u32(ud[NFTNL_UDATA_CT_KEY]);
+	dir = nftnl_udata_get_u32(ud[NFTNL_UDATA_CT_DIR]);
+
+	return ct_expr_alloc(&internal_location, key, dir);
+}
+
 const struct expr_ops ct_expr_ops = {
 	.type		= EXPR_CT,
 	.name		= "ct",
@@ -375,6 +431,8 @@ const struct expr_ops ct_expr_ops = {
 	.cmp		= ct_expr_cmp,
 	.clone		= ct_expr_clone,
 	.pctx_update	= ct_expr_pctx_update,
+	.parse_udata	= ct_expr_parse_udata,
+	.build_udata	= ct_expr_build_udata,
 };
 
 struct expr *ct_expr_alloc(const struct location *loc, enum nft_ct_keys key,

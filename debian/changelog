@@ -1,3 +1,28 @@
+nftables (0.9.6-1) unstable; urgency=medium
+
+  * [e2f26f2] New upstream version 0.9.6 (Closes: #962909)
+  * [a203bd9] nftables: bump libmnl build-dep version to 1.0.4
+  * [e7a683f] tests: only run them with kernels >= 5.x
+  * [517865d] src:nftables: bump std-version to 4.5.0
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 16 Jun 2020 10:46:53 +0200
+
+nftables (0.9.5-1) unstable; urgency=medium
+
+  * [15ebe06] New upstream version 0.9.5
+  * [1cc07ee] build-deps: bump libnftnl requirement to 1.1.7
+  * [34f7c95] src:nftables: bump debhelper compat level to 13
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Mon, 08 Jun 2020 11:11:53 +0200
+
+nftables (0.9.4-1) unstable; urgency=medium
+
+  * [41441b9] New upstream version 0.9.4
+  * [9de28bb] d/patches: drop 0001-upstream-py-load-soname.patch
+  * [7c044e8] src:nftables: bump build-dep on libnftnl to 1.1.6
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 02 Apr 2020 12:30:12 +0200
+
 nftables (0.9.3-2~bpo10+1) buster-backports; urgency=medium
 
   * Rebuild for buster-backports.

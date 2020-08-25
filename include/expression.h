@@ -10,6 +10,7 @@
 #include <utils.h>
 #include <list.h>
 #include <json.h>
+#include <libnftnl/udata.h>
 
 /**
  * enum expr_types
@@ -71,6 +72,7 @@ enum expr_types {
 	EXPR_FIB,
 	EXPR_XFRM,
 };
+#define EXPR_MAX EXPR_XFRM
 
 enum ops {
 	OP_INVALID,
@@ -166,9 +168,13 @@ struct expr_ops {
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
 					       const struct expr *expr);
+	int			(*build_udata)(struct nftnl_udata_buf *udbuf,
+					       const struct expr *expr);
+	struct expr *		(*parse_udata)(const struct nftnl_udata *ud);
 };
 
 const struct expr_ops *expr_ops(const struct expr *e);
+const struct expr_ops *expr_ops_by_type(enum expr_types etype);
 
 /**
  * enum expr_flags
@@ -178,6 +184,7 @@ const struct expr_ops *expr_ops(const struct expr *e);
  * @EXPR_F_PROTOCOL:		expressions describes upper layer protocol
  * @EXPR_F_INTERVAL_END:	set member ends an open interval
  * @EXPR_F_BOOLEAN:		expression is boolean (set by relational expr on LHS)
+ * @EXPR_F_INTERVAL:		expression describes a interval
  */
 enum expr_flags {
 	EXPR_F_CONSTANT		= 0x1,
@@ -185,6 +192,7 @@ enum expr_flags {
 	EXPR_F_PROTOCOL		= 0x4,
 	EXPR_F_INTERVAL_END	= 0x8,
 	EXPR_F_BOOLEAN		= 0x10,
+	EXPR_F_INTERVAL		= 0x20,
 };
 
 #include <payload.h>
@@ -256,6 +264,8 @@ struct expr {
 			struct list_head	expressions;
 			unsigned int		size;
 			uint32_t		set_flags;
+			uint8_t			field_len[NFT_REG32_COUNT];
+			uint8_t			field_count;
 		};
 		struct {
 			/* EXPR_SET_REF */
@@ -292,6 +302,7 @@ struct expr {
 			enum proto_bases		base;
 			unsigned int			offset;
 			bool				is_raw;
+			bool				evaluated;
 		} payload;
 		struct {
 			/* EXPR_EXTHDR */
@@ -441,6 +452,7 @@ extern struct expr *prefix_expr_alloc(const struct location *loc,
 
 extern struct expr *range_expr_alloc(const struct location *loc,
 				     struct expr *low, struct expr *high);
+struct expr *range_expr_to_prefix(struct expr *range);
 
 extern struct expr *compound_expr_alloc(const struct location *loc,
 					enum expr_types etypes);
@@ -458,6 +470,7 @@ extern int set_to_intervals(struct list_head *msgs, struct set *set,
 			    struct expr *init, bool add,
 			    unsigned int debug_mask, bool merge,
 			    struct output_ctx *octx);
+extern void concat_range_aggregate(struct expr *set);
 extern void interval_map_decompose(struct expr *set);
 
 extern struct expr *get_set_intervals(const struct set *set,

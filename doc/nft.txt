@@ -492,7 +492,7 @@ The sets allowed_hosts and allowed_ports need to be created first. The next
 section describes nft set syntax in more detail.
 
 [verse]
-*add set* ['family'] 'table' 'set' *{ type* 'type' *;* [*flags* 'flags' *;*] [*timeout* 'timeout' *;*] [*gc-interval* 'gc-interval' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] [*auto-merge ;*] *}*
+*add set* ['family'] 'table' 'set' *{ type* 'type' | *typeof* 'expression' *;* [*flags* 'flags' *;*] [*timeout* 'timeout' *;*] [*gc-interval* 'gc-interval' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] [*auto-merge ;*] *}*
 {*delete* | *list* | *flush*} *set* ['family'] 'table' 'set'
 *list sets* ['family']
 *delete set* ['family'] 'table' *handle* 'handle'
@@ -507,8 +507,6 @@ be tuned with the flags that can be specified at set creation time.
 *delete*:: Delete the specified set.
 *list*:: Display the elements in the specified set.
 *flush*:: Remove all elements from the specified set.
-*add element*:: Comma-separated list of elements to add into the specified set.
-*delete element*:: Comma-separated list of elements to delete from the specified set.
 
 .Set specifications
 [options="header"]
@@ -517,6 +515,9 @@ be tuned with the flags that can be specified at set creation time.
 |type |
 data type of set elements |
 string: ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark
+|typeof |
+data type of set element |
+expression to derive the data type from
 |flags |
 set flags |
 string: constant, dynamic, interval, timeout
@@ -544,10 +545,9 @@ automatic merge of adjacent/overlapping set elements (only for interval sets) |
 MAPS
 -----
 [verse]
-*add map* ['family'] 'table' 'map' *{ type* 'type' [*flags* 'flags' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] *}*
+*add map* ['family'] 'table' 'map' *{ type* 'type' | *typeof* 'expression' [*flags* 'flags' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*policy* 'policy' *;*] *}*
 {*delete* | *list* | *flush*} *map* ['family'] 'table' 'map'
 *list maps* ['family']
-{*add* | *delete*} *element* ['family'] 'table' 'map' *{ elements = {* 'element'[*,* ...] *} ; }*
 
 Maps store data based on some specific key used as input. They are uniquely identified by a user-defined name and attached to tables.
 
@@ -565,7 +565,10 @@ Maps store data based on some specific key used as input. They are uniquely iden
 |Keyword | Description | Type
 |type |
 data type of map elements |
-string `:' string: ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark, counter, quota. Counter and quota can't be used as keys
+string: ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark, counter, quota. Counter and quota can't be used as keys
+|typeof |
+data type of set element |
+expression to derive the data type from
 |flags |
 map flags |
 string: constant, interval
@@ -578,6 +581,43 @@ unsigned integer (64 bit)
 | policy |
 map policy |
 string: performance [default], memory
+|=================
+
+
+ELEMENTS
+--------
+[verse]
+____
+{*add* | *create* | *delete* | *get* } *element* ['family'] 'table' 'set' *{* 'ELEMENT'[*,* ...] *}*
+
+'ELEMENT' := 'key_expression' 'OPTIONS' [*:* 'value_expression']
+'OPTIONS' := [*timeout* 'TIMESPEC'] [*expires* 'TIMESPEC'] [*comment* 'string']
+'TIMESPEC' := ['num'*d*]['num'*h*]['num'*m*]['num'[*s*]]
+____
+Element-related commands allow to change contents of named sets and maps.
+'key_expression' is typically a value matching the set type.
+'value_expression' is not allowed in sets but mandatory when adding to maps, where it
+matches the data part in it's type definition. When deleting from maps, it may
+be specified but is optional as 'key_expression' uniquely identifies the
+element.
+
+*create* command is similar to *add* with the exception that none of the
+listed elements may already exist.
+
+*get* command is useful to check if an element is contained in a set which may
+be non-trivial in very large and/or interval sets. In the latter case, the
+containing interval is returned instead of just the element itself.
+
+.Element options
+[options="header"]
+|=================
+|Option | Description
+|timeout |
+timeout value for sets/maps with flag *timeout*
+|expires |
+the time until given element expires, useful for ruleset replication only
+|comment |
+per element comment field
 |=================
 
 

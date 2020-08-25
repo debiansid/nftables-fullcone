@@ -657,34 +657,13 @@ const struct datatype inet_protocol_type = {
 
 static void inet_service_print(const struct expr *expr, struct output_ctx *octx)
 {
-	struct sockaddr_in sin = { .sin_family = AF_INET };
-	char buf[NI_MAXSERV];
-	uint16_t port;
-	int err;
+	uint16_t port = mpz_get_be16(expr->value);
+	const struct servent *s = getservbyport(port, NULL);
 
-	sin.sin_port = mpz_get_be16(expr->value);
-	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL, 0,
-			  buf, sizeof(buf), 0);
-	if (err != 0) {
-		nft_print(octx, "%u", ntohs(sin.sin_port));
-		return;
-	}
-	port = atoi(buf);
-	/* We got a TCP service name string, display it... */
-	if (htons(port) != sin.sin_port) {
-		nft_print(octx, "\"%s\"", buf);
-		return;
-	}
-
-	/* ...otherwise, this might be a UDP service name. */
-	err = getnameinfo((struct sockaddr *)&sin, sizeof(sin), NULL, 0,
-			  buf, sizeof(buf), NI_DGRAM);
-	if (err != 0) {
-		/* No service name, display numeric value. */
-		nft_print(octx, "%u", ntohs(sin.sin_port));
-		return;
-	}
-	nft_print(octx, "\"%s\"", buf);
+	if (s == NULL)
+		nft_print(octx, "%hu", ntohs(port));
+	else
+		nft_print(octx, "\"%s\"", s->s_name);
 }
 
 void inet_service_type_print(const struct expr *expr, struct output_ctx *octx)
@@ -846,6 +825,7 @@ static const struct symbol_table icmp_code_tbl = {
 		SYMBOL("net-prohibited",	ICMP_NET_ANO),
 		SYMBOL("host-prohibited",	ICMP_HOST_ANO),
 		SYMBOL("admin-prohibited",	ICMP_PKT_FILTERED),
+		SYMBOL("frag-needed",		ICMP_FRAG_NEEDED),
 		SYMBOL_LIST_END
 	},
 };
@@ -1104,6 +1084,8 @@ struct datatype *datatype_get(const struct datatype *ptr)
 
 void datatype_set(struct expr *expr, const struct datatype *dtype)
 {
+	if (dtype == expr->dtype)
+		return;
 	datatype_free(expr->dtype);
 	expr->dtype = datatype_get(dtype);
 }
@@ -1188,11 +1170,6 @@ const struct datatype *set_datatype_alloc(const struct datatype *orig_dtype,
 	dtype->byteorder = byteorder;
 
 	return dtype;
-}
-
-void set_datatype_destroy(const struct datatype *dtype)
-{
-	datatype_free(dtype);
 }
 
 static struct error_record *time_unit_parse(const struct location *loc,

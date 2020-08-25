@@ -1,3 +1,9 @@
+nftables (0.9.6-1~bpo10+1) buster-backports; urgency=medium
+
+  * Rebuild for buster-backports.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 25 Aug 2020 11:46:38 +0200
+
 nftables (0.9.6-1) unstable; urgency=medium
 
   * [e2f26f2] New upstream version 0.9.6 (Closes: #962909)

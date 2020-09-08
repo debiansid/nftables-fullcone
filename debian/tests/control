@@ -1,6 +1,6 @@
 Test-Command: nft -h
 Depends: @
-Restrictions: needs-root
+Restrictions: needs-root, superficial
 
 Tests: internaltest-shell.sh
 Depends: kmod, @

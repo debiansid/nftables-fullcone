@@ -27,6 +27,7 @@
 #include <erec.h>
 #include <sys/socket.h>
 #include <libnftnl/udata.h>
+#include <cache.h>
 #include <xt.h>
 
 static int netlink_parse_expr(const struct nftnl_expr *nle,
@@ -163,6 +164,24 @@ err:
 	return NULL;
 }
 
+static void netlink_parse_chain_verdict(struct netlink_parse_ctx *ctx,
+					const struct location *loc,
+					struct expr *expr,
+					enum nft_verdicts verdict)
+{
+	char chain_name[NFT_CHAIN_MAXNAMELEN] = {};
+	struct chain *chain;
+
+	expr_chain_export(expr->chain, chain_name);
+	chain = chain_binding_lookup(ctx->table, chain_name);
+	if (chain) {
+		ctx->stmt = chain_stmt_alloc(loc, chain, verdict);
+		expr_free(expr);
+	} else {
+		ctx->stmt = verdict_stmt_alloc(loc, expr);
+	}
+}
+
 static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 				    const struct location *loc,
 				    const struct nftnl_expr *nle)
@@ -182,12 +201,23 @@ static void netlink_parse_immediate(struct netlink_parse_ctx *ctx,
 	}
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_IMM_DREG);
-
 	expr = netlink_alloc_data(loc, &nld, dreg);
-	if (dreg == NFT_REG_VERDICT)
-		ctx->stmt = verdict_stmt_alloc(loc, expr);
-	else
+
+	if (dreg == NFT_REG_VERDICT) {
+		switch (expr->verdict) {
+		case NFT_JUMP:
+			netlink_parse_chain_verdict(ctx, loc, expr, NFT_JUMP);
+			break;
+		case NFT_GOTO:
+			netlink_parse_chain_verdict(ctx, loc, expr, NFT_GOTO);
+			break;
+		default:
+			ctx->stmt = verdict_stmt_alloc(loc, expr);
+			break;
+		}
+	} else {
 		netlink_set_register(ctx, dreg, expr);
+	}
 }
 
 static void netlink_parse_xfrm(struct netlink_parse_ctx *ctx,
@@ -901,7 +931,11 @@ static void netlink_parse_log(struct netlink_parse_ctx *ctx,
 	stmt = log_stmt_alloc(loc);
 	prefix = nftnl_expr_get_str(nle, NFTNL_EXPR_LOG_PREFIX);
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_LOG_PREFIX)) {
-		stmt->log.prefix = xstrdup(prefix);
+		stmt->log.prefix = constant_expr_alloc(&internal_location,
+						       &string_type,
+						       BYTEORDER_HOST_ENDIAN,
+						       (strlen(prefix) + 1) * BITS_PER_BYTE,
+						       prefix);
 		stmt->log.flags |= STMT_LOG_PREFIX;
 	}
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_LOG_GROUP)) {
@@ -1594,12 +1628,14 @@ static void netlink_parse_objref(struct netlink_parse_ctx *ctx,
 	ctx->stmt = stmt;
 }
 
-static const struct {
+struct expr_handler {
 	const char	*name;
 	void		(*parse)(struct netlink_parse_ctx *ctx,
 				 const struct location *loc,
 				 const struct nftnl_expr *nle);
-} netlink_parsers[] = {
+};
+
+static const struct expr_handler netlink_parsers[] = {
 	{ .name = "immediate",	.parse = netlink_parse_immediate },
 	{ .name = "cmp",	.parse = netlink_parse_cmp },
 	{ .name = "lookup",	.parse = netlink_parse_lookup },
@@ -1640,25 +1676,48 @@ static const struct {
 	{ .name = "synproxy",	.parse = netlink_parse_synproxy },
 };
 
+static const struct expr_handler **expr_handle_ht;
+
+#define NFT_EXPR_HSIZE	4096
+
+void expr_handler_init(void)
+{
+	unsigned int i;
+	uint32_t hash;
+
+	expr_handle_ht = calloc(NFT_EXPR_HSIZE, sizeof(expr_handle_ht));
+	if (!expr_handle_ht)
+		memory_allocation_error();
+
+	for (i = 0; i < array_size(netlink_parsers); i++) {
+		hash = djb_hash(netlink_parsers[i].name) % NFT_EXPR_HSIZE;
+		assert(expr_handle_ht[hash] == NULL);
+		expr_handle_ht[hash] = &netlink_parsers[i];
+	}
+}
+
+void expr_handler_exit(void)
+{
+	xfree(expr_handle_ht);
+}
+
 static int netlink_parse_expr(const struct nftnl_expr *nle,
 			      struct netlink_parse_ctx *ctx)
 {
 	const char *type = nftnl_expr_get_str(nle, NFTNL_EXPR_NAME);
 	struct location loc;
-	unsigned int i;
+	uint32_t hash;
 
 	memset(&loc, 0, sizeof(loc));
 	loc.indesc = &indesc_netlink;
 	loc.nle = nle;
 
-	for (i = 0; i < array_size(netlink_parsers); i++) {
-		if (strcmp(type, netlink_parsers[i].name))
-			continue;
-		netlink_parsers[i].parse(ctx, &loc, nle);
-		return 0;
-	}
+	hash = djb_hash(type) % NFT_EXPR_HSIZE;
+	if (expr_handle_ht[hash])
+		expr_handle_ht[hash]->parse(ctx, &loc, nle);
+	else
+		netlink_error(ctx, &loc, "unknown expression type '%s'", type);
 
-	netlink_error(ctx, &loc, "unknown expression type '%s'", type);
 	return 0;
 }
 
@@ -2069,7 +2128,7 @@ static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *e
 
 		expr_free(binop);
 	} else if (binop->left->dtype->flags & DTYPE_F_PREFIX &&
-		   binop->op == OP_AND &&
+		   binop->op == OP_AND && expr->right->etype == EXPR_VALUE &&
 		   expr_mask_is_prefix(binop->right)) {
 		expr->left = expr_get(binop->left);
 		expr->right = prefix_expr_alloc(&expr->location,

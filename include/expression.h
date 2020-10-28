@@ -167,7 +167,9 @@ struct expr_ops {
 	bool			(*cmp)(const struct expr *e1,
 				       const struct expr *e2);
 	void			(*pctx_update)(struct proto_ctx *ctx,
-					       const struct expr *expr);
+					       const struct location *loc,
+					       const struct expr *left,
+					       const struct expr *right);
 	int			(*build_udata)(struct nftnl_udata_buf *udbuf,
 					       const struct expr *expr);
 	struct expr *		(*parse_udata)(const struct nftnl_udata *ud);
@@ -249,6 +251,7 @@ struct expr {
 			/* EXPR_VERDICT */
 			int			verdict;
 			struct expr		*chain;
+			uint32_t		chain_id;
 		};
 		struct {
 			/* EXPR_VALUE */
@@ -381,6 +384,8 @@ extern const struct datatype *expr_basetype(const struct expr *expr);
 extern void expr_set_type(struct expr *expr, const struct datatype *dtype,
 			  enum byteorder byteorder);
 
+void expr_to_string(const struct expr *expr, char *string);
+
 struct eval_ctx;
 extern int expr_binary_error(struct list_head *msgs,
 			     const struct expr *e1, const struct expr *e2,
@@ -476,7 +481,7 @@ extern void interval_map_decompose(struct expr *set);
 extern struct expr *get_set_intervals(const struct set *set,
 				      const struct expr *init);
 struct table;
-extern int get_set_decompose(struct table *table, struct set *set);
+extern int get_set_decompose(struct set *cache_set, struct set *set);
 
 extern struct expr *mapping_expr_alloc(const struct location *loc,
 				       struct expr *from, struct expr *to);

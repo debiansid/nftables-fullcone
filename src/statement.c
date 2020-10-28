@@ -15,9 +15,11 @@
 #include <inttypes.h>
 #include <string.h>
 #include <syslog.h>
+#include <rule.h>
 
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter/nf_log.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 #include <statement.h>
@@ -108,6 +110,50 @@ struct stmt *verdict_stmt_alloc(const struct location *loc, struct expr *expr)
 
 	stmt = stmt_alloc(loc, &verdict_stmt_ops);
 	stmt->expr = expr;
+	return stmt;
+}
+
+static const char *chain_verdict(const struct expr *expr)
+{
+	switch (expr->verdict) {
+	case NFT_JUMP:
+		return "jump";
+	case NFT_GOTO:
+		return "goto";
+	default:
+		BUG("unknown chain verdict");
+	}
+}
+
+static void chain_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	nft_print(octx, "%s {\n", chain_verdict(stmt->chain.expr));
+	chain_rules_print(stmt->chain.chain, octx, "\t");
+	nft_print(octx, "\t\t}");
+}
+
+static void chain_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->chain.expr);
+}
+
+static const struct stmt_ops chain_stmt_ops = {
+	.type		= STMT_CHAIN,
+	.name		= "chain",
+	.print		= chain_stmt_print,
+	.destroy	= chain_stmt_destroy,
+};
+
+struct stmt *chain_stmt_alloc(const struct location *loc, struct chain *chain,
+			      enum nft_verdicts verdict)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &chain_stmt_ops);
+	stmt->chain.chain = chain;
+	stmt->chain.expr = verdict_expr_alloc(loc, verdict, NULL);
+	stmt->chain.expr->chain_id = chain->handle.chain_id;
+
 	return stmt;
 }
 
@@ -300,8 +346,12 @@ int log_level_parse(const char *level)
 static void log_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
 	nft_print(octx, "log");
-	if (stmt->log.flags & STMT_LOG_PREFIX)
-		nft_print(octx, " prefix \"%s\"", stmt->log.prefix);
+	if (stmt->log.flags & STMT_LOG_PREFIX) {
+		char prefix[NF_LOG_PREFIXLEN] = {};
+
+		expr_to_string(stmt->log.prefix, prefix);
+		nft_print(octx, " prefix \"%s\"", prefix);
+	}
 	if (stmt->log.flags & STMT_LOG_GROUP)
 		nft_print(octx, " group %u", stmt->log.group);
 	if (stmt->log.flags & STMT_LOG_SNAPLEN)
@@ -338,7 +388,7 @@ static void log_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 
 static void log_stmt_destroy(struct stmt *stmt)
 {
-	xfree(stmt->log.prefix);
+	expr_free(stmt->log.prefix);
 }
 
 static const struct stmt_ops log_stmt_ops = {

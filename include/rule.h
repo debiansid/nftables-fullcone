@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <libnftnl/object.h>	/* For NFTNL_CTTIMEOUT_ARRAY_MAX. */
 #include <linux/netfilter/nf_tables.h>
+#include <string.h>
+#include <cache.h>
 
 /**
  * struct handle_spec - handle ID
@@ -79,6 +81,7 @@ struct handle {
 	struct position_spec	position;
 	struct position_spec	index;
 	uint32_t		set_id;
+	uint32_t		chain_id;
 	uint32_t		rule_id;
 	uint32_t		position_id;
 };
@@ -151,12 +154,15 @@ struct table {
 	struct handle		handle;
 	struct location		location;
 	struct scope		scope;
+	struct list_head	*chain_htable;
 	struct list_head	chains;
 	struct list_head	sets;
 	struct list_head	objs;
 	struct list_head	flowtables;
+	struct list_head	chain_bindings;
 	enum table_flags 	flags;
 	unsigned int		refcnt;
+	const char		*comment;
 };
 
 extern struct table *table_alloc(void);
@@ -176,6 +182,7 @@ extern struct table *table_lookup_fuzzy(const struct handle *h,
 enum chain_flags {
 	CHAIN_F_BASECHAIN	= 0x1,
 	CHAIN_F_HW_OFFLOAD	= 0x2,
+	CHAIN_F_BINDING		= 0x4,
 };
 
 /**
@@ -213,10 +220,12 @@ struct hook_spec {
  */
 struct chain {
 	struct list_head	list;
+	struct list_head	hlist;
 	struct handle		handle;
 	struct location		location;
 	unsigned int		refcnt;
 	uint32_t		flags;
+	const char		*comment;
 	struct {
 		struct location		loc;
 		struct prio_spec	priority;
@@ -238,18 +247,21 @@ extern const char *chain_hookname_lookup(const char *name);
 extern struct chain *chain_alloc(const char *name);
 extern struct chain *chain_get(struct chain *chain);
 extern void chain_free(struct chain *chain);
-extern void chain_add_hash(struct chain *chain, struct table *table);
 extern struct chain *chain_lookup(const struct table *table,
 				  const struct handle *h);
 extern struct chain *chain_lookup_fuzzy(const struct handle *h,
 					const struct nft_cache *cache,
 					const struct table **table);
+extern struct chain *chain_binding_lookup(const struct table *table,
+					  const char *chain_name);
 
 extern const char *family2str(unsigned int family);
 extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
 extern const char *chain_policy2str(uint32_t policy);
 extern void chain_print_plain(const struct chain *chain,
 			      struct output_ctx *octx);
+extern void chain_rules_print(const struct chain *chain,
+			      struct output_ctx *octx, const char *indent);
 
 /**
  * struct rule - nftables rule
@@ -302,6 +314,7 @@ void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
  * @rg_cache:	cached range element (left)
  * @policy:	set mechanism policy
  * @automerge:	merge adjacents and overlapping elements, if possible
+ * @comment:	comment
  * @desc.size:		count of set elements
  * @desc.field_len:	length of single concatenated fields, bytes
  * @desc.field_count:	count of concatenated fields
@@ -324,6 +337,7 @@ struct set {
 	bool			root;
 	bool			automerge;
 	bool			key_typeof_valid;
+	const char		*comment;
 	struct {
 		uint32_t	size;
 		uint8_t		field_len[NFT_REG32_COUNT];
@@ -466,6 +480,7 @@ struct obj {
 	struct handle			handle;
 	uint32_t			type;
 	unsigned int			refcnt;
+	const char			*comment;
 	union {
 		struct counter		counter;
 		struct quota		quota;
@@ -651,7 +666,7 @@ struct monitor {
 struct monitor *monitor_alloc(uint32_t format, uint32_t type, const char *event);
 void monitor_free(struct monitor *m);
 
-#define NFT_NLATTR_LOC_MAX 8
+#define NFT_NLATTR_LOC_MAX 32
 
 /**
  * struct cmd - command statement
@@ -676,6 +691,10 @@ struct cmd {
 		void		*data;
 		struct expr	*expr;
 		struct set	*set;
+		struct {
+			struct expr	*expr;	/* same offset as cmd->expr */
+			struct set	*set;
+		} elem;
 		struct rule	*rule;
 		struct chain	*chain;
 		struct table	*table;
@@ -685,8 +704,8 @@ struct cmd {
 		struct obj	*object;
 	};
 	struct {
-		uint16_t	offset;
-		struct location	*location;
+		uint16_t		offset;
+		const struct location	*location;
 	} attr[NFT_NLATTR_LOC_MAX];
 	int			num_attrs;
 	const void		*arg;
@@ -701,7 +720,7 @@ extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
 				    const struct location *loc, struct obj *obj);
 extern void cmd_free(struct cmd *cmd);
 
-void cmd_add_loc(struct cmd *cmd, uint16_t offset, struct location *loc);
+void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc);
 
 #include <payload.h>
 #include <expression.h>

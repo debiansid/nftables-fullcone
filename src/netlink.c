@@ -123,7 +123,7 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	netlink_gen_data(key, &nld);
 	nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY, &nld.value, nld.len);
 
-	if (set->set_flags & NFT_SET_INTERVAL && expr->key->field_count > 1) {
+	if (set->set_flags & NFT_SET_INTERVAL && key->field_count > 1) {
 		key->flags |= EXPR_F_INTERVAL_END;
 		netlink_gen_data(key, &nld);
 		key->flags &= ~EXPR_F_INTERVAL_END;
@@ -269,31 +269,41 @@ static void netlink_gen_constant_data(const struct expr *expr,
 			     div_round_up(expr->len, BITS_PER_BYTE), data);
 }
 
-static void netlink_gen_verdict(const struct expr *expr,
-				struct nft_data_linearize *data)
+static void netlink_gen_chain(const struct expr *expr,
+			      struct nft_data_linearize *data)
 {
 	char chain[NFT_CHAIN_MAXNAMELEN];
 	unsigned int len;
+
+	len = expr->chain->len / BITS_PER_BYTE;
+
+	if (!len)
+		BUG("chain length is 0");
+
+	if (len > sizeof(chain))
+		BUG("chain is too large (%u, %u max)",
+		    len, (unsigned int)sizeof(chain));
+
+	memset(chain, 0, sizeof(chain));
+
+	mpz_export_data(chain, expr->chain->value,
+			BYTEORDER_HOST_ENDIAN, len);
+	snprintf(data->chain, NFT_CHAIN_MAXNAMELEN, "%s", chain);
+}
+
+static void netlink_gen_verdict(const struct expr *expr,
+				struct nft_data_linearize *data)
+{
 
 	data->verdict = expr->verdict;
 
 	switch (expr->verdict) {
 	case NFT_JUMP:
 	case NFT_GOTO:
-		len = expr->chain->len / BITS_PER_BYTE;
-
-		if (!len)
-			BUG("chain length is 0");
-
-		if (len > sizeof(chain))
-			BUG("chain is too large (%u, %u max)",
-			    len, (unsigned int)sizeof(chain));
-
-		memset(chain, 0, sizeof(chain));
-
-		mpz_export_data(chain, expr->chain->value,
-				BYTEORDER_HOST_ENDIAN, len);
-		snprintf(data->chain, NFT_CHAIN_MAXNAMELEN, "%s", chain);
+		if (expr->chain)
+			netlink_gen_chain(expr, data);
+		else
+			data->chain_id = expr->chain_id;
 		break;
 	}
 }
@@ -462,12 +472,34 @@ void netlink_dump_chain(const struct nftnl_chain *nlc, struct netlink_ctx *ctx)
 	fprintf(fp, "\n");
 }
 
+static int chain_parse_udata_cb(const struct nftnl_udata *attr, void *data)
+{
+	unsigned char *value = nftnl_udata_get(attr);
+	uint8_t type = nftnl_udata_type(attr);
+	const struct nftnl_udata **tb = data;
+	uint8_t len = nftnl_udata_len(attr);
+
+	switch (type) {
+		case NFTNL_UDATA_CHAIN_COMMENT:
+			if (value[len - 1] != '\0')
+				return -1;
+			break;
+		default:
+			return 0;
+	}
+	tb[type] = attr;
+	return 0;
+}
+
 struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 					const struct nftnl_chain *nlc)
 {
+	const struct nftnl_udata *ud[NFTNL_UDATA_OBJ_MAX + 1] = {};
 	int priority, policy, len = 0, i;
 	const char * const *dev_array;
 	struct chain *chain;
+	const char *udata;
+	uint32_t ulen;
 
 	chain = chain_alloc(nftnl_chain_get_str(nlc, NFTNL_CHAIN_NAME));
 	chain->handle.family =
@@ -524,62 +556,61 @@ struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 		chain->flags        |= CHAIN_F_BASECHAIN;
 	}
 
+	if (nftnl_chain_is_set(nlc, NFTNL_CHAIN_USERDATA)) {
+		udata = nftnl_chain_get_data(nlc, NFTNL_CHAIN_USERDATA, &ulen);
+		if (nftnl_udata_parse(udata, ulen, chain_parse_udata_cb, ud) < 0) {
+			netlink_io_error(ctx, NULL, "Cannot parse userdata");
+			return NULL;
+		}
+		if (ud[NFTNL_UDATA_CHAIN_COMMENT])
+			chain->comment = xstrdup(nftnl_udata_get(ud[NFTNL_UDATA_CHAIN_COMMENT]));
+	}
+
 	return chain;
 }
 
-static int list_chain_cb(struct nftnl_chain *nlc, void *arg)
+static int table_parse_udata_cb(const struct nftnl_udata *attr, void *data)
 {
-	struct netlink_ctx *ctx = arg;
-	const struct handle *h = ctx->data;
-	const char *table;
-	const char *name;
-	struct chain *chain;
-	uint32_t family;
+	unsigned char *value = nftnl_udata_get(attr);
+	const struct nftnl_udata **tb = data;
+	uint8_t type = nftnl_udata_type(attr);
+	uint8_t len = nftnl_udata_len(attr);
 
-	table  = nftnl_chain_get_str(nlc, NFTNL_CHAIN_TABLE);
-	name   = nftnl_chain_get_str(nlc, NFTNL_CHAIN_NAME);
-	family = nftnl_chain_get_u32(nlc, NFTNL_CHAIN_FAMILY);
-
-	if (h->family != family || strcmp(table, h->table.name) != 0)
-		return 0;
-	if (h->chain.name && strcmp(name, h->chain.name) != 0)
-		return 0;
-
-	chain = netlink_delinearize_chain(ctx, nlc);
-	list_add_tail(&chain->list, &ctx->list);
-
-	return 0;
-}
-
-int netlink_list_chains(struct netlink_ctx *ctx, const struct handle *h)
-{
-	struct nftnl_chain_list *chain_cache;
-
-	chain_cache = mnl_nft_chain_dump(ctx, h->family);
-	if (chain_cache == NULL) {
-		if (errno == EINTR)
-			return -1;
-
-		return 0;
+	switch (type) {
+		case NFTNL_UDATA_TABLE_COMMENT:
+			if (value[len - 1] != '\0')
+				return -1;
+			break;
+		default:
+			return 0;
 	}
-
-	ctx->data = h;
-	nftnl_chain_list_foreach(chain_cache, list_chain_cb, ctx);
-	nftnl_chain_list_free(chain_cache);
-
+	tb[type] = attr;
 	return 0;
 }
 
 struct table *netlink_delinearize_table(struct netlink_ctx *ctx,
 					const struct nftnl_table *nlt)
 {
+	const struct nftnl_udata *ud[NFTNL_UDATA_TABLE_MAX + 1] = {};
 	struct table *table;
+	const char *udata;
+	uint32_t ulen;
 
 	table = table_alloc();
 	table->handle.family = nftnl_table_get_u32(nlt, NFTNL_TABLE_FAMILY);
 	table->handle.table.name = xstrdup(nftnl_table_get_str(nlt, NFTNL_TABLE_NAME));
 	table->flags	     = nftnl_table_get_u32(nlt, NFTNL_TABLE_FLAGS);
 	table->handle.handle.id = nftnl_table_get_u64(nlt, NFTNL_TABLE_HANDLE);
+
+	if (nftnl_table_is_set(nlt, NFTNL_TABLE_USERDATA)) {
+		udata = nftnl_table_get_data(nlt, NFTNL_TABLE_USERDATA, &ulen);
+		if (nftnl_udata_parse(udata, ulen, table_parse_udata_cb, ud) < 0) {
+			netlink_io_error(ctx, NULL, "Cannot parse userdata");
+			return NULL;
+		}
+		if (ud[NFTNL_UDATA_TABLE_COMMENT])
+			table->comment = xstrdup(nftnl_udata_get(ud[NFTNL_UDATA_TABLE_COMMENT]));
+	}
 
 	return table;
 }
@@ -648,6 +679,7 @@ void netlink_dump_set(const struct nftnl_set *nls, struct netlink_ctx *ctx)
 
 static int set_parse_udata_cb(const struct nftnl_udata *attr, void *data)
 {
+	unsigned char *value = nftnl_udata_get(attr);
 	const struct nftnl_udata **tb = data;
 	uint8_t type = nftnl_udata_type(attr);
 	uint8_t len = nftnl_udata_len(attr);
@@ -663,6 +695,10 @@ static int set_parse_udata_cb(const struct nftnl_udata *attr, void *data)
 	case NFTNL_UDATA_SET_KEY_TYPEOF:
 	case NFTNL_UDATA_SET_DATA_TYPEOF:
 		if (len < 3)
+			return -1;
+		break;
+	case NFTNL_UDATA_SET_COMMENT:
+		if (value[len - 1] != '\0')
 			return -1;
 		break;
 	default:
@@ -738,11 +774,11 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	enum byteorder databyteorder = BYTEORDER_INVALID;
 	const struct datatype *keytype, *datatype = NULL;
 	struct expr *typeof_expr_key, *typeof_expr_data;
+	const char *udata, *comment = NULL;
 	uint32_t flags, key, objtype = 0;
 	const struct datatype *dtype;
 	uint32_t data_interval = 0;
 	bool automerge = false;
-	const char *udata;
 	struct set *set;
 	uint32_t ulen;
 	uint32_t klen;
@@ -770,6 +806,8 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 		typeof_expr_key = set_make_key(ud[NFTNL_UDATA_SET_KEY_TYPEOF]);
 		if (ud[NFTNL_UDATA_SET_DATA_TYPEOF])
 			typeof_expr_data = set_make_key(ud[NFTNL_UDATA_SET_DATA_TYPEOF]);
+		if (ud[NFTNL_UDATA_SET_COMMENT])
+			comment = xstrdup(nftnl_udata_get(ud[NFTNL_UDATA_SET_COMMENT]));
 	}
 
 	key = nftnl_set_get_u32(nls, NFTNL_SET_KEY_TYPE);
@@ -806,6 +844,8 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	set->handle.table.name = xstrdup(nftnl_set_get_str(nls, NFTNL_SET_TABLE));
 	set->handle.set.name = xstrdup(nftnl_set_get_str(nls, NFTNL_SET_NAME));
 	set->automerge	   = automerge;
+	if (comment)
+		set->comment = comment;
 
 	if (nftnl_set_is_set(nls, NFTNL_SET_EXPR)) {
 		const struct nftnl_expr *nle;
@@ -1172,6 +1212,42 @@ static int list_setelem_cb(struct nftnl_set_elem *nlse, void *arg)
 	return netlink_delinearize_setelem(nlse, ctx->set, &ctx->nft->cache);
 }
 
+static int list_setelem_debug_cb(struct nftnl_set_elem *nlse, void *arg)
+{
+	int r;
+
+	r = list_setelem_cb(nlse, arg);
+	if (r == 0) {
+		struct netlink_ctx *ctx = arg;
+		FILE *fp = ctx->nft->output.output_fp;
+
+		fprintf(fp, "\t");
+		nftnl_set_elem_fprintf(fp, nlse, 0, 0);
+		fprintf(fp, "\n");
+	}
+
+	return r;
+}
+
+static int list_setelements(struct nftnl_set *s, struct netlink_ctx *ctx)
+{
+	FILE *fp = ctx->nft->output.output_fp;
+
+	if (fp && (ctx->nft->debug_mask & NFT_DEBUG_NETLINK)) {
+		const char *table, *name;
+		uint32_t family = nftnl_set_get_u32(s, NFTNL_SET_FAMILY);
+
+		table = nftnl_set_get_str(s, NFTNL_SET_TABLE);
+		name = nftnl_set_get_str(s, NFTNL_SET_NAME);
+
+		fprintf(fp, "%s %s @%s\n", family2str(family), table, name);
+
+		return nftnl_set_elem_foreach(s, list_setelem_debug_cb, ctx);
+	}
+
+	return nftnl_set_elem_foreach(s, list_setelem_cb, ctx);
+}
+
 int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
 			  struct set *set)
 {
@@ -1199,7 +1275,7 @@ int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
 
 	ctx->set = set;
 	set->init = set_expr_alloc(&internal_location, set);
-	nftnl_set_elem_foreach(nls, list_setelem_cb, ctx);
+	list_setelements(nls, ctx);
 
 	if (set->flags & NFT_SET_INTERVAL && set->desc.field_count > 1)
 		concat_range_aggregate(set->init);
@@ -1215,7 +1291,7 @@ int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
 }
 
 int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
-			const struct location *loc, struct table *table,
+			const struct location *loc, struct set *cache_set,
 			struct set *set, struct expr *init)
 {
 	struct nftnl_set *nls, *nls_out = NULL;
@@ -1243,12 +1319,12 @@ int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
 
 	ctx->set = set;
 	set->init = set_expr_alloc(loc, set);
-	nftnl_set_elem_foreach(nls_out, list_setelem_cb, ctx);
+	list_setelements(nls_out, ctx);
 
 	if (set->flags & NFT_SET_INTERVAL && set->desc.field_count > 1)
 		concat_range_aggregate(set->init);
 	else if (set->flags & NFT_SET_INTERVAL)
-		err = get_set_decompose(table, set);
+		err = get_set_decompose(cache_set, set);
 	else
 		list_expr_sort(&ctx->set->init->expressions);
 
@@ -1270,11 +1346,33 @@ void netlink_dump_obj(struct nftnl_obj *nln, struct netlink_ctx *ctx)
 	fprintf(fp, "\n");
 }
 
+static int obj_parse_udata_cb(const struct nftnl_udata *attr, void *data)
+{
+	unsigned char *value = nftnl_udata_get(attr);
+	uint8_t type = nftnl_udata_type(attr);
+	const struct nftnl_udata **tb = data;
+	uint8_t len = nftnl_udata_len(attr);
+
+	switch (type) {
+		case NFTNL_UDATA_OBJ_COMMENT:
+			if (value[len - 1] != '\0')
+				return -1;
+			break;
+		default:
+			return 0;
+	}
+	tb[type] = attr;
+	return 0;
+}
+
 struct obj *netlink_delinearize_obj(struct netlink_ctx *ctx,
 				    struct nftnl_obj *nlo)
 {
+	const struct nftnl_udata *ud[NFTNL_UDATA_OBJ_MAX + 1] = {};
+	const char *udata;
 	struct obj *obj;
 	uint32_t type;
+	uint32_t ulen;
 
 	obj = obj_alloc(&netlink_location);
 	obj->handle.family = nftnl_obj_get_u32(nlo, NFTNL_OBJ_FAMILY);
@@ -1284,6 +1382,15 @@ struct obj *netlink_delinearize_obj(struct netlink_ctx *ctx,
 		xstrdup(nftnl_obj_get_str(nlo, NFTNL_OBJ_NAME));
 	obj->handle.handle.id =
 		nftnl_obj_get_u64(nlo, NFTNL_OBJ_HANDLE);
+	if (nftnl_obj_is_set(nlo, NFTNL_OBJ_USERDATA)) {
+		udata = nftnl_obj_get_data(nlo, NFTNL_OBJ_USERDATA, &ulen);
+		if (nftnl_udata_parse(udata, ulen, obj_parse_udata_cb, ud) < 0) {
+			netlink_io_error(ctx, NULL, "Cannot parse userdata");
+			return NULL;
+		}
+		if (ud[NFTNL_UDATA_OBJ_COMMENT])
+			obj->comment = xstrdup(nftnl_udata_get(ud[NFTNL_UDATA_OBJ_COMMENT]));
+	}
 
 	type = nftnl_obj_get_u32(nlo, NFTNL_OBJ_TYPE);
 	switch (type) {

@@ -427,6 +427,8 @@ static struct expr *json_parse_socket_expr(struct json_ctx *ctx,
 		keyval = NFT_SOCKET_TRANSPARENT;
 	else if (!strcmp(key, "mark"))
 		keyval = NFT_SOCKET_MARK;
+	else if (!strcmp(key, "wildcard"))
+		keyval = NFT_SOCKET_WILDCARD;
 
 	if (keyval == -1) {
 		json_error(ctx, "Invalid socket key value.");
@@ -2159,7 +2161,9 @@ static struct stmt *json_parse_log_stmt(struct json_ctx *ctx,
 	stmt = log_stmt_alloc(int_loc);
 
 	if (!json_unpack(value, "{s:s}", "prefix", &tmpstr)) {
-		stmt->log.prefix = xstrdup(tmpstr);
+		stmt->log.prefix = constant_expr_alloc(int_loc, &string_type,
+						       BYTEORDER_HOST_ENDIAN,
+						       (strlen(tmpstr) + 1) * BITS_PER_BYTE, tmpstr);
 		stmt->log.flags |= STMT_LOG_PREFIX;
 	}
 	if (!json_unpack(value, "{s:i}", "group", &tmp)) {

@@ -121,6 +121,17 @@ static struct expr *handle_concat_expr(const struct location *loc,
 	return expr;
 }
 
+static bool already_set(const void *attr, const struct location *loc,
+			struct parser_state *state)
+{
+	if (!attr)
+		return false;
+
+	erec_queue(error(loc, "You can only specify this once. This statement is duplicated."),
+		   state->msgs);
+	return true;
+}
+
 #define YYLLOC_DEFAULT(Current, Rhs, N)	location_update(&Current, Rhs, N)
 
 #define symbol_value(loc, str) \
@@ -213,6 +224,7 @@ int nft_lex(void *, void *, void *);
 
 %token SOCKET			"socket"
 %token TRANSPARENT		"transparent"
+%token WILDCARD			"wildcard"
 
 %token TPROXY			"tproxy"
 
@@ -594,8 +606,8 @@ int nft_lex(void *, void *, void *);
 
 %type <table>			table_block_alloc table_block
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
-%type <chain>			chain_block_alloc chain_block
-%destructor { close_scope(state); chain_free($$); }	chain_block_alloc
+%type <chain>			chain_block_alloc chain_block subchain_block
+%destructor { close_scope(state); chain_free($$); }	chain_block_alloc subchain_block
 %type <rule>			rule rule_alloc
 %destructor { rule_free($$); }	rule
 
@@ -642,7 +654,9 @@ int nft_lex(void *, void *, void *);
 %destructor { stmt_free($$); }	tproxy_stmt
 %type <stmt>			synproxy_stmt synproxy_stmt_alloc
 %destructor { stmt_free($$); }	synproxy_stmt synproxy_stmt_alloc
-
+%type <stmt>			chain_stmt
+%destructor { stmt_free($$); }	chain_stmt
+%type <val>			chain_stmt_type
 
 %type <stmt>			queue_stmt queue_stmt_alloc
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
@@ -860,6 +874,7 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 				if (symbol_lookup(scope, $2) != NULL) {
 					erec_queue(error(&@2, "redefinition of symbol '%s'", $2),
 						   state->msgs);
+					expr_free($4);
 					xfree($2);
 					YYERROR;
 				}
@@ -1002,7 +1017,15 @@ add_cmd			:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_COUNTER, &$2, &@$, $3);
 			}
+			|	COUNTER		obj_spec	counter_obj	'{' counter_block '}'
+			{
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_COUNTER, &$2, &@$, $3);
+			}
 			|	QUOTA		obj_spec	quota_obj	quota_config
+			{
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_QUOTA, &$2, &@$, $3);
+			}
+			|	QUOTA		obj_spec	quota_obj	'{' quota_block	'}'
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_QUOTA, &$2, &@$, $3);
 			}
@@ -1022,11 +1045,23 @@ add_cmd			:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_LIMIT, &$2, &@$, $3);
 			}
+			|	LIMIT		obj_spec	limit_obj	'{' limit_block '}'
+			{
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_LIMIT, &$2, &@$, $3);
+			}
 			|	SECMARK		obj_spec	secmark_obj	secmark_config
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SECMARK, &$2, &@$, $3);
 			}
+			|	SECMARK		obj_spec	secmark_obj	'{' secmark_block '}'
+			{
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SECMARK, &$2, &@$, $3);
+			}
 			|	SYNPROXY	obj_spec	synproxy_obj	synproxy_config
+			{
+				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SYNPROXY, &$2, &@$, $3);
+			}
+			|	SYNPROXY	obj_spec	synproxy_obj	'{' synproxy_block '}'
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SYNPROXY, &$2, &@$, $3);
 			}
@@ -1530,6 +1565,14 @@ table_options		:	FLAGS		STRING
 					YYERROR;
 				}
 			}
+			|	comment_spec
+			{
+				if (already_set($<table>0->comment, &@$, state)) {
+					xfree($1);
+					YYERROR;
+				}
+				$<table>0->comment = $1;
+			}
 			;
 
 table_block		:	/* empty */	{ $$ = $<table>-1; }
@@ -1680,6 +1723,23 @@ chain_block		:	/* empty */	{ $$ = $<chain>-1; }
 				list_add_tail(&$2->list, &$1->rules);
 				$$ = $1;
 			}
+			|	chain_block	comment_spec	stmt_separator
+			{
+				if (already_set($1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$1->comment = $2;
+			}
+			;
+
+subchain_block		:	/* empty */	{ $$ = $<chain>-1; }
+			|	subchain_block	stmt_separator
+			|	subchain_block	rule stmt_separator
+			{
+				list_add_tail(&$2->list, &$1->rules);
+				$$ = $1;
+			}
 			;
 
 typeof_expr		:	primary_expr
@@ -1756,6 +1816,15 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				$$ = $1;
 			}
 			|	set_block	set_mechanism	stmt_separator
+			|	set_block	comment_spec	stmt_separator
+			{
+				if (already_set($1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$1->comment = $2;
+				$$ = $1;
+			}
 			;
 
 set_block_expr		:	set_expr
@@ -1879,6 +1948,15 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->init = $4;
 				$$ = $1;
 			}
+			|	map_block	comment_spec	stmt_separator
+			{
+				if (already_set($1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$1->comment = $2;
+				$$ = $1;
+			}
 			|	map_block	set_mechanism	stmt_separator
 			;
 
@@ -1934,6 +2012,11 @@ flowtable_expr		:	'{'	flowtable_list_expr	'}'
 				$2->location = @$;
 				$$ = $2;
 			}
+			|	variable_expr
+			{
+				$1->location = @$;
+				$$ = $1;
+			}
 			;
 
 flowtable_list_expr	:	flowtable_expr_member
@@ -1955,6 +2038,11 @@ flowtable_expr_member	:	STRING
 							 BYTEORDER_HOST_ENDIAN,
 							 strlen($1) * BITS_PER_BYTE, $1);
 				xfree($1);
+			}
+			|	variable_expr
+			{
+				datatype_set($1->sym->expr, &ifname_type);
+				$$ = $1;
 			}
 			;
 
@@ -2002,6 +2090,14 @@ counter_block		:	/* empty */	{ $$ = $<obj>-1; }
 			{
 				$$ = $1;
 			}
+			|	counter_block	  comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
+			}
 			;
 
 quota_block		:	/* empty */	{ $$ = $<obj>-1; }
@@ -2011,6 +2107,14 @@ quota_block		:	/* empty */	{ $$ = $<obj>-1; }
 			{
 				$$ = $1;
 			}
+			|	quota_block	comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
+			}
 			;
 
 ct_helper_block		:	/* empty */	{ $$ = $<obj>-1; }
@@ -2019,6 +2123,14 @@ ct_helper_block		:	/* empty */	{ $$ = $<obj>-1; }
 			|       ct_helper_block     ct_helper_config
 			{
 				$$ = $1;
+			}
+			|       ct_helper_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
 			}
 			;
 
@@ -2033,6 +2145,14 @@ ct_timeout_block	:	/*empty */
 			{
 				$$ = $1;
 			}
+			|       ct_timeout_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
+			}
 			;
 
 ct_expect_block		:	/*empty */	{ $$ = $<obj>-1; }
@@ -2041,6 +2161,14 @@ ct_expect_block		:	/*empty */	{ $$ = $<obj>-1; }
 			|	ct_expect_block     ct_expect_config
 			{
 				$$ = $1;
+			}
+			|       ct_expect_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
 			}
 			;
 
@@ -2051,6 +2179,14 @@ limit_block		:	/* empty */	{ $$ = $<obj>-1; }
 			{
 				$$ = $1;
 			}
+			|       limit_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
+			}
 			;
 
 secmark_block		:	/* empty */	{ $$ = $<obj>-1; }
@@ -2060,6 +2196,14 @@ secmark_block		:	/* empty */	{ $$ = $<obj>-1; }
 			{
 				$$ = $1;
 			}
+			|       secmark_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
+			}
 			;
 
 synproxy_block		:	/* empty */	{ $$ = $<obj>-1; }
@@ -2068,6 +2212,14 @@ synproxy_block		:	/* empty */	{ $$ = $<obj>-1; }
 			|	synproxy_block	synproxy_config
 			{
 				$$ = $1;
+			}
+			|       synproxy_block     comment_spec
+			{
+				if (already_set($<obj>1->comment, &@2, state)) {
+					xfree($2);
+					YYERROR;
+				}
+				$<obj>1->comment = $2;
 			}
 			;
 
@@ -2136,7 +2288,6 @@ extended_prio_spec	:	int_num
 			{
 				struct prio_spec spec = {0};
 
-				datatype_set($1->sym->expr, &priority_type);
 				spec.expr = $1;
 				$$ = spec;
 			}
@@ -2194,6 +2345,12 @@ dev_spec		:	DEVICE	string
 				$$ = compound_expr_alloc(&@$, EXPR_LIST);
 				compound_expr_add($$, expr);
 
+			}
+			|	DEVICE	variable_expr
+			{
+				datatype_set($2->sym->expr, &ifname_type);
+				$$ = compound_expr_alloc(&@$, EXPR_LIST);
+				compound_expr_add($$, $2);
 			}
 			|	DEVICES		'='	flowtable_expr
 			{
@@ -2527,6 +2684,20 @@ stmt			:	verdict_stmt
 			|	set_stmt
 			|	map_stmt
 			|	synproxy_stmt
+			|	chain_stmt
+			;
+
+chain_stmt_type		:	JUMP	{ $$ = NFT_JUMP; }
+			|	GOTO	{ $$ = NFT_GOTO; }
+			;
+
+chain_stmt		:	chain_stmt_type	chain_block_alloc '{'	subchain_block	'}'
+			{
+				$2->location = @2;
+				close_scope(state);
+				$4->location = @4;
+				$$ = chain_stmt_alloc(&@$, $4, $1);
+			}
 			;
 
 verdict_stmt		:	verdict_expr
@@ -2636,7 +2807,127 @@ log_args		:	log_arg
 
 log_arg			:	PREFIX			string
 			{
-				$<stmt>0->log.prefix	 = $2;
+				struct scope *scope = current_scope(state);
+				bool done = false, another_var = false;
+				char *start, *end, scratch = '\0';
+				struct expr *expr, *item;
+				struct symbol *sym;
+				enum {
+					PARSE_TEXT,
+					PARSE_VAR,
+				} prefix_state;
+
+				/* No variables in log prefix, skip. */
+				if (!strchr($2, '$')) {
+					expr = constant_expr_alloc(&@$, &string_type,
+								   BYTEORDER_HOST_ENDIAN,
+								   (strlen($2) + 1) * BITS_PER_BYTE, $2);
+					xfree($2);
+					$<stmt>0->log.prefix = expr;
+					$<stmt>0->log.flags |= STMT_LOG_PREFIX;
+					break;
+				}
+
+				/* Parse variables in log prefix string using a
+				 * state machine parser with two states. This
+				 * parser creates list of expressions composed
+				 * of constant and variable expressions.
+				 */
+				expr = compound_expr_alloc(&@$, EXPR_LIST);
+
+				start = (char *)$2;
+
+				if (*start != '$') {
+					prefix_state = PARSE_TEXT;
+				} else {
+					prefix_state = PARSE_VAR;
+					start++;
+				}
+				end = start;
+
+				/* Not nice, but works. */
+				while (!done) {
+					switch (prefix_state) {
+					case PARSE_TEXT:
+						while (*end != '\0' && *end != '$')
+							end++;
+
+						if (*end == '\0')
+							done = true;
+
+						*end = '\0';
+						item = constant_expr_alloc(&@$, &string_type,
+									   BYTEORDER_HOST_ENDIAN,
+									   (strlen(start) + 1) * BITS_PER_BYTE,
+									   start);
+						compound_expr_add(expr, item);
+
+						if (done)
+							break;
+
+						start = end + 1;
+						end = start;
+
+						/* fall through */
+					case PARSE_VAR:
+						while (isalnum(*end) || *end == '_')
+							end++;
+
+						if (*end == '\0')
+							done = true;
+						else if (*end == '$')
+							another_var = true;
+						else
+							scratch = *end;
+
+						*end = '\0';
+
+						sym = symbol_get(scope, start);
+						if (!sym) {
+							sym = symbol_lookup_fuzzy(scope, start);
+							if (sym) {
+								erec_queue(error(&@2, "unknown identifier '%s'; "
+										 "did you mean identifier ‘%s’?",
+										 start, sym->identifier),
+									   state->msgs);
+							} else {
+								erec_queue(error(&@2, "unknown identifier '%s'",
+										 start),
+									   state->msgs);
+							}
+							expr_free(expr);
+							xfree($2);
+							YYERROR;
+						}
+						item = variable_expr_alloc(&@$, scope, sym);
+						compound_expr_add(expr, item);
+
+						if (done)
+							break;
+
+						/* Restore original byte after
+						 * symbol lookup.
+						 */
+						if (scratch) {
+							*end = scratch;
+							scratch = '\0';
+						}
+
+						start = end;
+						if (another_var) {
+							another_var = false;
+							start++;
+							prefix_state = PARSE_VAR;
+						} else {
+							prefix_state = PARSE_TEXT;
+						}
+						end = start;
+						break;
+					}
+				}
+
+				xfree($2);
+				$<stmt>0->log.prefix	 = expr;
 				$<stmt>0->log.flags 	|= STMT_LOG_PREFIX;
 			}
 			|	GROUP			NUM
@@ -3772,6 +4063,10 @@ set_elem_option		:	TIMEOUT			time_spec
 			}
 			|	comment_spec
 			{
+				if (already_set($<expr>0->comment, &@1, state)) {
+					xfree($1);
+					YYERROR;
+				}
 				$<expr>0->comment = $1;
 			}
 			;
@@ -3806,6 +4101,10 @@ set_elem_expr_option	:	TIMEOUT			time_spec
 			}
 			|	comment_spec
 			{
+				if (already_set($<expr>0->comment, &@1, state)) {
+					xfree($1);
+					YYERROR;
+				}
 				$<expr>0->comment = $1;
 			}
 			;
@@ -3820,6 +4119,16 @@ set_rhs_expr		:	concat_rhs_expr
 
 initializer_expr	:	rhs_expr
 			|	list_rhs_expr
+			|	'{' '}'		{ $$ = compound_expr_alloc(&@$, EXPR_SET); }
+			|	DASH	NUM
+			{
+				int32_t num = -$2;
+
+				$$ = constant_expr_alloc(&@$, &integer_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(num) * BITS_PER_BYTE,
+							 &num);
+			}
 			;
 
 counter_config		:	PACKETS		NUM	BYTES	NUM
@@ -4410,6 +4719,7 @@ socket_expr		:	SOCKET	socket_key
 
 socket_key 		: 	TRANSPARENT	{ $$ = NFT_SOCKET_TRANSPARENT; }
 			|	MARK		{ $$ = NFT_SOCKET_MARK; }
+			|	WILDCARD	{ $$ = NFT_SOCKET_WILDCARD; }
 			;
 
 offset_opt		:	/* empty */	{ $$ = 0; }

@@ -193,10 +193,67 @@ void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 		      const struct location *loc,
 		      const struct proto_desc *desc)
 {
+	bool found = false;
+	unsigned int i;
+
+	switch (base) {
+	case PROTO_BASE_LL_HDR:
+	case PROTO_BASE_NETWORK_HDR:
+		break;
+	case PROTO_BASE_TRANSPORT_HDR:
+		if (ctx->protocol[base].num_protos >= PROTO_CTX_NUM_PROTOS)
+			break;
+
+		for (i = 0; i < ctx->protocol[base].num_protos; i++) {
+			if (ctx->protocol[base].protos[i].desc == desc) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			i = ctx->protocol[base].num_protos++;
+			ctx->protocol[base].protos[i].desc = desc;
+			ctx->protocol[base].protos[i].location = *loc;
+		}
+		break;
+	default:
+		BUG("unknown protocol base %d", base);
+	}
+
 	ctx->protocol[base].location	= *loc;
 	ctx->protocol[base].desc	= desc;
 
 	proto_ctx_debug(ctx, base, ctx->debug_mask);
+}
+
+bool proto_ctx_is_ambiguous(struct proto_ctx *ctx, enum proto_bases base)
+{
+	return ctx->protocol[base].num_protos > 1;
+}
+
+const struct proto_desc *proto_ctx_find_conflict(struct proto_ctx *ctx,
+						 enum proto_bases base,
+						 const struct proto_desc *desc)
+{
+	unsigned int i;
+
+	switch (base) {
+	case PROTO_BASE_LL_HDR:
+	case PROTO_BASE_NETWORK_HDR:
+		if (desc != ctx->protocol[base].desc)
+			return ctx->protocol[base].desc;
+		break;
+	case PROTO_BASE_TRANSPORT_HDR:
+		for (i = 0; i < ctx->protocol[base].num_protos; i++) {
+			if (desc != ctx->protocol[base].protos[i].desc)
+				return ctx->protocol[base].protos[i].desc;
+		}
+		break;
+	default:
+		BUG("unknown protocol base %d", base);
+	}
+
+	return NULL;
 }
 
 #define HDR_TEMPLATE(__name, __dtype, __type, __member)			\
@@ -349,6 +406,7 @@ const struct proto_desc proto_icmp = {
 	.id		= PROTO_DESC_ICMP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
 	.checksum_key	= ICMPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[ICMPHDR_TYPE]		= ICMPHDR_TYPE("type", &icmp_type_type, type),
 		[ICMPHDR_CODE]		= ICMPHDR_TYPE("code", &icmp_code_type, code),
@@ -402,6 +460,7 @@ const struct proto_desc proto_igmp = {
 	.id		= PROTO_DESC_IGMP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
 	.checksum_key	= IGMPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[IGMPHDR_TYPE]		= IGMPHDR_TYPE("type", &igmp_type_type, igmp_type),
 		[IGMPHDR_MRT]		= IGMPHDR_FIELD("mrt", igmp_code),
@@ -423,6 +482,7 @@ const struct proto_desc proto_udp = {
 	.id		= PROTO_DESC_UDP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
 	.checksum_key	= UDPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[UDPHDR_SPORT]		= INET_SERVICE("sport", struct udphdr, source),
 		[UDPHDR_DPORT]		= INET_SERVICE("dport", struct udphdr, dest),
@@ -482,6 +542,7 @@ const struct proto_desc proto_tcp = {
 	.id		= PROTO_DESC_TCP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
 	.checksum_key	= TCPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[TCPHDR_SPORT]		= INET_SERVICE("sport", struct tcphdr, source),
 		[TCPHDR_DPORT]		= INET_SERVICE("dport", struct tcphdr, dest),
@@ -563,6 +624,8 @@ const struct proto_desc proto_sctp = {
 	.name		= "sctp",
 	.id		= PROTO_DESC_SCTP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.checksum_key	= SCTPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_SCTP,
 	.templates	= {
 		[SCTPHDR_SPORT]		= INET_SERVICE("sport", struct sctphdr, source),
 		[SCTPHDR_DPORT]		= INET_SERVICE("dport", struct sctphdr, dest),
@@ -662,6 +725,7 @@ const struct proto_desc proto_ip = {
 	.id		= PROTO_DESC_IP,
 	.base		= PROTO_BASE_NETWORK_HDR,
 	.checksum_key	= IPHDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.protocols	= {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
 		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
@@ -759,6 +823,7 @@ const struct proto_desc proto_icmp6 = {
 	.id		= PROTO_DESC_ICMPV6,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
 	.checksum_key	= ICMP6HDR_CHECKSUM,
+	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[ICMP6HDR_TYPE]		= ICMP6HDR_TYPE("type", &icmp6_type_type, icmp6_type),
 		[ICMP6HDR_CODE]		= ICMP6HDR_TYPE("code", &icmpv6_code_type, icmp6_code),

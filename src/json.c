@@ -62,7 +62,7 @@ static json_t *set_dtype_json(const struct expr *key)
 
 	tok = strtok(namedup, " .");
 	while (tok) {
-		json_t *jtok = json_string(xstrdup(tok));
+		json_t *jtok = json_string(tok);
 		if (!root)
 			root = jtok;
 		else if (json_is_string(root))
@@ -98,6 +98,9 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 			"table", set->handle.table.name,
 			"type", set_dtype_json(set->key),
 			"handle", set->handle.handle.id);
+
+	if (set->comment)
+		json_object_set_new(root, "comment", json_string(set->comment));
 	if (datatype_ext)
 		json_object_set_new(root, "map", json_string(datatype_ext));
 
@@ -137,7 +140,7 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 		json_object_set_new(root, "gc-interval", tmp);
 	}
 
-	if (set->init && set->init->size > 0) {
+	if (!nft_output_terse(octx) && set->init && set->init->size > 0) {
 		json_t *array = json_array();
 		const struct expr *i;
 
@@ -586,7 +589,7 @@ json_t *set_elem_expr_json(const struct expr *expr, struct output_ctx *octx)
 		return NULL;
 
 	/* these element attributes require formal set elem syntax */
-	if (expr->timeout || expr->expiration || expr->comment) {
+	if (expr->timeout || expr->expiration || expr->comment || expr->stmt) {
 		root = json_pack("{s:o}", "val", root);
 
 		if (expr->timeout) {
@@ -600,6 +603,12 @@ json_t *set_elem_expr_json(const struct expr *expr, struct output_ctx *octx)
 		if (expr->comment) {
 			tmp = json_string(expr->comment);
 			json_object_set_new(root, "comment", tmp);
+		}
+		if (expr->stmt) {
+			tmp = stmt_print_json(expr->stmt, octx);
+			/* XXX: detect and complain about clashes? */
+			json_object_update_missing(root, tmp);
+			json_decref(tmp);
 		}
 		return json_pack("{s:o}", "elem", root);
 	}
@@ -1224,9 +1233,12 @@ json_t *log_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 {
 	json_t *root = json_object(), *flags;
 
-	if (stmt->log.flags & STMT_LOG_PREFIX)
-		json_object_set_new(root, "prefix",
-				    json_string(stmt->log.prefix));
+	if (stmt->log.flags & STMT_LOG_PREFIX) {
+		char prefix[NF_LOG_PREFIXLEN] = {};
+
+		expr_to_string(stmt->log.prefix, prefix);
+		json_object_set_new(root, "prefix", json_string(prefix));
+	}
 	if (stmt->log.flags & STMT_LOG_GROUP)
 		json_object_set_new(root, "group",
 				    json_integer(stmt->log.group));
@@ -1565,7 +1577,7 @@ static json_t *table_print_json_full(struct netlink_ctx *ctx,
 static json_t *do_list_ruleset_json(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	unsigned int family = cmd->handle.family;
-	json_t *root = json_array();
+	json_t *root = json_array(), *tmp;
 	struct table *table;
 
 	list_for_each_entry(table, &ctx->nft->cache.list, list) {
@@ -1573,7 +1585,9 @@ static json_t *do_list_ruleset_json(struct netlink_ctx *ctx, struct cmd *cmd)
 		    table->handle.family != family)
 			continue;
 
-		json_array_extend(root, table_print_json_full(ctx, table));
+		tmp = table_print_json_full(ctx, table);
+		json_array_extend(root, tmp);
+		json_decref(tmp);
 	}
 
 	return root;

@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 06/15/2020
+.\"      Date: 10/27/2020
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "06/15/2020" "\ \&" "\ \&"
+.TH "NFT" "8" "10/27/2020" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -41,7 +41,9 @@ nft \- Administration tool of the nftables framework for packet filtering and cl
 nft is the command line tool used to set up, maintain and inspect packet filtering and classification rules in the Linux kernel, in the nftables framework\&. The Linux kernel subsystem is known as nf_tables, and \(oqnf\(cq stands for Netfilter\&.
 .SH "OPTIONS"
 .sp
-For a full summary of options, run \fBnft \-\-help\fR\&.
+The command accepts several different options which are documented here in groups for better understanding of their meaning\&. You can get information about options by running \fBnft \-\-help\fR\&.
+.PP
+\fBGeneral options:\fR
 .PP
 \fB\-h\fR, \fB\-\-help\fR
 .RS 4
@@ -53,39 +55,31 @@ Show help message and all options\&.
 Show version\&.
 .RE
 .PP
-\fB\-n\fR, \fB\-\-numeric\fR
+\fB\-V\fR
 .RS 4
-Print fully numerical output\&.
+Show long version information, including compile\-time configuration\&.
 .RE
 .PP
-\fB\-s\fR, \fB\-\-stateless\fR
+\fBRuleset input handling options that specify to how to load rulesets:\fR
+.PP
+\fB\-f\fR, \fB\-\-file \fR\fB\fIfilename\fR\fR
 .RS 4
-Omit stateful information of rules and stateful objects\&.
+Read input from
+\fIfilename\fR\&. If
+\fIfilename\fR
+is \-, read from stdin\&.
 .RE
 .PP
-\fB\-N\fR, \fB\-\-reversedns\fR
+\fB\-i\fR, \fB\-\-interactive\fR
 .RS 4
-Translate IP address to names via reverse DNS lookup\&. This may slow down your listing since it generates network traffic\&.
+Read input from an interactive readline CLI\&. You can use quit to exit, or use the EOF marker, normally this is CTRL\-D\&.
 .RE
 .PP
-\fB\-S\fR, \fB\-\-service\fR
+\fB\-I\fR, \fB\-\-includepath directory\fR
 .RS 4
-Translate ports to service names as defined by /etc/services\&.
-.RE
-.PP
-\fB\-u\fR, \fB\-\-guid\fR
-.RS 4
-Translate numeric UID/GID to names as defined by /etc/passwd and /etc/group\&.
-.RE
-.PP
-\fB\-p\fR, \fB\-\-numeric\-protocol\fR
-.RS 4
-Display layer 4 protocol numerically\&.
-.RE
-.PP
-\fB\-y\fR, \fB\-\-numeric\-priority\fR
-.RS 4
-Display base chain priority numerically\&.
+Add the directory
+\fIdirectory\fR
+to the list of directories to be searched for included files\&. This option may be specified multiple times\&.
 .RE
 .PP
 \fB\-c\fR, \fB\-\-check\fR
@@ -93,10 +87,59 @@ Display base chain priority numerically\&.
 Check commands validity without actually applying the changes\&.
 .RE
 .PP
+\fBRuleset list output formatting that modify the output of the list ruleset command:\fR
+.PP
 \fB\-a\fR, \fB\-\-handle\fR
 .RS 4
 Show object handles in output\&.
 .RE
+.PP
+\fB\-s\fR, \fB\-\-stateless\fR
+.RS 4
+Omit stateful information of rules and stateful objects\&.
+.RE
+.PP
+\fB\-t\fR, \fB\-\-terse\fR
+.RS 4
+Omit contents of sets from output\&.
+.RE
+.PP
+\fB\-S\fR, \fB\-\-service\fR
+.RS 4
+Translate ports to service names as defined by /etc/services\&.
+.RE
+.PP
+\fB\-N\fR, \fB\-\-reversedns\fR
+.RS 4
+Translate IP address to names via reverse DNS lookup\&. This may slow down your listing since it generates network traffic\&.
+.RE
+.PP
+\fB\-u\fR, \fB\-\-guid\fR
+.RS 4
+Translate numeric UID/GID to names as defined by /etc/passwd and /etc/group\&.
+.RE
+.PP
+\fB\-n\fR, \fB\-\-numeric\fR
+.RS 4
+Print fully numerical output\&.
+.RE
+.PP
+\fB\-y\fR, \fB\-\-numeric\-priority\fR
+.RS 4
+Display base chain priority numerically\&.
+.RE
+.PP
+\fB\-p\fR, \fB\-\-numeric\-protocol\fR
+.RS 4
+Display layer 4 protocol numerically\&.
+.RE
+.PP
+\fB\-T\fR, \fB\-\-numeric\-time\fR
+.RS 4
+Show time, day and hour values in numeric format\&.
+.RE
+.PP
+\fBCommand output formatting:\fR
 .PP
 \fB\-e\fR, \fB\-\-echo\fR
 .RS 4
@@ -114,34 +157,20 @@ commands, print notifications just like
 Format output in JSON\&. See libnftables\-json(5) for a schema description\&.
 .RE
 .PP
-\fB\-I\fR, \fB\-\-includepath directory\fR
+\fB\-d\fR, \fB\-\-debug\fR \fIlevel\fR
 .RS 4
-Add the directory
-\fIdirectory\fR
-to the list of directories to be searched for included files\&. This option may be specified multiple times\&.
-.RE
-.PP
-\fB\-f\fR, \fB\-\-file \fR\fB\fIfilename\fR\fR
-.RS 4
-Read input from
-\fIfilename\fR\&. If
-\fIfilename\fR
-is \-, read from stdin\&.
-.RE
-.PP
-\fB\-i\fR, \fB\-\-interactive\fR
-.RS 4
-Read input from an interactive readline CLI\&. You can use quit to exit, or use the EOF marker, normally this is CTRL\-D\&.
-.RE
-.PP
-\fB\-T\fR, \fB\-\-numeric\-time\fR
-.RS 4
-Show time, day and hour values in numeric format\&.
-.RE
-.PP
-\fB\-t\fR, \fB\-\-terse\fR
-.RS 4
-Omit contents of sets from output\&.
+Enable debugging output\&. The debug level can be any of
+\fBscanner\fR,
+\fBparser\fR,
+\fBeval\fR,
+\fBnetlink\fR,
+\fBmnl\fR,
+\fBproto\-ctx\fR,
+\fBsegtree\fR,
+\fBall\fR\&. You can combine more than one by separating by the
+\fI,\fR
+symbol, for example
+\fI\-d eval,mnl\fR\&.
 .RE
 .SH "INPUT FILE FORMATS"
 .SS "LEXICAL CONVENTIONS"
@@ -278,6 +307,7 @@ lt lt
 lt lt
 lt lt
 lt lt
+lt lt
 lt lt.
 T{
 .sp
@@ -313,6 +343,13 @@ postrouting
 T}:T{
 .sp
 All packets leaving the system are processed by the postrouting hook\&.
+T}
+T{
+.sp
+ingress
+T}:T{
+.sp
+All packets entering the system are processed by this hook\&. It is invoked before layer 3 protocol handlers, hence before the prerouting hook, and it can be used for filtering and policing\&. Ingress is only available for Inet family (since Linux kernel 5\&.10)\&.
 T}
 .TE
 .sp 1
@@ -359,7 +396,7 @@ The bridge address family handles Ethernet packets traversing bridge devices\&.
 The list of supported hooks is identical to IPv4/IPv6/Inet address families above\&.
 .SS "NETDEV ADDRESS FAMILY"
 .sp
-The Netdev address family handles packets from ingress\&.
+The Netdev address family handles packets from the device ingress path\&. This family allows you to filter packets of any ethertype such as ARP, VLAN 802\&.1q, VLAN 802\&.1ad (Q\-in\-Q) as well as IPv4 and IPv6 packets\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -381,7 +418,7 @@ T{
 ingress
 T}:T{
 .sp
-All packets entering the system are processed by this hook\&. It is invoked before layer 3 protocol handlers and it can be used for early filtering and policing\&.
+All packets entering the system are processed by this hook\&. It is invoked after the network taps (ie\&. \fBtcpdump\fR), right after \fBtc\fR ingress and before layer 3 protocol handlers, it can be used for early filtering and policing\&.
 T}
 .TE
 .sp 1
@@ -663,7 +700,7 @@ T}
 .TE
 .sp 1
 .sp
-Apart from the special cases illustrated above (e\&.g\&. \fBnat\fR type not supporting \fBforward\fR hook or \fBroute\fR type only supporting \fBoutput\fR hook), there are two further quirks worth noticing:
+Apart from the special cases illustrated above (e\&.g\&. \fBnat\fR type not supporting \fBforward\fR hook or \fBroute\fR type only supporting \fBoutput\fR hook), there are three further quirks worth noticing:
 .sp
 .RS 4
 .ie n \{\
@@ -696,6 +733,29 @@ and
 \fBoutput\fR
 hooks, both in chains of type
 \fBfilter\fR\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+The inet family also supports the
+\fBingress\fR
+hook (since Linux kernel 5\&.10), to filter IPv4 and IPv6 packet at the same location as the netdev
+\fBingress\fR
+hook\&. This inet hook allows you to share sets and maps between the usual
+\fBprerouting\fR,
+\fBinput\fR,
+\fBforward\fR,
+\fBoutput\fR,
+\fBpostrouting\fR
+and this
+\fBingress\fR
+hook\&.
 .RE
 .sp
 The \fBpriority\fR parameter accepts a signed integer value or a standard priority name which specifies the order in which chains with same \fBhook\fR value are traversed\&. The ordering is ascending, i\&.e\&. lower priority values have precedence over higher ones\&.
@@ -3760,7 +3820,7 @@ T{
 ipsec
 T}:T{
 .sp
-boolean
+true if packet was ipsec encrypted
 T}:T{
 .sp
 boolean (1 bit)
@@ -3903,7 +3963,7 @@ T{
 ifkind
 T}:T{
 .sp
-Interface kind (16 byte string)\&. Does not have to exist\&.
+Interface kind (16 byte string)\&. See TYPES in ip\-link(8) for a list\&.
 T}
 T{
 .sp
@@ -3937,11 +3997,12 @@ T}
 .nf
 # qualified meta expression
 filter output meta oif eth0
+filter forward meta iifkind { "tun", "veth" }
 
 # unqualified meta expression
 filter output oif eth0
 
-# packet was subject to ipsec processing
+# incoming packet was subject to ipsec processing
 raw prerouting meta ipsec exists accept
 .fi
 .if n \{\
@@ -3954,7 +4015,7 @@ raw prerouting meta ipsec exists accept
 .RS 4
 .\}
 .nf
-\fBsocket\fR {\fBtransparent\fR | \fBmark\fR}
+\fBsocket\fR {\fBtransparent\fR | \fBmark\fR | \fBwildcard\fR}
 .fi
 .if n \{\
 .RE
@@ -3979,6 +4040,7 @@ Type
 T}
 .T&
 lt lt lt
+lt lt lt
 lt lt lt.
 T{
 .sp
@@ -4000,6 +4062,16 @@ T}:T{
 .sp
 mark
 T}
+T{
+.sp
+wildcard
+T}:T{
+.sp
+Indicates whether the socket is wildcard\-bound (e\&.g\&. 0\&.0\&.0\&.0 or ::0)\&.
+T}:T{
+.sp
+boolean (1 bit)
+T}
 .TE
 .sp 1
 .PP
@@ -4009,11 +4081,13 @@ T}
 .RS 4
 .\}
 .nf
-# Mark packets that correspond to a transparent socket
+# Mark packets that correspond to a transparent socket\&. "socket wildcard 0"
+# means that zero\-bound listener sockets are NOT matched (which is usually
+# exactly what you want)\&.
 table inet x {
     chain y {
         type filter hook prerouting priority \-150; policy accept;
-        socket transparent 1 mark set 0x00000001 accept
+        socket transparent 1 socket wildcard 0 mark set 0x00000001 accept
     }
 }
 
@@ -4338,13 +4412,15 @@ T}
 .nf
 # IP family independent rt expression
 filter output rt classid 10
-filter output rt ipsec missing
 
 # IP family dependent rt expressions
 ip filter output rt nexthop 192\&.168\&.0\&.1
 ip6 filter output rt nexthop fd00::1
 inet filter output rt ip nexthop 192\&.168\&.0\&.1
 inet filter output rt ip6 nexthop fd00::1
+
+# outgoing packet will be encapsulated/encrypted by ipsec
+filter output rt ipsec exists
 .fi
 .if n \{\
 .RE
@@ -6427,6 +6503,8 @@ There are three types of conntrack expressions\&. Some conntrack expressions req
 .RE
 .\}
 .sp
+The conntrack\-specific types in this table are described in the sub\-section CONNTRACK TYPES above\&.
+.sp
 .it 1 an-trap
 .nr an-no-space-flag 1
 .nr an-break-flag 1
@@ -6443,6 +6521,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -6636,15 +6715,23 @@ T{
 count
 T}:T{
 .sp
-count number of connections integer (32 bit)
+number of current connections
 T}:T{
 .sp
+integer (32 bit)
+T}
+T{
+.sp
 id
+T}:T{
+.sp
+Connection id
+T}:T{
+.sp
+ct_id
 T}
 .TE
 .sp 1
-.sp
-A description of conntrack\-specific types listed above can be found sub\-section CONNTRACK TYPES above\&.
 .PP
 \fBrestrict the number of parallel connections to a server\fR. 
 .sp
@@ -6652,7 +6739,8 @@ A description of conntrack\-specific types listed above can be found sub\-sectio
 .RS 4
 .\}
 .nf
-filter input tcp dport 22 meter test { ip saddr ct count over 2 } reject
+nft add set filter ssh_flood \*(Aq{ type ipv4_addr; flags dynamic; }\*(Aq
+nft add rule filter input tcp dport 22 add @ssh_flood \*(Aq{ ip saddr ct count over 2 }\*(Aq reject
 .fi
 .if n \{\
 .RE
@@ -7108,6 +7196,8 @@ The conntrack statement can be used to set the conntrack mark and conntrack labe
 .sp
 The ct statement sets meta data associated with a connection\&. The zone id has to be assigned before a conntrack lookup takes place, i\&.e\&. this has to be done in prerouting and possibly output (if locally generated packets need to be placed in a distinct zone), with a hook priority of \-300\&.
 .sp
+Unlike iptables, where the helper assignment happens in the raw table, the helper needs to be assigned after a conntrack entry has been found, i\&.e\&. it will not work when used with hook priorities equal or before \-200\&.
+.sp
 .it 1 an-trap
 .nr an-no-space-flag 1
 .nr an-break-flag 1
@@ -7227,6 +7317,23 @@ ct event set new,related,destroy
 .RE
 .\}
 .sp
+.SS "NOTRACK STATEMENT"
+.sp
+The notrack statement allows to disable connection tracking for certain packets\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBnotrack\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Note that for this statement to be effective, it has to be applied to packets before a conntrack lookup happens\&. Therefore, it needs to sit in a chain with either prerouting or output hook and a hook priority of \-300 or less\&.
+.sp
+See SYNPROXY STATEMENT for an example usage\&.
 .SS "META STATEMENT"
 .sp
 A meta statement sets the value of a meta expression\&. The existing meta fields are: priority, mark, pkttype, nftrace\&.
@@ -7968,8 +8075,17 @@ The set statement is used to dynamically add or update elements in a set from th
 .RS 4
 .\}
 .nf
-# declare a set, bound to table "filter", in family "ip"\&. Timeout and size are mandatory because we will add elements from packet path\&.
-nft add set ip filter blackhole "{ type ipv4_addr; flags timeout; size 65536; }"
+# declare a set, bound to table "filter", in family "ip"\&.
+# Timeout and size are mandatory because we will add elements from packet path\&.
+# Entries will timeout after one minute, after which they might be
+# re\-added if limit condition persists\&.
+nft add set ip filter blackhole \e
+    "{ type ipv4_addr; flags dynamic; timeout 1m; size 65536; }"
+
+# declare a set to store the limit per saddr\&.
+# This must be separate from blackhole since the timeout is different
+nft add set ip filter flood \e
+    "{ type ipv4_addr; flags dynamic; timeout 10s; size 128000; }"
 
 # whitelist internal interface\&.
 nft add rule ip filter input meta iifname "internal" accept
@@ -7977,17 +8093,17 @@ nft add rule ip filter input meta iifname "internal" accept
 # drop packets coming from blacklisted ip addresses\&.
 nft add rule ip filter input ip saddr @blackhole counter drop
 
-# add source ip addresses to the blacklist if more than 10 tcp connection requests occurred per second and ip address\&.
-# entries will timeout after one minute, after which they might be re\-added if limit condition persists\&.
-nft add rule ip filter input tcp flags syn tcp dport ssh meter flood size 128000 { ip saddr timeout 10s limit rate over 10/second} add @blackhole { ip saddr timeout 1m } drop
+# add source ip addresses to the blacklist if more than 10 tcp connection
+# requests occurred per second and ip address\&.
+nft add rule ip filter input tcp flags syn tcp dport ssh \e
+    add @flood { ip saddr limit rate over 10/second } \e
+    add @blackhole { ip saddr } drop
 
-# inspect state of the rate limit meter:
-nft list meter ip filter flood
-
-# inspect content of blackhole:
+# inspect state of the sets\&.
+nft list set ip filter flood
 nft list set ip filter blackhole
 
-# manually add two addresses to the set:
+# manually add two addresses to the blackhole\&.
 nft add element filter blackhole { 10\&.2\&.3\&.4, 10\&.23\&.1\&.42 }
 .fi
 .if n \{\

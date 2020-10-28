@@ -687,17 +687,15 @@ struct expr *get_set_intervals(const struct set *set, const struct expr *init)
 	return new_init;
 }
 
-static struct expr *get_set_interval_find(const struct table *table,
-					  const char *set_name,
+static struct expr *get_set_interval_find(const struct set *cache_set,
 					  struct expr *left,
 					  struct expr *right)
 {
+	const struct set *set = cache_set;
 	struct expr *range = NULL;
-	struct set *set;
 	struct expr *i;
 	mpz_t val;
 
-	set = set_lookup(table, set_name);
 	mpz_init2(val, set->key->len);
 
 	list_for_each_entry(i, &set->init->expressions, list) {
@@ -724,7 +722,7 @@ out:
 	return range;
 }
 
-int get_set_decompose(struct table *table, struct set *set)
+int get_set_decompose(struct set *cache_set, struct set *set)
 {
 	struct expr *i, *next, *range;
 	struct expr *left = NULL;
@@ -737,8 +735,7 @@ int get_set_decompose(struct table *table, struct set *set)
 			list_del(&left->list);
 			list_del(&i->list);
 			mpz_sub_ui(i->key->value, i->key->value, 1);
-			range = get_set_interval_find(table, set->handle.set.name,
-						    left, i);
+			range = get_set_interval_find(cache_set, left, i);
 			if (!range) {
 				expr_free(new_init);
 				errno = ENOENT;
@@ -751,8 +748,7 @@ int get_set_decompose(struct table *table, struct set *set)
 			left = NULL;
 		} else {
 			if (left) {
-				range = get_set_interval_find(table,
-							      set->handle.set.name,
+				range = get_set_interval_find(cache_set,
 							      left, NULL);
 				if (range)
 					compound_expr_add(new_init, range);
@@ -764,8 +760,7 @@ int get_set_decompose(struct table *table, struct set *set)
 		}
 	}
 	if (left) {
-		range = get_set_interval_find(table, set->handle.set.name,
-					      left, NULL);
+		range = get_set_interval_find(cache_set, left, NULL);
 		if (range)
 			compound_expr_add(new_init, range);
 		else
@@ -932,6 +927,20 @@ next:
 	}
 }
 
+static void interval_expr_copy(struct expr *dst, struct expr *src)
+{
+	if (src->comment)
+		dst->comment = xstrdup(src->comment);
+	if (src->timeout)
+		dst->timeout = src->timeout;
+	if (src->expiration)
+		dst->expiration = src->expiration;
+	if (src->stmt) {
+		dst->stmt = src->stmt;
+		src->stmt = NULL;
+	}
+}
+
 void interval_map_decompose(struct expr *set)
 {
 	struct expr **elements, **ranges;
@@ -1021,22 +1030,12 @@ void interval_map_decompose(struct expr *set)
 			tmp = set_elem_expr_alloc(&low->location, tmp);
 
 			if (low->etype == EXPR_MAPPING) {
-				if (low->left->comment)
-					tmp->comment = xstrdup(low->left->comment);
-				if (low->left->timeout)
-					tmp->timeout = low->left->timeout;
-				if (low->left->expiration)
-					tmp->expiration = low->left->expiration;
+				interval_expr_copy(tmp, low->left);
 
 				tmp = mapping_expr_alloc(&tmp->location, tmp,
 							 expr_clone(low->right));
 			} else {
-				if (low->comment)
-					tmp->comment = xstrdup(low->comment);
-				if (low->timeout)
-					tmp->timeout = low->timeout;
-				if (low->expiration)
-					tmp->expiration = low->expiration;
+				interval_expr_copy(tmp, low);
 			}
 
 			compound_expr_add(set, tmp);
@@ -1053,22 +1052,12 @@ void interval_map_decompose(struct expr *set)
 			prefix = set_elem_expr_alloc(&low->location, prefix);
 
 			if (low->etype == EXPR_MAPPING) {
-				if (low->left->comment)
-					prefix->comment = xstrdup(low->left->comment);
-				if (low->left->timeout)
-					prefix->timeout = low->left->timeout;
-				if (low->left->expiration)
-					prefix->expiration = low->left->expiration;
+				interval_expr_copy(prefix, low->left);
 
 				prefix = mapping_expr_alloc(&low->location, prefix,
 							    expr_clone(low->right));
 			} else {
-				if (low->comment)
-					prefix->comment = xstrdup(low->comment);
-				if (low->timeout)
-					prefix->timeout = low->timeout;
-				if (low->expiration)
-					prefix->expiration = low->expiration;
+				interval_expr_copy(prefix, low);
 			}
 
 			compound_expr_add(set, prefix);
@@ -1086,16 +1075,23 @@ void interval_map_decompose(struct expr *set)
 
 	i = constant_expr_alloc(&low->location, low->dtype,
 				low->byteorder, expr_value(low)->len, NULL);
-	mpz_init_bitmask(i->value, i->len);
+	mpz_bitmask(i->value, i->len);
 
 	if (!mpz_cmp(i->value, expr_value(low)->value)) {
 		expr_free(i);
 		i = low;
 	} else {
-		i = range_expr_alloc(&low->location, expr_value(low), i);
+		i = range_expr_alloc(&low->location,
+				     expr_clone(expr_value(low)), i);
 		i = set_elem_expr_alloc(&low->location, i);
-		if (low->etype == EXPR_MAPPING)
-			i = mapping_expr_alloc(&i->location, i, low->right);
+		if (low->etype == EXPR_MAPPING) {
+			i = mapping_expr_alloc(&i->location, i,
+					       expr_clone(low->right));
+			interval_expr_copy(i->left, low->left);
+		} else {
+			interval_expr_copy(i, low);
+		}
+		expr_free(low);
 	}
 
 	compound_expr_add(set, i);

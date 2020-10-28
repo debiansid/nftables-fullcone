@@ -30,8 +30,33 @@ enum cache_level_flags {
 				  NFT_CACHE_CHAIN_BIT |
 				  NFT_CACHE_RULE_BIT,
 	NFT_CACHE_FULL		= __NFT_CACHE_MAX_BIT - 1,
+	NFT_CACHE_REFRESH	= (1 << 29),
 	NFT_CACHE_UPDATE	= (1 << 30),
 	NFT_CACHE_FLUSHED	= (1 << 31),
 };
+
+static inline uint32_t djb_hash(const char *key)
+{
+	uint32_t i, hash = 5381;
+
+	for (i = 0; i < strlen(key); i++)
+		hash = ((hash << 5) + hash) + key[i];
+
+	return hash;
+}
+
+#define NFT_CACHE_HSIZE 8192
+
+struct netlink_ctx;
+struct table;
+struct chain;
+struct handle;
+
+struct nftnl_chain_list *chain_cache_dump(struct netlink_ctx *ctx, int *err);
+int chain_cache_init(struct netlink_ctx *ctx, struct table *table,
+		     struct nftnl_chain_list *chain_cache);
+void chain_cache_add(struct chain *chain, struct table *table);
+struct chain *chain_cache_find(const struct table *table,
+			       const struct handle *handle);
 
 #endif /* _NFT_CACHE_H_ */

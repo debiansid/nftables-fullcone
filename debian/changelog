@@ -1,12 +1,11 @@
-nftables (0.9.7-1~1.gbp720bfa) UNRELEASED; urgency=medium
-
-  ** SNAPSHOT build @720bfaf4f4fb46b8a383fd084f0939567c048a19 **
+nftables (0.9.7-1) unstable; urgency=medium
 
   * [8813565] d/t/control: mark nft -h test as superficial (Closes: #969851)
   * [2a29c4f] d/upstream/signing-key.asc: refresh
   * [eaf8b7f] New upstream version 0.9.7
+  * [80c259b] src:nftables: bump build-dep on libnftnl to 1.1.8
 
- -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 28 Oct 2020 15:36:13 +0100
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 28 Oct 2020 16:01:29 +0100
 
 nftables (0.9.6-1) unstable; urgency=medium
 

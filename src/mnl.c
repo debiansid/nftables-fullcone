@@ -359,6 +359,9 @@ static int mnl_batch_extack_cb(const struct nlmsghdr *nlh, void *data)
 }
 
 #define NFT_MNL_ECHO_RCVBUFF_DEFAULT	(MNL_SOCKET_BUFFER_SIZE * 1024)
+#define NFT_MNL_ACK_MAXSIZE		((sizeof(struct nlmsghdr) + \
+					  sizeof(struct nfgenmsg) + (1 << 16)) + \
+					  MNL_SOCKET_BUFFER_SIZE)
 
 int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 		   uint32_t num_cmds)
@@ -366,7 +369,7 @@ int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 	struct mnl_socket *nl = ctx->nft->nf_sock;
 	int ret, fd = mnl_socket_get_fd(nl), portid = mnl_socket_get_portid(nl);
 	uint32_t iov_len = nftnl_batch_iovec_len(ctx->batch);
-	char rcv_buf[MNL_SOCKET_BUFFER_SIZE];
+	char rcv_buf[NFT_MNL_ACK_MAXSIZE];
 	const struct sockaddr_nl snl = {
 		.nl_family = AF_NETLINK
 	};
@@ -1043,6 +1046,8 @@ int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 	struct set *set = cmd->set;
 	struct nftnl_set *nls;
 	struct nlmsghdr *nlh;
+	struct stmt *stmt;
+	int num_stmts = 0;
 
 	nls = nftnl_set_alloc();
 	if (!nls)
@@ -1125,9 +1130,18 @@ int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 			   nftnl_udata_buf_len(udbuf));
 	nftnl_udata_buf_free(udbuf);
 
-	if (set->stmt) {
-		nftnl_set_set_data(nls, NFTNL_SET_EXPR,
-				   netlink_gen_stmt_stateful(set->stmt), 0);
+	list_for_each_entry(stmt, &set->stmt_list, list)
+		num_stmts++;
+
+	if (num_stmts == 1) {
+		list_for_each_entry(stmt, &set->stmt_list, list) {
+			nftnl_set_set_data(nls, NFTNL_SET_EXPR,
+					   netlink_gen_stmt_stateful(stmt), 0);
+			break;
+		}
+	} else if (num_stmts > 1) {
+		list_for_each_entry(stmt, &set->stmt_list, list)
+			nftnl_set_add_expr(nls, netlink_gen_stmt_stateful(stmt));
 	}
 
 	netlink_dump_set(nls, ctx);

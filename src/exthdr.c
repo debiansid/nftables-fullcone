@@ -52,6 +52,18 @@ static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 		 */
 		unsigned int offset = expr->exthdr.offset / 64;
 
+		if (expr->exthdr.desc == NULL) {
+			if (expr->exthdr.offset == 0 &&
+			    expr->exthdr.flags & NFT_EXTHDR_F_PRESENT) {
+				nft_print(octx, "tcp option %d", expr->exthdr.raw_type);
+				return;
+			}
+
+			nft_print(octx, "tcp option @%u,%u,%u", expr->exthdr.raw_type,
+								expr->exthdr.offset, expr->len);
+			return;
+		}
+
 		nft_print(octx, "tcp option %s", expr->exthdr.desc->name);
 		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
 			return;
@@ -79,6 +91,7 @@ static bool exthdr_expr_cmp(const struct expr *e1, const struct expr *e2)
 	return e1->exthdr.desc == e2->exthdr.desc &&
 	       e1->exthdr.tmpl == e2->exthdr.tmpl &&
 	       e1->exthdr.op == e2->exthdr.op &&
+	       e1->exthdr.raw_type == e2->exthdr.raw_type &&
 	       e1->exthdr.flags == e2->exthdr.flags;
 }
 
@@ -89,6 +102,7 @@ static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
 	new->exthdr.offset = expr->exthdr.offset;
 	new->exthdr.op = expr->exthdr.op;
 	new->exthdr.flags = expr->exthdr.flags;
+	new->exthdr.raw_type = expr->exthdr.raw_type;
 }
 
 #define NFTNL_UDATA_EXTHDR_DESC 0
@@ -192,7 +206,9 @@ struct expr *exthdr_expr_alloc(const struct location *loc,
 	expr = expr_alloc(loc, EXPR_EXTHDR, tmpl->dtype,
 			  BYTEORDER_BIG_ENDIAN, tmpl->len);
 	expr->exthdr.desc = desc;
+	expr->exthdr.raw_type = desc ? desc->type : 0;
 	expr->exthdr.tmpl = tmpl;
+	expr->exthdr.offset = tmpl->offset;
 	return expr;
 }
 
@@ -269,6 +285,8 @@ void exthdr_init_raw(struct expr *expr, uint8_t type,
 	unsigned int i;
 
 	assert(expr->etype == EXPR_EXTHDR);
+	expr->exthdr.raw_type = type;
+
 	if (op == NFT_EXTHDR_OP_TCPOPT)
 		return tcpopt_init_raw(expr, type, offset, len, flags);
 	if (op == NFT_EXTHDR_OP_IPV4)
@@ -391,7 +409,6 @@ const struct exthdr_desc exthdr_rt2 = {
 	.name           = "rt2",
 	.id		= EXTHDR_DESC_RT2,
 	.type           = IPPROTO_ROUTING,
-	.proto_key	= 2,
 	.templates	= {
 		[RT2HDR_RESERVED]	= {},
 		[RT2HDR_ADDR]		= {},
@@ -405,7 +422,6 @@ const struct exthdr_desc exthdr_rt0 = {
 	.name           = "rt0",
 	.id		= EXTHDR_DESC_RT0,
 	.type           = IPPROTO_ROUTING,
-	.proto_key      = 0,
 	.templates	= {
 		[RT0HDR_RESERVED]	= RT0_FIELD("reserved", ip6r0_reserved, &integer_type),
 		[RT0HDR_ADDR_1]		= RT0_FIELD("addr[1]", ip6r0_addr[0], &ip6addr_type),
@@ -421,7 +437,6 @@ const struct exthdr_desc exthdr_rt4 = {
 	.name		= "srh",
 	.id		= EXTHDR_DESC_SRH,
 	.type		= IPPROTO_ROUTING,
-	.proto_key	= 4,
 	.templates      = {
 		[RT4HDR_LASTENT]	= RT4_FIELD("last-entry", ip6r4_last_entry, &integer_type),
 		[RT4HDR_FLAGS]		= RT4_FIELD("flags", ip6r4_flags, &integer_type),
@@ -440,7 +455,6 @@ const struct exthdr_desc exthdr_rt = {
 	.name		= "rt",
 	.id		= EXTHDR_DESC_RT,
 	.type		= IPPROTO_ROUTING,
-	.proto_key      = -1,
 #if 0
 	.protocol_key	= RTHDR_TYPE,
 	.protocols	= {

@@ -1,57 +1,15 @@
 # tcp option eol kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 0 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option eol kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 0 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option eol kind 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 0 + 0 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
-# tcp option noop kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 1 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option noop kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 1 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option noop kind 1
+# tcp option nop kind 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 1 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option maxseg kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 2 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option maxseg kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 2 + 0 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option maxseg kind 1
@@ -62,39 +20,11 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option maxseg length 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 2 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option maxseg length 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 2 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option maxseg length 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 2 + 1 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
-
-# tcp option maxseg size 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 2b @ 2 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x00000100 ]
-
-# tcp option maxseg size 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 2b @ 2 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x00000100 ]
 
 # tcp option maxseg size 1
 inet 
@@ -104,38 +34,10 @@ inet
   [ cmp eq reg 1 0x00000100 ]
 
 # tcp option window kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window kind 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 3 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window length 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window length 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 1 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option window length 1
@@ -146,80 +48,24 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option window count 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window count 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option window count 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 3 + 2 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
-# tcp option sack-permitted kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 4 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack-permitted kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 4 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack-permitted kind 1
+# tcp option sack-perm kind 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 4 + 0 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
-# tcp option sack-permitted length 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 4 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack-permitted length 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 4 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack-permitted length 1
+# tcp option sack-perm length 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 4 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 5 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 5 + 0 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option sack kind 1
@@ -230,20 +76,6 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option sack length 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 5 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack length 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 5 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option sack length 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
@@ -251,35 +83,7 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option sack left 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack left 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack left 1
 inet 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack0 left 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack0 left 1
-ip6 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 4b @ 5 + 2 => reg 1 ]
@@ -293,38 +97,10 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack1 left 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 10 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack1 left 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 10 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack1 left 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 4b @ 5 + 10 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack2 left 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 18 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack2 left 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 18 => reg 1 ]
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack2 left 1
@@ -335,20 +111,6 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack3 left 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 26 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack3 left 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 26 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack3 left 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
@@ -356,35 +118,7 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack right 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 6 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack right 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 6 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack right 1
 inet 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 6 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack0 right 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 6 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack0 right 1
-ip6 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 4b @ 5 + 6 => reg 1 ]
@@ -398,38 +132,10 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack1 right 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 14 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack1 right 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 14 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack1 right 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 4b @ 5 + 14 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack2 right 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 22 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack2 right 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 22 => reg 1 ]
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack2 right 1
@@ -440,20 +146,6 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option sack3 right 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 30 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack3 right 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 5 + 30 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option sack3 right 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
@@ -461,38 +153,10 @@ inet
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option timestamp kind 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 8 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option timestamp kind 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 8 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option timestamp kind 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 8 + 0 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option timestamp length 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 8 + 1 => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
-
-# tcp option timestamp length 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 8 + 1 => reg 1 ]
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option timestamp length 1
@@ -503,38 +167,10 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option timestamp tsval 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 8 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option timestamp tsval 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 8 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option timestamp tsval 1
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 4b @ 8 + 2 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option timestamp tsecr 1
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 8 + 6 => reg 1 ]
-  [ cmp eq reg 1 0x01000000 ]
-
-# tcp option timestamp tsecr 1
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 4b @ 8 + 6 => reg 1 ]
   [ cmp eq reg 1 0x01000000 ]
 
 # tcp option timestamp tsecr 1
@@ -544,19 +180,19 @@ inet
   [ exthdr load tcpopt 4b @ 8 + 6 => reg 1 ]
   [ cmp eq reg 1 0x01000000 ]
 
-# tcp option window exists
-ip 
+# tcp option 255 missing
+inet
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 present => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
+  [ exthdr load tcpopt 1b @ 255 + 0 present => reg 1 ]
+  [ cmp eq reg 1 0x00000000 ]
 
-# tcp option window exists
-ip6 
+# tcp option @255,8,8 255
+inet
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 present => reg 1 ]
-  [ cmp eq reg 1 0x00000001 ]
+  [ exthdr load tcpopt 1b @ 255 + 1 => reg 1 ]
+  [ cmp eq reg 1 0x000000ff ]
 
 # tcp option window exists
 inet 
@@ -566,35 +202,11 @@ inet
   [ cmp eq reg 1 0x00000001 ]
 
 # tcp option window missing
-ip 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 present => reg 1 ]
-  [ cmp eq reg 1 0x00000000 ]
-
-# tcp option window missing
-ip6 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-  [ exthdr load tcpopt 1b @ 3 + 0 present => reg 1 ]
-  [ cmp eq reg 1 0x00000000 ]
-
-# tcp option window missing
 inet 
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ exthdr load tcpopt 1b @ 3 + 0 present => reg 1 ]
   [ cmp eq reg 1 0x00000000 ]
-
-# tcp option maxseg size set 1360
-ip 
-  [ immediate reg 1 0x00005005 ]
-  [ exthdr write tcpopt reg 1 => 2b @ 2 + 2 ]
-
-# tcp option maxseg size set 1360
-ip6 
-  [ immediate reg 1 0x00005005 ]
-  [ exthdr write tcpopt reg 1 => 2b @ 2 + 2 ]
 
 # tcp option maxseg size set 1360
 inet 

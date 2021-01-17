@@ -5,15 +5,15 @@
 *inet;test-inet;input
 
 tcp option eol kind 1;ok
-tcp option noop kind 1;ok
+tcp option nop kind 1;ok
 tcp option maxseg kind 1;ok
 tcp option maxseg length 1;ok
 tcp option maxseg size 1;ok
 tcp option window kind 1;ok
 tcp option window length 1;ok
 tcp option window count 1;ok
-tcp option sack-permitted kind 1;ok
-tcp option sack-permitted length 1;ok
+tcp option sack-perm kind 1;ok
+tcp option sack-perm length 1;ok
 tcp option sack kind 1;ok
 tcp option sack length 1;ok
 tcp option sack left 1;ok
@@ -30,6 +30,8 @@ tcp option timestamp kind 1;ok
 tcp option timestamp length 1;ok
 tcp option timestamp tsval 1;ok
 tcp option timestamp tsecr 1;ok
+tcp option 255 missing;ok
+tcp option @255,8,8 255;ok
 
 tcp option foobar;fail
 tcp option foo bar;fail
@@ -38,6 +40,8 @@ tcp option eol left 1;fail
 tcp option eol left 1;fail
 tcp option sack window;fail
 tcp option sack window 1;fail
+tcp option 256 exists;fail
+tcp option @255,8,8 256;fail
 
 tcp option window exists;ok
 tcp option window missing;ok

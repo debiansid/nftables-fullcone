@@ -583,13 +583,15 @@ json_t *set_ref_expr_json(const struct expr *expr, struct output_ctx *octx)
 json_t *set_elem_expr_json(const struct expr *expr, struct output_ctx *octx)
 {
 	json_t *root = expr_print_json(expr->key, octx);
+	struct stmt *stmt;
 	json_t *tmp;
 
 	if (!root)
 		return NULL;
 
 	/* these element attributes require formal set elem syntax */
-	if (expr->timeout || expr->expiration || expr->comment || expr->stmt) {
+	if (expr->timeout || expr->expiration || expr->comment ||
+	    !list_empty(&expr->stmt_list)) {
 		root = json_pack("{s:o}", "val", root);
 
 		if (expr->timeout) {
@@ -604,11 +606,13 @@ json_t *set_elem_expr_json(const struct expr *expr, struct output_ctx *octx)
 			tmp = json_string(expr->comment);
 			json_object_set_new(root, "comment", tmp);
 		}
-		if (expr->stmt) {
-			tmp = stmt_print_json(expr->stmt, octx);
+		list_for_each_entry(stmt, &expr->stmt_list, list) {
+			tmp = stmt_print_json(stmt, octx);
 			/* XXX: detect and complain about clashes? */
 			json_object_update_missing(root, tmp);
 			json_decref(tmp);
+			/* TODO: only one statement per element. */
+			break;
 		}
 		return json_pack("{s:o}", "elem", root);
 	}
@@ -665,29 +669,31 @@ json_t *map_expr_json(const struct expr *expr, struct output_ctx *octx)
 json_t *exthdr_expr_json(const struct expr *expr, struct output_ctx *octx)
 {
 	const char *desc = expr->exthdr.desc ?
-			   expr->exthdr.desc->name :
-			   "unknown-exthdr";
+			   expr->exthdr.desc->name : NULL;
 	const char *field = expr->exthdr.tmpl->token;
 	json_t *root;
 	bool is_exists = expr->exthdr.flags & NFT_EXTHDR_F_PRESENT;
 
 	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT) {
+		static const char *offstrs[] = { "", "1", "2", "3" };
 		unsigned int offset = expr->exthdr.offset / 64;
+		const char *offstr = "";
 
-		if (offset) {
-			const char *offstrs[] = { "0", "1", "2", "3" };
-			const char *offstr = "";
-
+		if (desc) {
 			if (offset < 4)
 				offstr = offstrs[offset];
 
 			root = json_pack("{s:s+}", "name", desc, offstr);
-		} else {
-			root = json_pack("{s:s}", "name", desc);
-		}
 
-		if (!is_exists)
-			json_object_set_new(root, "field", json_string(field));
+			if (!is_exists)
+				json_object_set_new(root, "field", json_string(field));
+		} else {
+			root = json_pack("{s:i, s:i, s:i}",
+					 "base", expr->exthdr.raw_type,
+					 "offset", expr->exthdr.offset,
+					 "len", expr->len);
+			is_exists = false;
+		}
 
 		return json_pack("{s:o}", "tcp option", root);
 	}
@@ -1288,7 +1294,7 @@ json_t *log_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 	return json_pack("{s:o}", "log", root);
 }
 
-static json_t *nat_flags_json(int flags)
+static json_t *nat_flags_json(uint32_t flags)
 {
 	json_t *array = json_array();
 
@@ -1298,7 +1304,35 @@ static json_t *nat_flags_json(int flags)
 		json_array_append_new(array, json_string("fully-random"));
 	if (flags & NF_NAT_RANGE_PERSISTENT)
 		json_array_append_new(array, json_string("persistent"));
+	if (flags & NF_NAT_RANGE_NETMAP)
+		json_array_append_new(array, json_string("netmap"));
 	return array;
+}
+
+static json_t *nat_type_flags_json(uint32_t type_flags)
+{
+	json_t *array = json_array();
+
+	if (type_flags & STMT_NAT_F_INTERVAL)
+		json_array_append_new(array, json_string("interval"));
+	if (type_flags & STMT_NAT_F_PREFIX)
+		json_array_append_new(array, json_string("prefix"));
+	if (type_flags & STMT_NAT_F_CONCAT)
+		json_array_append_new(array, json_string("concat"));
+
+	return array;
+}
+
+static void nat_stmt_add_array(json_t *root, const char *name, json_t *array)
+{
+	if (json_array_size(array) > 1) {
+		json_object_set_new(root, name, array);
+	} else {
+		if (json_array_size(array))
+			json_object_set(root, name,
+					json_array_get(array, 0));
+		json_decref(array);
+	}
 }
 
 json_t *nat_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
@@ -1322,13 +1356,12 @@ json_t *nat_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 		json_object_set_new(root, "port",
 				    expr_print_json(stmt->nat.proto, octx));
 
-	if (json_array_size(array) > 1) {
-		json_object_set_new(root, "flags", array);
-	} else {
-		if (json_array_size(array))
-			json_object_set(root, "flags",
-					json_array_get(array, 0));
-		json_decref(array);
+	nat_stmt_add_array(root, "flags", array);
+
+	if (stmt->nat.type_flags) {
+		array = nat_type_flags_json(stmt->nat.type_flags);
+
+		nat_stmt_add_array(root, "type_flags", array);
 	}
 
 	if (!json_object_size(root)) {
@@ -1866,9 +1899,15 @@ int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 static void monitor_print_json(struct netlink_mon_handler *monh,
 			       const char *cmd, json_t *obj)
 {
+	struct nft_ctx *nft = monh->ctx->nft;
+
 	obj = json_pack("{s:o}", cmd, obj);
-	json_dumpf(obj, monh->ctx->nft->output.output_fp, 0);
-	json_decref(obj);
+	if (nft_output_echo(&nft->output) && !nft->json_root) {
+		json_array_append_new(nft->json_echo, obj);
+	} else {
+		json_dumpf(obj, nft->output.output_fp, 0);
+		json_decref(obj);
+	}
 }
 
 void monitor_print_table_json(struct netlink_mon_handler *monh,
@@ -1911,4 +1950,11 @@ void monitor_print_rule_json(struct netlink_mon_handler *monh,
 	struct output_ctx *octx = &monh->ctx->nft->output;
 
 	monitor_print_json(monh, cmd, rule_print_json(octx, r));
+}
+
+void json_alloc_echo(struct nft_ctx *nft)
+{
+	nft->json_echo = json_array();
+	if (!nft->json_echo)
+		memory_allocation_error();
 }

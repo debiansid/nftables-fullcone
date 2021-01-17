@@ -14,14 +14,14 @@
     }
 ]
 
-# tcp option noop kind 1
+# tcp option nop kind 1
 [
     {
         "match": {
             "left": {
                 "tcp option": {
                     "field": "kind",
-                    "name": "noop"
+                    "name": "nop"
                 }
             },
             "op": "==",
@@ -126,14 +126,14 @@
     }
 ]
 
-# tcp option sack-permitted kind 1
+# tcp option sack-perm kind 1
 [
     {
         "match": {
             "left": {
                 "tcp option": {
                     "field": "kind",
-                    "name": "sack-permitted"
+                    "name": "sack-perm"
                 }
             },
             "op": "==",
@@ -142,14 +142,14 @@
     }
 ]
 
-# tcp option sack-permitted length 1
+# tcp option sack-perm length 1
 [
     {
         "match": {
             "left": {
                 "tcp option": {
                     "field": "length",
-                    "name": "sack-permitted"
+                    "name": "sack-perm"
                 }
             },
             "op": "==",
@@ -410,6 +410,40 @@
             },
             "op": "==",
             "right": 1
+        }
+    }
+]
+
+# tcp option 255 missing
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "base": 255,
+                    "len": 8,
+                    "offset": 0
+                }
+            },
+            "op": "==",
+            "right": false
+        }
+    }
+]
+
+# tcp option @255,8,8 255
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "base": 255,
+                    "len": 8,
+                    "offset": 8
+                }
+            },
+            "op": "==",
+            "right": 255
         }
     }
 ]

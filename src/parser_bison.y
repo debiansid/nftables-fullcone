@@ -184,7 +184,6 @@ int nft_lex(void *, void *, void *);
 	struct handle_spec	handle_spec;
 	struct position_spec	position_spec;
 	struct prio_spec	prio_spec;
-	const struct exthdr_desc *exthdr_desc;
 }
 
 %token TOKEN_EOF 0		"end of file"
@@ -233,7 +232,6 @@ int nft_lex(void *, void *, void *);
 %token SYNPROXY			"synproxy"
 %token MSS			"mss"
 %token WSCALE			"wscale"
-%token SACKPERM			"sack-perm"
 
 %token TYPEOF			"typeof"
 
@@ -400,14 +398,13 @@ int nft_lex(void *, void *, void *);
 %token OPTION			"option"
 %token ECHO			"echo"
 %token EOL			"eol"
-%token MAXSEG			"maxseg"
-%token NOOP			"noop"
+%token NOP			"nop"
 %token SACK			"sack"
 %token SACK0			"sack0"
 %token SACK1			"sack1"
 %token SACK2			"sack2"
 %token SACK3			"sack3"
-%token SACK_PERMITTED		"sack-permitted"
+%token SACK_PERM		"sack-permitted"
 %token TIMESTAMP		"timestamp"
 %token KIND			"kind"
 %token COUNT			"count"
@@ -607,7 +604,7 @@ int nft_lex(void *, void *, void *);
 %type <table>			table_block_alloc table_block
 %destructor { close_scope(state); table_free($$); }	table_block_alloc
 %type <chain>			chain_block_alloc chain_block subchain_block
-%destructor { close_scope(state); chain_free($$); }	chain_block_alloc subchain_block
+%destructor { close_scope(state); chain_free($$); }	chain_block_alloc
 %type <rule>			rule rule_alloc
 %destructor { rule_free($$); }	rule
 
@@ -627,10 +624,10 @@ int nft_lex(void *, void *, void *);
 %type <obj>			obj_block_alloc counter_block quota_block ct_helper_block ct_timeout_block ct_expect_block limit_block secmark_block synproxy_block
 %destructor { obj_free($$); }	obj_block_alloc
 
-%type <list>			stmt_list
-%destructor { stmt_list_free($$); xfree($$); } stmt_list
-%type <stmt>			stmt match_stmt verdict_stmt
-%destructor { stmt_free($$); }	stmt match_stmt verdict_stmt
+%type <list>			stmt_list stateful_stmt_list set_elem_stmt_list
+%destructor { stmt_list_free($$); xfree($$); } stmt_list stateful_stmt_list set_elem_stmt_list
+%type <stmt>			stmt match_stmt verdict_stmt set_elem_stmt
+%destructor { stmt_free($$); }	stmt match_stmt verdict_stmt set_elem_stmt
 %type <stmt>			counter_stmt counter_stmt_alloc stateful_stmt
 %destructor { stmt_free($$); }	counter_stmt counter_stmt_alloc stateful_stmt
 %type <stmt>			payload_stmt
@@ -1800,10 +1797,11 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->gc_int = $3;
 				$$ = $1;
 			}
-			|	set_block	COUNTER		stmt_separator
+			|	set_block	stateful_stmt_list		stmt_separator
 			{
-				$1->stmt = counter_stmt_alloc(&@$);
+				list_splice_tail($2, &$1->stmt_list);
 				$$ = $1;
+				free($2);
 			}
 			|	set_block	ELEMENTS	'='		set_block_expr
 			{
@@ -2659,6 +2657,19 @@ stmt_list		:	stmt
 			}
 			;
 
+stateful_stmt_list	:	stateful_stmt
+			{
+				$$ = xmalloc(sizeof(*$$));
+				init_list_head($$);
+				list_add_tail(&$1->list, $$);
+			}
+			|	stateful_stmt_list	stateful_stmt
+			{
+				$$ = $1;
+				list_add_tail(&$2->list, $1);
+			}
+			;
+
 stateful_stmt		:	counter_stmt
 			|	limit_stmt
 			|	quota_stmt
@@ -3027,6 +3038,11 @@ log_flag_tcp		:	SEQUENCE
 
 limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst_pkts
 	    		{
+				if ($7 == 0) {
+					erec_queue(error(&@7, "limit burst must be > 0"),
+						   state->msgs);
+					YYERROR;
+				}
 				$$ = limit_stmt_alloc(&@$);
 				$$->limit.rate	= $4;
 				$$->limit.unit	= $6;
@@ -3038,6 +3054,12 @@ limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst_pkts
 			{
 				struct error_record *erec;
 				uint64_t rate, unit;
+
+				if ($6 == 0) {
+					erec_queue(error(&@6, "limit burst must be > 0"),
+						   state->msgs);
+					YYERROR;
+				}
 
 				erec = rate_parse(&@$, $5, &rate, &unit);
 				xfree($5);
@@ -3115,11 +3137,11 @@ limit_mode		:	OVER				{ $$ = NFT_LIMIT_F_INV; }
 			|	/* empty */			{ $$ = 0; }
 			;
 
-limit_burst_pkts	:	/* empty */			{ $$ = 0; }
+limit_burst_pkts	:	/* empty */			{ $$ = 5; }
 			|	BURST	NUM	PACKETS		{ $$ = $2; }
 			;
 
-limit_burst_bytes	:	/* empty */			{ $$ = 0; }
+limit_burst_bytes	:	/* empty */			{ $$ = 5; }
 			|	BURST	NUM	BYTES		{ $$ = $2; }
 			|	BURST	NUM	STRING
 			{
@@ -3279,7 +3301,7 @@ synproxy_arg		:	MSS	NUM
 			{
 				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_TIMESTAMP;
 			}
-			|	SACKPERM
+			|	SACK_PERM
 			{
 				$<stmt>0->synproxy.flags |= NF_SYNPROXY_OPT_SACK_PERM;
 			}
@@ -3334,7 +3356,7 @@ synproxy_ts		:	/* empty */	{ $$ = 0; }
 			;
 
 synproxy_sack		:	/* empty */	{ $$ = 0; }
-			|	SACKPERM
+			|	SACK_PERM
 			{
 				$$ = NF_SYNPROXY_OPT_SACK_PERM;
 			}
@@ -3678,13 +3700,14 @@ set_stmt		:	SET	set_stmt_op	set_elem_expr_stmt	set_ref_expr
 				$$->set.key = $4;
 				$$->set.set = $2;
 			}
-			|	set_stmt_op	set_ref_expr '{' set_elem_expr_stmt	stateful_stmt	'}'
+			|	set_stmt_op	set_ref_expr '{' set_elem_expr_stmt	stateful_stmt_list	'}'
 			{
 				$$ = set_stmt_alloc(&@$);
 				$$->set.op  = $1;
 				$$->set.key = $4;
 				$$->set.set = $2;
-				$$->set.stmt = $5;
+				list_splice_tail($5, &$$->set.stmt_list);
+				free($5);
 			}
 			;
 
@@ -3701,14 +3724,15 @@ map_stmt		:	set_stmt_op	set_ref_expr '{' set_elem_expr_stmt	COLON	set_elem_expr_
 				$$->map.data = $6;
 				$$->map.set = $2;
 			}
-			|	set_stmt_op	set_ref_expr '{' set_elem_expr_stmt	stateful_stmt COLON	set_elem_expr_stmt	'}'
+			|	set_stmt_op	set_ref_expr '{' set_elem_expr_stmt	stateful_stmt_list	COLON	set_elem_expr_stmt	'}'
 			{
 				$$ = map_stmt_alloc(&@$);
 				$$->map.op  = $1;
 				$$->map.key = $4;
 				$$->map.data = $7;
-				$$->map.stmt = $5;
 				$$->map.set = $2;
+				list_splice_tail($5, &$$->map.stmt_list);
+				free($5);
 			}
 			;
 
@@ -4040,7 +4064,13 @@ set_elem_expr		:	set_elem_expr_alloc
 			|	set_elem_expr_alloc		set_elem_expr_options
 			;
 
-set_elem_expr_alloc	:	set_lhs_expr
+set_elem_expr_alloc	:	set_lhs_expr	set_elem_stmt_list
+			{
+				$$ = set_elem_expr_alloc(&@1, $1);
+				list_splice_tail($2, &$$->stmt_list);
+				xfree($2);
+			}
+			|	set_lhs_expr
 			{
 				$$ = set_elem_expr_alloc(&@1, $1);
 			}
@@ -4078,6 +4108,69 @@ set_elem_expr_options	:	set_elem_expr_option
 			|	set_elem_expr_options	set_elem_expr_option
 			;
 
+set_elem_stmt_list	:	set_elem_stmt
+			{
+				$$ = xmalloc(sizeof(*$$));
+				init_list_head($$);
+				list_add_tail(&$1->list, $$);
+			}
+			|	set_elem_stmt_list	set_elem_stmt
+			{
+				$$ = $1;
+				list_add_tail(&$2->list, $1);
+			}
+			;
+
+set_elem_stmt		:	COUNTER
+			{
+				$$ = counter_stmt_alloc(&@$);
+			}
+			|	COUNTER	PACKETS	NUM	BYTES	NUM
+			{
+				$$ = counter_stmt_alloc(&@$);
+				$$->counter.packets = $3;
+				$$->counter.bytes = $5;
+			}
+			|	LIMIT   RATE    limit_mode      NUM     SLASH   time_unit       limit_burst_pkts
+			{
+				if ($7 == 0) {
+					erec_queue(error(&@7, "limit burst must be > 0"),
+						   state->msgs);
+					YYERROR;
+				}
+				$$ = limit_stmt_alloc(&@$);
+				$$->limit.rate  = $4;
+				$$->limit.unit  = $6;
+				$$->limit.burst = $7;
+				$$->limit.type  = NFT_LIMIT_PKTS;
+				$$->limit.flags = $3;
+			}
+			|       LIMIT   RATE    limit_mode      NUM     STRING  limit_burst_bytes
+			{
+				struct error_record *erec;
+				uint64_t rate, unit;
+
+				if ($6 == 0) {
+					erec_queue(error(&@6, "limit burst must be > 0"),
+						   state->msgs);
+					YYERROR;
+				}
+				erec = rate_parse(&@$, $5, &rate, &unit);
+				xfree($5);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+
+				$$ = limit_stmt_alloc(&@$);
+				$$->limit.rate  = rate * $4;
+				$$->limit.unit  = unit;
+				$$->limit.burst = $6;
+				$$->limit.type  = NFT_LIMIT_PKT_BYTES;
+				$$->limit.flags = $3;
+                        }
+			;
+
 set_elem_expr_option	:	TIMEOUT			time_spec
 			{
 				$<expr>0->timeout = $2;
@@ -4085,19 +4178,6 @@ set_elem_expr_option	:	TIMEOUT			time_spec
 			|	EXPIRES		time_spec
 			{
 				$<expr>0->expiration = $2;
-			}
-			|	COUNTER
-			{
-				$<expr>0->stmt = counter_stmt_alloc(&@$);
-			}
-			|	COUNTER	PACKETS	NUM	BYTES	NUM
-			{
-				struct stmt *stmt;
-
-				stmt = counter_stmt_alloc(&@$);
-				stmt->counter.packets = $3;
-				stmt->counter.bytes = $5;
-				$<expr>0->stmt = stmt;
 			}
 			|	comment_spec
 			{
@@ -5197,8 +5277,13 @@ tcp_hdr_expr		:	TCP	tcp_hdr_field
 			}
 			|	TCP	OPTION	tcp_hdr_option_type
 			{
-				$$ = tcpopt_expr_alloc(&@$, $3, TCPOPTHDR_FIELD_KIND);
+				$$ = tcpopt_expr_alloc(&@$, $3, TCPOPT_COMMON_KIND);
 				$$->exthdr.flags = NFT_EXTHDR_F_PRESENT;
+			}
+			|	TCP	OPTION	AT tcp_hdr_option_type	COMMA	NUM	COMMA	NUM
+			{
+				$$ = tcpopt_expr_alloc(&@$, $4, 0);
+				tcpopt_init_raw($$, $4, $6, $8, 0);
 			}
 			;
 
@@ -5214,28 +5299,35 @@ tcp_hdr_field		:	SPORT		{ $$ = TCPHDR_SPORT; }
 			|	URGPTR		{ $$ = TCPHDR_URGPTR; }
 			;
 
-tcp_hdr_option_type	:	EOL		{ $$ = TCPOPTHDR_EOL; }
-			|	NOOP		{ $$ = TCPOPTHDR_NOOP; }
-			|	MAXSEG		{ $$ = TCPOPTHDR_MAXSEG; }
-			|	WINDOW		{ $$ = TCPOPTHDR_WINDOW; }
-			|	SACK_PERMITTED	{ $$ = TCPOPTHDR_SACK_PERMITTED; }
-			|	SACK		{ $$ = TCPOPTHDR_SACK0; }
-			|	SACK0		{ $$ = TCPOPTHDR_SACK0; }
-			|	SACK1		{ $$ = TCPOPTHDR_SACK1; }
-			|	SACK2		{ $$ = TCPOPTHDR_SACK2; }
-			|	SACK3		{ $$ = TCPOPTHDR_SACK3; }
-			|	ECHO		{ $$ = TCPOPTHDR_ECHO; }
-			|	TIMESTAMP	{ $$ = TCPOPTHDR_TIMESTAMP; }
+tcp_hdr_option_type	:	EOL		{ $$ = TCPOPT_KIND_EOL; }
+			|	NOP		{ $$ = TCPOPT_KIND_NOP; }
+			|	MSS  	  	{ $$ = TCPOPT_KIND_MAXSEG; }
+			|	WINDOW		{ $$ = TCPOPT_KIND_WINDOW; }
+			|	SACK_PERM	{ $$ = TCPOPT_KIND_SACK_PERMITTED; }
+			|	SACK		{ $$ = TCPOPT_KIND_SACK; }
+			|	SACK0		{ $$ = TCPOPT_KIND_SACK; }
+			|	SACK1		{ $$ = TCPOPT_KIND_SACK1; }
+			|	SACK2		{ $$ = TCPOPT_KIND_SACK2; }
+			|	SACK3		{ $$ = TCPOPT_KIND_SACK3; }
+			|	ECHO		{ $$ = TCPOPT_KIND_ECHO; }
+			|	TIMESTAMP	{ $$ = TCPOPT_KIND_TIMESTAMP; }
+			|	NUM		{
+				if ($1 > 255) {
+					erec_queue(error(&@1, "value too large"), state->msgs);
+					YYERROR;
+				}
+				$$ = $1;
+			}
 			;
 
-tcp_hdr_option_field	:	KIND		{ $$ = TCPOPTHDR_FIELD_KIND; }
-			|	LENGTH		{ $$ = TCPOPTHDR_FIELD_LENGTH; }
-			|	SIZE		{ $$ = TCPOPTHDR_FIELD_SIZE; }
-			|	COUNT		{ $$ = TCPOPTHDR_FIELD_COUNT; }
-			|	LEFT		{ $$ = TCPOPTHDR_FIELD_LEFT; }
-			|	RIGHT		{ $$ = TCPOPTHDR_FIELD_RIGHT; }
-			|	TSVAL		{ $$ = TCPOPTHDR_FIELD_TSVAL; }
-			|	TSECR		{ $$ = TCPOPTHDR_FIELD_TSECR; }
+tcp_hdr_option_field	:	KIND		{ $$ = TCPOPT_COMMON_KIND; }
+			|	LENGTH		{ $$ = TCPOPT_COMMON_LENGTH; }
+			|	SIZE		{ $$ = TCPOPT_MAXSEG_SIZE; }
+			|	COUNT		{ $$ = TCPOPT_WINDOW_COUNT; }
+			|	LEFT		{ $$ = TCPOPT_SACK_LEFT; }
+			|	RIGHT		{ $$ = TCPOPT_SACK_RIGHT; }
+			|	TSVAL		{ $$ = TCPOPT_TS_TSVAL; }
+			|	TSECR		{ $$ = TCPOPT_TS_TSECR; }
 			;
 
 dccp_hdr_expr		:	DCCP	dccp_hdr_field

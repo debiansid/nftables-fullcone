@@ -396,25 +396,37 @@ const struct datatype icmp_type_type = {
 	.sym_tbl	= &icmp_type_tbl,
 };
 
-#define ICMPHDR_FIELD(__name, __member) \
-	HDR_FIELD(__name, struct icmphdr, __member)
+#define ICMP46HDR_FIELD(__token, __struct, __member, __dep)			\
+	{									\
+		.token		= (__token),					\
+		.dtype		= &integer_type,				\
+		.byteorder	= BYTEORDER_BIG_ENDIAN,				\
+		.offset		= offsetof(__struct, __member) * 8,		\
+		.len		= field_sizeof(__struct, __member) * 8,		\
+		.icmp_dep	= (__dep),					\
+	}
+
+#define ICMPHDR_FIELD(__token, __member, __dep) \
+	ICMP46HDR_FIELD(__token, struct icmphdr, __member, __dep)
+
 #define ICMPHDR_TYPE(__name, __type, __member) \
-	HDR_TYPE(__name, __type, struct icmphdr, __member)
+	HDR_TYPE(__name,  __type, struct icmphdr, __member)
 
 const struct proto_desc proto_icmp = {
 	.name		= "icmp",
 	.id		= PROTO_DESC_ICMP,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.protocol_key	= ICMPHDR_TYPE,
 	.checksum_key	= ICMPHDR_CHECKSUM,
 	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[ICMPHDR_TYPE]		= ICMPHDR_TYPE("type", &icmp_type_type, type),
 		[ICMPHDR_CODE]		= ICMPHDR_TYPE("code", &icmp_code_type, code),
-		[ICMPHDR_CHECKSUM]	= ICMPHDR_FIELD("checksum", checksum),
-		[ICMPHDR_ID]		= ICMPHDR_FIELD("id", un.echo.id),
-		[ICMPHDR_SEQ]		= ICMPHDR_FIELD("sequence", un.echo.sequence),
-		[ICMPHDR_GATEWAY]	= ICMPHDR_FIELD("gateway", un.gateway),
-		[ICMPHDR_MTU]		= ICMPHDR_FIELD("mtu", un.frag.mtu),
+		[ICMPHDR_CHECKSUM]	= ICMPHDR_FIELD("checksum", checksum, PROTO_ICMP_ANY),
+		[ICMPHDR_ID]		= ICMPHDR_FIELD("id", un.echo.id, PROTO_ICMP_ECHO),
+		[ICMPHDR_SEQ]		= ICMPHDR_FIELD("sequence", un.echo.sequence, PROTO_ICMP_ECHO),
+		[ICMPHDR_GATEWAY]	= ICMPHDR_FIELD("gateway", un.gateway, PROTO_ICMP_ADDRESS),
+		[ICMPHDR_MTU]		= ICMPHDR_FIELD("mtu", un.frag.mtu, PROTO_ICMP_MTU),
 	},
 };
 
@@ -813,8 +825,8 @@ const struct datatype icmp6_type_type = {
 	.sym_tbl	= &icmp6_type_tbl,
 };
 
-#define ICMP6HDR_FIELD(__name, __member) \
-	HDR_FIELD(__name, struct icmp6_hdr, __member)
+#define ICMP6HDR_FIELD(__token, __member, __dep) \
+	ICMP46HDR_FIELD(__token, struct icmp6_hdr, __member, __dep)
 #define ICMP6HDR_TYPE(__name, __type, __member) \
 	HDR_TYPE(__name, __type, struct icmp6_hdr, __member)
 
@@ -822,17 +834,18 @@ const struct proto_desc proto_icmp6 = {
 	.name		= "icmpv6",
 	.id		= PROTO_DESC_ICMPV6,
 	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.protocol_key	= ICMP6HDR_TYPE,
 	.checksum_key	= ICMP6HDR_CHECKSUM,
 	.checksum_type  = NFT_PAYLOAD_CSUM_INET,
 	.templates	= {
 		[ICMP6HDR_TYPE]		= ICMP6HDR_TYPE("type", &icmp6_type_type, icmp6_type),
 		[ICMP6HDR_CODE]		= ICMP6HDR_TYPE("code", &icmpv6_code_type, icmp6_code),
-		[ICMP6HDR_CHECKSUM]	= ICMP6HDR_FIELD("checksum", icmp6_cksum),
-		[ICMP6HDR_PPTR]		= ICMP6HDR_FIELD("parameter-problem", icmp6_pptr),
-		[ICMP6HDR_MTU]		= ICMP6HDR_FIELD("mtu", icmp6_mtu),
-		[ICMP6HDR_ID]		= ICMP6HDR_FIELD("id", icmp6_id),
-		[ICMP6HDR_SEQ]		= ICMP6HDR_FIELD("sequence", icmp6_seq),
-		[ICMP6HDR_MAXDELAY]	= ICMP6HDR_FIELD("max-delay", icmp6_maxdelay),
+		[ICMP6HDR_CHECKSUM]	= ICMP6HDR_FIELD("checksum", icmp6_cksum, PROTO_ICMP_ANY),
+		[ICMP6HDR_PPTR]		= ICMP6HDR_FIELD("parameter-problem", icmp6_pptr, PROTO_ICMP6_PPTR),
+		[ICMP6HDR_MTU]		= ICMP6HDR_FIELD("mtu", icmp6_mtu, PROTO_ICMP6_MTU),
+		[ICMP6HDR_ID]		= ICMP6HDR_FIELD("id", icmp6_id, PROTO_ICMP6_ECHO),
+		[ICMP6HDR_SEQ]		= ICMP6HDR_FIELD("sequence", icmp6_seq, PROTO_ICMP6_ECHO),
+		[ICMP6HDR_MAXDELAY]	= ICMP6HDR_FIELD("max-delay", icmp6_maxdelay, PROTO_ICMP6_MGMQ),
 	},
 };
 
@@ -980,8 +993,8 @@ const struct proto_desc proto_arp = {
 		[ARPHDR_PLN]		= ARPHDR_FIELD("plen", plen),
 		[ARPHDR_OP]		= ARPHDR_TYPE("operation", &arpop_type, oper),
 		[ARPHDR_SADDR_ETHER]	= ARPHDR_TYPE("saddr ether", &etheraddr_type, sha),
-		[ARPHDR_DADDR_ETHER]	= ARPHDR_TYPE("daddr ether", &etheraddr_type, tha),
 		[ARPHDR_SADDR_IP]	= ARPHDR_TYPE("saddr ip", &ipaddr_type, spa),
+		[ARPHDR_DADDR_ETHER]	= ARPHDR_TYPE("daddr ether", &etheraddr_type, tha),
 		[ARPHDR_DADDR_IP]	= ARPHDR_TYPE("daddr ip", &ipaddr_type, tpa),
 	},
 	.format		= {

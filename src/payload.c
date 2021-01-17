@@ -19,6 +19,8 @@
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
 #include <linux/if_ether.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
 
 #include <rule.h>
 #include <expression.h>
@@ -95,8 +97,16 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	base = ctx->protocol[left->payload.base].desc;
 	desc = proto_find_upper(base, proto);
 
-	if (!desc)
+	if (!desc) {
+		if (base == &proto_icmp || base == &proto_icmp6) {
+			/* proto 0 is ECHOREPLY, just pretend its ECHO.
+			 * Not doing this would need an additional marker
+			 * bit to tell when icmp.type was set.
+			 */
+			ctx->th_dep.icmp.type = proto ? proto : ICMP_ECHO;
+		}
 		return;
+	}
 
 	assert(desc->base <= PROTO_BASE_MAX);
 	if (desc->base == base->base) {
@@ -544,6 +554,35 @@ void payload_dependency_reset(struct payload_dep_ctx *ctx)
 	memset(ctx, 0, sizeof(*ctx));
 }
 
+static uint8_t icmp_get_type(const struct proto_desc *desc, uint8_t value)
+{
+	if (desc == &proto_icmp && value == 0)
+		return ICMP_ECHO;
+
+	return value;
+}
+
+static uint8_t icmp_get_dep_type(const struct proto_desc *desc, struct expr *right)
+{
+	if (right->etype == EXPR_VALUE && right->len == BITS_PER_BYTE)
+		return icmp_get_type(desc, mpz_get_uint8(right->value));
+
+	return 0;
+}
+
+static void payload_dependency_store_icmp_type(struct payload_dep_ctx *ctx)
+{
+	struct expr *dep = ctx->pdep->expr;
+	const struct proto_desc *desc;
+
+	if (dep->left->etype != EXPR_PAYLOAD)
+		return;
+
+	desc = dep->left->payload.desc;
+	if (desc == &proto_icmp || desc == &proto_icmp6)
+		ctx->icmp_type = icmp_get_dep_type(dep->left->payload.desc, dep->right);
+}
+
 /**
  * payload_dependency_store - store a possibly redundant protocol match
  *
@@ -556,6 +595,8 @@ void payload_dependency_store(struct payload_dep_ctx *ctx,
 {
 	ctx->pbase = base + 1;
 	ctx->pdep  = stmt;
+
+	payload_dependency_store_icmp_type(ctx);
 }
 
 /**
@@ -571,8 +612,8 @@ bool payload_dependency_exists(const struct payload_dep_ctx *ctx,
 			       enum proto_bases base)
 {
 	return ctx->pbase != PROTO_BASE_INVALID &&
-	       ctx->pbase == base &&
-	       ctx->pdep != NULL;
+	       ctx->pdep != NULL &&
+	       (ctx->pbase == base || (base == PROTO_BASE_TRANSPORT_HDR && ctx->pbase == base + 1));
 }
 
 void payload_dependency_release(struct payload_dep_ctx *ctx)
@@ -639,6 +680,10 @@ void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 	if (payload_dependency_exists(ctx, expr->payload.base) &&
 	    payload_may_dependency_kill(ctx, family, expr))
 		payload_dependency_release(ctx);
+	else if (ctx->icmp_type && ctx->pdep) {
+		fprintf(stderr, "Did not kill \n");
+		payload_dependency_release(ctx);
+	}
 }
 
 void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
@@ -660,6 +705,23 @@ void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 	default:
 		break;
 	}
+}
+
+static uint8_t icmp_dep_to_type(enum icmp_hdr_field_type t)
+{
+	switch (t) {
+	case PROTO_ICMP_ANY:
+		BUG("Invalid map for simple dependency");
+	case PROTO_ICMP_ECHO: return ICMP_ECHO;
+	case PROTO_ICMP6_ECHO: return ICMP6_ECHO_REQUEST;
+	case PROTO_ICMP_MTU: return ICMP_DEST_UNREACH;
+	case PROTO_ICMP_ADDRESS: return ICMP_REDIRECT;
+	case PROTO_ICMP6_MTU: return ICMP6_PACKET_TOO_BIG;
+	case PROTO_ICMP6_MGMQ: return MLD_LISTENER_QUERY;
+	case PROTO_ICMP6_PPTR: return ICMP6_PARAM_PROB;
+	}
+
+	BUG("Missing icmp type mapping");
 }
 
 /**
@@ -689,6 +751,11 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 		if (tmpl->offset != expr->payload.offset ||
 		    tmpl->len    != expr->len)
 			continue;
+
+		if (tmpl->icmp_dep && ctx->th_dep.icmp.type &&
+		    ctx->th_dep.icmp.type != icmp_dep_to_type(tmpl->icmp_dep))
+			continue;
+
 		expr->dtype	   = tmpl->dtype;
 		expr->payload.desc = desc;
 		expr->payload.tmpl = tmpl;
@@ -815,6 +882,10 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 		if (tmpl->offset != expr->payload.offset)
 			continue;
 
+		if (tmpl->icmp_dep && ctx->th_dep.icmp.type &&
+		     ctx->th_dep.icmp.type != icmp_dep_to_type(tmpl->icmp_dep))
+			continue;
+
 		if (tmpl->len <= expr->len) {
 			new = payload_expr_alloc(&expr->location, desc, i);
 			list_add_tail(&new->list, list);
@@ -822,6 +893,11 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 			expr->payload.offset += tmpl->len;
 			if (expr->len == 0)
 				return;
+		} else if (expr->len > 0) {
+			new = payload_expr_alloc(&expr->location, desc, i);
+			new->len = expr->len;
+			list_add_tail(&new->list, list);
+			return;
 		} else
 			break;
 	}
@@ -907,4 +983,137 @@ struct expr *payload_expr_join(const struct expr *e1, const struct expr *e2)
 	expr->payload.offset = e1->payload.offset;
 	expr->len	     = e1->len + e2->len;
 	return expr;
+}
+
+static struct stmt *
+__payload_gen_icmp_simple_dependency(struct eval_ctx *ctx, const struct expr *expr,
+				     const struct datatype *icmp_type,
+				     const struct proto_desc *desc,
+				     uint8_t type)
+{
+	struct expr *left, *right, *dep;
+
+	left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
+	right = constant_expr_alloc(&expr->location, icmp_type,
+				    BYTEORDER_BIG_ENDIAN, BITS_PER_BYTE,
+				    constant_data_ptr(type, BITS_PER_BYTE));
+
+	dep = relational_expr_alloc(&expr->location, OP_EQ, left, right);
+	return expr_stmt_alloc(&dep->location, dep);
+}
+
+static struct stmt *
+__payload_gen_icmp_echo_dependency(struct eval_ctx *ctx, const struct expr *expr,
+				   uint8_t echo, uint8_t reply,
+				   const struct datatype *icmp_type,
+				   const struct proto_desc *desc)
+{
+	struct expr *left, *right, *dep, *set;
+
+	left = payload_expr_alloc(&expr->location, desc, desc->protocol_key);
+
+	set = set_expr_alloc(&expr->location, NULL);
+
+	right = constant_expr_alloc(&expr->location, icmp_type,
+				    BYTEORDER_BIG_ENDIAN, BITS_PER_BYTE,
+				    constant_data_ptr(echo, BITS_PER_BYTE));
+	right = set_elem_expr_alloc(&expr->location, right);
+	compound_expr_add(set, right);
+
+	right = constant_expr_alloc(&expr->location, icmp_type,
+				    BYTEORDER_BIG_ENDIAN, BITS_PER_BYTE,
+				    constant_data_ptr(reply, BITS_PER_BYTE));
+	right = set_elem_expr_alloc(&expr->location, right);
+	compound_expr_add(set, right);
+
+	dep = relational_expr_alloc(&expr->location, OP_IMPLICIT, left, set);
+	return expr_stmt_alloc(&dep->location, dep);
+}
+
+int payload_gen_icmp_dependency(struct eval_ctx *ctx, const struct expr *expr,
+				struct stmt **res)
+{
+	const struct proto_hdr_template *tmpl;
+	const struct proto_desc *desc;
+	struct stmt *stmt = NULL;
+	uint8_t type;
+
+	assert(expr->etype == EXPR_PAYLOAD);
+
+	tmpl = expr->payload.tmpl;
+	desc = expr->payload.desc;
+
+	switch (tmpl->icmp_dep) {
+	case PROTO_ICMP_ANY:
+		BUG("No dependency needed");
+		break;
+	case PROTO_ICMP_ECHO:
+		/* do not test ICMP_ECHOREPLY here: its 0 */
+		if (ctx->pctx.th_dep.icmp.type == ICMP_ECHO)
+			goto done;
+
+		type = ICMP_ECHO;
+		if (ctx->pctx.th_dep.icmp.type)
+			goto bad_proto;
+
+		stmt = __payload_gen_icmp_echo_dependency(ctx, expr,
+							  ICMP_ECHO, ICMP_ECHOREPLY,
+							  &icmp_type_type,
+							  desc);
+		break;
+	case PROTO_ICMP_MTU:
+	case PROTO_ICMP_ADDRESS:
+		type = icmp_dep_to_type(tmpl->icmp_dep);
+		if (ctx->pctx.th_dep.icmp.type == type)
+			goto done;
+		if (ctx->pctx.th_dep.icmp.type)
+			goto bad_proto;
+		stmt = __payload_gen_icmp_simple_dependency(ctx, expr,
+							    &icmp_type_type,
+							    desc, type);
+		break;
+	case PROTO_ICMP6_ECHO:
+		if (ctx->pctx.th_dep.icmp.type == ICMP6_ECHO_REQUEST ||
+		    ctx->pctx.th_dep.icmp.type == ICMP6_ECHO_REPLY)
+			goto done;
+
+		type = ICMP6_ECHO_REQUEST;
+		if (ctx->pctx.th_dep.icmp.type)
+			goto bad_proto;
+
+		stmt = __payload_gen_icmp_echo_dependency(ctx, expr,
+							  ICMP6_ECHO_REQUEST,
+							  ICMP6_ECHO_REPLY,
+							  &icmp6_type_type,
+							  desc);
+		break;
+	case PROTO_ICMP6_MTU:
+	case PROTO_ICMP6_MGMQ:
+	case PROTO_ICMP6_PPTR:
+		type = icmp_dep_to_type(tmpl->icmp_dep);
+		if (ctx->pctx.th_dep.icmp.type == type)
+			goto done;
+		if (ctx->pctx.th_dep.icmp.type)
+			goto bad_proto;
+		stmt = __payload_gen_icmp_simple_dependency(ctx, expr,
+							    &icmp6_type_type,
+							    desc, type);
+		break;
+		break;
+	default:
+		BUG("Unhandled icmp dependency code");
+	}
+
+	ctx->pctx.th_dep.icmp.type = type;
+
+	if (stmt_evaluate(ctx, stmt) < 0)
+		return expr_error(ctx->msgs, expr,
+				  "icmp dependency statement is invalid");
+done:
+	*res = stmt;
+	return 0;
+
+bad_proto:
+	return expr_error(ctx->msgs, expr, "incompatible icmp match: rule has %d, need %u",
+			  ctx->pctx.th_dep.icmp.type, type);
 }

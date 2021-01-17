@@ -280,7 +280,7 @@ struct expr {
 			uint64_t		timeout;
 			uint64_t		expiration;
 			const char		*comment;
-			struct stmt		*stmt;
+			struct list_head	stmt_list;
 			uint32_t		elem_flags;
 		};
 		struct {
@@ -311,7 +311,8 @@ struct expr {
 			/* EXPR_EXTHDR */
 			const struct exthdr_desc	*desc;
 			const struct proto_hdr_template	*tmpl;
-			unsigned int			offset;
+			uint16_t			offset;
+			uint8_t				raw_type;
 			enum nft_exthdr_op		op;
 			unsigned int			flags;
 		} exthdr;

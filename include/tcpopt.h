@@ -6,7 +6,7 @@
 #include <statement.h>
 
 extern struct expr *tcpopt_expr_alloc(const struct location *loc,
-				      uint8_t type, uint8_t field);
+				      unsigned int kind, unsigned int field);
 
 extern void tcpopt_init_raw(struct expr *expr, uint8_t type,
 			    unsigned int offset, unsigned int len,
@@ -15,35 +15,62 @@ extern void tcpopt_init_raw(struct expr *expr, uint8_t type,
 extern bool tcpopt_find_template(struct expr *expr, const struct expr *mask,
 				 unsigned int *shift);
 
-enum tcpopt_hdr_types {
-	TCPOPTHDR_INVALID,
-	TCPOPTHDR_EOL,
-	TCPOPTHDR_NOOP,
-	TCPOPTHDR_MAXSEG,
-	TCPOPTHDR_WINDOW,
-	TCPOPTHDR_SACK_PERMITTED,
-	TCPOPTHDR_SACK0,
-	TCPOPTHDR_SACK1,
-	TCPOPTHDR_SACK2,
-	TCPOPTHDR_SACK3,
-	TCPOPTHDR_TIMESTAMP,
-	TCPOPTHDR_ECHO,
-	TCPOPTHDR_ECHO_REPLY,
-	__TCPOPTHDR_MAX
+/* TCP option numbers used on wire */
+enum tcpopt_kind {
+	TCPOPT_KIND_EOL = 0,
+	TCPOPT_KIND_NOP = 1,
+	TCPOPT_KIND_MAXSEG = 2,
+	TCPOPT_KIND_WINDOW = 3,
+	TCPOPT_KIND_SACK_PERMITTED = 4,
+	TCPOPT_KIND_SACK = 5,
+	TCPOPT_KIND_TIMESTAMP = 8,
+	TCPOPT_KIND_ECHO = 8,
+	__TCPOPT_KIND_MAX,
+
+	/* extra oob info, internal to nft */
+	TCPOPT_KIND_SACK1 = 256,
+	TCPOPT_KIND_SACK2 = 257,
+	TCPOPT_KIND_SACK3 = 258,
 };
 
-enum tcpopt_hdr_fields {
-	TCPOPTHDR_FIELD_INVALID,
-	TCPOPTHDR_FIELD_KIND,
-	TCPOPTHDR_FIELD_LENGTH,
-	TCPOPTHDR_FIELD_SIZE,
-	TCPOPTHDR_FIELD_COUNT,
-	TCPOPTHDR_FIELD_LEFT,
-	TCPOPTHDR_FIELD_RIGHT,
-	TCPOPTHDR_FIELD_TSVAL,
-	TCPOPTHDR_FIELD_TSECR,
+/* Internal identifiers */
+enum tcpopt_common {
+	TCPOPT_COMMON_KIND,
+	TCPOPT_COMMON_LENGTH,
 };
 
-extern const struct exthdr_desc *tcpopthdr_protocols[__TCPOPTHDR_MAX];
+enum tcpopt_maxseg {
+	TCPOPT_MAXSEG_KIND,
+	TCPOPT_MAXSEG_LENGTH,
+	TCPOPT_MAXSEG_SIZE,
+};
+
+enum tcpopt_timestamp {
+	TCPOPT_TS_KIND,
+	TCPOPT_TS_LENGTH,
+	TCPOPT_TS_TSVAL,
+	TCPOPT_TS_TSECR,
+};
+
+enum tcpopt_windowscale {
+	TCPOPT_WINDOW_KIND,
+	TCPOPT_WINDOW_LENGTH,
+	TCPOPT_WINDOW_COUNT,
+};
+
+enum tcpopt_hdr_field_sack {
+	TCPOPT_SACK_KIND,
+	TCPOPT_SACK_LENGTH,
+	TCPOPT_SACK_LEFT,
+	TCPOPT_SACK_RIGHT,
+	TCPOPT_SACK_LEFT1,
+	TCPOPT_SACK_RIGHT1,
+	TCPOPT_SACK_LEFT2,
+	TCPOPT_SACK_RIGHT2,
+	TCPOPT_SACK_LEFT3,
+	TCPOPT_SACK_RIGHT3,
+};
+
+extern const struct exthdr_desc *tcpopt_protocols[__TCPOPT_KIND_MAX];
 
 #endif /* NFTABLES_TCPOPT_H */

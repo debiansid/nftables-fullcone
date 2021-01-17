@@ -392,7 +392,7 @@ integer (32 bit)
 DCCP HEADER EXPRESSION
 ~~~~~~~~~~~~~~~~~~~~~~
 [verse]
-*dccp* {*sport* | *dport*}
+*dccp* {*sport* | *dport* | *type*}
 
 .DCCP header expression
 [options="header"]
@@ -404,6 +404,9 @@ inet_service
 |dport|
 Destination port|
 inet_service
+|type|
+Packet type|
+dccp_pkttype
 |========================
 
 AUTHENTICATION HEADER EXPRESSION
@@ -525,13 +528,13 @@ nftables currently supports matching (finding) a given ipv6 extension header, TC
 *dst* {*nexthdr* | *hdrlength*}
 *mh* {*nexthdr* | *hdrlength* | *checksum* | *type*}
 *srh* {*flags* | *tag* | *sid* | *seg-left*}
-*tcp option* {*eol* | *noop* | *maxseg* | *window* | *sack-permitted* | *sack* | *sack0* | *sack1* | *sack2* | *sack3* | *timestamp*} 'tcp_option_field'
+*tcp option* {*eol* | *nop* | *maxseg* | *window* | *sack-perm* | *sack* | *sack0* | *sack1* | *sack2* | *sack3* | *timestamp*} 'tcp_option_field'
 *ip option* { lsrr | ra | rr | ssrr } 'ip_option_field'
 
 The following syntaxes are valid only in a relational expression with boolean type on right-hand side for checking header existence only:
 [verse]
 *exthdr* {*hbh* | *frag* | *rt* | *dst* | *mh*}
-*tcp option* {*eol* | *noop* | *maxseg* | *window* | *sack-permitted* | *sack* | *sack0* | *sack1* | *sack2* | *sack3* | *timestamp*}
+*tcp option* {*eol* | *nop* | *maxseg* | *window* | *sack-perm* | *sack* | *sack0* | *sack1* | *sack2* | *sack3* | *timestamp*}
 *ip option* { lsrr | ra | rr | ssrr }
 
 .IPv6 extension headers
@@ -559,8 +562,8 @@ Segment Routing Header
 |eol|
 End if option list|
 kind
-|noop|
-1 Byte TCP No-op options |
+|nop|
+1 Byte TCP Nop padding option |
 kind
 |maxseg|
 TCP Maximum Segment Size|
@@ -568,7 +571,7 @@ kind, length, size
 |window|
 TCP Window Scaling |
 kind, length, count
-|sack-permitted|
+|sack-perm |
 TCP SACK permitted |
 kind, length
 |sack|
@@ -591,6 +594,12 @@ TCP Timestamps |
 kind, length, tsval, tsecr
 |============================
 
+TCP option matching also supports raw expression syntax to access arbitrary options:
+[verse]
+*tcp option*
+[verse]
+*tcp option* *@*'number'*,*'offset'*,*'length'
+
 .IP Options
 [options="header"]
 |==================
@@ -611,7 +620,7 @@ type, length, ptr, addr
 
 .finding TCP options
 --------------------
-filter input tcp option sack-permitted kind 1 counter
+filter input tcp option sack-perm kind 1 counter
 --------------------
 
 .matching IPv6 exthdr

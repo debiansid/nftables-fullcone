@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.7], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Anyface"], [Release name])
+AC_INIT([nftables], [0.9.8], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["E.D.S."], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -57,7 +57,7 @@ AS_IF([test "x$enable_man_doc" = "xyes"], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.4])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.8])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.1.9])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],
@@ -68,7 +68,7 @@ AC_CHECK_LIB([gmp],[__gmpz_init], , AC_MSG_ERROR([No suitable version of libgmp 
 AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" = xyes])
 
 AC_ARG_WITH([cli], [AS_HELP_STRING([--without-cli],
-            [disable interactive CLI (libreadline or linenoise support)])],
+            [disable interactive CLI (libreadline, editline or linenoise support)])],
             [], [with_cli=readline])
 
 AS_IF([test "x$with_cli" = xreadline], [
@@ -80,6 +80,11 @@ AC_DEFINE([HAVE_LIBREADLINE], [1], [])
 AC_CHECK_LIB([linenoise], [linenoise], ,
 	     AC_MSG_ERROR([No suitable version of linenoise found]))
 AC_DEFINE([HAVE_LIBLINENOISE], [1], [])
+],
+      [test "x$with_cli" = xeditline], [
+AC_CHECK_LIB([edit], [readline], ,
+	     AC_MSG_ERROR([No suitable version of libedit found]))
+AC_DEFINE([HAVE_LIBEDIT], [1], [])
 ],
       [test "x$with_cli" != xno], [
 AC_MSG_ERROR([unexpected CLI value: $with_cli])
@@ -111,7 +116,7 @@ AC_ARG_ENABLE(python,
 
 AC_ARG_WITH([python_bin],
             [AS_HELP_STRING([--with-python-bin], [Specify Python binary to use])],
-	    [PYTHON_BIN="$withval"], [AC_PATH_PROGS(PYTHON_BIN, python python2 python2.7)]
+	    [PYTHON_BIN="$withval"], [AC_PATH_PROGS(PYTHON_BIN, python python2 python2.7 python3)]
 	   )
 
 AS_IF([test "x$PYTHON_BIN" = "x"], [

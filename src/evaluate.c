@@ -477,7 +477,7 @@ static void expr_evaluate_bits(struct eval_ctx *ctx, struct expr **exprp)
 					  &extra_len);
 		break;
 	case EXPR_EXTHDR:
-		shift = expr_offset_shift(expr, expr->exthdr.tmpl->offset,
+		shift = expr_offset_shift(expr, expr->exthdr.offset,
 					  &extra_len);
 		break;
 	default:
@@ -530,18 +530,16 @@ static int __expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 	if (expr_evaluate_primary(ctx, exprp) < 0)
 		return -1;
 
-	if (expr->exthdr.tmpl->offset % BITS_PER_BYTE != 0 ||
+	if (expr->exthdr.offset % BITS_PER_BYTE != 0 ||
 	    expr->len % BITS_PER_BYTE != 0)
 		expr_evaluate_bits(ctx, exprp);
 
 	switch (expr->exthdr.op) {
 	case NFT_EXTHDR_OP_TCPOPT: {
 		static const unsigned int max_tcpoptlen = (15 * 4 - 20) * BITS_PER_BYTE;
-		unsigned int totlen = 0;
+		unsigned int totlen;
 
-		totlen += expr->exthdr.tmpl->offset;
-		totlen += expr->exthdr.tmpl->len;
-		totlen += expr->exthdr.offset;
+		totlen = expr->exthdr.tmpl->len + expr->exthdr.offset;
 
 		if (totlen > max_tcpoptlen)
 			return expr_error(ctx->msgs, expr,
@@ -551,11 +549,9 @@ static int __expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 	}
 	case NFT_EXTHDR_OP_IPV4: {
 		static const unsigned int max_ipoptlen = 40 * BITS_PER_BYTE;
-		unsigned int totlen = 0;
+		unsigned int totlen;
 
-		totlen += expr->exthdr.tmpl->offset;
-		totlen += expr->exthdr.tmpl->len;
-		totlen += expr->exthdr.offset;
+		totlen = expr->exthdr.offset + expr->exthdr.tmpl->len;
 
 		if (totlen > max_ipoptlen)
 			return expr_error(ctx->msgs, expr,
@@ -710,7 +706,8 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 			return -1;
 
 		rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
-		return 0;
+		desc = ctx->pctx.protocol[base].desc;
+		goto check_icmp;
 	}
 
 	if (payload->payload.base == desc->base &&
@@ -728,7 +725,24 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 	 * if needed.
 	 */
 	if (desc == payload->payload.desc) {
+		const struct proto_hdr_template *tmpl;
+
 		payload->payload.offset += ctx->pctx.protocol[base].offset;
+check_icmp:
+		if (desc != &proto_icmp && desc != &proto_icmp6)
+			return 0;
+
+		tmpl = expr->payload.tmpl;
+
+		if (!tmpl || !tmpl->icmp_dep)
+			return 0;
+
+		if (payload_gen_icmp_dependency(ctx, expr, &nstmt) < 0)
+			return -1;
+
+		if (nstmt)
+			rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
+
 		return 0;
 	}
 	/* If we already have context and this payload is on the same
@@ -1326,26 +1340,55 @@ static int expr_evaluate_list(struct eval_ctx *ctx, struct expr **expr)
 	return 0;
 }
 
-static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
+static int __expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr *elem)
 {
+	int num_elem_exprs = 0, num_set_exprs = 0;
 	struct set *set = ctx->set;
-	struct expr *elem = *expr;
+	struct stmt *stmt;
 
-	if (elem->stmt) {
-		if (set->stmt && set->stmt->ops != elem->stmt->ops) {
-			return stmt_error(ctx, elem->stmt,
-					  "statement mismatch, element expects %s, "
-					  "but %s has type %s",
-					  elem->stmt->ops->name,
-					  set_is_map(set->flags) ? "map" : "set",
-					  set->stmt->ops->name);
-		} else if (!set->stmt && !(set->flags & NFT_SET_EVAL)) {
-			return stmt_error(ctx, elem->stmt,
-					  "missing %s statement in %s definition",
-					  elem->stmt->ops->name,
+	list_for_each_entry(stmt, &elem->stmt_list, list)
+		num_elem_exprs++;
+	list_for_each_entry(stmt, &set->stmt_list, list)
+		num_set_exprs++;
+
+	if (num_elem_exprs > 0) {
+		struct stmt *set_stmt, *elem_stmt;
+
+		if (num_set_exprs > 0 && num_elem_exprs != num_set_exprs) {
+			return expr_error(ctx->msgs, elem,
+					  "number of statements mismatch, set expects %d "
+					  "but element has %d", num_set_exprs,
+					  num_elem_exprs);
+		} else if (num_set_exprs == 0 && !(set->flags & NFT_SET_EVAL)) {
+			return expr_error(ctx->msgs, elem,
+					  "missing statements in %s definition",
 					  set_is_map(set->flags) ? "map" : "set");
 		}
+
+		set_stmt = list_first_entry(&set->stmt_list, struct stmt, list);
+
+		list_for_each_entry(elem_stmt, &elem->stmt_list, list) {
+			if (set_stmt->ops != elem_stmt->ops) {
+				return stmt_error(ctx, elem_stmt,
+						  "statement mismatch, element expects %s, "
+						  "but %s has type %s",
+						  elem_stmt->ops->name,
+						  set_is_map(set->flags) ? "map" : "set",
+						  set_stmt->ops->name);
+			}
+			set_stmt = list_next_entry(set_stmt, list);
+		}
 	}
+
+	return 0;
+}
+
+static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
+{
+	struct expr *elem = *expr;
+
+	if (ctx->set && __expr_evaluate_set_elem(ctx, elem) < 0)
+		return -1;
 
 	if (expr_evaluate(ctx, &elem->key) < 0)
 		return -1;
@@ -1428,6 +1471,12 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 	struct expr *map = *expr, *mappings;
 	const struct datatype *dtype;
 	struct expr *key, *data;
+
+	if (map->map->etype == EXPR_CT &&
+	    (map->map->ct.key == NFT_CT_SRC ||
+	     map->map->ct.key == NFT_CT_DST))
+		return expr_error(ctx->msgs, map->map,
+				  "specify either ip or ip6 for address matching");
 
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &map->map) < 0)
@@ -2745,6 +2794,7 @@ static int stmt_evaluate_reject_default(struct eval_ctx *ctx,
 		}
 		break;
 	case NFPROTO_BRIDGE:
+	case NFPROTO_NETDEV:
 		desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
 		if (desc == NULL) {
 			stmt->reject.type = NFT_REJECT_ICMPX_UNREACH;
@@ -3355,6 +3405,8 @@ static int stmt_evaluate_log(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 {
+	struct stmt *this;
+
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &stmt->set.set) < 0)
 		return -1;
@@ -3374,12 +3426,12 @@ static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 	if (stmt->set.key->comment != NULL)
 		return expr_error(ctx->msgs, stmt->set.key,
 				  "Key expression comments are not supported");
-	if (stmt->set.stmt) {
-		if (stmt_evaluate(ctx, stmt->set.stmt) < 0)
+	list_for_each_entry(this, &stmt->set.stmt_list, list) {
+		if (stmt_evaluate(ctx, this) < 0)
 			return -1;
-		if (!(stmt->set.stmt->flags & STMT_F_STATEFUL))
-			return stmt_binary_error(ctx, stmt->set.stmt, stmt,
-						 "meter statement must be stateful");
+		if (!(this->flags & STMT_F_STATEFUL))
+			return stmt_error(ctx, this,
+					  "statement must be stateful");
 	}
 
 	return 0;
@@ -3387,6 +3439,8 @@ static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_map(struct eval_ctx *ctx, struct stmt *stmt)
 {
+	struct stmt *this;
+
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &stmt->map.set) < 0)
 		return -1;
@@ -3420,12 +3474,12 @@ static int stmt_evaluate_map(struct eval_ctx *ctx, struct stmt *stmt)
 		return expr_error(ctx->msgs, stmt->map.data,
 				  "Data expression comments are not supported");
 
-	if (stmt->map.stmt) {
-		if (stmt_evaluate(ctx, stmt->map.stmt) < 0)
+	list_for_each_entry(this, &stmt->map.stmt_list, list) {
+		if (stmt_evaluate(ctx, this) < 0)
 			return -1;
-		if (!(stmt->map.stmt->flags & STMT_F_STATEFUL))
-			return stmt_binary_error(ctx, stmt->map.stmt, stmt,
-						 "meter statement must be stateful");
+		if (!(this->flags & STMT_F_STATEFUL))
+			return stmt_error(ctx, this,
+					  "statement must be stateful");
 	}
 
 	return 0;
@@ -3623,7 +3677,9 @@ static int set_key_data_error(struct eval_ctx *ctx, const struct set *set,
 
 static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 {
+	unsigned int num_stmts = 0;
 	struct table *table;
+	struct stmt *stmt;
 	const char *type;
 
 	table = table_lookup_global(ctx);
@@ -3683,6 +3739,12 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	/* Default timeout value implies timeout support */
 	if (set->timeout)
 		set->flags |= NFT_SET_TIMEOUT;
+
+	list_for_each_entry(stmt, &set->stmt_list, list)
+		num_stmts++;
+
+	if (num_stmts > 1)
+		set->flags |= NFT_SET_EXPR;
 
 	if (set_is_anonymous(set->flags))
 		return 0;

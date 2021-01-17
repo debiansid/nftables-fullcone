@@ -1,3 +1,15 @@
+nftables (0.9.8-1) unstable; urgency=medium
+
+  * [ccb440d] New upstream version 0.9.8
+    Closes: #944759
+    Closes: #933621
+    Closes: #932878
+  * [fb3429c] src:nftables: bump build-dep on libnftnl to 1.1.9
+  * [1539707] src:nftables: bump std-version to 4.5.1
+  * [48ea92d] src:nftables: switch to libeditreadline (Closes: #979103)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Sun, 17 Jan 2021 18:48:39 +0100
+
 nftables (0.9.7-1) unstable; urgency=medium
 
   * [8813565] d/t/control: mark nft -h test as superficial (Closes: #969851)

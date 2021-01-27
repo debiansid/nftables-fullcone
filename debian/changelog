@@ -1,3 +1,10 @@
+nftables (0.9.8-2) unstable; urgency=medium
+
+  [ Helmut Grohne ]
+  * [4eb3236] src:nftables: reduce Build-Depends (Closes: #981206)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 27 Jan 2021 18:04:11 +0100
+
 nftables (0.9.8-1) unstable; urgency=medium
 
   * [ccb440d] New upstream version 0.9.8

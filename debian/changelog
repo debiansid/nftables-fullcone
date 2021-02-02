@@ -1,3 +1,10 @@
+nftables (0.9.8-3) unstable; urgency=medium
+
+  * [94a6c9b] src:nftables: add docbook-xsl again as build-dep.
+    Thanks to Michael Biebl for the suggestion (Closes: #981641)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 02 Feb 2021 17:25:57 +0100
+
 nftables (0.9.8-2) unstable; urgency=medium
 
   [ Helmut Grohne ]

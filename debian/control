@@ -87,7 +87,10 @@ Package: python3-nftables
 Priority: optional
 Section: python
 Architecture: linux-any
-Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${python3:Depends}
+Depends: libnftables1 (=${binary:Version}),
+         python3-jsonschema,
+         ${misc:Depends},
+         ${python3:Depends}
 Description: nftables/libnftables python3 module
  The libnftables library provides high level semantics to interact with the
  nftables framework by the Netfilter project.

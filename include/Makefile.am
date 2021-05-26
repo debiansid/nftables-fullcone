@@ -29,8 +29,10 @@ noinst_HEADERS = 	cli.h		\
 			numgen.h	\
 			netlink.h	\
 			osf.h		\
+			owner.h		\
 			parser.h	\
 			proto.h		\
+			sctp_chunk.h	\
 			socket.h	\
 			rule.h		\
 			rt.h		\

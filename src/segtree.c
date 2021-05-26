@@ -210,6 +210,12 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 			ei = lei;
 			goto err;
 		}
+		/* single element contained in an existing interval */
+		if (mpz_cmp(new->left, new->right) == 0) {
+			ei_destroy(new);
+			goto out;
+		}
+
 		/*
 		 * The new interval is entirely contained in the same interval,
 		 * split it into two parts:
@@ -277,7 +283,7 @@ static int ei_insert(struct list_head *msgs, struct seg_tree *tree,
 	}
 
 	__ei_insert(tree, new);
-
+out:
 	mpz_clear(p);
 
 	return 0;
@@ -612,9 +618,26 @@ int set_to_intervals(struct list_head *errs, struct set *set,
 		     struct expr *init, bool add, unsigned int debug_mask,
 		     bool merge, struct output_ctx *octx)
 {
+	struct expr *catchall = NULL, *i, *in, *key;
 	struct elementary_interval *ei, *next;
 	struct seg_tree tree;
 	LIST_HEAD(list);
+
+	list_for_each_entry_safe(i, in, &init->expressions, list) {
+		if (i->etype == EXPR_MAPPING)
+			key = i->left->key;
+		else if (i->etype == EXPR_SET_ELEM)
+			key = i->key;
+		else
+			continue;
+
+		if (key->etype == EXPR_SET_ELEM_CATCHALL) {
+			init->size--;
+			catchall = i;
+			list_del(&i->list);
+			break;
+		}
+	}
 
 	seg_tree_init(&tree, set, init, debug_mask);
 	if (set_to_segtree(errs, set, init, &tree, add, merge) < 0)
@@ -635,6 +658,11 @@ int set_to_intervals(struct list_head *errs, struct set *set,
 	if (segtree_debug(tree.debug_mask)) {
 		expr_print(init, octx);
 		pr_gmp_debug("\n");
+	}
+
+	if (catchall) {
+		list_add_tail(&catchall->list, &init->expressions);
+		init->size++;
 	}
 
 	return 0;
@@ -674,6 +702,9 @@ struct expr *get_set_intervals(const struct set *set, const struct expr *init)
 		case EXPR_CONCAT:
 			compound_expr_add(new_init, expr_clone(i));
 			i->flags |= EXPR_F_INTERVAL_END;
+			compound_expr_add(new_init, expr_clone(i));
+			break;
+		case EXPR_SET_ELEM_CATCHALL:
 			compound_expr_add(new_init, expr_clone(i));
 			break;
 		default:
@@ -832,8 +863,8 @@ static int range_mask_len(const mpz_t start, const mpz_t end, unsigned int len)
 	mpz_t tmp_start, tmp_end;
 	int ret;
 
-	mpz_init_set_ui(tmp_start, mpz_get_ui(start));
-	mpz_init_set_ui(tmp_end, mpz_get_ui(end));
+	mpz_init_set(tmp_start, start);
+	mpz_init_set(tmp_end, end);
 
 	while (mpz_cmp(tmp_start, tmp_end) <= 0 &&
 		!mpz_tstbit(tmp_start, 0) && mpz_tstbit(tmp_end, 0) &&
@@ -935,8 +966,8 @@ next:
 
 void interval_map_decompose(struct expr *set)
 {
+	struct expr *i, *next, *low = NULL, *end, *catchall = NULL, *key;
 	struct expr **elements, **ranges;
-	struct expr *i, *next, *low = NULL, *end;
 	unsigned int n, m, size;
 	mpz_t range, p;
 	bool interval;
@@ -953,6 +984,17 @@ void interval_map_decompose(struct expr *set)
 	/* Sort elements */
 	n = 0;
 	list_for_each_entry_safe(i, next, &set->expressions, list) {
+		key = NULL;
+		if (i->etype == EXPR_SET_ELEM)
+			key = i->key;
+		else if (i->etype == EXPR_MAPPING)
+			key = i->left->key;
+
+		if (key && key->etype == EXPR_SET_ELEM_CATCHALL) {
+			list_del(&i->list);
+			catchall = i;
+			continue;
+		}
 		compound_expr_remove(set, i);
 		elements[n++] = i;
 	}
@@ -1088,6 +1130,9 @@ void interval_map_decompose(struct expr *set)
 
 	compound_expr_add(set, i);
 out:
+	if (catchall)
+		compound_expr_add(set, catchall);
+
 	mpz_clear(range);
 	mpz_clear(p);
 

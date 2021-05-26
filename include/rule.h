@@ -131,10 +131,11 @@ struct symbol *symbol_get(const struct scope *scope, const char *identifier);
 
 enum table_flags {
 	TABLE_F_DORMANT		= (1 << 0),
+	TABLE_F_OWNER		= (1 << 1),
 };
-#define TABLE_FLAGS_MAX 1
+#define TABLE_FLAGS_MAX		2
 
-extern const char *table_flags_name[TABLE_FLAGS_MAX];
+const char *table_flag_name(uint32_t flag);
 
 /**
  * struct table - nftables table
@@ -151,10 +152,14 @@ extern const char *table_flags_name[TABLE_FLAGS_MAX];
  */
 struct table {
 	struct list_head	list;
+	struct cache_item	cache;
 	struct handle		handle;
 	struct location		location;
 	struct scope		scope;
-	struct list_head	*chain_htable;
+	struct cache		chain_cache;
+	struct cache		set_cache;
+	struct cache		obj_cache;
+	struct cache		ft_cache;
 	struct list_head	chains;
 	struct list_head	sets;
 	struct list_head	objs;
@@ -162,15 +167,13 @@ struct table {
 	struct list_head	chain_bindings;
 	enum table_flags 	flags;
 	unsigned int		refcnt;
+	uint32_t		owner;
 	const char		*comment;
 };
 
 extern struct table *table_alloc(void);
 extern struct table *table_get(struct table *table);
 extern void table_free(struct table *table);
-extern void table_add_hash(struct table *table, struct nft_cache *cache);
-extern struct table *table_lookup(const struct handle *h,
-				  const struct nft_cache *cache);
 extern struct table *table_lookup_fuzzy(const struct handle *h,
 					const struct nft_cache *cache);
 
@@ -183,6 +186,14 @@ enum chain_flags {
 	CHAIN_F_BASECHAIN	= 0x1,
 	CHAIN_F_HW_OFFLOAD	= 0x2,
 	CHAIN_F_BINDING		= 0x4,
+};
+
+/**
+ * enum flowtable_flags - flowtable flags
+ *
+ */
+enum flowtable_flags {
+	FLOWTABLE_F_HW_OFFLOAD	= 0x1, /* NF_FLOWTABLE_HW_OFFLOAD in linux nf_flow_table.h */
 };
 
 /**
@@ -200,6 +211,11 @@ struct hook_spec {
 	struct location	loc;
 	const char	*name;
 	unsigned int	num;
+};
+
+struct chain_type_spec {
+	struct location	loc;
+	const char	*str;
 };
 
 /**
@@ -220,7 +236,7 @@ struct hook_spec {
  */
 struct chain {
 	struct list_head	list;
-	struct list_head	hlist;
+	struct cache_item	cache;
 	struct handle		handle;
 	struct location		location;
 	unsigned int		refcnt;
@@ -231,7 +247,7 @@ struct chain {
 		struct prio_spec	priority;
 		struct hook_spec	hook;
 		struct expr		*policy;
-		const char		*type;
+		struct chain_type_spec	type;
 		const char		**dev_array;
 		struct expr		*dev_expr;
 		int			dev_array_len;
@@ -247,8 +263,6 @@ extern const char *chain_hookname_lookup(const char *name);
 extern struct chain *chain_alloc(const char *name);
 extern struct chain *chain_get(struct chain *chain);
 extern void chain_free(struct chain *chain);
-extern struct chain *chain_lookup(const struct table *table,
-				  const struct handle *h);
 extern struct chain *chain_lookup_fuzzy(const struct handle *h,
 					const struct nft_cache *cache,
 					const struct table **table);
@@ -321,6 +335,7 @@ void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
  */
 struct set {
 	struct list_head	list;
+	struct cache_item	cache;
 	struct handle		handle;
 	struct location		location;
 	unsigned int		refcnt;
@@ -349,8 +364,6 @@ extern struct set *set_alloc(const struct location *loc);
 extern struct set *set_get(struct set *set);
 extern void set_free(struct set *set);
 extern struct set *set_clone(const struct set *set);
-extern void set_add_hash(struct set *set, struct table *table);
-extern struct set *set_lookup(const struct table *table, const char *name);
 extern struct set *set_lookup_global(uint32_t family, const char *table,
 				     const char *name, struct nft_cache *cache);
 extern struct set *set_lookup_fuzzy(const char *set_name,
@@ -476,6 +489,7 @@ struct secmark {
  */
 struct obj {
 	struct list_head		list;
+	struct cache_item		cache;
 	struct location			location;
 	struct handle			handle;
 	uint32_t			type;
@@ -496,9 +510,6 @@ struct obj {
 struct obj *obj_alloc(const struct location *loc);
 extern struct obj *obj_get(struct obj *obj);
 void obj_free(struct obj *obj);
-void obj_add_hash(struct obj *obj, struct table *table);
-struct obj *obj_lookup(const struct table *table, const char *name,
-		       uint32_t type);
 struct obj *obj_lookup_fuzzy(const char *obj_name,
 			     const struct nft_cache *cache,
 			     const struct table **t);
@@ -509,6 +520,7 @@ uint32_t obj_type_to_cmd(uint32_t type);
 
 struct flowtable {
 	struct list_head	list;
+	struct cache_item	cache;
 	struct handle		handle;
 	struct scope		scope;
 	struct location		location;
@@ -524,8 +536,6 @@ struct flowtable {
 extern struct flowtable *flowtable_alloc(const struct location *loc);
 extern struct flowtable *flowtable_get(struct flowtable *flowtable);
 extern void flowtable_free(struct flowtable *flowtable);
-extern void flowtable_add_hash(struct flowtable *flowtable, struct table *table);
-extern struct flowtable *flowtable_lookup(const struct table *table, const char *name);
 extern struct flowtable *flowtable_lookup_fuzzy(const char *ft_name,
 						const struct nft_cache *cache,
 						const struct table **table);
@@ -758,12 +768,6 @@ extern struct error_record *rule_postprocess(struct rule *rule);
 
 struct netlink_ctx;
 extern int do_command(struct netlink_ctx *ctx, struct cmd *cmd);
-
-extern unsigned int cache_evaluate(struct nft_ctx *nft, struct list_head *cmds);
-extern int cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
-			struct list_head *msgs);
-extern bool cache_needs_update(struct nft_cache *cache);
-extern void cache_release(struct nft_cache *cache);
 
 struct timeout_protocol {
 	uint32_t array_size;

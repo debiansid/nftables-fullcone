@@ -105,6 +105,7 @@ static void nft_init(struct nft_ctx *ctx)
 
 static void nft_exit(struct nft_ctx *ctx)
 {
+	cache_free(&ctx->cache.table_cache);
 	expr_handler_exit();
 	ct_label_table_exit(ctx);
 	realm_table_rt_exit(ctx);
@@ -166,7 +167,7 @@ struct nft_ctx *nft_ctx_new(uint32_t flags)
 	ctx->state = xzalloc(sizeof(struct parser_state));
 	nft_ctx_add_include_path(ctx, DEFAULT_INCLUDE_PATH);
 	ctx->parser_max_errors	= 10;
-	init_list_head(&ctx->cache.list);
+	cache_init(&ctx->cache.table_cache);
 	ctx->top_scope = scope_alloc();
 	ctx->flags = flags;
 	ctx->output.output_fp = stdout;
@@ -303,7 +304,7 @@ void nft_ctx_free(struct nft_ctx *ctx)
 	exit_cookie(&ctx->output.output_cookie);
 	exit_cookie(&ctx->output.error_cookie);
 	iface_cache_release();
-	cache_release(&ctx->cache);
+	nft_cache_release(&ctx->cache);
 	nft_ctx_clear_include_paths(ctx);
 	scope_free(ctx->top_scope);
 	xfree(ctx->state);
@@ -416,8 +417,8 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 	unsigned int flags;
 	struct cmd *cmd;
 
-	flags = cache_evaluate(nft, cmds);
-	if (cache_update(nft, flags, msgs) < 0)
+	flags = nft_cache_evaluate(nft, cmds);
+	if (nft_cache_update(nft, flags, msgs) < 0)
 		return -1;
 
 	list_for_each_entry(cmd, cmds, list) {
@@ -496,7 +497,7 @@ err:
 	    nft_output_echo(&nft->output))
 		json_print_echo(nft);
 	if (rc)
-		cache_release(&nft->cache);
+		nft_cache_release(&nft->cache);
 	return rc;
 }
 
@@ -547,6 +548,6 @@ err:
 	    nft_output_echo(&nft->output))
 		json_print_echo(nft);
 	if (rc)
-		cache_release(&nft->cache);
+		nft_cache_release(&nft->cache);
 	return rc;
 }

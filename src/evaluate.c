@@ -166,20 +166,6 @@ static int byteorder_conversion(struct eval_ctx *ctx, struct expr **expr,
 	return 0;
 }
 
-static struct table *table_lookup_global(struct eval_ctx *ctx)
-{
-	struct table *table;
-
-	if (ctx->table != NULL)
-		return ctx->table;
-
-	table = table_lookup(&ctx->cmd->handle, &ctx->nft->cache);
-	if (table == NULL)
-		return NULL;
-
-	return table;
-}
-
 static int table_not_found(struct eval_ctx *ctx)
 {
 	struct table *table;
@@ -238,7 +224,7 @@ static int flowtable_not_found(struct eval_ctx *ctx, const struct location *loc,
 	struct flowtable *ft;
 
 	ft = flowtable_lookup_fuzzy(ft_name, &ctx->nft->cache, &table);
-	if (ft == NULL)
+	if (!ft)
 		return cmd_error(ctx, loc, "%s", strerror(ENOENT));
 
 	return cmd_error(ctx, loc,
@@ -269,12 +255,14 @@ static int expr_evaluate_symbol(struct eval_ctx *ctx, struct expr **expr)
 		}
 		break;
 	case SYMBOL_SET:
-		table = table_lookup_global(ctx);
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 ctx->cmd->handle.table.name,
+					 ctx->cmd->handle.family);
 		if (table == NULL)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, (*expr)->identifier);
-		if (set == NULL)
+		set = set_cache_find(table, (*expr)->identifier);
+		if (set == NULL || !set->key)
 			return set_not_found(ctx, &(*expr)->location,
 					     (*expr)->identifier);
 
@@ -580,9 +568,8 @@ static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 
 	switch (expr->exthdr.op) {
 	case NFT_EXTHDR_OP_TCPOPT:
-		dependency = &proto_tcp;
-		pb = PROTO_BASE_TRANSPORT_HDR;
-		break;
+	case NFT_EXTHDR_OP_SCTP:
+		return __expr_evaluate_exthdr(ctx, exprp);
 	case NFT_EXTHDR_OP_IPV4:
 		dependency = &proto_ip;
 		break;
@@ -1266,6 +1253,12 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr,
 	list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
 		unsigned dsize_bytes;
 
+		if (i->etype == EXPR_CT &&
+		    (i->ct.key == NFT_CT_SRC ||
+		     i->ct.key == NFT_CT_DST))
+			return expr_error(ctx->msgs, i,
+					  "specify either ip or ip6 for address matching");
+
 		if (expr_is_constant(*expr) && dtype && off == 0)
 			return expr_binary_error(ctx->msgs, i, *expr,
 						 "unexpected concat component, "
@@ -1359,10 +1352,12 @@ static int __expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr *elem)
 					  "number of statements mismatch, set expects %d "
 					  "but element has %d", num_set_exprs,
 					  num_elem_exprs);
-		} else if (num_set_exprs == 0 && !(set->flags & NFT_SET_EVAL)) {
-			return expr_error(ctx->msgs, elem,
-					  "missing statements in %s definition",
-					  set_is_map(set->flags) ? "map" : "set");
+		} else if (num_set_exprs == 0) {
+			if (!(set->flags & NFT_SET_EVAL))
+				return expr_error(ctx->msgs, elem,
+						  "missing statements in %s definition",
+						  set_is_map(set->flags) ? "map" : "set");
+			return 0;
 		}
 
 		set_stmt = list_first_entry(&set->stmt_list, struct stmt, list);
@@ -1387,8 +1382,15 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *elem = *expr;
 
-	if (ctx->set && __expr_evaluate_set_elem(ctx, elem) < 0)
-		return -1;
+	if (ctx->set) {
+		const struct expr *key;
+
+		if (__expr_evaluate_set_elem(ctx, elem) < 0)
+			return -1;
+
+		key = ctx->set->key;
+		__expr_set_context(&ctx->ectx, key->dtype, key->byteorder, key->len, 0);
+	}
 
 	if (expr_evaluate(ctx, &elem->key) < 0)
 		return -1;
@@ -1477,6 +1479,17 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 	     map->map->ct.key == NFT_CT_DST))
 		return expr_error(ctx->msgs, map->map,
 				  "specify either ip or ip6 for address matching");
+	else if (map->map->etype == EXPR_CONCAT) {
+		struct expr *i;
+
+		list_for_each_entry(i, &map->map->expressions, list) {
+			if (i->etype == EXPR_CT &&
+			    (i->ct.key == NFT_CT_SRC ||
+			     i->ct.key == NFT_CT_DST))
+				return expr_error(ctx->msgs, i,
+					  "specify either ip or ip6 for address matching");
+		}
+	}
 
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &map->map) < 0)
@@ -1581,7 +1594,7 @@ static int expr_evaluate_mapping(struct eval_ctx *ctx, struct expr **expr)
 		else
 			datalen = set->data->len;
 
-		expr_set_context(&ctx->ectx, set->data->dtype, datalen);
+		__expr_set_context(&ctx->ectx, set->data->dtype, set->data->byteorder, datalen, 0);
 	} else {
 		assert((set->flags & NFT_SET_MAP) == 0);
 	}
@@ -1941,6 +1954,14 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 
 		/* fall through */
 	case OP_NEQ:
+	case OP_NEG:
+		if (rel->op == OP_NEG &&
+		    (right->etype != EXPR_VALUE ||
+		     right->dtype->basetype == NULL ||
+		     right->dtype->basetype->type != TYPE_BITMASK))
+			return expr_binary_error(ctx->msgs, left, right,
+						 "negation can only be used with singleton bitmask values");
+
 		switch (right->etype) {
 		case EXPR_RANGE:
 			if (byteorder_conversion(ctx, &rel->left, BYTEORDER_BIG_ENDIAN) < 0)
@@ -2114,6 +2135,25 @@ static int expr_evaluate_xfrm(struct eval_ctx *ctx, struct expr **exprp)
 	return expr_evaluate_primary(ctx, exprp);
 }
 
+static int expr_evaluate_flagcmp(struct eval_ctx *ctx, struct expr **exprp)
+{
+	struct expr *expr = *exprp, *binop, *rel;
+
+	if (expr->op != OP_EQ &&
+	    expr->op != OP_NEQ)
+		return expr_error(ctx->msgs, expr, "either == or != is allowed");
+
+	binop = binop_expr_alloc(&expr->location, OP_AND,
+				 expr_get(expr->flagcmp.expr),
+				 expr_get(expr->flagcmp.mask));
+	rel = relational_expr_alloc(&expr->location, expr->op, binop,
+				    expr_get(expr->flagcmp.value));
+	expr_free(expr);
+	*exprp = rel;
+
+	return expr_evaluate(ctx, exprp);
+}
+
 static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 {
 	if (ctx->nft->debug_mask & NFT_DEBUG_EVALUATION) {
@@ -2181,6 +2221,10 @@ static int expr_evaluate(struct eval_ctx *ctx, struct expr **expr)
 		return expr_evaluate_hash(ctx, expr);
 	case EXPR_XFRM:
 		return expr_evaluate_xfrm(ctx, expr);
+	case EXPR_SET_ELEM_CATCHALL:
+		return 0;
+	case EXPR_FLAGCMP:
+		return expr_evaluate_flagcmp(ctx, expr);
 	default:
 		BUG("unknown expression type %s\n", expr_name(*expr));
 	}
@@ -2703,10 +2747,9 @@ static int stmt_evaluate_reject_bridge(struct eval_ctx *ctx, struct stmt *stmt,
 	const struct proto_desc *desc;
 
 	desc = ctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
-	if (desc != &proto_eth && desc != &proto_vlan)
-		return stmt_binary_error(ctx,
-					 &ctx->pctx.protocol[PROTO_BASE_LL_HDR],
-					 stmt, "unsupported link layer protocol");
+	if (desc != &proto_eth && desc != &proto_vlan && desc != &proto_netdev)
+		return __stmt_binary_error(ctx, &stmt->location, NULL,
+					   "cannot reject from this link layer protocol");
 
 	desc = ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
 	if (desc != NULL &&
@@ -2743,6 +2786,7 @@ static int stmt_evaluate_reject_family(struct eval_ctx *ctx, struct stmt *stmt,
 		}
 		break;
 	case NFPROTO_BRIDGE:
+	case NFPROTO_NETDEV:
 		if (stmt_evaluate_reject_bridge(ctx, stmt, expr) < 0)
 			return -1;
 		break;
@@ -2939,12 +2983,48 @@ static int evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 				 expr);
 }
 
+static bool nat_evaluate_addr_has_th_expr(const struct expr *map)
+{
+	const struct expr *i, *concat;
+
+	if (!map || map->etype != EXPR_MAP)
+		return false;
+
+	concat = map->map;
+	if (concat ->etype != EXPR_CONCAT)
+		return false;
+
+	list_for_each_entry(i, &concat->expressions, list) {
+		enum proto_bases base;
+
+		if ((i->flags & EXPR_F_PROTOCOL) == 0)
+			continue;
+
+		switch (i->etype) {
+		case EXPR_META:
+			base = i->meta.base;
+			break;
+		case EXPR_PAYLOAD:
+			base = i->payload.base;
+			break;
+		default:
+			return false;
+		}
+
+		if (base == PROTO_BASE_NETWORK_HDR)
+			return true;
+	}
+
+	return false;
+}
+
 static int nat_evaluate_transport(struct eval_ctx *ctx, struct stmt *stmt,
 				  struct expr **expr)
 {
 	struct proto_ctx *pctx = &ctx->pctx;
 
-	if (pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc == NULL)
+	if (pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc == NULL &&
+	    !nat_evaluate_addr_has_th_expr(stmt->nat.addr))
 		return stmt_binary_error(ctx, *expr, stmt,
 					 "transport protocol mapping is only "
 					 "valid after transport protocol match");
@@ -3641,11 +3721,13 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 	struct table *table;
 	struct set *set;
 
-	table = table_lookup_global(ctx);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
 	if (table == NULL)
 		return table_not_found(ctx);
 
-	set = set_lookup(table, ctx->cmd->handle.set.name);
+	set = set_cache_find(table, ctx->cmd->handle.set.name);
 	if (set == NULL)
 		return set_not_found(ctx, &ctx->cmd->handle.set.location,
 				     ctx->cmd->handle.set.name);
@@ -3682,9 +3764,15 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	struct stmt *stmt;
 	const char *type;
 
-	table = table_lookup_global(ctx);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
 	if (table == NULL)
 		return table_not_found(ctx);
+
+	if (!(set->flags & NFT_SET_ANONYMOUS) &&
+	    !set_cache_find(table, set->handle.set.name))
+		set_cache_add(set_get(set), table);
 
 	if (!(set->flags & NFT_SET_INTERVAL) && set->automerge)
 		return set_error(ctx, set, "auto-merge only works with interval sets");
@@ -3755,11 +3843,14 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 				   set->key->byteorder, set->key->len, 0);
 		if (expr_evaluate(ctx, &set->init) < 0)
 			return -1;
+		if (set->init->etype != EXPR_SET)
+			return expr_error(ctx->msgs, set->init, "Set %s: Unexpected initial type %s, missing { }?",
+					  set->handle.set.name, expr_name(set->init));
 	}
 	ctx->set = NULL;
 
-	if (set_lookup(table, set->handle.set.name) == NULL)
-		set_add_hash(set_get(set), table);
+	if (set_cache_find(table, set->handle.set.name) == NULL)
+		set_cache_add(set_get(set), table);
 
 	return 0;
 }
@@ -3774,8 +3865,8 @@ static bool evaluate_priority(struct eval_ctx *ctx, struct prio_spec *prio,
 	int prio_snd;
 	char op;
 
-	ctx->ectx.dtype = &priority_type;
-	ctx->ectx.len = NFT_NAME_MAXLEN * BITS_PER_BYTE;
+	expr_set_context(&ctx->ectx, &priority_type, NFT_NAME_MAXLEN * BITS_PER_BYTE);
+
 	if (expr_evaluate(ctx, &prio->expr) < 0)
 		return false;
 	if (prio->expr->etype != EXPR_VALUE) {
@@ -3882,9 +3973,14 @@ static int flowtable_evaluate(struct eval_ctx *ctx, struct flowtable *ft)
 {
 	struct table *table;
 
-	table = table_lookup_global(ctx);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
 	if (table == NULL)
 		return table_not_found(ctx);
+
+	if (!ft_cache_find(table, ft->handle.flowtable.name))
+		ft_cache_add(flowtable_get(ft), table);
 
 	if (ft->hook.name) {
 		ft->hook.num = str2hooknum(NFPROTO_NETDEV, ft->hook.name);
@@ -3927,11 +4023,13 @@ static int rule_cache_update(struct eval_ctx *ctx, enum cmd_ops op)
 	struct table *table;
 	struct chain *chain;
 
-	table = table_lookup(&rule->handle, &ctx->nft->cache);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 rule->handle.table.name,
+				 rule->handle.family);
 	if (!table)
 		return table_not_found(ctx);
 
-	chain = chain_cache_find(table, &rule->handle);
+	chain = chain_cache_find(table, rule->handle.chain.name);
 	if (!chain)
 		return chain_not_found(ctx);
 
@@ -4015,7 +4113,7 @@ static int rule_evaluate(struct eval_ctx *ctx, struct rule *rule,
 		return -1;
 	}
 
-	if (cache_needs_update(&ctx->nft->cache))
+	if (nft_cache_needs_update(&ctx->nft->cache))
 		return rule_cache_update(ctx, op);
 
 	return 0;
@@ -4069,19 +4167,21 @@ static int chain_evaluate(struct eval_ctx *ctx, struct chain *chain)
 	struct table *table;
 	struct rule *rule;
 
-	table = table_lookup_global(ctx);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
 	if (table == NULL)
 		return table_not_found(ctx);
 
 	if (chain == NULL) {
-		if (chain_lookup(table, &ctx->cmd->handle) == NULL) {
+		if (!chain_cache_find(table, ctx->cmd->handle.chain.name)) {
 			chain = chain_alloc(NULL);
 			handle_merge(&chain->handle, &ctx->cmd->handle);
 			chain_cache_add(chain, table);
 		}
 		return 0;
 	} else if (!(chain->flags & CHAIN_F_BINDING)) {
-		if (chain_lookup(table, &chain->handle) == NULL)
+		if (!chain_cache_find(table, chain->handle.chain.name))
 			chain_cache_add(chain_get(chain), table);
 	}
 
@@ -4168,6 +4268,17 @@ static int ct_timeout_evaluate(struct eval_ctx *ctx, struct obj *obj)
 
 static int obj_evaluate(struct eval_ctx *ctx, struct obj *obj)
 {
+	struct table *table;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
+	if (!table)
+		return table_not_found(ctx);
+
+	if (!obj_cache_find(table, obj->handle.obj.name, obj->type))
+		obj_cache_add(obj_get(obj), table);
+
 	switch (obj->type) {
 	case NFT_OBJECT_CT_TIMEOUT:
 		return ct_timeout_evaluate(ctx, obj);
@@ -4187,13 +4298,15 @@ static int table_evaluate(struct eval_ctx *ctx, struct table *table)
 	struct set *set;
 	struct obj *obj;
 
-	if (table_lookup(&ctx->cmd->handle, &ctx->nft->cache) == NULL) {
-		if (table == NULL) {
+	if (!table_cache_find(&ctx->nft->cache.table_cache,
+			      ctx->cmd->handle.table.name,
+			      ctx->cmd->handle.family)) {
+		if (!table) {
 			table = table_alloc();
 			handle_merge(&table->handle, &ctx->cmd->handle);
-			table_add_hash(table, &ctx->nft->cache);
+			table_cache_add(table, &ctx->nft->cache);
 		} else {
-			table_add_hash(table_get(table), &ctx->nft->cache);
+			table_cache_add(table_get(table), &ctx->nft->cache);
 		}
 	}
 
@@ -4254,6 +4367,7 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SECMARK:
 	case CMD_OBJ_CT_EXPECT:
 	case CMD_OBJ_SYNPROXY:
+		handle_merge(&cmd->object->handle, &cmd->handle);
 		return obj_evaluate(ctx, cmd->object);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
@@ -4264,12 +4378,105 @@ static void table_del_cache(struct eval_ctx *ctx, struct cmd *cmd)
 {
 	struct table *table;
 
-	table = table_lookup(&cmd->handle, &ctx->nft->cache);
+	if (!cmd->handle.table.name)
+		return;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
 	if (!table)
 		return;
 
-	list_del(&table->list);
+	table_cache_del(table);
 	table_free(table);
+}
+
+static void chain_del_cache(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	struct table *table;
+	struct chain *chain;
+
+	if (!cmd->handle.chain.name)
+		return;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
+	if (!table)
+		return;
+
+	chain = chain_cache_find(table, cmd->handle.chain.name);
+	if (!chain)
+		return;
+
+	chain_cache_del(chain);
+	chain_free(chain);
+}
+
+static void set_del_cache(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	struct table *table;
+	struct set *set;
+
+	if (!cmd->handle.set.name)
+		return;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
+	if (!table)
+		return;
+
+	set = set_cache_find(table, cmd->handle.set.name);
+	if (!set)
+		return;
+
+	set_cache_del(set);
+	set_free(set);
+}
+
+static void ft_del_cache(struct eval_ctx *ctx, struct cmd *cmd)
+{
+	struct flowtable *ft;
+	struct table *table;
+
+	if (!cmd->handle.flowtable.name)
+		return;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
+	if (!table)
+		return;
+
+	ft = ft_cache_find(table, cmd->handle.flowtable.name);
+	if (!ft)
+		return;
+
+	ft_cache_del(ft);
+	flowtable_free(ft);
+}
+
+static void obj_del_cache(struct eval_ctx *ctx, struct cmd *cmd, int type)
+{
+	struct table *table;
+	struct obj *obj;
+
+	if (!cmd->handle.obj.name)
+		return;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
+	if (!table)
+		return;
+
+	obj = obj_cache_find(table, cmd->handle.obj.name, type);
+	if (!obj)
+		return;
+
+	obj_cache_del(obj);
+	obj_free(obj);
 }
 
 static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
@@ -4278,21 +4485,42 @@ static int cmd_evaluate_delete(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_ELEMENTS:
 		return setelem_evaluate(ctx, cmd);
 	case CMD_OBJ_SET:
+		set_del_cache(ctx, cmd);
+		return 0;
 	case CMD_OBJ_RULE:
+		return 0;
 	case CMD_OBJ_CHAIN:
+		chain_del_cache(ctx, cmd);
 		return 0;
 	case CMD_OBJ_TABLE:
 		table_del_cache(ctx, cmd);
 		return 0;
 	case CMD_OBJ_FLOWTABLE:
+		ft_del_cache(ctx, cmd);
+		return 0;
 	case CMD_OBJ_COUNTER:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_COUNTER);
+		return 0;
 	case CMD_OBJ_QUOTA:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_QUOTA);
+		return 0;
 	case CMD_OBJ_CT_HELPER:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_CT_HELPER);
+		return 0;
 	case CMD_OBJ_CT_TIMEOUT:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_CT_TIMEOUT);
+		return 0;
 	case CMD_OBJ_LIMIT:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_LIMIT);
+		return 0;
 	case CMD_OBJ_SECMARK:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_SECMARK);
+		return 0;
 	case CMD_OBJ_CT_EXPECT:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_CT_EXPECT);
+		return 0;
 	case CMD_OBJ_SYNPROXY:
+		obj_del_cache(ctx, cmd, NFT_OBJECT_SYNPROXY);
 		return 0;
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
@@ -4334,11 +4562,13 @@ static int cmd_evaluate_list_obj(struct eval_ctx *ctx, const struct cmd *cmd,
 	if (obj_type == NFT_OBJECT_UNSPEC)
 		obj_type = NFT_OBJECT_COUNTER;
 
-	table = table_lookup(&cmd->handle, &ctx->nft->cache);
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 cmd->handle.table.name,
+				 cmd->handle.family);
 	if (table == NULL)
 		return table_not_found(ctx);
 
-	if (obj_lookup(table, cmd->handle.obj.name, obj_type) == NULL)
+	if (!obj_cache_find(table, cmd->handle.obj.name, obj_type))
 		return obj_not_found(ctx, &cmd->handle.obj.location,
 				     cmd->handle.obj.name);
 
@@ -4356,17 +4586,21 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 		if (cmd->handle.table.name == NULL)
 			return 0;
 
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
 		return 0;
 	case CMD_OBJ_SET:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4376,11 +4610,13 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 
 		return 0;
 	case CMD_OBJ_METER:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4390,11 +4626,13 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 
 		return 0;
 	case CMD_OBJ_MAP:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4404,21 +4642,25 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 
 		return 0;
 	case CMD_OBJ_CHAIN:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		if (chain_lookup(table, &cmd->handle) == NULL)
+		if (!chain_cache_find(table, cmd->handle.chain.name))
 			return chain_not_found(ctx);
 
 		return 0;
 	case CMD_OBJ_FLOWTABLE:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		ft = flowtable_lookup(table, cmd->handle.flowtable.name);
-		if (ft == NULL)
+		ft = ft_cache_find(table, cmd->handle.flowtable.name);
+		if (!ft)
 			return flowtable_not_found(ctx, &ctx->cmd->handle.flowtable.location,
 						   ctx->cmd->handle.flowtable.name);
 
@@ -4449,7 +4691,9 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SYNPROXYS:
 		if (cmd->handle.table.name == NULL)
 			return 0;
-		if (table_lookup(&cmd->handle, &ctx->nft->cache) == NULL)
+		if (!table_cache_find(&ctx->nft->cache.table_cache,
+				      cmd->handle.table.name,
+				      cmd->handle.family))
 			return table_not_found(ctx);
 
 		return 0;
@@ -4472,7 +4716,9 @@ static int cmd_evaluate_reset(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_QUOTAS:
 		if (cmd->handle.table.name == NULL)
 			return 0;
-		if (table_lookup(&cmd->handle, &ctx->nft->cache) == NULL)
+		if (!table_cache_find(&ctx->nft->cache.table_cache,
+				      cmd->handle.table.name,
+				      cmd->handle.family))
 			return table_not_found(ctx);
 
 		return 0;
@@ -4491,6 +4737,7 @@ static void __flush_set_cache(struct set *set)
 
 static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 {
+	struct cache *table_cache = &ctx->nft->cache.table_cache;
 	struct table *table;
 	struct set *set;
 
@@ -4505,11 +4752,12 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 		/* Chains don't hold sets */
 		break;
 	case CMD_OBJ_SET:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(table_cache, cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4521,11 +4769,12 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 
 		return 0;
 	case CMD_OBJ_MAP:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(table_cache, cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4537,11 +4786,12 @@ static int cmd_evaluate_flush(struct eval_ctx *ctx, struct cmd *cmd)
 
 		return 0;
 	case CMD_OBJ_METER:
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(table_cache, cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		set = set_lookup(table, cmd->handle.set.name);
+		set = set_cache_find(table, cmd->handle.set.name);
 		if (set == NULL)
 			return set_not_found(ctx, &ctx->cmd->handle.set.location,
 					     ctx->cmd->handle.set.name);
@@ -4564,11 +4814,13 @@ static int cmd_evaluate_rename(struct eval_ctx *ctx, struct cmd *cmd)
 
 	switch (cmd->obj) {
 	case CMD_OBJ_CHAIN:
-		table = table_lookup(&ctx->cmd->handle, &ctx->nft->cache);
-		if (table == NULL)
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
+		if (!table)
 			return table_not_found(ctx);
 
-		if (chain_lookup(table, &ctx->cmd->handle) == NULL)
+		if (!chain_cache_find(table, ctx->cmd->handle.chain.name))
 			return chain_not_found(ctx);
 
 		break;

@@ -104,6 +104,7 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	struct nftnl_set_elem *nlse;
 	struct nft_data_linearize nld;
 	struct nftnl_udata_buf *udbuf = NULL;
+	uint32_t flags = 0;
 	int num_exprs = 0;
 	struct stmt *stmt;
 	struct expr *key;
@@ -120,18 +121,26 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	} else {
 		elem = expr;
 	}
+	if (elem->etype != EXPR_SET_ELEM)
+		BUG("Unexpected expression type: got %d\n", elem->etype);
+
 	key = elem->key;
 
-	netlink_gen_data(key, &nld);
-	nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY, &nld.value, nld.len);
-
-	if (set->set_flags & NFT_SET_INTERVAL && key->field_count > 1) {
-		key->flags |= EXPR_F_INTERVAL_END;
+	switch (key->etype) {
+	case EXPR_SET_ELEM_CATCHALL:
+		break;
+	default:
 		netlink_gen_data(key, &nld);
-		key->flags &= ~EXPR_F_INTERVAL_END;
+		nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY, &nld.value, nld.len);
+		if (set->set_flags & NFT_SET_INTERVAL && key->field_count > 1) {
+			key->flags |= EXPR_F_INTERVAL_END;
+			netlink_gen_data(key, &nld);
+			key->flags &= ~EXPR_F_INTERVAL_END;
 
-		nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY_END, &nld.value,
-				   nld.len);
+			nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY_END,
+					   &nld.value, nld.len);
+		}
+		break;
 	}
 
 	if (elem->timeout)
@@ -206,8 +215,12 @@ static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	}
 
 	if (expr->flags & EXPR_F_INTERVAL_END)
-		nftnl_set_elem_set_u32(nlse, NFTNL_SET_ELEM_FLAGS,
-				       NFT_SET_ELEM_INTERVAL_END);
+		flags |= NFT_SET_ELEM_INTERVAL_END;
+	if (key->etype == EXPR_SET_ELEM_CATCHALL)
+		flags |= NFT_SET_ELEM_CATCHALL;
+
+	if (flags)
+		nftnl_set_elem_set_u32(nlse, NFTNL_SET_ELEM_FLAGS, flags);
 
 	return nlse;
 }
@@ -539,7 +552,7 @@ struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 						    BYTEORDER_HOST_ENDIAN,
 						    sizeof(int) * BITS_PER_BYTE,
 						    &priority);
-		chain->type          =
+		chain->type.str =
 			xstrdup(nftnl_chain_get_str(nlc, NFTNL_CHAIN_TYPE));
 		policy = nftnl_chain_get_u32(nlc, NFTNL_CHAIN_POLICY);
 		chain->policy = constant_expr_alloc(&netlink_location,
@@ -614,6 +627,7 @@ struct table *netlink_delinearize_table(struct netlink_ctx *ctx,
 	table->handle.table.name = xstrdup(nftnl_table_get_str(nlt, NFTNL_TABLE_NAME));
 	table->flags	     = nftnl_table_get_u32(nlt, NFTNL_TABLE_FLAGS);
 	table->handle.handle.id = nftnl_table_get_u64(nlt, NFTNL_TABLE_HANDLE);
+	table->owner	     = nftnl_table_get_u32(nlt, NFTNL_TABLE_OWNER);
 
 	if (nftnl_table_is_set(nlt, NFTNL_TABLE_USERDATA)) {
 		udata = nftnl_table_get_data(nlt, NFTNL_TABLE_USERDATA, &ulen);
@@ -970,37 +984,6 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	return set;
 }
 
-static int list_set_cb(struct nftnl_set *nls, void *arg)
-{
-	struct netlink_ctx *ctx = arg;
-	struct set *set;
-
-	set = netlink_delinearize_set(ctx, nls);
-	if (set == NULL)
-		return -1;
-	list_add_tail(&set->list, &ctx->list);
-	return 0;
-}
-
-int netlink_list_sets(struct netlink_ctx *ctx, const struct handle *h)
-{
-	struct nftnl_set_list *set_cache;
-	int err;
-
-	set_cache = mnl_nft_set_dump(ctx, h->family, h->table.name);
-	if (set_cache == NULL) {
-		if (errno == EINTR)
-			return -1;
-
-		return 0;
-	}
-
-	ctx->data = h;
-	err = nftnl_set_list_foreach(set_cache, list_set_cb, ctx);
-	nftnl_set_list_free(set_cache);
-	return err;
-}
-
 void alloc_setelem_cache(const struct expr *set, struct nftnl_set *nls)
 {
 	struct nftnl_set_elem *nlse;
@@ -1160,25 +1143,34 @@ int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
 
 	init_list_head(&setelem_parse_ctx.stmt_list);
 
-	nld.value =
-		nftnl_set_elem_get(nlse, NFTNL_SET_ELEM_KEY, &nld.len);
+	if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_KEY))
+		nld.value = nftnl_set_elem_get(nlse, NFTNL_SET_ELEM_KEY, &nld.len);
 	if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_FLAGS))
 		flags = nftnl_set_elem_get_u32(nlse, NFTNL_SET_ELEM_FLAGS);
 
 key_end:
-	key = netlink_alloc_value(&netlink_location, &nld);
-	datatype_set(key, set->key->dtype);
-	key->byteorder	= set->key->byteorder;
-	if (set->key->dtype->subtypes)
-		key = netlink_parse_concat_elem(set->key->dtype, key);
+	if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_KEY)) {
+		key = netlink_alloc_value(&netlink_location, &nld);
+		datatype_set(key, set->key->dtype);
+		key->byteorder	= set->key->byteorder;
+		if (set->key->dtype->subtypes)
+			key = netlink_parse_concat_elem(set->key->dtype, key);
 
-	if (!(set->flags & NFT_SET_INTERVAL) &&
-	    key->byteorder == BYTEORDER_HOST_ENDIAN)
-		mpz_switch_byteorder(key->value, key->len / BITS_PER_BYTE);
+		if (!(set->flags & NFT_SET_INTERVAL) &&
+		    key->byteorder == BYTEORDER_HOST_ENDIAN)
+			mpz_switch_byteorder(key->value, key->len / BITS_PER_BYTE);
 
-	if (key->dtype->basetype != NULL &&
-	    key->dtype->basetype->type == TYPE_BITMASK)
-		key = bitmask_expr_to_binops(key);
+		if (key->dtype->basetype != NULL &&
+		    key->dtype->basetype->type == TYPE_BITMASK)
+			key = bitmask_expr_to_binops(key);
+	} else if (flags & NFT_SET_ELEM_CATCHALL) {
+		key = set_elem_catchall_expr_alloc(&netlink_location);
+		datatype_set(key, set->key->dtype);
+		key->byteorder = set->key->byteorder;
+		key->len = set->key->len;
+	} else {
+		BUG("Unexpected set element with no key\n");
+	}
 
 	expr = set_elem_expr_alloc(&netlink_location, key);
 
@@ -1544,25 +1536,6 @@ static int list_obj_cb(struct nftnl_obj *nls, void *arg)
 	return 0;
 }
 
-int netlink_list_objs(struct netlink_ctx *ctx, const struct handle *h)
-{
-	struct nftnl_obj_list *obj_cache;
-	int err;
-
-	obj_cache = mnl_nft_obj_dump(ctx, h->family,
-				     h->table.name, NULL, 0, true, false);
-	if (obj_cache == NULL) {
-		if (errno == EINTR)
-			return -1;
-
-		return 0;
-	}
-
-	err = nftnl_obj_list_foreach(obj_cache, list_obj_cb, ctx);
-	nftnl_obj_list_free(obj_cache);
-	return err;
-}
-
 int netlink_reset_objs(struct netlink_ctx *ctx, const struct cmd *cmd,
 		       uint32_t type, bool dump)
 {
@@ -1580,7 +1553,7 @@ int netlink_reset_objs(struct netlink_ctx *ctx, const struct cmd *cmd,
 	return err;
 }
 
-static struct flowtable *
+struct flowtable *
 netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 			      struct nftnl_flowtable *nlo)
 {
@@ -1597,6 +1570,8 @@ netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 		xstrdup(nftnl_flowtable_get_str(nlo, NFTNL_FLOWTABLE_NAME));
 	flowtable->handle.handle.id =
 		nftnl_flowtable_get_u64(nlo, NFTNL_FLOWTABLE_HANDLE);
+	if (nftnl_flowtable_is_set(nlo, NFTNL_FLOWTABLE_FLAGS))
+		flowtable->flags = nftnl_flowtable_get_u32(nlo, NFTNL_FLOWTABLE_FLAGS);
 	dev_array = nftnl_flowtable_get(nlo, NFTNL_FLOWTABLE_DEVICES);
 	while (dev_array[len])
 		len++;
@@ -1739,11 +1714,11 @@ static struct rule *trace_lookup_rule(const struct nftnl_trace *nlt,
 	if (!h.table.name)
 		return NULL;
 
-	table = table_lookup(&h, cache);
+	table = table_cache_find(&cache->table_cache, h.table.name, h.family);
 	if (!table)
 		return NULL;
 
-	chain = chain_lookup(table, &h);
+	chain = chain_cache_find(table, h.chain.name);
 	if (!chain)
 		return NULL;
 
@@ -1859,7 +1834,9 @@ next:
 		    pctx->pbase == PROTO_BASE_INVALID) {
 			payload_dependency_store(pctx, stmt, base - stacked);
 		} else {
-			payload_dependency_kill(pctx, lhs, ctx->family);
+			/* Don't strip 'icmp type' from payload dump. */
+			if (pctx->icmp_type == 0)
+				payload_dependency_kill(pctx, lhs, ctx->family);
 			if (lhs->flags & EXPR_F_PROTOCOL)
 				payload_dependency_store(pctx, stmt, base - stacked);
 		}

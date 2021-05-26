@@ -477,7 +477,7 @@ static int netlink_events_obj_cb(const struct nlmsghdr *nlh, int type,
 	nlo = netlink_obj_alloc(nlh);
 
 	obj = netlink_delinearize_obj(monh->ctx, nlo);
-	if (obj == NULL) {
+	if (!obj) {
 		nftnl_obj_free(nlo);
 		return MNL_CB_ERROR;
 	}
@@ -575,7 +575,7 @@ static void netlink_events_cache_addtable(struct netlink_mon_handler *monh,
 	t = netlink_delinearize_table(monh->ctx, nlt);
 	nftnl_table_free(nlt);
 
-	table_add_hash(t, &monh->ctx->nft->cache);
+	table_cache_add(t, &monh->ctx->nft->cache);
 }
 
 static void netlink_events_cache_deltable(struct netlink_mon_handler *monh,
@@ -589,11 +589,12 @@ static void netlink_events_cache_deltable(struct netlink_mon_handler *monh,
 	h.family = nftnl_table_get_u32(nlt, NFTNL_TABLE_FAMILY);
 	h.table.name  = nftnl_table_get_str(nlt, NFTNL_TABLE_NAME);
 
-	t = table_lookup(&h, &monh->ctx->nft->cache);
+	t = table_cache_find(&monh->ctx->nft->cache.table_cache,
+			     h.table.name, h.family);
 	if (t == NULL)
 		goto out;
 
-	list_del(&t->list);
+	table_cache_del(t);
 	table_free(t);
 out:
 	nftnl_table_free(nlt);
@@ -619,7 +620,8 @@ static void netlink_events_cache_addset(struct netlink_mon_handler *monh,
 		goto out;
 	s->init = set_expr_alloc(monh->loc, s);
 
-	t = table_lookup(&s->handle, &monh->ctx->nft->cache);
+	t = table_cache_find(&monh->ctx->nft->cache.table_cache,
+			     s->handle.table.name, s->handle.family);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache set: table not found.\n");
 		set_free(s);
@@ -632,7 +634,7 @@ static void netlink_events_cache_addset(struct netlink_mon_handler *monh,
 		goto out;
 	}
 
-	set_add_hash(s, t);
+	set_cache_add(s, t);
 out:
 	nftnl_set_free(nls);
 }
@@ -687,7 +689,7 @@ out:
 static void netlink_events_cache_delset_cb(struct set *s,
 					   void *data)
 {
-	list_del(&s->list);
+	set_cache_del(s);
 	set_free(s);
 }
 
@@ -720,14 +722,15 @@ static void netlink_events_cache_addobj(struct netlink_mon_handler *monh,
 	if (obj == NULL)
 		goto out;
 
-	t = table_lookup(&obj->handle, &monh->ctx->nft->cache);
+	t = table_cache_find(&monh->ctx->nft->cache.table_cache,
+			     obj->handle.table.name, obj->handle.family);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache object: table not found.\n");
 		obj_free(obj);
 		goto out;
 	}
 
-	obj_add_hash(obj, t);
+	obj_cache_add(obj, t);
 out:
 	nftnl_obj_free(nlo);
 }
@@ -750,19 +753,20 @@ static void netlink_events_cache_delobj(struct netlink_mon_handler *monh,
 	type	 = nftnl_obj_get_u32(nlo, NFTNL_OBJ_TYPE);
 	h.handle.id	= nftnl_obj_get_u64(nlo, NFTNL_OBJ_HANDLE);
 
-	t = table_lookup(&h, &monh->ctx->nft->cache);
+	t = table_cache_find(&monh->ctx->nft->cache.table_cache,
+			     h.table.name, h.family);
 	if (t == NULL) {
 		fprintf(stderr, "W: Unable to cache object: table not found.\n");
 		goto out;
 	}
 
-	obj = obj_lookup(t, name, type);
+	obj = obj_cache_find(t, name, type);
 	if (obj == NULL) {
 		fprintf(stderr, "W: Unable to find object in cache\n");
 		goto out;
 	}
 
-	list_del(&obj->list);
+	obj_cache_del(obj);
 	obj_free(obj);
 out:
 	nftnl_obj_free(nlo);
@@ -841,6 +845,9 @@ static int netlink_events_newgen_cb(const struct nlmsghdr *nlh, int type,
 	const struct nlattr *attr;
 	char name[256] = "";
 	int genid = -1, pid = -1;
+
+	if (monh->format != NFTNL_OUTPUT_DEFAULT)
+		return MNL_CB_OK;
 
 	mnl_attr_for_each(attr, nlh, sizeof(struct nfgenmsg)) {
 		switch (mnl_attr_get_type(attr)) {

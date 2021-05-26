@@ -640,7 +640,7 @@
     }
 ]
 
-# icmpv6 checksum != 2222 log
+# icmpv6 checksum != 222-226
 [
     {
         "match": {
@@ -650,12 +650,11 @@
                     "protocol": "icmpv6"
                 }
             },
-            "op": "!=",
-            "right": 2222
+	    "op": "!=",
+            "right": {
+                "range": [ 222, 226 ]
+            }
         }
-    },
-    {
-        "log": null
     }
 ]
 
@@ -1185,7 +1184,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
 	    "op": "==",
@@ -1203,7 +1202,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
             "op": "!=",
@@ -1221,7 +1220,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
 	    "op": "==",
@@ -1244,7 +1243,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
             "op": "!=",
@@ -1267,7 +1266,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
 	    "op": "==",
@@ -1287,7 +1286,7 @@
             "left": {
                 "payload": {
                     "field": "max-delay",
-                    "name": "icmpv6"
+                    "protocol": "icmpv6"
                 }
             },
             "op": "!=",
@@ -1300,3 +1299,46 @@
     }
 ]
 
+# icmpv6 type packet-too-big icmpv6 mtu 1280
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "mtu",
+                    "protocol": "icmpv6"
+                }
+            },
+            "op": "==",
+            "right": 1280
+        }
+    }
+]
+
+# icmpv6 type parameter-problem icmpv6 code no-route
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "type",
+                    "protocol": "icmpv6"
+                }
+            },
+            "op": "==",
+            "right": "parameter-problem"
+        }
+    },
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "code",
+                    "protocol": "icmpv6"
+                }
+            },
+            "op": "==",
+            "right": "no-route"
+        }
+    }
+]

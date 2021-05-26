@@ -196,10 +196,14 @@ SOCKET EXPRESSION
 ~~~~~~~~~~~~~~~~~
 [verse]
 *socket* {*transparent* | *mark* | *wildcard*}
+*socket* *cgroupv2* *level* 'NUM'
 
 Socket expression can be used to search for an existing open TCP/UDP socket and
 its attributes that can be associated with a packet. It looks for an established
-or non-zero bound listening socket (possibly with a non-local address).
+or non-zero bound listening socket (possibly with a non-local address). You can
+also use it to match on the socket cgroupv2 at a given ancestor level, e.g. if
+the socket belongs to cgroupv2 'a/b', ancestor level 1 checks for a matching on
+cgroup 'a' and ancestor level 2 checks for a matching on cgroup 'b'.
 
 .Available socket attributes
 [options="header"]
@@ -212,6 +216,9 @@ boolean (1 bit)
 |wildcard|
 Indicates whether the socket is wildcard-bound (e.g. 0.0.0.0 or ::0). |
 boolean (1 bit)
+|cgroupv2|
+cgroup version 2 for this socket (path from /sys/fs/cgroup)|
+cgroupv2
 |==================
 
 .Using socket expression
@@ -221,7 +228,7 @@ boolean (1 bit)
 # exactly what you want).
 table inet x {
     chain y {
-	type filter hook prerouting priority -150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         socket transparent 1 socket wildcard 0 mark set 0x00000001 accept
     }
 }
@@ -229,7 +236,7 @@ table inet x {
 # Trace packets that corresponds to a socket with a mark value of 15
 table inet x {
     chain y {
-        type filter hook prerouting priority -150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         socket mark 0x0000000f nftrace set 1
     }
 }
@@ -237,8 +244,16 @@ table inet x {
 # Set packet mark to socket mark
 table inet x {
     chain y {
-        type filter hook prerouting priority -150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport 8080 mark set socket mark
+    }
+}
+
+# Count packets for cgroupv2 "user.slice" at level 1
+table inet x {
+    chain y {
+        type filter hook input priority filter; policy accept;
+        socket cgroupv2 level 1 "user.slice" counter
     }
 }
 ----------------------
@@ -280,7 +295,7 @@ If no TTL attribute is passed, make a true IP header and fingerprint TTL true co
 # Accept packets that match the "Linux" OS genre signature without comparing TTL.
 table inet x {
     chain y {
-	type filter hook input priority 0; policy accept;
+        type filter hook input priority filter; policy accept;
         osf ttl skip name "Linux"
     }
 }

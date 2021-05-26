@@ -585,7 +585,7 @@ netdev test-netdev ingress
 # ip hdrlength vmap { 0-4 : drop, 5 : accept, 6 : continue } counter
 __map%d test-netdev f size 4
 __map%d test-netdev 0
-	element 00000000  : 0 [end]	element 00000005  : 0 [end]	element 00000006  : 0 [end]	element 00000007  : 1 [end]
+	element 00000000  : drop 0 [end]	element 00000005  : accept 0 [end]	element 00000006  : continue 0 [end]	element 00000007  : drop 1 [end]
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
@@ -628,118 +628,6 @@ netdev test-netdev ingress
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 4b @ network header + 16 => reg 1 ]
   [ cmp eq reg 1 0x0200a8c0 ]
-
-# ip ttl 233
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ cmp eq reg 1 0x000000e9 ]
-
-# ip protocol tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-
-# ip protocol != tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp neq reg 1 0x00000006 ]
-
-# ip saddr != 1.1.1.1
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 12 => reg 1 ]
-  [ cmp neq reg 1 0x01010101 ]
-
-# ip daddr 192.168.0.2
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 16 => reg 1 ]
-  [ cmp eq reg 1 0x0200a8c0 ]
-
-# ip ttl 233
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ cmp eq reg 1 0x000000e9 ]
-
-# ip protocol tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-
-# ip protocol != tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp neq reg 1 0x00000006 ]
-
-# ip saddr != 1.1.1.1
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 12 => reg 1 ]
-  [ cmp neq reg 1 0x01010101 ]
-
-# ip daddr 192.168.0.2
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 16 => reg 1 ]
-  [ cmp eq reg 1 0x0200a8c0 ]
-
-# ip ttl 233
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ cmp eq reg 1 0x000000e9 ]
-
-# ip protocol tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-
-# ip protocol != tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp neq reg 1 0x00000006 ]
-
-# ip ttl 233
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ cmp eq reg 1 0x000000e9 ]
-
-# ip protocol tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp eq reg 1 0x00000006 ]
-
-# ip protocol != tcp
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 9 => reg 1 ]
-  [ cmp neq reg 1 0x00000006 ]
 
 # ip dscp cs1
 netdev test-netdev ingress 
@@ -798,7 +686,7 @@ netdev test-netdev ingress
 # ip dscp vmap { cs1 : continue , cs4 : accept } counter
 __map%d test-netdev b size 2
 __map%d test-netdev 0
-	element 00000020  : 0 [end]	element 00000080  : 0 [end]
+	element 00000020  : continue 0 [end]	element 00000080  : accept 0 [end]
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]

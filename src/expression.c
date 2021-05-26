@@ -135,9 +135,12 @@ void expr_describe(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, "datatype %s (%s)",
 			  dtype->name, dtype->desc);
 		len = dtype->size;
-	} else {
+	} else if (dtype != &invalid_type) {
 		nft_print(octx, "%s expression, datatype %s (%s)",
 			  expr_name(expr), dtype->name, dtype->desc);
+	} else {
+		nft_print(octx, "datatype %s is invalid\n", expr->identifier);
+		return;
 	}
 
 	if (dtype->basetype != NULL) {
@@ -172,6 +175,8 @@ void expr_describe(const struct expr *expr, struct output_ctx *octx)
 			nft_print(octx, "(in hexadecimal):\n");
 		symbol_table_print(edtype->sym_tbl, edtype,
 				   expr->byteorder, octx);
+	} else if (edtype->describe) {
+		edtype->describe(octx);
 	}
 }
 
@@ -252,6 +257,21 @@ static void verdict_expr_destroy(struct expr *expr)
 	expr_free(expr->chain);
 }
 
+static int verdict_expr_build_udata(struct nftnl_udata_buf *udbuf,
+				    const struct expr *expr)
+{
+	return 0;
+}
+
+static struct expr *verdict_expr_parse_udata(const struct nftnl_udata *attr)
+{
+	struct expr *e;
+
+	e = symbol_expr_alloc(&internal_location, SYMBOL_VALUE, NULL, "verdict");
+	e->len = NFT_REG_SIZE * BITS_PER_BYTE;
+	return e;
+}
+
 static const struct expr_ops verdict_expr_ops = {
 	.type		= EXPR_VERDICT,
 	.name		= "verdict",
@@ -260,6 +280,8 @@ static const struct expr_ops verdict_expr_ops = {
 	.cmp		= verdict_expr_cmp,
 	.clone		= verdict_expr_clone,
 	.destroy	= verdict_expr_destroy,
+	.build_udata	= verdict_expr_build_udata,
+	.parse_udata	= verdict_expr_parse_udata,
 };
 
 struct expr *verdict_expr_alloc(const struct location *loc,
@@ -560,6 +582,7 @@ const char *expr_op_symbols[] = {
 	[OP_GT]		= ">",
 	[OP_LTE]	= "<=",
 	[OP_GTE]	= ">=",
+	[OP_NEG]	= "!",
 };
 
 static void unary_expr_print(const struct expr *expr, struct output_ctx *octx)
@@ -1308,6 +1331,79 @@ struct expr *set_elem_expr_alloc(const struct location *loc, struct expr *key)
 	return expr;
 }
 
+static void set_elem_catchall_expr_print(const struct expr *expr,
+					 struct output_ctx *octx)
+{
+	nft_print(octx, "*");
+}
+
+static const struct expr_ops set_elem_catchall_expr_ops = {
+	.type		= EXPR_SET_ELEM_CATCHALL,
+	.name		= "catch-all set element",
+	.print		= set_elem_catchall_expr_print,
+};
+
+struct expr *set_elem_catchall_expr_alloc(const struct location *loc)
+{
+	struct expr *expr;
+
+	expr = expr_alloc(loc, EXPR_SET_ELEM_CATCHALL, &invalid_type,
+			  BYTEORDER_INVALID, 0);
+	expr->flags = EXPR_F_CONSTANT | EXPR_F_SINGLETON;
+
+	return expr;
+}
+
+static void flagcmp_expr_print(const struct expr *expr, struct output_ctx *octx)
+{
+	expr_print(expr->flagcmp.expr, octx);
+	nft_print(octx, " ");
+	expr_print(expr->flagcmp.value, octx);
+	nft_print(octx, " / ");
+	expr_print(expr->flagcmp.mask, octx);
+}
+
+static void flagcmp_expr_clone(struct expr *new, const struct expr *expr)
+{
+	new->flagcmp.expr = expr_clone(expr->flagcmp.expr);
+	new->flagcmp.mask = expr_clone(expr->flagcmp.mask);
+	new->flagcmp.value = expr_clone(expr->flagcmp.value);
+}
+
+static void flagcmp_expr_destroy(struct expr *expr)
+{
+	expr_free(expr->flagcmp.expr);
+	expr_free(expr->flagcmp.mask);
+	expr_free(expr->flagcmp.value);
+}
+
+static const struct expr_ops flagcmp_expr_ops = {
+	.type		= EXPR_FLAGCMP,
+	.name		= "flags comparison",
+	.print		= flagcmp_expr_print,
+	.json		= flagcmp_expr_json,
+	.clone		= flagcmp_expr_clone,
+	.destroy	= flagcmp_expr_destroy,
+};
+
+struct expr *flagcmp_expr_alloc(const struct location *loc, enum ops op,
+				struct expr *match, struct expr *mask,
+				struct expr *value)
+{
+	struct expr *expr;
+
+	expr = expr_alloc(loc, EXPR_FLAGCMP, match->dtype, match->byteorder,
+			  match->len);
+	expr->op = op;
+	expr->flagcmp.expr = match;
+	expr->flagcmp.mask = mask;
+	/* json output needs this operation for compatibility */
+	expr->flagcmp.mask->op = OP_OR;
+	expr->flagcmp.value = value;
+
+	return expr;
+}
+
 void range_expr_value_low(mpz_t rop, const struct expr *expr)
 {
 	switch (expr->etype) {
@@ -1383,6 +1479,8 @@ static const struct expr_ops *__expr_ops_by_type(enum expr_types etype)
 	case EXPR_RT: return &rt_expr_ops;
 	case EXPR_FIB: return &fib_expr_ops;
 	case EXPR_XFRM: return &xfrm_expr_ops;
+	case EXPR_SET_ELEM_CATCHALL: return &set_elem_catchall_expr_ops;
+	case EXPR_FLAGCMP: return &flagcmp_expr_ops;
 	}
 
 	BUG("Unknown expression type %d\n", etype);

@@ -2,12 +2,12 @@
 .\"     Title: libnftables-json
 .\"    Author: Phil Sutter <phil@nwl.cc>
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/15/2021
+.\"      Date: 05/25/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES\-JSON" "5" "01/15/2021" "\ \&" "\ \&"
+.TH "LIBNFTABLES\-JSON" "5" "05/25/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2130,6 +2130,24 @@ If the \fBfield\fR property is not given, the expression is to be used as a head
 Create a reference to a field (\fBfield\fR) of a TCP option header (\fBname\fR)\&.
 .sp
 If the \fBfield\fR property is not given, the expression is to be used as a TCP option existence check in a \fBmatch\fR statement with a boolean on the right hand side\&.
+.SS "SCTP CHUNK"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB{ "sctp chunk": {
+        "name":\fR \fISTRING\fR\fB,
+        "field":\fR \fISTRING\fR
+\fB}}\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a reference to a field (\fBfield\fR) of an SCTP chunk (\fBname\fR)\&.
+.sp
+If the \fBfield\fR property is not given, the expression is to be used as an SCTP chunk existence check in a \fBmatch\fR statement with a boolean on the right hand side\&.
 .SS "META"
 .sp
 .if n \{\

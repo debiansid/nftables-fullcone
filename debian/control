@@ -14,7 +14,7 @@ Build-Depends: asciidoc-base,
                libgmp-dev,
                libjansson-dev,
                libmnl-dev (>= 1.0.4),
-               libnftnl-dev (>= 1.1.9),
+               libnftnl-dev (>= 1.2.0),
                libtool (>= 2.2.6),
                libxtables-dev (>= 1.6.1),
                python3-all

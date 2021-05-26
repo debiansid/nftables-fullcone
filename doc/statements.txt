@@ -216,7 +216,7 @@ The conntrack statement can be used to set the conntrack mark and conntrack labe
 The ct statement sets meta data associated with a connection. The zone id
 has to be assigned before a conntrack lookup takes place, i.e. this has to be
 done in prerouting and possibly output (if locally generated packets need to be
-placed in a distinct zone), with a hook priority of -300.
+placed in a distinct zone), with a hook priority of *raw* (-300).
 
 Unlike iptables, where the helper assignment happens in the raw table,
 the helper needs to be assigned after a conntrack entry has been
@@ -253,11 +253,11 @@ ct mark set meta mark
 ------------------------------
 table inet raw {
   chain prerouting {
-      type filter hook prerouting priority -300;
+      type filter hook prerouting priority raw;
       ct zone set iif map { "eth1" : 1, "veth1" : 2 }
   }
   chain output {
-      type filter hook output priority -300;
+      type filter hook output priority raw;
       ct zone set oif map { "eth1" : 1, "veth1" : 2 }
   }
 }
@@ -278,7 +278,7 @@ packets.
 
 Note that for this statement to be effective, it has to be applied to packets
 before a conntrack lookup happens. Therefore, it needs to sit in a chain with
-either prerouting or output hook and a hook priority of -300 or less.
+either prerouting or output hook and a hook priority of -300 (*raw*) or less.
 
 See SYNPROXY STATEMENT for an example usage.
 
@@ -343,21 +343,16 @@ NAT STATEMENTS
 ~~~~~~~~~~~~~~
 [verse]
 ____
-*snat to* 'address' [*:*'port'] ['PRF_FLAGS']
-*snat to* 'address' *-* 'address' [*:*'port' *-* 'port'] ['PRF_FLAGS']
-*snat* { *ip* | *ip6* } *to* 'address' *-* 'address' [*:*'port' *-* 'port'] ['PR_FLAGS']
-*dnat to* 'address' [*:*'port'] ['PRF_FLAGS']
-*dnat to* 'address' [*:*'port' *-* 'port'] ['PR_FLAGS']
-*dnat* { *ip* | *ip6* } *to* 'address' [*:*'port' *-* 'port'] ['PR_FLAGS']
-*masquerade to* [*:*'port'] ['PRF_FLAGS']
-*masquerade to* [*:*'port' *-* 'port'] ['PRF_FLAGS']
-*redirect to* [*:*'port'] ['PRF_FLAGS']
-*redirect to* [*:*'port' *-* 'port'] ['PRF_FLAGS']
+*snat* [[*ip* | *ip6*] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
+*dnat* [[*ip* | *ip6*] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
+*masquerade* [*to :*'PORT_SPEC'] ['FLAGS']
+*redirect* [*to :*'PORT_SPEC'] ['FLAGS']
 
-'PRF_FLAGS' := 'PRF_FLAG' [*,* 'PRF_FLAGS']
-'PR_FLAGS'  := 'PR_FLAG' [*,* 'PR_FLAGS']
-'PRF_FLAG'  := 'PR_FLAG' | *fully-random*
-'PR_FLAG'   := *persistent* | *random*
+'ADDR_SPEC' := 'address' | 'address' *-* 'address'
+'PORT_SPEC' := 'port' | 'port' *-* 'port'
+
+'FLAGS'  := 'FLAG' [*,* 'FLAGS']
+'FLAG'  := *persistent* | *random* | *fully-random*
 ____
 
 The nat statements are only valid from nat chain types. +
@@ -420,8 +415,8 @@ If used then port mapping is generated based on a 32-bit pseudo-random algorithm
 ---------------------
 # create a suitable table/chain setup for all further examples
 add table nat
-add chain nat prerouting { type nat hook prerouting priority 0; }
-add chain nat postrouting { type nat hook postrouting priority 100; }
+add chain nat prerouting { type nat hook prerouting priority dstnat; }
+add chain nat postrouting { type nat hook postrouting priority srcnat; }
 
 # translate source addresses of all packets leaving via eth0 to address 1.2.3.4
 add rule nat postrouting oif eth0 snat to 1.2.3.4
@@ -482,21 +477,21 @@ this case the rule will match for both families.
 -------------------------------------
 table ip x {
     chain y {
-        type filter hook prerouting priority -150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport ntp tproxy to 1.1.1.1
         udp dport ssh tproxy to :2222
     }
 }
 table ip6 x {
     chain y {
-       type filter hook prerouting priority -150; policy accept;
+       type filter hook prerouting priority mangle; policy accept;
        tcp dport ntp tproxy to [dead::beef]
        udp dport ssh tproxy to :2222
     }
 }
 table inet x {
     chain y {
-        type filter hook prerouting priority -150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport 321 tproxy to :ssh
         tcp dport 99 tproxy ip to 1.1.1.1:999
         udp dport 155 tproxy ip6 to [dead::beef]:smux
@@ -567,28 +562,13 @@ drop incorrect cookies. Flags combinations not expected during  3WHS will not
 match and continue (e.g. SYN+FIN, SYN+ACK). Finally, drop invalid packets, this
 will be out-of-flow packets that were not matched by SYNPROXY.
 
-    table ip foo {
+    table ip x {
             chain z {
                     type filter hook input priority filter; policy accept;
-                    ct state { invalid, untracked } synproxy mss 1460 wscale 9 timestamp sack-perm
+                    ct state invalid, untracked synproxy mss 1460 wscale 9 timestamp sack-perm
                     ct state invalid drop
             }
     }
-
-The outcome ruleset of the steps above should be similar to the one below.
-
-	table ip x {
-		chain y {
-			type filter hook prerouting priority raw; policy accept;
-	                tcp flags syn notrack
-		}
-
-		chain z {
-			type filter hook input priority filter; policy accept;
-	                ct state { invalid, untracked } synproxy mss 1460 wscale 9 timestamp sack-perm
-		        ct state invalid drop
-	        }
-	}
 ---------------------------------------
 
 FLOW STATEMENT
@@ -727,7 +707,8 @@ nft add rule ip filter input ip saddr @blackhole counter drop
 # requests occurred per second and ip address.
 nft add rule ip filter input tcp flags syn tcp dport ssh \
     add @flood { ip saddr limit rate over 10/second } \
-    add @blackhole { ip saddr } drop
+    add @blackhole { ip saddr } \
+    drop
 
 # inspect state of the sets.
 nft list set ip filter flood

@@ -1,6 +1,8 @@
 #ifndef _NFT_CACHE_H_
 #define _NFT_CACHE_H_
 
+#include <string.h>
+
 enum cache_level_bits {
 	NFT_CACHE_TABLE_BIT	= (1 << 0),
 	NFT_CACHE_CHAIN_BIT	= (1 << 1),
@@ -35,6 +37,15 @@ enum cache_level_flags {
 	NFT_CACHE_FLUSHED	= (1 << 31),
 };
 
+struct nft_cache;
+enum cmd_ops;
+
+unsigned int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds);
+int nft_cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
+		     struct list_head *msgs);
+bool nft_cache_needs_update(struct nft_cache *cache);
+void nft_cache_release(struct nft_cache *cache);
+
 static inline uint32_t djb_hash(const char *key)
 {
 	uint32_t i, hash = 5381;
@@ -47,16 +58,52 @@ static inline uint32_t djb_hash(const char *key)
 
 #define NFT_CACHE_HSIZE 8192
 
-struct netlink_ctx;
 struct table;
 struct chain;
-struct handle;
 
-struct nftnl_chain_list *chain_cache_dump(struct netlink_ctx *ctx, int *err);
-int chain_cache_init(struct netlink_ctx *ctx, struct table *table,
-		     struct nftnl_chain_list *chain_cache);
 void chain_cache_add(struct chain *chain, struct table *table);
-struct chain *chain_cache_find(const struct table *table,
-			       const struct handle *handle);
+void chain_cache_del(struct chain *chain);
+struct chain *chain_cache_find(const struct table *table, const char *name);
+
+void set_cache_add(struct set *set, struct table *table);
+void set_cache_del(struct set *set);
+struct set *set_cache_find(const struct table *table, const char *name);
+
+struct cache {
+	struct list_head	*ht;
+	struct list_head	list;
+};
+
+struct cache_item {
+	struct list_head	hlist;
+	struct list_head	list;
+};
+
+void cache_init(struct cache *cache);
+void cache_free(struct cache *cache);
+void cache_add(struct cache_item *item, struct cache *cache, uint32_t hash);
+void cache_del(struct cache_item *item);
+
+void table_cache_add(struct table *table, struct nft_cache *cache);
+void table_cache_del(struct table *table);
+struct table *table_cache_find(const struct cache *cache, const char *name,
+			       uint32_t family);
+
+void obj_cache_add(struct obj *obj, struct table *table);
+void obj_cache_del(struct obj *obj);
+struct obj *obj_cache_find(const struct table *table, const char *name,
+			   uint32_t obj_type);
+
+struct flowtable;
+void ft_cache_add(struct flowtable *ft, struct table *table);
+void ft_cache_del(struct flowtable *ft);
+struct flowtable *ft_cache_find(const struct table *table, const char *name);
+
+struct nft_cache {
+	uint32_t		genid;
+	struct cache		table_cache;
+	uint32_t		seqnum;
+	uint32_t		flags;
+};
 
 #endif /* _NFT_CACHE_H_ */

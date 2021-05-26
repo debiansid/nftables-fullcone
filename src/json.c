@@ -444,7 +444,7 @@ static json_t *table_flags_json(const struct table *table)
 
 	while (flags) {
 		if (flags & 0x1) {
-			tmp = json_string(table_flags_name[i]);
+			tmp = json_string(table_flag_name(i));
 			json_array_append_new(root, tmp);
 		}
 		flags >>= 1;
@@ -477,6 +477,20 @@ static json_t *table_print_json(const struct table *table)
 		json_object_set_new(root, "flags", tmp);
 
 	return json_pack("{s:o}", "table", root);
+}
+
+json_t *flagcmp_expr_json(const struct expr *expr, struct output_ctx *octx)
+{
+	json_t *left;
+
+	left = json_pack("{s:[o, o]}", expr_op_symbols[OP_AND],
+			 expr_print_json(expr->flagcmp.expr, octx),
+			 expr_print_json(expr->flagcmp.mask, octx));
+
+	return json_pack("{s:{s:s, s:o, s:o}}", "match",
+			 "op", expr_op_symbols[expr->op] ? : "in",
+			 "left", left,
+			 "right", expr_print_json(expr->flagcmp.value, octx));
 }
 
 json_t *binop_expr_json(const struct expr *expr, struct output_ctx *octx)
@@ -697,21 +711,19 @@ json_t *exthdr_expr_json(const struct expr *expr, struct output_ctx *octx)
 
 		return json_pack("{s:o}", "tcp option", root);
 	}
-	if (expr->exthdr.op == NFT_EXTHDR_OP_IPV4) {
-		root = json_pack("{s:s}", "name", desc);
 
-		if (!is_exists)
-			json_object_set_new(root, "field", json_string(field));
-
-		return json_pack("{s:o}", "ip option", root);
-	}
-
-	root = json_pack("{s:s}",
-			 "name", desc);
+	root = json_pack("{s:s}", "name", desc);
 	if (!is_exists)
 		json_object_set_new(root, "field", json_string(field));
 
-	return json_pack("{s:o}", "exthdr", root);
+	switch (expr->exthdr.op) {
+	case NFT_EXTHDR_OP_IPV4:
+		return json_pack("{s:o}", "ip option", root);
+	case NFT_EXTHDR_OP_SCTP:
+		return json_pack("{s:o}", "sctp chunk", root);
+	default:
+		return json_pack("{s:o}", "exthdr", root);
+	}
 }
 
 json_t *verdict_expr_json(const struct expr *expr, struct output_ctx *octx)
@@ -1168,19 +1180,17 @@ json_t *limit_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 		burst_unit = get_rate(stmt->limit.burst, &burst);
 	}
 
-	root = json_pack("{s:I, s:s}",
+	root = json_pack("{s:I, s:I, s:s}",
 			 "rate", rate,
+			 "burst", burst,
 			 "per", get_unit(stmt->limit.unit));
 	if (inv)
 		json_object_set_new(root, "inv", json_boolean(inv));
 	if (rate_unit)
 		json_object_set_new(root, "rate_unit", json_string(rate_unit));
-	if (burst && burst != 5) {
-		json_object_set_new(root, "burst", json_integer(burst));
-		if (burst_unit)
-			json_object_set_new(root, "burst_unit",
-					    json_string(burst_unit));
-	}
+	if (burst_unit)
+		json_object_set_new(root, "burst_unit",
+				    json_string(burst_unit));
 
 	return json_pack("{s:o}", "limit", root);
 }
@@ -1382,24 +1392,16 @@ json_t *reject_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 		type = "tcp reset";
 		break;
 	case NFT_REJECT_ICMPX_UNREACH:
-		if (stmt->reject.icmp_code == NFT_REJECT_ICMPX_PORT_UNREACH)
-			break;
 		type = "icmpx";
 		jexpr = expr_print_json(stmt->reject.expr, octx);
 		break;
 	case NFT_REJECT_ICMP_UNREACH:
 		switch (stmt->reject.family) {
 		case NFPROTO_IPV4:
-			if (!stmt->reject.verbose_print &&
-			    stmt->reject.icmp_code == ICMP_PORT_UNREACH)
-				break;
 			type = "icmp";
 			jexpr = expr_print_json(stmt->reject.expr, octx);
 			break;
 		case NFPROTO_IPV6:
-			if (!stmt->reject.verbose_print &&
-			    stmt->reject.icmp_code == ICMP6_DST_UNREACH_NOPORT)
-				break;
 			type = "icmpv6";
 			jexpr = expr_print_json(stmt->reject.expr, octx);
 			break;
@@ -1580,21 +1582,21 @@ static json_t *table_print_json_full(struct netlink_ctx *ctx,
 	tmp = table_print_json(table);
 	json_array_append_new(root, tmp);
 
-	list_for_each_entry(obj, &table->objs, list) {
+	list_for_each_entry(obj, &table->obj_cache.list, cache.list) {
 		tmp = obj_print_json(obj);
 		json_array_append_new(root, tmp);
 	}
-	list_for_each_entry(set, &table->sets, list) {
+	list_for_each_entry(set, &table->set_cache.list, cache.list) {
 		if (set_is_anonymous(set->flags))
 			continue;
 		tmp = set_print_json(&ctx->nft->output, set);
 		json_array_append_new(root, tmp);
 	}
-	list_for_each_entry(flowtable, &table->flowtables, list) {
+	list_for_each_entry(flowtable, &table->ft_cache.list, cache.list) {
 		tmp = flowtable_print_json(flowtable);
 		json_array_append_new(root, tmp);
 	}
-	list_for_each_entry(chain, &table->chains, list) {
+	list_for_each_entry(chain, &table->chain_cache.list, cache.list) {
 		tmp = chain_print_json(chain);
 		json_array_append_new(root, tmp);
 
@@ -1613,7 +1615,7 @@ static json_t *do_list_ruleset_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	json_t *root = json_array(), *tmp;
 	struct table *table;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (family != NFPROTO_UNSPEC &&
 		    table->handle.family != family)
 			continue;
@@ -1632,7 +1634,7 @@ static json_t *do_list_tables_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	json_t *root = json_array();
 	struct table *table;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (family != NFPROTO_UNSPEC &&
 		    table->handle.family != family)
 			continue;
@@ -1656,7 +1658,7 @@ static json_t *do_list_chain_json(struct netlink_ctx *ctx,
 	struct chain *chain;
 	struct rule *rule;
 
-	list_for_each_entry(chain, &table->chains, list) {
+	list_for_each_entry(chain, &table->chain_cache.list, cache.list) {
 		if (chain->handle.family != cmd->handle.family ||
 		    strcmp(cmd->handle.chain.name, chain->handle.chain.name))
 			continue;
@@ -1679,12 +1681,12 @@ static json_t *do_list_chains_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	struct table *table;
 	struct chain *chain;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (cmd->handle.family != NFPROTO_UNSPEC &&
 		    cmd->handle.family != table->handle.family)
 			continue;
 
-		list_for_each_entry(chain, &table->chains, list) {
+		list_for_each_entry(chain, &table->chain_cache.list, cache.list) {
 			json_t *tmp = chain_print_json(chain);
 
 			json_array_append_new(root, tmp);
@@ -1697,7 +1699,7 @@ static json_t *do_list_chains_json(struct netlink_ctx *ctx, struct cmd *cmd)
 static json_t *do_list_set_json(struct netlink_ctx *ctx,
 				struct cmd *cmd, struct table *table)
 {
-	struct set *set = set_lookup(table, cmd->handle.set.name);
+	struct set *set = set_cache_find(table, cmd->handle.set.name);
 
 	if (set == NULL)
 		return json_null();
@@ -1712,12 +1714,12 @@ static json_t *do_list_sets_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	struct table *table;
 	struct set *set;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (cmd->handle.family != NFPROTO_UNSPEC &&
 		    cmd->handle.family != table->handle.family)
 			continue;
 
-		list_for_each_entry(set, &table->sets, list) {
+		list_for_each_entry(set, &table->set_cache.list, cache.list) {
 			if (cmd->obj == CMD_OBJ_SETS &&
 			    !set_is_literal(set->flags))
 				continue;
@@ -1741,7 +1743,7 @@ static json_t *do_list_obj_json(struct netlink_ctx *ctx,
 	struct table *table;
 	struct obj *obj;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (cmd->handle.family != NFPROTO_UNSPEC &&
 		    cmd->handle.family != table->handle.family)
 			continue;
@@ -1750,7 +1752,7 @@ static json_t *do_list_obj_json(struct netlink_ctx *ctx,
 		    strcmp(cmd->handle.table.name, table->handle.table.name))
 			continue;
 
-		list_for_each_entry(obj, &table->objs, list) {
+		list_for_each_entry(obj, &table->obj_cache.list, cache.list) {
 			if (obj->type != type ||
 			    (cmd->handle.obj.name &&
 			     strcmp(cmd->handle.obj.name, obj->handle.obj.name)))
@@ -1769,8 +1771,8 @@ static json_t *do_list_flowtable_json(struct netlink_ctx *ctx,
 	json_t *root = json_array();
 	struct flowtable *ft;
 
-	ft = flowtable_lookup(table, cmd->handle.flowtable.name);
-	if (ft == NULL)
+	ft = ft_cache_find(table, cmd->handle.flowtable.name);
+	if (!ft)
 		return json_null();
 
 	json_array_append_new(root, flowtable_print_json(ft));
@@ -1784,12 +1786,12 @@ static json_t *do_list_flowtables_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	struct flowtable *flowtable;
 	struct table *table;
 
-	list_for_each_entry(table, &ctx->nft->cache.list, list) {
+	list_for_each_entry(table, &ctx->nft->cache.table_cache.list, cache.list) {
 		if (cmd->handle.family != NFPROTO_UNSPEC &&
 		    cmd->handle.family != table->handle.family)
 			continue;
 
-		list_for_each_entry(flowtable, &table->flowtables, list) {
+		list_for_each_entry(flowtable, &table->ft_cache.list, cache.list) {
 			tmp = flowtable_print_json(flowtable);
 			json_array_append_new(root, tmp);
 		}
@@ -1812,7 +1814,9 @@ int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd)
 	json_t *root;
 
 	if (cmd->handle.table.name)
-		table = table_lookup(&cmd->handle, &ctx->nft->cache);
+		table = table_cache_find(&ctx->nft->cache.table_cache,
+					 cmd->handle.table.name,
+					 cmd->handle.family);
 
 	switch (cmd->obj) {
 	case CMD_OBJ_TABLE:

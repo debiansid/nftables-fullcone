@@ -38,7 +38,7 @@ icmpv6 code != { 3-66};ok
 icmpv6 checksum 2222 log;ok
 icmpv6 checksum != 2222 log;ok
 icmpv6 checksum 222-226;ok
-icmpv6 checksum != 2222 log;ok
+icmpv6 checksum != 222-226;ok
 icmpv6 checksum { 222, 226};ok
 icmpv6 checksum != { 222, 226};ok
 icmpv6 checksum { 222-226};ok
@@ -92,3 +92,5 @@ icmpv6 max-delay {33, 55, 67, 88};ok
 icmpv6 max-delay != {33, 55, 67, 88};ok
 icmpv6 max-delay {33-55};ok
 icmpv6 max-delay != {33-55};ok
+
+icmpv6 type parameter-problem icmpv6 code no-route;ok

@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 01/15/2021
+.\"      Date: 05/25/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "01/15/2021" "\ \&" "\ \&"
+.TH "NFT" "8" "05/25/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -179,7 +179,7 @@ Input is parsed line\-wise\&. When the last character of a line, just before the
 .sp
 A hash sign (#) begins a comment\&. All following characters on the same line are ignored\&.
 .sp
-Identifiers begin with an alphabetic character (a\-z,A\-Z), followed zero or more alphanumeric characters (a\-z,A\-Z,0\-9) and the characters slash (/), backslash (\e), underscore (_) and dot (\&.)\&. Identifiers using different characters or clashing with a keyword need to be enclosed in double quotes (")\&.
+Identifiers begin with an alphabetic character (a\-z,A\-Z), followed by zero or more alphanumeric characters (a\-z,A\-Z,0\-9) and the characters slash (/), backslash (\e), underscore (_) and dot (\&.)\&. Identifiers using different characters or clashing with a keyword need to be enclosed in double quotes (")\&.
 .SS "INCLUDE FILES"
 .sp
 .if n \{\
@@ -194,9 +194,9 @@ Identifiers begin with an alphabetic character (a\-z,A\-Z), followed zero or mor
 .sp
 Other files can be included by using the \fBinclude\fR statement\&. The directories to be searched for include files can be specified using the \fB\-I\fR/\fB\-\-includepath\fR option\&. You can override this behaviour either by prepending \(oq\&./\(cq to your path to force inclusion of files located in the current working directory (i\&.e\&. relative path) or / for file location expressed as an absolute path\&.
 .sp
-If \fB\-I\fR/\fB\-\-includepath\fR is not specified, then nft relies on the default directory that is specified at compile time\&. You can retrieve this default directory via \fB\-h\fR/\fB\-\-help\fR option\&.
+If \fB\-I\fR/\fB\-\-includepath\fR is not specified, then nft relies on the default directory that is specified at compile time\&. You can retrieve this default directory via the \fB\-h\fR/\fB\-\-help\fR option\&.
 .sp
-Include statements support the usual shell wildcard symbols (\e*,?,[])\&. Having no matches for an include statement is not an error, if wildcard symbols are used in the include statement\&. This allows having potentially empty include directories for statements like \fBinclude "/etc/firewall/rules/"\fR\&. The wildcard matches are loaded in alphabetical order\&. Files beginning with dot (\&.) are not matched by include statements\&.
+Include statements support the usual shell wildcard symbols (\fB,?,[])\&. Having no matches for an include statement is not an error, if wildcard symbols are used in the include statement\&. This allows having potentially empty include directories for statements like \fR\fB\fBinclude "/etc/firewall/rules/\fR\fR\fB"\fR\&. The wildcard matches are loaded in alphabetical order\&. Files beginning with dot (\&.) are not matched by include statements\&.
 .SS "SYMBOLIC VARIABLES"
 .sp
 .if n \{\
@@ -210,7 +210,7 @@ Include statements support the usual shell wildcard symbols (\e*,?,[])\&. Having
 .RE
 .\}
 .sp
-Symbolic variables can be defined using the \fBdefine\fR statement\&. Variable references are expressions and can be used initialize other variables\&. The scope of a definition is the current block and all blocks contained within\&.
+Symbolic variables can be defined using the \fBdefine\fR statement\&. Variable references are expressions and can be used to initialize other variables\&. The scope of a definition is the current block and all blocks contained within\&.
 .PP
 \fBUsing symbolic variables\fR. 
 .sp
@@ -514,7 +514,7 @@ nft \-\-interactive
 create table inet mytable
 
 # add a new base chain: get input packets
-add chain inet mytable myin { type filter hook input priority 0; }
+add chain inet mytable myin { type filter hook input priority filter; }
 
 # add a single counter to the chain
 add rule inet mytable myin counter
@@ -758,7 +758,7 @@ and this
 hook\&.
 .RE
 .sp
-The \fBpriority\fR parameter accepts a signed integer value or a standard priority name which specifies the order in which chains with same \fBhook\fR value are traversed\&. The ordering is ascending, i\&.e\&. lower priority values have precedence over higher ones\&.
+The \fBpriority\fR parameter accepts a signed integer value or a standard priority name which specifies the order in which chains with the same \fBhook\fR value are traversed\&. The ordering is ascending, i\&.e\&. lower priority values have precedence over higher ones\&.
 .sp
 Standard priority values can be replaced with easily memorizable names\&. Not all names make sense in every family with every hook (see the compatibility matrices below) but their numerical value can still be used for prioritizing chains\&.
 .sp
@@ -936,7 +936,7 @@ T}
 .TE
 .sp 1
 .sp
-Basic arithmetic expressions (addition and subtraction) can also be achieved with these standard names to ease relative prioritizing, e\&.g\&. \fBmangle \- 5\fR stands for \fB\-155\fR\&. Values will also be printed like this until the value is not further than 10 form the standard value\&.
+Basic arithmetic expressions (addition and subtraction) can also be achieved with these standard names to ease relative prioritizing, e\&.g\&. \fBmangle \- 5\fR stands for \fB\-155\fR\&. Values will also be printed like this until the value is not further than 10 from the standard value\&.
 .sp
 Base chains also allow to set the chain\(cqs \fBpolicy\fR, i\&.e\&. what happens to packets not explicitly accepted or refused in contained rules\&. Supported policy values are \fBaccept\fR (which is the default) or \fBdrop\fR\&.
 .SH "RULES"
@@ -1018,12 +1018,12 @@ nft add rule ip filter output ip daddr 192\&.168\&.0\&.0/24 accept
 # nft \-a list ruleset
 table inet filter {
         chain input {
-                type filter hook input priority 0; policy accept;
+                type filter hook input priority filter; policy accept;
                 ct state established,related accept # handle 4
                 ip saddr 10\&.1\&.1\&.1 tcp dport ssh accept # handle 5
           \&.\&.\&.
 # delete the rule with handle 5
-# nft delete rule inet filter input handle 5
+nft delete rule inet filter input handle 5
 .fi
 .if n \{\
 .RE
@@ -1087,7 +1087,7 @@ T{
 \fBadd\fR
 T}:T{
 .sp
-Add a new set in the specified table\&. See the Set specification table below for more information about how to specify a sets properties\&.
+Add a new set in the specified table\&. See the Set specification table below for more information about how to specify properties of a set\&.
 T}
 T{
 .sp
@@ -1173,7 +1173,7 @@ T{
 timeout
 T}:T{
 .sp
-time an element stays in the set, mandatory if set is added to from the packet path (ruleset)\&.
+time an element stays in the set, mandatory if set is added to from the packet path (ruleset)
 T}:T{
 .sp
 string, decimal followed by unit\&. Units are: d, h, m, s
@@ -1203,7 +1203,7 @@ T{
 size
 T}:T{
 .sp
-maximum number of elements in the set, mandatory if set is added to from the packet path (ruleset)\&.
+maximum number of elements in the set, mandatory if set is added to from the packet path (ruleset)
 T}:T{
 .sp
 unsigned integer (64 bit)
@@ -1397,7 +1397,7 @@ T}
 .RE
 .\}
 .sp
-Element\-related commands allow to change contents of named sets and maps\&. \fIkey_expression\fR is typically a value matching the set type\&. \fIvalue_expression\fR is not allowed in sets but mandatory when adding to maps, where it matches the data part in it\(cqs type definition\&. When deleting from maps, it may be specified but is optional as \fIkey_expression\fR uniquely identifies the element\&.
+Element\-related commands allow to change contents of named sets and maps\&. \fIkey_expression\fR is typically a value matching the set type\&. \fIvalue_expression\fR is not allowed in sets but mandatory when adding to maps, where it matches the data part in its type definition\&. When deleting from maps, it may be specified but is optional as \fIkey_expression\fR uniquely identifies the element\&.
 .sp
 \fBcreate\fR command is similar to \fBadd\fR with the exception that none of the listed elements may already exist\&.
 .sp
@@ -1504,7 +1504,7 @@ T}
 .RE
 .\}
 .sp
-Stateful objects are attached to tables and are identified by an unique name\&. They group stateful information from rules, to reference them in rules the keywords "type name" are used e\&.g\&. "counter name"\&.
+Stateful objects are attached to tables and are identified by a unique name\&. They group stateful information from rules, to reference them in rules the keywords "type name" are used e\&.g\&. "counter name"\&.
 .TS
 tab(:);
 lt lt
@@ -1621,7 +1621,7 @@ table inet myhelpers {
      type "ftp" protocol tcp
   }
   chain prerouting {
-      type filter hook prerouting priority 0;
+      type filter hook prerouting priority filter;
       tcp dport 21 ct helper set "ftp\-standard"
   }
 }
@@ -4145,12 +4145,13 @@ raw prerouting meta ipsec exists accept
 .\}
 .nf
 \fBsocket\fR {\fBtransparent\fR | \fBmark\fR | \fBwildcard\fR}
+\fBsocket\fR \fBcgroupv2\fR \fBlevel\fR \fINUM\fR
 .fi
 .if n \{\
 .RE
 .\}
 .sp
-Socket expression can be used to search for an existing open TCP/UDP socket and its attributes that can be associated with a packet\&. It looks for an established or non\-zero bound listening socket (possibly with a non\-local address)\&.
+Socket expression can be used to search for an existing open TCP/UDP socket and its attributes that can be associated with a packet\&. It looks for an established or non\-zero bound listening socket (possibly with a non\-local address)\&. You can also use it to match on the socket cgroupv2 at a given ancestor level, e\&.g\&. if the socket belongs to cgroupv2 \fIa/b\fR, ancestor level 1 checks for a matching on cgroup \fIa\fR and ancestor level 2 checks for a matching on cgroup \fIb\fR\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -4168,6 +4169,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt.
@@ -4201,6 +4203,16 @@ T}:T{
 .sp
 boolean (1 bit)
 T}
+T{
+.sp
+cgroupv2
+T}:T{
+.sp
+cgroup version 2 for this socket (path from /sys/fs/cgroup)
+T}:T{
+.sp
+cgroupv2
+T}
 .TE
 .sp 1
 .PP
@@ -4215,7 +4227,7 @@ T}
 # exactly what you want)\&.
 table inet x {
     chain y {
-        type filter hook prerouting priority \-150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         socket transparent 1 socket wildcard 0 mark set 0x00000001 accept
     }
 }
@@ -4223,7 +4235,7 @@ table inet x {
 # Trace packets that corresponds to a socket with a mark value of 15
 table inet x {
     chain y {
-        type filter hook prerouting priority \-150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         socket mark 0x0000000f nftrace set 1
     }
 }
@@ -4231,8 +4243,16 @@ table inet x {
 # Set packet mark to socket mark
 table inet x {
     chain y {
-        type filter hook prerouting priority \-150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport 8080 mark set socket mark
+    }
+}
+
+# Count packets for cgroupv2 "user\&.slice" at level 1
+table inet x {
+    chain y {
+        type filter hook input priority filter; policy accept;
+        socket cgroupv2 level 1 "user\&.slice" counter
     }
 }
 .fi
@@ -4329,7 +4349,7 @@ If no TTL attribute is passed, make a true IP header and fingerprint TTL true co
 # Accept packets that match the "Linux" OS genre signature without comparing TTL\&.
 table inet x {
     chain y {
-        type filter hook input priority 0; policy accept;
+        type filter hook input priority filter; policy accept;
         osf ttl skip name "Linux"
     }
 }
@@ -5868,6 +5888,30 @@ T}
 .\}
 .nf
 \fBsctp\fR {\fBsport\fR | \fBdport\fR | \fBvtag\fR | \fBchecksum\fR}
+\fBsctp chunk\fR \fICHUNK\fR [ \fIFIELD\fR ]
+
+\fICHUNK\fR := \fBdata\fR | \fBinit\fR | \fBinit\-ack\fR | \fBsack\fR | \fBheartbeat\fR |
+           \fBheartbeat\-ack\fR | \fBabort\fR | \fBshutdown\fR | \fBshutdown\-ack\fR | \fBerror\fR |
+           \fBcookie\-echo\fR | \fBcookie\-ack\fR | \fBecne\fR | \fBcwr\fR | \fBshutdown\-complete\fR
+           | \fBasconf\-ack\fR | \fBforward\-tsn\fR | \fBasconf\fR
+
+\fIFIELD\fR := \fICOMMON_FIELD\fR | \fIDATA_FIELD\fR | \fIINIT_FIELD\fR | \fIINIT_ACK_FIELD\fR |
+           \fISACK_FIELD\fR | \fISHUTDOWN_FIELD\fR | \fIECNE_FIELD\fR | \fICWR_FIELD\fR |
+           \fIASCONF_ACK_FIELD\fR | \fIFORWARD_TSN_FIELD\fR | \fIASCONF_FIELD\fR
+
+\fICOMMON_FIELD\fR := \fBtype\fR | \fBflags\fR | \fBlength\fR
+\fIDATA_FIELD\fR := \fBtsn\fR | \fBstream\fR | \fBssn\fR | \fBppid\fR
+\fIINIT_FIELD\fR := \fBinit\-tag\fR | \fBa\-rwnd\fR | \fBnum\-outbound\-streams\fR |
+                \fBnum\-inbound\-streams\fR | \fBinitial\-tsn\fR
+\fIINIT_ACK_FIELD\fR := \fIINIT_FIELD\fR
+\fISACK_FIELD\fR := \fBcum\-tsn\-ack\fR | \fBa\-rwnd\fR | \fBnum\-gap\-ack\-blocks\fR |
+                \fBnum\-dup\-tsns\fR
+\fISHUTDOWN_FIELD\fR := \fBcum\-tsn\-ack\fR
+\fIECNE_FIELD\fR := \fBlowest\-tsn\fR
+\fICWR_FIELD\fR := \fBlowest\-tsn\fR
+\fIASCONF_ACK_FIELD\fR := \fBseqno\fR
+\fIFORWARD_TSN_FIELD\fR := \fBnew\-cum\-tsn\fR
+\fIASCONF_FIELD\fR := \fBseqno\fR
 .fi
 .if n \{\
 .RE
@@ -5889,6 +5933,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -5933,6 +5978,289 @@ T}:T{
 .sp
 integer (32 bit)
 T}
+T{
+.sp
+chunk
+T}:T{
+.sp
+Search chunk in packet
+T}:T{
+.sp
+without \fIFIELD\fR, boolean indicating existence
+T}
+.TE
+.sp 1
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&49.\ \&SCTP chunk fields
+.TS
+allbox tab(:);
+ltB ltB ltB ltB.
+T{
+Name
+T}:T{
+Width in bits
+T}:T{
+Chunk
+T}:T{
+Notes
+T}
+.T&
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt
+lt lt lt lt.
+T{
+.sp
+type
+T}:T{
+.sp
+8
+T}:T{
+.sp
+all
+T}:T{
+.sp
+not useful, defined by chunk type
+T}
+T{
+.sp
+flags
+T}:T{
+.sp
+8
+T}:T{
+.sp
+all
+T}:T{
+.sp
+semantics defined on per\-chunk basis
+T}
+T{
+.sp
+length
+T}:T{
+.sp
+16
+T}:T{
+.sp
+all
+T}:T{
+.sp
+length of this chunk in bytes excluding padding
+T}
+T{
+.sp
+tsn
+T}:T{
+.sp
+32
+T}:T{
+.sp
+data
+T}:T{
+.sp
+transmission sequence number
+T}
+T{
+.sp
+stream
+T}:T{
+.sp
+16
+T}:T{
+.sp
+data
+T}:T{
+.sp
+stream identifier
+T}
+T{
+.sp
+ssn
+T}:T{
+.sp
+16
+T}:T{
+.sp
+data
+T}:T{
+.sp
+stream sequence number
+T}
+T{
+.sp
+ppid
+T}:T{
+.sp
+32
+T}:T{
+.sp
+data
+T}:T{
+.sp
+payload protocol identifier
+T}
+T{
+.sp
+init\-tag
+T}:T{
+.sp
+32
+T}:T{
+.sp
+init, init\-ack
+T}:T{
+.sp
+initiate tag
+T}
+T{
+.sp
+a\-rwnd
+T}:T{
+.sp
+32
+T}:T{
+.sp
+init, init\-ack, sack
+T}:T{
+.sp
+advertised receiver window credit
+T}
+T{
+.sp
+num\-outbound\-streams
+T}:T{
+.sp
+16
+T}:T{
+.sp
+init, init\-ack
+T}:T{
+.sp
+number of outbound streams
+T}
+T{
+.sp
+num\-inbound\-streams
+T}:T{
+.sp
+16
+T}:T{
+.sp
+init, init\-ack
+T}:T{
+.sp
+number of inbound streams
+T}
+T{
+.sp
+initial\-tsn
+T}:T{
+.sp
+32
+T}:T{
+.sp
+init, init\-ack
+T}:T{
+.sp
+initial transmit sequence number
+T}
+T{
+.sp
+cum\-tsn\-ack
+T}:T{
+.sp
+32
+T}:T{
+.sp
+sack, shutdown
+T}:T{
+.sp
+cumulative transmission sequence number acknowledged
+T}
+T{
+.sp
+num\-gap\-ack\-blocks
+T}:T{
+.sp
+16
+T}:T{
+.sp
+sack
+T}:T{
+.sp
+number of Gap Ack Blocks included
+T}
+T{
+.sp
+num\-dup\-tsns
+T}:T{
+.sp
+16
+T}:T{
+.sp
+sack
+T}:T{
+.sp
+number of duplicate transmission sequence numbers received
+T}
+T{
+.sp
+lowest\-tsn
+T}:T{
+.sp
+32
+T}:T{
+.sp
+ecne, cwr
+T}:T{
+.sp
+lowest transmission sequence number
+T}
+T{
+.sp
+seqno
+T}:T{
+.sp
+32
+T}:T{
+.sp
+asconf\-ack, asconf
+T}:T{
+.sp
+sequence number
+T}
+T{
+.sp
+new\-cum\-tsn
+T}:T{
+.sp
+32
+T}:T{
+.sp
+forward\-tsn
+T}:T{
+.sp
+new cumulative transmission sequence number
+T}
 .TE
 .sp 1
 .SS "DCCP HEADER EXPRESSION"
@@ -5951,7 +6279,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&49.\ \&DCCP header expression
+.B Table\ \&50.\ \&DCCP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6014,7 +6342,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&50.\ \&AH header expression
+.B Table\ \&51.\ \&AH header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6099,7 +6427,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&51.\ \&ESP header expression
+.B Table\ \&52.\ \&ESP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6143,7 +6471,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&52.\ \&IPComp header expression
+.B Table\ \&53.\ \&IPComp header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6208,7 +6536,7 @@ The raw payload expression instructs to load \fIlength\fR bits starting at \fIof
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&53.\ \&Supported payload protocol bases
+.B Table\ \&54.\ \&Supported payload protocol bases
 .TS
 allbox tab(:);
 ltB ltB.
@@ -6324,7 +6652,7 @@ The following syntaxes are valid only in a relational expression with boolean ty
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&54.\ \&IPv6 extension headers
+.B Table\ \&55.\ \&IPv6 extension headers
 .TS
 allbox tab(:);
 ltB ltB.
@@ -6389,7 +6717,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&55.\ \&TCP Options
+.B Table\ \&56.\ \&TCP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6551,7 +6879,7 @@ TCP option matching also supports raw expression syntax to access arbitrary opti
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&56.\ \&IP Options
+.B Table\ \&57.\ \&IP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6671,7 +6999,7 @@ The conntrack\-specific types in this table are described in the sub\-section CO
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&57.\ \&Conntrack expressions
+.B Table\ \&58.\ \&Conntrack expressions
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7100,7 +7428,7 @@ This is a non\-terminating statement, so the rule evaluation continues after the
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&58.\ \&log statement options
+.B Table\ \&59.\ \&log statement options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7174,7 +7502,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&59.\ \&log\-flags
+.B Table\ \&60.\ \&log\-flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7277,7 +7605,7 @@ A reject statement is used to send back an error packet in response to the match
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&60.\ \&different ICMP reject variants are meant for use in different table families
+.B Table\ \&61.\ \&different ICMP reject variants are meant for use in different table families
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7356,7 +7684,7 @@ The conntrack statement can be used to set the conntrack mark and conntrack labe
 .RE
 .\}
 .sp
-The ct statement sets meta data associated with a connection\&. The zone id has to be assigned before a conntrack lookup takes place, i\&.e\&. this has to be done in prerouting and possibly output (if locally generated packets need to be placed in a distinct zone), with a hook priority of \-300\&.
+The ct statement sets meta data associated with a connection\&. The zone id has to be assigned before a conntrack lookup takes place, i\&.e\&. this has to be done in prerouting and possibly output (if locally generated packets need to be placed in a distinct zone), with a hook priority of \fBraw\fR (\-300)\&.
 .sp
 Unlike iptables, where the helper assignment happens in the raw table, the helper needs to be assigned after a conntrack entry has been found, i\&.e\&. it will not work when used with hook priorities equal or before \-200\&.
 .sp
@@ -7364,7 +7692,7 @@ Unlike iptables, where the helper assignment happens in the raw table, the helpe
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&61.\ \&Conntrack statement types
+.B Table\ \&62.\ \&Conntrack statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7454,11 +7782,11 @@ ct mark set meta mark
 .nf
 table inet raw {
   chain prerouting {
-      type filter hook prerouting priority \-300;
+      type filter hook prerouting priority raw;
       ct zone set iif map { "eth1" : 1, "veth1" : 2 }
   }
   chain output {
-      type filter hook output priority \-300;
+      type filter hook output priority raw;
       ct zone set oif map { "eth1" : 1, "veth1" : 2 }
   }
 }
@@ -7493,7 +7821,7 @@ The notrack statement allows to disable connection tracking for certain packets\
 .RE
 .\}
 .sp
-Note that for this statement to be effective, it has to be applied to packets before a conntrack lookup happens\&. Therefore, it needs to sit in a chain with either prerouting or output hook and a hook priority of \-300 or less\&.
+Note that for this statement to be effective, it has to be applied to packets before a conntrack lookup happens\&. Therefore, it needs to sit in a chain with either prerouting or output hook and a hook priority of \-300 (\fBraw\fR) or less\&.
 .sp
 See SYNPROXY STATEMENT for an example usage\&.
 .SS "META STATEMENT"
@@ -7516,7 +7844,7 @@ A meta statement sets meta data associated with a packet\&.
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&62.\ \&Meta statement types
+.B Table\ \&63.\ \&Meta statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7596,7 +7924,7 @@ A limit statement matches at a limited rate using a token bucket filter\&. A rul
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&63.\ \&limit statement values
+.B Table\ \&64.\ \&limit statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7638,21 +7966,16 @@ T}
 .RS 4
 .\}
 .nf
-\fBsnat to\fR \fIaddress\fR [\fB:\fR\fIport\fR] [\fIPRF_FLAGS\fR]
-\fBsnat to\fR \fIaddress\fR \fB\-\fR \fIaddress\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPRF_FLAGS\fR]
-\fBsnat\fR { \fBip\fR | \fBip6\fR } \fBto\fR \fIaddress\fR \fB\-\fR \fIaddress\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPR_FLAGS\fR]
-\fBdnat to\fR \fIaddress\fR [\fB:\fR\fIport\fR] [\fIPRF_FLAGS\fR]
-\fBdnat to\fR \fIaddress\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPR_FLAGS\fR]
-\fBdnat\fR { \fBip\fR | \fBip6\fR } \fBto\fR \fIaddress\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPR_FLAGS\fR]
-\fBmasquerade to\fR [\fB:\fR\fIport\fR] [\fIPRF_FLAGS\fR]
-\fBmasquerade to\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPRF_FLAGS\fR]
-\fBredirect to\fR [\fB:\fR\fIport\fR] [\fIPRF_FLAGS\fR]
-\fBredirect to\fR [\fB:\fR\fIport\fR \fB\-\fR \fIport\fR] [\fIPRF_FLAGS\fR]
+\fBsnat\fR [[\fBip\fR | \fBip6\fR] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
+\fBdnat\fR [[\fBip\fR | \fBip6\fR] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
+\fBmasquerade\fR [\fBto :\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
+\fBredirect\fR [\fBto :\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
 
-\fIPRF_FLAGS\fR := \fIPRF_FLAG\fR [\fB,\fR \fIPRF_FLAGS\fR]
-\fIPR_FLAGS\fR  := \fIPR_FLAG\fR [\fB,\fR \fIPR_FLAGS\fR]
-\fIPRF_FLAG\fR  := \fIPR_FLAG\fR | \fBfully\-random\fR
-\fIPR_FLAG\fR   := \fBpersistent\fR | \fBrandom\fR
+\fIADDR_SPEC\fR := \fIaddress\fR | \fIaddress\fR \fB\-\fR \fIaddress\fR
+\fIPORT_SPEC\fR := \fIport\fR | \fIport\fR \fB\-\fR \fIport\fR
+
+\fIFLAGS\fR  := \fIFLAG\fR [\fB,\fR \fIFLAGS\fR]
+\fIFLAG\fR  := \fBpersistent\fR | \fBrandom\fR | \fBfully\-random\fR
 .fi
 .if n \{\
 .RE
@@ -7674,7 +7997,7 @@ Before kernel 4\&.18 nat statements require both prerouting and postrouting base
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&64.\ \&NAT statement values
+.B Table\ \&65.\ \&NAT statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7715,7 +8038,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&65.\ \&NAT statement flags
+.B Table\ \&66.\ \&NAT statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7760,8 +8083,8 @@ T}
 .nf
 # create a suitable table/chain setup for all further examples
 add table nat
-add chain nat prerouting { type nat hook prerouting priority 0; }
-add chain nat postrouting { type nat hook postrouting priority 100; }
+add chain nat prerouting { type nat hook prerouting priority dstnat; }
+add chain nat postrouting { type nat hook postrouting priority srcnat; }
 
 # translate source addresses of all packets leaving via eth0 to address 1\&.2\&.3\&.4
 add rule nat postrouting oif eth0 snat to 1\&.2\&.3\&.4
@@ -7822,7 +8145,7 @@ This syntax can be used in \fBinet\fR tables\&. The \fBip/ip6\fR parameter defin
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&66.\ \&tproxy attributes
+.B Table\ \&67.\ \&tproxy attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7859,21 +8182,21 @@ T}
 .nf
 table ip x {
     chain y {
-        type filter hook prerouting priority \-150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport ntp tproxy to 1\&.1\&.1\&.1
         udp dport ssh tproxy to :2222
     }
 }
 table ip6 x {
     chain y {
-       type filter hook prerouting priority \-150; policy accept;
+       type filter hook prerouting priority mangle; policy accept;
        tcp dport ntp tproxy to [dead::beef]
        udp dport ssh tproxy to :2222
     }
 }
 table inet x {
     chain y {
-        type filter hook prerouting priority \-150; policy accept;
+        type filter hook prerouting priority mangle; policy accept;
         tcp dport 321 tproxy to :ssh
         tcp dport 99 tproxy ip to 1\&.1\&.1\&.1:999
         udp dport 155 tproxy ip6 to [dead::beef]:smux
@@ -7902,7 +8225,7 @@ This statement will process TCP three\-way\-handshake parallel in netfilter cont
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&67.\ \&synproxy statement attributes
+.B Table\ \&68.\ \&synproxy statement attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7935,7 +8258,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&68.\ \&synproxy statement flags
+.B Table\ \&69.\ \&synproxy statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8002,28 +8325,13 @@ drop incorrect cookies\&. Flags combinations not expected during  3WHS will not
 match and continue (e\&.g\&. SYN+FIN, SYN+ACK)\&. Finally, drop invalid packets, this
 will be out\-of\-flow packets that were not matched by SYNPROXY\&.
 
-    table ip foo {
+    table ip x {
             chain z {
                     type filter hook input priority filter; policy accept;
-                    ct state { invalid, untracked } synproxy mss 1460 wscale 9 timestamp sack\-perm
+                    ct state invalid, untracked synproxy mss 1460 wscale 9 timestamp sack\-perm
                     ct state invalid drop
             }
     }
-
-The outcome ruleset of the steps above should be similar to the one below\&.
-
-        table ip x {
-                chain y {
-                        type filter hook prerouting priority raw; policy accept;
-                        tcp flags syn notrack
-                }
-
-                chain z {
-                        type filter hook input priority filter; policy accept;
-                        ct state { invalid, untracked } synproxy mss 1460 wscale 9 timestamp sack\-perm
-                        ct state invalid drop
-                }
-        }
 .fi
 .if n \{\
 .RE
@@ -8056,7 +8364,7 @@ This statement passes the packet to userspace using the nfnetlink_queue handler\
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&69.\ \&queue statement values
+.B Table\ \&70.\ \&queue statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8108,7 +8416,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&70.\ \&queue statement flags
+.B Table\ \&71.\ \&queue statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8155,7 +8463,7 @@ The dup statement is used to duplicate a packet and send the copy to a different
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&71.\ \&Dup statement values
+.B Table\ \&72.\ \&Dup statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8259,7 +8567,8 @@ nft add rule ip filter input ip saddr @blackhole counter drop
 # requests occurred per second and ip address\&.
 nft add rule ip filter input tcp flags syn tcp dport ssh \e
     add @flood { ip saddr limit rate over 10/second } \e
-    add @blackhole { ip saddr } drop
+    add @blackhole { ip saddr } \e
+    drop
 
 # inspect state of the sets\&.
 nft list set ip filter flood
@@ -8346,11 +8655,26 @@ nft add rule ip filter input ip protocol vmap { tcp : jump tcp\-chain, udp : jum
 These are some additional commands included in nft\&.
 .SS "MONITOR"
 .sp
-The monitor command allows you to listen to Netlink events produced by the nf_tables subsystem, related to creation and deletion of objects\&. When they occur, nft will print to stdout the monitored events in either JSON or native nft format\&.
+The monitor command allows you to listen to Netlink events produced by the nf_tables subsystem\&. These are either related to creation and deletion of objects or to packets for which \fBmeta nftrace\fR was enabled\&. When they occur, nft will print to stdout the monitored events in either JSON or native nft format\&.
 .sp
-To filter events related to a concrete object, use one of the keywords \fItables\fR, \fIchains\fR, \fIsets\fR, \fIrules\fR, \fIelements\fR, \fIruleset\fR\&.
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBmonitor\fR [\fBnew\fR | \fBdestroy\fR] \fIMONITOR_OBJECT\fR
+\fBmonitor\fR \fBtrace\fR
+
+\fIMONITOR_OBJECT\fR := \fBtables\fR | \fBchains\fR | \fBsets\fR | \fBrules\fR | \fBelements\fR | \fBruleset\fR
+.fi
+.if n \{\
+.RE
+.\}
 .sp
-To filter events related to a concrete action, use keyword \fInew\fR or \fIdestroy\fR\&.
+To filter events related to a concrete object, use one of the keywords in \fIMONITOR_OBJECT\fR\&.
+.sp
+To filter events related to a concrete action, use keyword \fBnew\fR or \fBdestroy\fR\&.
+.sp
+The second form of invocation takes no further options and exclusively prints events generated for packets with \fBnftrace\fR enabled\&.
 .sp
 Hit ^C to finish the monitor operation\&.
 .PP
@@ -8397,6 +8721,19 @@ Hit ^C to finish the monitor operation\&.
 .\}
 .nf
 % nft monitor ruleset
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBTrace incoming packets from host 10.0.0.1\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+% nft add rule filter input ip saddr 10\&.0\&.0\&.1 meta nftrace set 1
+% nft monitor trace
 .fi
 .if n \{\
 .RE

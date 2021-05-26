@@ -96,7 +96,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/gcc4_visibility.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(dist_pkgsysconf_DATA) \
+DIST_COMMON = $(srcdir)/Makefile.am $(dist_pkgdata_DATA) \
 	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -148,19 +148,19 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(pkgsysconfdir)"
-DATA = $(dist_pkgsysconf_DATA)
+am__installdirs = "$(DESTDIR)$(pkgdatadir)"
+DATA = $(dist_pkgdata_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 A2X = a2x
-ACLOCAL = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/missing aclocal-1.16
+ACLOCAL = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/missing aclocal-1.16
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/missing autoconf
-AUTOHEADER = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/missing autoheader
-AUTOMAKE = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/missing automake-1.16
+AUTOCONF = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/missing autoconf
+AUTOHEADER = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/missing autoheader
+AUTOMAKE = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/missing automake-1.16
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -202,7 +202,7 @@ LIPO =
 LN_S = ln -s
 LTLIBOBJS = 
 LT_SYS_LIBRARY_PATH = 
-MAKEINFO = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/missing makeinfo
+MAKEINFO = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -214,10 +214,10 @@ OTOOL64 =
 PACKAGE = nftables
 PACKAGE_BUGREPORT = netfilter-devel@vger.kernel.org
 PACKAGE_NAME = nftables
-PACKAGE_STRING = nftables 0.9.8
+PACKAGE_STRING = nftables 0.9.9
 PACKAGE_TARNAME = nftables
 PACKAGE_URL = 
-PACKAGE_VERSION = 0.9.8
+PACKAGE_VERSION = 0.9.9
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -228,15 +228,15 @@ SED = /bin/sed
 SET_MAKE = 
 SHELL = /bin/sh
 STRIP = strip
-VERSION = 0.9.8
+VERSION = 0.9.9
 XTABLES_CFLAGS = 
 XTABLES_LIBS = 
 YACC = bison -y
 YFLAGS = 
-abs_builddir = /tmp/tmp.ztNaiourui/files/nftables
-abs_srcdir = /tmp/tmp.ztNaiourui/files/nftables
-abs_top_builddir = /tmp/tmp.ztNaiourui
-abs_top_srcdir = /tmp/tmp.ztNaiourui
+abs_builddir = /tmp/tmp.Dnnu55rYJW/files/nftables
+abs_srcdir = /tmp/tmp.Dnnu55rYJW/files/nftables
+abs_top_builddir = /tmp/tmp.Dnnu55rYJW
+abs_top_srcdir = /tmp/tmp.Dnnu55rYJW
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -265,7 +265,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /tmp/tmp.ztNaiourui/build-aux/install-sh
+install_sh = ${SHELL} /tmp/tmp.Dnnu55rYJW/build-aux/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -286,8 +286,7 @@ target_alias =
 top_build_prefix = ../../
 top_builddir = ../..
 top_srcdir = ../..
-pkgsysconfdir = ${sysconfdir}/nftables
-dist_pkgsysconf_DATA = all-in-one.nft		\
+dist_pkgdata_DATA = all-in-one.nft		\
 			arp-filter.nft		\
 			bridge-filter.nft	\
 			inet-filter.nft		\
@@ -340,27 +339,27 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-dist_pkgsysconfDATA: $(dist_pkgsysconf_DATA)
+install-dist_pkgdataDATA: $(dist_pkgdata_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(dist_pkgsysconf_DATA)'; test -n "$(pkgsysconfdir)" || list=; \
+	@list='$(dist_pkgdata_DATA)'; test -n "$(pkgdatadir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgsysconfdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pkgsysconfdir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgdatadir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(pkgdatadir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgsysconfdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgsysconfdir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgdatadir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgdatadir)" || exit $$?; \
 	done
 
-uninstall-dist_pkgsysconfDATA:
+uninstall-dist_pkgdataDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dist_pkgsysconf_DATA)'; test -n "$(pkgsysconfdir)" || list=; \
+	@list='$(dist_pkgdata_DATA)'; test -n "$(pkgdatadir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(pkgsysconfdir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(pkgdatadir)'; $(am__uninstall_files_from_dir)
 tags TAGS:
 
 ctags CTAGS:
@@ -405,7 +404,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(pkgsysconfdir)"; do \
+	for dir in "$(DESTDIR)$(pkgdatadir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -458,7 +457,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_pkgsysconfDATA
+install-data-am: install-dist_pkgdataDATA
 
 install-dvi: install-dvi-am
 
@@ -502,7 +501,7 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_pkgsysconfDATA
+uninstall-am: uninstall-dist_pkgdataDATA
 
 .MAKE: install-am install-strip
 
@@ -510,14 +509,14 @@ uninstall-am: uninstall-dist_pkgsysconfDATA
 	cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am \
-	install-dist_pkgsysconfDATA install-dvi install-dvi-am \
+	install-dist_pkgdataDATA install-dvi install-dvi-am \
 	install-exec install-exec-am install-html install-html-am \
 	install-info install-info-am install-man install-pdf \
 	install-pdf-am install-ps install-ps-am install-strip \
 	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic \
 	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-dist_pkgsysconfDATA
+	uninstall-am uninstall-dist_pkgdataDATA
 
 .PRECIOUS: Makefile
 

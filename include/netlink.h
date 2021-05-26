@@ -139,7 +139,6 @@ extern int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h);
 extern struct table *netlink_delinearize_table(struct netlink_ctx *ctx,
 					       const struct nftnl_table *nlt);
 
-extern int netlink_list_sets(struct netlink_ctx *ctx, const struct handle *h);
 extern struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 					   const struct nftnl_set *nls);
 
@@ -164,6 +163,8 @@ extern struct obj *netlink_delinearize_obj(struct netlink_ctx *ctx,
 
 extern int netlink_list_flowtables(struct netlink_ctx *ctx,
 				   const struct handle *h);
+extern struct flowtable *netlink_delinearize_flowtable(struct netlink_ctx *ctx,
+						       struct nftnl_flowtable *nlo);
 
 extern void netlink_dump_chain(const struct nftnl_chain *nlc,
 			       struct netlink_ctx *ctx);
@@ -180,7 +181,7 @@ extern void netlink_dump_flowtable(struct nftnl_flowtable *flo, struct netlink_c
 	__netlink_abi_error(__FILE__, __LINE__, strerror(errno));
 extern void __noreturn __netlink_abi_error(const char *file, int line, const char *reason);
 extern int netlink_io_error(struct netlink_ctx *ctx,
-			    const struct location *loc, const char *fmt, ...);
+			    const struct location *loc, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
 #define netlink_init_error()	\
 	__netlink_init_error(__FILE__, __LINE__, strerror(errno));
 extern void __noreturn __netlink_init_error(const char *file, int line, const char *reason);

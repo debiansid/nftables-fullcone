@@ -356,7 +356,7 @@ static void netlink_parse_lookup(struct netlink_parse_ctx *ctx,
 	uint32_t flag;
 
 	name = nftnl_expr_get_str(nle, NFTNL_EXPR_LOOKUP_SET);
-	set  = set_lookup(ctx->table, name);
+	set  = set_cache_find(ctx->table, name);
 	if (set == NULL)
 		return netlink_error(ctx, loc,
 				     "Unknown set '%s' in lookup expression",
@@ -731,11 +731,12 @@ static void netlink_parse_socket(struct netlink_parse_ctx *ctx,
 				      const struct nftnl_expr *nle)
 {
 	enum nft_registers dreg;
-	uint32_t key;
+	uint32_t key, level;
 	struct expr * expr;
 
 	key = nftnl_expr_get_u32(nle, NFTNL_EXPR_SOCKET_KEY);
-	expr = socket_expr_alloc(loc, key);
+	level = nftnl_expr_get_u32(nle, NFTNL_EXPR_SOCKET_LEVEL);
+	expr = socket_expr_alloc(loc, key, level);
 
 	dreg = netlink_parse_register(nle, NFTNL_EXPR_SOCKET_DREG);
 	netlink_set_register(ctx, dreg, expr);
@@ -1531,7 +1532,7 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 	init_list_head(&dynset_parse_ctx.stmt_list);
 
 	name = nftnl_expr_get_str(nle, NFTNL_EXPR_DYNSET_SET_NAME);
-	set  = set_lookup(ctx->table, name);
+	set  = set_cache_find(ctx->table, name);
 	if (set == NULL)
 		return netlink_error(ctx, loc,
 				     "Unknown set '%s' in dynset statement",
@@ -1640,7 +1641,7 @@ static void netlink_parse_objref(struct netlink_parse_ctx *ctx,
 		struct set *set;
 
 		name = nftnl_expr_get_str(nle, NFTNL_EXPR_OBJREF_SET_NAME);
-		set  = set_lookup(ctx->table, name);
+		set  = set_cache_find(ctx->table, name);
 		if (set == NULL)
 			return netlink_error(ctx, loc,
 					     "Unknown set '%s' in objref expression",
@@ -1792,7 +1793,9 @@ struct stmt *netlink_parse_set_expr(const struct set *set,
 
 	handle_merge(&h, &set->handle);
 	pctx->rule = rule_alloc(&netlink_location, &h);
-	pctx->table = table_lookup(&set->handle, cache);
+	pctx->table = table_cache_find(&cache->table_cache,
+				       set->handle.table.name,
+				       set->handle.family);
 	assert(pctx->table != NULL);
 
 	if (netlink_parse_expr(nle, pctx) < 0)
@@ -2163,26 +2166,55 @@ static void map_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
 		binop_postprocess(ctx, expr);
 }
 
-static void relational_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
+static void relational_binop_postprocess(struct rule_pp_ctx *ctx,
+					 struct expr **exprp)
 {
-	struct expr *binop = expr->left, *value = expr->right;
+	struct expr *expr = *exprp, *binop = expr->left, *value = expr->right;
 
-	if (binop->op == OP_AND && expr->op == OP_NEQ &&
+	if (binop->op == OP_AND && (expr->op == OP_NEQ || expr->op == OP_EQ) &&
 	    value->dtype->basetype &&
-	    value->dtype->basetype->type == TYPE_BITMASK &&
-	    !mpz_cmp_ui(value->value, 0)) {
-		/* Flag comparison: data & flags != 0
-		 *
-		 * Split the flags into a list of flag values and convert the
-		 * op to OP_EQ.
-		 */
-		expr_free(value);
+	    value->dtype->basetype->type == TYPE_BITMASK) {
+		switch (value->etype) {
+		case EXPR_VALUE:
+			if (!mpz_cmp_ui(value->value, 0)) {
+				/* Flag comparison: data & flags != 0
+				 *
+				 * Split the flags into a list of flag values and convert the
+				 * op to OP_EQ.
+				 */
+				expr_free(value);
 
-		expr->left  = expr_get(binop->left);
-		expr->right = binop_tree_to_list(NULL, binop->right);
-		expr->op    = OP_IMPLICIT;
-
-		expr_free(binop);
+				expr->left  = expr_get(binop->left);
+				expr->right = binop_tree_to_list(NULL, binop->right);
+				switch (expr->op) {
+				case OP_NEQ:
+					expr->op = OP_IMPLICIT;
+					break;
+				case OP_EQ:
+					expr->op = OP_NEG;
+					break;
+				default:
+					BUG("unknown operation type %d\n", expr->op);
+				}
+				expr_free(binop);
+			} else {
+				*exprp = flagcmp_expr_alloc(&expr->location, expr->op,
+							    expr_get(binop->left),
+							    binop_tree_to_list(NULL, binop->right),
+							    expr_get(value));
+				expr_free(expr);
+			}
+			break;
+		case EXPR_BINOP:
+			*exprp = flagcmp_expr_alloc(&expr->location, expr->op,
+						    expr_get(binop->left),
+						    binop_tree_to_list(NULL, binop->right),
+						    binop_tree_to_list(NULL, value));
+			expr_free(expr);
+			break;
+		default:
+			break;
+		}
 	} else if (binop->left->dtype->flags & DTYPE_F_PREFIX &&
 		   binop->op == OP_AND && expr->right->etype == EXPR_VALUE &&
 		   expr_mask_is_prefix(binop->right)) {
@@ -2391,7 +2423,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 			meta_match_postprocess(ctx, expr);
 			break;
 		case EXPR_BINOP:
-			relational_binop_postprocess(ctx, expr);
+			relational_binop_postprocess(ctx, exprp);
 			break;
 		default:
 			break;
@@ -2418,6 +2450,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 	case EXPR_RANGE:
 		expr_postprocess(ctx, &expr->left);
 		expr_postprocess(ctx, &expr->right);
+		break;
 	case EXPR_PREFIX:
 		expr_postprocess(ctx, &expr->prefix);
 		break;
@@ -2473,24 +2506,8 @@ static void stmt_reject_postprocess(struct rule_pp_ctx *rctx)
 			payload_dependency_release(&rctx->pdctx);
 		break;
 	case NFPROTO_INET:
-		if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH) {
-			datatype_set(stmt->reject.expr, &icmpx_code_type);
-			break;
-		}
-		base = rctx->pctx.protocol[PROTO_BASE_LL_HDR].desc;
-		desc = rctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
-		protocol = proto_find_num(base, desc);
-		switch (protocol) {
-		case NFPROTO_IPV4:
-			datatype_set(stmt->reject.expr, &icmp_code_type);
-			break;
-		case NFPROTO_IPV6:
-			datatype_set(stmt->reject.expr, &icmpv6_code_type);
-			break;
-		}
-		stmt->reject.family = protocol;
-		break;
 	case NFPROTO_BRIDGE:
+	case NFPROTO_NETDEV:
 		if (stmt->reject.type == NFT_REJECT_ICMPX_UNREACH) {
 			datatype_set(stmt->reject.expr, &icmpx_code_type);
 			break;
@@ -2505,11 +2522,13 @@ static void stmt_reject_postprocess(struct rule_pp_ctx *rctx)
 		desc = rctx->pctx.protocol[PROTO_BASE_NETWORK_HDR].desc;
 		protocol = proto_find_num(base, desc);
 		switch (protocol) {
-		case __constant_htons(ETH_P_IP):
+		case NFPROTO_IPV4:			/* INET */
+		case __constant_htons(ETH_P_IP):	/* BRIDGE, NETDEV */
 			stmt->reject.family = NFPROTO_IPV4;
 			datatype_set(stmt->reject.expr, &icmp_code_type);
 			break;
-		case __constant_htons(ETH_P_IPV6):
+		case NFPROTO_IPV6:			/* INET */
+		case __constant_htons(ETH_P_IPV6):	/* BRIDGE, NETDEV */
 			stmt->reject.family = NFPROTO_IPV6;
 			datatype_set(stmt->reject.expr, &icmpv6_code_type);
 			break;
@@ -2519,7 +2538,6 @@ static void stmt_reject_postprocess(struct rule_pp_ctx *rctx)
 
 		if (payload_dependency_exists(&rctx->pdctx, PROTO_BASE_NETWORK_HDR))
 			payload_dependency_release(&rctx->pdctx);
-
 		break;
 	default:
 		break;
@@ -2945,7 +2963,8 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 		h.position.id = nftnl_rule_get_u64(nlr, NFTNL_RULE_POSITION);
 
 	pctx->rule = rule_alloc(&netlink_location, &h);
-	pctx->table = table_lookup(&h, &ctx->nft->cache);
+	pctx->table = table_cache_find(&ctx->nft->cache.table_cache,
+				       h.table.name, h.family);
 	assert(pctx->table != NULL);
 
 	pctx->rule->comment = nftnl_rule_get_comment(nlr);

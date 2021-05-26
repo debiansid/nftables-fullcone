@@ -52,13 +52,6 @@ struct mnl_socket *nft_mnl_socket_open(void)
 	return nf_sock;
 }
 
-struct mnl_socket *nft_mnl_socket_reopen(struct mnl_socket *nf_sock)
-{
-	mnl_socket_close(nf_sock);
-
-	return nft_mnl_socket_open();
-}
-
 uint32_t mnl_seqnum_alloc(unsigned int *seqnum)
 {
 	return (*seqnum)++;
@@ -77,20 +70,31 @@ nft_mnl_recv(struct netlink_ctx *ctx, uint32_t portid,
 	     int (*cb)(const struct nlmsghdr *nlh, void *data), void *cb_data)
 {
 	char buf[NFT_NLMSG_MAXSIZE];
+	bool eintr = false;
 	int ret;
 
 	ret = mnl_socket_recvfrom(ctx->nft->nf_sock, buf, sizeof(buf));
 	while (ret > 0) {
 		ret = mnl_cb_run(buf, ret, ctx->seqnum, portid, cb, cb_data);
-		if (ret <= 0)
-			goto out;
+		if (ret == 0)
+			break;
+		if (ret < 0) {
+			if (errno == EAGAIN) {
+				ret = 0;
+				break;
+			}
+			if (errno != EINTR)
+				break;
 
+			/* process all pending messages before reporting EINTR */
+			eintr = true;
+		}
 		ret = mnl_socket_recvfrom(ctx->nft->nf_sock, buf, sizeof(buf));
 	}
-out:
-	if (ret < 0 && errno == EAGAIN)
-		return 0;
-
+	if (eintr) {
+		ret = -1;
+		errno = EINTR;
+	}
 	return ret;
 }
 
@@ -156,11 +160,11 @@ static int check_genid(const struct nlmsghdr *nlh)
  * Batching
  */
 
-/* selected batch page is 256 Kbytes long to load ruleset of
- * half a million rules without hitting -EMSGSIZE due to large
- * iovec.
+/* Selected batch page is 2 Mbytes long to support loading a ruleset of 3.5M
+ * rules matching on source and destination address as well as input and output
+ * interfaces. This is what legacy iptables supports.
  */
-#define BATCH_PAGE_SIZE getpagesize() * 32
+#define BATCH_PAGE_SIZE 2 * 1024 * 1024
 
 struct nftnl_batch *mnl_batch_init(void)
 {
@@ -694,7 +698,7 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 					BYTEORDER_HOST_ENDIAN, sizeof(int));
 			nftnl_chain_set_s32(nlc, NFTNL_CHAIN_PRIO, priority);
 			nftnl_chain_set_str(nlc, NFTNL_CHAIN_TYPE,
-					    cmd->chain->type);
+					    cmd->chain->type.str);
 		}
 		if (cmd->chain->dev_expr) {
 			dev_array = xmalloc(sizeof(char *) * 8);
@@ -758,6 +762,12 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		mnl_attr_put_u32(nlh, NFTA_CHAIN_ID, htonl(cmd->handle.chain_id));
 		if (cmd->chain->flags)
 			nftnl_chain_set_u32(nlc, NFTNL_CHAIN_FLAGS, cmd->chain->flags);
+	}
+
+	if (cmd->chain && cmd->chain->flags & CHAIN_F_BASECHAIN) {
+		nftnl_chain_unset(nlc, NFTNL_CHAIN_TYPE);
+		cmd_add_loc(cmd, nlh->nlmsg_len, &cmd->chain->type.loc);
+		mnl_attr_put_strz(nlh, NFTA_CHAIN_TYPE, cmd->chain->type.str);
 	}
 
 	if (cmd->chain && cmd->chain->policy) {
@@ -956,7 +966,7 @@ int mnl_nft_table_del(struct netlink_ctx *ctx, struct cmd *cmd)
 		mnl_attr_put_strz(nlh, NFTA_TABLE_NAME, cmd->handle.table.name);
 	} else if (cmd->handle.handle.id) {
 		cmd_add_loc(cmd, nlh->nlmsg_len, &cmd->handle.handle.location);
-		mnl_attr_put_u64(nlh, NFTA_TABLE_NAME,
+		mnl_attr_put_u64(nlh, NFTA_TABLE_HANDLE,
 				 htobe64(cmd->handle.handle.id));
 	}
 	nftnl_table_nlmsg_build_payload(nlh, nlt);
@@ -1540,6 +1550,9 @@ int mnl_nft_setelem_add(struct netlink_ctx *ctx, const struct set *set,
 	nftnl_set_set_str(nls, NFTNL_SET_NAME, h->set.name);
 	if (h->set_id)
 		nftnl_set_set_u32(nls, NFTNL_SET_ID, h->set_id);
+	if (set_is_datamap(set->flags))
+		nftnl_set_set_u32(nls, NFTNL_SET_DATA_TYPE,
+				  dtype_map_to_kernel(set->data->dtype));
 
 	alloc_setelem_cache(expr, nls);
 	netlink_dump_set(nls, ctx);

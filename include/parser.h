@@ -23,7 +23,34 @@ struct parser_state {
 	struct scope			*scopes[SCOPE_NEST_MAX];
 	unsigned int			scope;
 
+	unsigned int			flex_state_pop;
+	unsigned int			startcond_type;
 	struct list_head		*cmds;
+};
+
+enum startcond_type {
+	PARSER_SC_BEGIN,
+	PARSER_SC_ARP,
+	PARSER_SC_CT,
+	PARSER_SC_COUNTER,
+	PARSER_SC_ETH,
+	PARSER_SC_IP,
+	PARSER_SC_IP6,
+	PARSER_SC_LIMIT,
+	PARSER_SC_QUOTA,
+	PARSER_SC_SCTP,
+	PARSER_SC_SECMARK,
+	PARSER_SC_VLAN,
+	PARSER_SC_EXPR_FIB,
+	PARSER_SC_EXPR_HASH,
+	PARSER_SC_EXPR_IPSEC,
+	PARSER_SC_EXPR_NUMGEN,
+	PARSER_SC_EXPR_QUEUE,
+	PARSER_SC_EXPR_RT,
+	PARSER_SC_EXPR_SCTP_CHUNK,
+	PARSER_SC_EXPR_SOCKET,
+
+	PARSER_SC_STMT_LOG,
 };
 
 struct mnl_socket;
@@ -44,5 +71,7 @@ extern int scanner_include_file(struct nft_ctx *ctx, void *scanner,
 extern void scanner_push_buffer(void *scanner,
 				const struct input_descriptor *indesc,
 				const char *buffer);
+
+extern void scanner_pop_start_cond(void *scanner, enum startcond_type sc);
 
 #endif /* NFTABLES_PARSER_H */

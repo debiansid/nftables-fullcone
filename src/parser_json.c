@@ -11,6 +11,7 @@
 #include <netlink.h>
 #include <parser.h>
 #include <rule.h>
+#include <sctp_chunk.h>
 #include <socket.h>
 
 #include <netdb.h>
@@ -435,7 +436,7 @@ static struct expr *json_parse_socket_expr(struct json_ctx *ctx,
 		return NULL;
 	}
 
-	return socket_expr_alloc(int_loc, keyval);
+	return socket_expr_alloc(int_loc, keyval, 0);
 }
 
 static int json_parse_payload_field(const struct proto_desc *desc,
@@ -705,6 +706,53 @@ static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
 		return NULL;
 	}
 	return ipopt_expr_alloc(int_loc, descval, fieldval, 0);
+}
+
+static int json_parse_sctp_chunk_field(const struct exthdr_desc *desc,
+				       const char *name, int *val)
+{
+	unsigned int i;
+
+	for (i = 0; i < array_size(desc->templates); i++) {
+		if (desc->templates[i].token &&
+		    !strcmp(desc->templates[i].token, name)) {
+			if (val)
+				*val = i;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static struct expr *json_parse_sctp_chunk_expr(struct json_ctx *ctx,
+					       const char *type, json_t *root)
+{
+	const struct exthdr_desc *desc;
+	const char *name, *field;
+	struct expr *expr;
+	int fieldval;
+
+	if (json_unpack_err(ctx, root, "{s:s}", "name", &name))
+		return NULL;
+
+	desc = sctp_chunk_protocol_find(name);
+	if (!desc) {
+		json_error(ctx, "Unknown sctp chunk name '%s'.", name);
+		return NULL;
+	}
+
+	if (json_unpack(root, "{s:s}", "field", &field)) {
+		expr = sctp_chunk_expr_alloc(int_loc, desc->type,
+					     SCTP_CHUNK_COMMON_TYPE);
+		expr->exthdr.flags = NFT_EXTHDR_F_PRESENT;
+
+		return expr;
+	}
+	if (json_parse_sctp_chunk_field(desc, field, &fieldval)) {
+		json_error(ctx, "Unknown sctp chunk field '%s'.", field);
+		return NULL;
+	}
+	return sctp_chunk_expr_alloc(int_loc, desc->type, fieldval);
 }
 
 static const struct exthdr_desc *exthdr_lookup_byname(const char *name)
@@ -1412,6 +1460,7 @@ static struct expr *json_parse_expr(struct json_ctx *ctx, json_t *root)
 		{ "exthdr", json_parse_exthdr_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_SES | CTX_F_MAP | CTX_F_CONCAT },
 		{ "tcp option", json_parse_tcp_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
 		{ "ip option", json_parse_ip_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
+		{ "sctp chunk", json_parse_sctp_chunk_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
 		{ "meta", json_parse_meta_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_MAP | CTX_F_CONCAT },
 		{ "osf", json_parse_osf_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_MAP | CTX_F_CONCAT },
 		{ "ipsec", json_parse_xfrm_expr, CTX_F_PRIMARY | CTX_F_MAP | CTX_F_CONCAT },
@@ -1784,7 +1833,7 @@ static struct stmt *json_parse_limit_stmt(struct json_ctx *ctx,
 					  const char *key, json_t *value)
 {
 	struct stmt *stmt;
-	uint64_t rate, burst = 0;
+	uint64_t rate, burst = 5;
 	const char *rate_unit = "packets", *time, *burst_unit = "bytes";
 	int inv = 0;
 
@@ -2741,7 +2790,7 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 
 	chain = chain_alloc(NULL);
 	chain->flags |= CHAIN_F_BASECHAIN;
-	chain->type = xstrdup(type);
+	chain->type.str = xstrdup(type);
 	chain->priority.expr = constant_expr_alloc(int_loc, &integer_type,
 						   BYTEORDER_HOST_ENDIAN,
 						   sizeof(int) * BITS_PER_BYTE,
@@ -3893,6 +3942,7 @@ int nft_parse_json_buffer(struct nft_ctx *nft, const char *buf,
 	};
 	int ret;
 
+	parser_init(nft, nft->state, msgs, cmds, nft->top_scope);
 	nft->json_root = json_loads(buf, 0, NULL);
 	if (!nft->json_root)
 		return -EINVAL;
@@ -3921,6 +3971,7 @@ int nft_parse_json_filename(struct nft_ctx *nft, const char *filename,
 	json_error_t err;
 	int ret;
 
+	parser_init(nft, nft->state, msgs, cmds, nft->top_scope);
 	nft->json_root = json_load_file(filename, 0, &err);
 	if (!nft->json_root)
 		return -EINVAL;

@@ -1,5 +1,6 @@
-nftables (0.9.8-4) unstable; urgency=medium
+nftables (0.9.8-3.1) unstable; urgency=medium
 
+  * Non-maintainer upload.
   * d/p/payload-check-icmp-dependency-before-removing-previo.patch
     Fix a regression in nftables 0.9.8 that made nftables too greedy
     in removing icmp dependencies (Closes: #991309).

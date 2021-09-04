@@ -166,7 +166,7 @@
     }
 ]
 
-# snat ip addr . port to ip saddr map { 10.141.11.4 : 192.168.2.3 . 80 }
+# snat ip to ip saddr map { 10.141.11.4 : 192.168.2.3 . 80 }
 [
     {
         "snat": {

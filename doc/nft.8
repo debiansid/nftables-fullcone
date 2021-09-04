@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 05/25/2021
+.\"      Date: 08/19/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "05/25/2021" "\ \&" "\ \&"
+.TH "NFT" "8" "08/19/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -68,6 +68,12 @@ Read input from
 \fIfilename\fR\&. If
 \fIfilename\fR
 is \-, read from stdin\&.
+.RE
+.PP
+\fB\-D\fR, \fB\-\-define \fR\fB\fIname=value\fR\fR
+.RS 4
+Define a variable\&. You can only combine this option with
+\fI\-f\fR\&.
 .RE
 .PP
 \fB\-i\fR, \fB\-\-interactive\fR
@@ -1489,6 +1495,21 @@ List all flowtables\&.
 T}
 .TE
 .sp 1
+.SH "LISTING"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBlist { secmarks | synproxys | flow tables | meters | hooks }\fR [\fIfamily\fR]
+\fBlist { secmarks | synproxys | flow tables | meters | hooks } table\fR [\fIfamily\fR] \fItable\fR
+\fBlist ct { timeout | expectation | helper | helpers } table\fR [\fIfamily\fR] \fItable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Inspect configured objects\&. \fBlist hooks\fR shows the full hook pipeline, including those registered by kernel modules, such as nf_conntrack\&.
 .SH "STATEFUL OBJECTS"
 .sp
 .if n \{\
@@ -1499,6 +1520,7 @@ T}
 \fBdelete\fR \fItype\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBlist counters\fR [\fIfamily\fR]
 \fBlist quotas\fR [\fIfamily\fR]
+\fBlist limits\fR [\fIfamily\fR]
 .fi
 .if n \{\
 .RE
@@ -4795,7 +4817,7 @@ T}
 .RS 4
 .\}
 .nf
-\fBvlan\fR {\fBid\fR | \fBcfi\fR | \fBpcp\fR | \fBtype\fR}
+\fBvlan\fR {\fBid\fR | \fBdei\fR | \fBpcp\fR | \fBtype\fR}
 .fi
 .if n \{\
 .RE
@@ -4833,10 +4855,10 @@ integer (12 bit)
 T}
 T{
 .sp
-cfi
+dei
 T}:T{
 .sp
-Canonical Format Indicator
+Drop Eligible Indicator
 T}:T{
 .sp
 integer (1 bit)
@@ -6984,8 +7006,8 @@ There are three types of conntrack expressions\&. Some conntrack expressions req
 .RS 4
 .\}
 .nf
-\fBct\fR {\fBstate\fR | \fBdirection\fR | \fBstatus\fR | \fBmark\fR | \fBexpiration\fR | \fBhelper\fR | \fBlabel\fR}
-\fBct\fR [\fBoriginal\fR | \fBreply\fR] {\fBl3proto\fR | \fBprotocol\fR | \fBbytes\fR | \fBpackets\fR | \fBavgpkt\fR | \fBzone\fR | \fBid\fR}
+\fBct\fR {\fBstate\fR | \fBdirection\fR | \fBstatus\fR | \fBmark\fR | \fBexpiration\fR | \fBhelper\fR | \fBlabel\fR | \fBcount\fR | \fBid\fR}
+\fBct\fR [\fBoriginal\fR | \fBreply\fR] {\fBl3proto\fR | \fBprotocol\fR | \fBbytes\fR | \fBpackets\fR | \fBavgpkt\fR | \fBzone\fR}
 \fBct\fR {\fBoriginal\fR | \fBreply\fR} {\fBproto\-src\fR | \fBproto\-dst\fR}
 \fBct\fR {\fBoriginal\fR | \fBreply\fR} {\fBip\fR | \fBip6\fR} {\fBsaddr\fR | \fBdaddr\fR}
 .fi
@@ -7590,9 +7612,9 @@ ip6 filter output log flags all
 .nf
 \fBreject\fR [ \fBwith\fR \fIREJECT_WITH\fR ]
 
-\fIREJECT_WITH\fR := \fBicmp type\fR \fIicmp_code\fR |
-                 \fBicmpv6 type\fR \fIicmpv6_code\fR |
-                 \fBicmpx type\fR \fIicmpx_code\fR |
+\fIREJECT_WITH\fR := \fBicmp\fR \fIicmp_code\fR |
+                 \fBicmpv6\fR \fIicmpv6_code\fR |
+                 \fBicmpx\fR \fIicmpx_code\fR |
                  \fBtcp reset\fR
 .fi
 .if n \{\
@@ -8350,15 +8372,19 @@ This statement passes the packet to userspace using the nfnetlink_queue handler\
 .RS 4
 .\}
 .nf
-\fBqueue\fR [\fBnum\fR \fIqueue_number\fR] [\fBbypass\fR]
-\fBqueue\fR [\fBnum\fR \fIqueue_number_from\fR \- \fIqueue_number_to\fR] [\fIQUEUE_FLAGS\fR]
+\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBnum\fR \fIqueue_number\fR]
+\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBnum\fR \fIqueue_number_from\fR \- \fIqueue_number_to\fR]
+\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBto\fR \fIQUEUE_EXPRESSION\fR ]
 
 \fIQUEUE_FLAGS\fR := \fIQUEUE_FLAG\fR [\fB,\fR \fIQUEUE_FLAGS\fR]
 \fIQUEUE_FLAG\fR  := \fBbypass\fR | \fBfanout\fR
+\fIQUEUE_EXPRESSION\fR := \fBnumgen\fR | \fBhash\fR | \fBsymhash\fR | \fBMAP STATEMENT\fR
 .fi
 .if n \{\
 .RE
 .\}
+.sp
+QUEUE_EXPRESSION can be used to compute a queue number at run\-time with the hash or numgen expressions\&. It also allows to use the map statement to assign fixed queue numbers based on external inputs such as the source ip address or interface names\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1

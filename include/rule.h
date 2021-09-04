@@ -270,6 +270,7 @@ extern struct chain *chain_binding_lookup(const struct table *table,
 					  const char *chain_name);
 
 extern const char *family2str(unsigned int family);
+#define __NF_ARP_INGRESS	255
 extern const char *hooknum2str(unsigned int family, unsigned int hooknum);
 extern const char *chain_policy2str(uint32_t policy);
 extern void chain_print_plain(const struct chain *chain,
@@ -644,6 +645,7 @@ enum cmd_obj {
 	CMD_OBJ_CT_EXPECT,
 	CMD_OBJ_SYNPROXY,
 	CMD_OBJ_SYNPROXYS,
+	CMD_OBJ_HOOKS,
 };
 
 struct markup {

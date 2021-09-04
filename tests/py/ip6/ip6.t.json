@@ -213,46 +213,6 @@
     }
 ]
 
-# ip6 flowlabel { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "flowlabel",
-                    "protocol": "ip6"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# ip6 flowlabel != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "flowlabel",
-                    "protocol": "ip6"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
 # ip6 flowlabel vmap { 0 : accept, 2 : continue } 
 [
     {
@@ -391,48 +351,6 @@
                     55,
                     67,
                     88
-                ]
-            }
-        }
-    }
-]
-
-# ip6 length { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "length",
-                    "protocol": "ip6"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    {
-                        "range": [ 33, 55 ]
-                    }
-                ]
-            }
-        }
-    }
-]
-
-# ip6 length != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "length",
-                    "protocol": "ip6"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
                 ]
             }
         }
@@ -737,46 +655,6 @@
                     55,
                     67,
                     88
-                ]
-            }
-        }
-    }
-]
-
-# ip6 hoplimit {33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "hoplimit",
-                    "protocol": "ip6"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# ip6 hoplimit != {33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "hoplimit",
-                    "protocol": "ip6"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
                 ]
             }
         }

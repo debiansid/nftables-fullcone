@@ -44,6 +44,10 @@ understanding of their meaning. You can get information about options by running
 *--file 'filename'*::
 	Read input from 'filename'. If 'filename' is -, read from stdin.
 
+*-D*::
+*--define 'name=value'*::
+	Define a variable. You can only combine this option with '-f'.
+
 *-i*::
 *--interactive*::
 	Read input from an interactive readline CLI. You can use quit to exit, or use the EOF marker,
@@ -683,6 +687,16 @@ and subtraction can be used to set relative priority, e.g. filter + 5 equals to
 *delete*:: Delete the specified flowtable.
 *list*:: List all flowtables.
 
+LISTING
+-------
+[verse]
+*list { secmarks | synproxys | flow tables | meters | hooks }* ['family']
+*list { secmarks | synproxys | flow tables | meters | hooks } table* ['family'] 'table'
+*list ct { timeout | expectation | helper | helpers } table* ['family'] 'table'
+
+Inspect configured objects.
+*list hooks* shows the full hook pipeline, including those registered by
+kernel modules, such as nf_conntrack.
 
 STATEFUL OBJECTS
 ----------------
@@ -691,6 +705,7 @@ STATEFUL OBJECTS
 *delete* 'type' ['family'] 'table' *handle* 'handle'
 *list counters* ['family']
 *list quotas* ['family']
+*list limits* ['family']
 
 Stateful objects are attached to tables and are identified by a unique name.
 They group stateful information from rules, to reference them in rules the

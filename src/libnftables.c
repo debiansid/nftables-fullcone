@@ -89,6 +89,12 @@ static int nft_netlink(struct nft_ctx *nft,
 			last_seqnum = UINT32_MAX;
 		}
 	}
+	/* nfnetlink uses the first netlink message header in the batch whose
+	 * sequence number is zero to report for EOPNOTSUPP and EPERM errors in
+	 * some scenarios. Now it is safe to release pending errors here.
+	 */
+	list_for_each_entry_safe(err, tmp, &err_list, head)
+		mnl_err_list_free(err);
 out:
 	mnl_batch_reset(ctx.batch);
 	return ret;
@@ -111,6 +117,45 @@ static void nft_exit(struct nft_ctx *ctx)
 	realm_table_rt_exit(ctx);
 	devgroup_table_exit(ctx);
 	mark_table_exit(ctx);
+}
+
+EXPORT_SYMBOL(nft_ctx_add_var);
+int nft_ctx_add_var(struct nft_ctx *ctx, const char *var)
+{
+	char *separator = strchr(var, '=');
+	int pcount = ctx->num_vars;
+	struct nft_vars *tmp;
+	const char *value;
+
+	if (!separator)
+		return -1;
+
+	tmp = realloc(ctx->vars, (pcount + 1) * sizeof(struct nft_vars));
+	if (!tmp)
+		return -1;
+
+	*separator = '\0';
+	value = separator + 1;
+
+	ctx->vars = tmp;
+	ctx->vars[pcount].key = xstrdup(var);
+	ctx->vars[pcount].value = xstrdup(value);
+	ctx->num_vars++;
+
+	return 0;
+}
+
+EXPORT_SYMBOL(nft_ctx_clear_vars);
+void nft_ctx_clear_vars(struct nft_ctx *ctx)
+{
+	unsigned int i;
+
+	for (i = 0; i < ctx->num_vars; i++) {
+		xfree(ctx->vars[i].key);
+		xfree(ctx->vars[i].value);
+	}
+	ctx->num_vars = 0;
+	xfree(ctx->vars);
 }
 
 EXPORT_SYMBOL(nft_ctx_add_include_path);
@@ -172,6 +217,7 @@ struct nft_ctx *nft_ctx_new(uint32_t flags)
 	ctx->flags = flags;
 	ctx->output.output_fp = stdout;
 	ctx->output.error_fp = stderr;
+	init_list_head(&ctx->vars_ctx.indesc_list);
 
 	if (flags == NFT_CTX_DEFAULT)
 		nft_ctx_netlink_init(ctx);
@@ -305,6 +351,7 @@ void nft_ctx_free(struct nft_ctx *ctx)
 	exit_cookie(&ctx->output.error_cookie);
 	iface_cache_release();
 	nft_cache_release(&ctx->cache);
+	nft_ctx_clear_vars(ctx);
 	nft_ctx_clear_include_paths(ctx);
 	scope_free(ctx->top_scope);
 	xfree(ctx->state);
@@ -501,6 +548,47 @@ err:
 	return rc;
 }
 
+static int load_cmdline_vars(struct nft_ctx *ctx, struct list_head *msgs)
+{
+	unsigned int bufsize, ret, i, offset = 0;
+	LIST_HEAD(cmds);
+	char *buf;
+	int rc;
+
+	if (ctx->num_vars == 0)
+		return 0;
+
+	bufsize = 1024;
+	buf = xzalloc(bufsize + 1);
+	for (i = 0; i < ctx->num_vars; i++) {
+retry:
+		ret = snprintf(buf + offset, bufsize - offset,
+			       "define %s=%s; ",
+			       ctx->vars[i].key, ctx->vars[i].value);
+		if (ret >= bufsize - offset) {
+			bufsize *= 2;
+			buf = xrealloc(buf, bufsize + 1);
+			goto retry;
+		}
+		offset += ret;
+	}
+	snprintf(buf + offset, bufsize - offset, "\n");
+
+	rc = nft_parse_bison_buffer(ctx, buf, msgs, &cmds);
+
+	assert(list_empty(&cmds));
+	/* Stash the buffer that contains the variable definitions and zap the
+	 * list of input descriptors before releasing the scanner state,
+	 * otherwise error reporting path walks over released objects.
+	 */
+	ctx->vars_ctx.buf = buf;
+	list_splice_init(&ctx->state->indesc_list, &ctx->vars_ctx.indesc_list);
+	scanner_destroy(ctx);
+	ctx->scanner = NULL;
+
+	return rc;
+}
+
 EXPORT_SYMBOL(nft_run_cmd_from_filename);
 int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 {
@@ -508,6 +596,10 @@ int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 	int rc, parser_rc;
 	LIST_HEAD(msgs);
 	LIST_HEAD(cmds);
+
+	rc = load_cmdline_vars(nft, &msgs);
+	if (rc < 0)
+		goto err;
 
 	if (!strcmp(filename, "-"))
 		filename = "/dev/stdin";
@@ -542,6 +634,17 @@ err:
 		scanner_destroy(nft);
 		nft->scanner = NULL;
 	}
+	if (!list_empty(&nft->vars_ctx.indesc_list)) {
+		struct input_descriptor *indesc, *next;
+
+		list_for_each_entry_safe(indesc, next, &nft->vars_ctx.indesc_list, list) {
+			if (indesc->name)
+				xfree(indesc->name);
+
+			xfree(indesc);
+		}
+	}
+	xfree(nft->vars_ctx.buf);
 
 	if (!rc &&
 	    nft_output_json(&nft->output) &&

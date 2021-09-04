@@ -1476,46 +1476,6 @@
     }
 ]
 
-# meta skgid { 2001-2005} accept
-[
-    {
-        "match": {
-            "left": {
-                "meta": { "key": "skgid" }
-            },
-            "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 2001, 2005 ] }
-                ]
-            }
-        }
-    },
-    {
-        "accept": null
-    }
-]
-
-# meta skgid != { 2001-2005} accept
-[
-    {
-        "match": {
-            "left": {
-                "meta": { "key": "skgid" }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 2001, 2005 ] }
-                ]
-            }
-        }
-    },
-    {
-        "accept": null
-    }
-]
-
 # meta mark set 0xffffffc8 xor 0x16
 [
     {

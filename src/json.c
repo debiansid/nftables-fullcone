@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <stdio.h>
 #include <string.h>
 
 #include <expression.h>
@@ -42,7 +43,8 @@ static json_t *expr_print_json(const struct expr *expr, struct output_ctx *octx)
 	if (ops->json)
 		return ops->json(expr, octx);
 
-	printf("warning: expr ops %s have no json callback\n", expr_name(expr));
+	fprintf(stderr, "warning: expr ops %s have no json callback\n",
+		expr_name(expr));
 
 	fp = octx->output_fp;
 	octx->output_fp = fmemopen(buf, 1024, "w");
@@ -180,8 +182,8 @@ static json_t *stmt_print_json(const struct stmt *stmt, struct output_ctx *octx)
 	if (stmt->ops->json)
 		return stmt->ops->json(stmt, octx);
 
-	printf("warning: stmt ops %s have no json callback\n",
-	       stmt->ops->name);
+	fprintf(stderr, "warning: stmt ops %s have no json callback\n",
+		stmt->ops->name);
 
 	fp = octx->output_fp;
 	octx->output_fp = fmemopen(buf, 1024, "w");
@@ -241,7 +243,7 @@ static json_t *chain_print_json(const struct chain *chain)
 		mpz_export_data(&policy, chain->policy->value,
 				BYTEORDER_HOST_ENDIAN, sizeof(int));
 		tmp = json_pack("{s:s, s:s, s:i, s:s}",
-				"type", chain->type,
+				"type", chain->type.str,
 				"hook", hooknum2str(chain->handle.family,
 						    chain->hook.num),
 				"prio", priority,
@@ -706,7 +708,6 @@ json_t *exthdr_expr_json(const struct expr *expr, struct output_ctx *octx)
 					 "base", expr->exthdr.raw_type,
 					 "offset", expr->exthdr.offset,
 					 "len", expr->len);
-			is_exists = false;
 		}
 
 		return json_pack("{s:o}", "tcp option", root);
@@ -887,6 +888,11 @@ static json_t *symbolic_constant_json(const struct symbol_table *tbl,
 		return json_integer(val);
 	else
 		return json_string(s->identifier);
+}
+
+json_t *set_elem_catchall_expr_json(const struct expr *expr, struct output_ctx *octx)
+{
+	return json_string("*");
 }
 
 static json_t *datatype_json(const struct expr *expr, struct output_ctx *octx)
@@ -1323,12 +1329,8 @@ static json_t *nat_type_flags_json(uint32_t type_flags)
 {
 	json_t *array = json_array();
 
-	if (type_flags & STMT_NAT_F_INTERVAL)
-		json_array_append_new(array, json_string("interval"));
 	if (type_flags & STMT_NAT_F_PREFIX)
 		json_array_append_new(array, json_string("prefix"));
-	if (type_flags & STMT_NAT_F_CONCAT)
-		json_array_append_new(array, json_string("concat"));
 
 	return array;
 }

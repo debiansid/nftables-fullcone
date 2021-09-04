@@ -459,7 +459,7 @@ top_srcdir = @top_srcdir@
 # set age to 0.
 # </snippet>
 #
-libnftables_LIBVERSION = 1:0:0
+libnftables_LIBVERSION = 2:0:1
 CLEANFILES = scanner.c parser_bison.c
 AM_CPPFLAGS = -I$(top_srcdir)/include \
 	-DDEFAULT_INCLUDE_PATH="\"${sysconfdir}\"" ${LIBMNL_CFLAGS} \

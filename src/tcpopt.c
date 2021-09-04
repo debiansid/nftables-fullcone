@@ -200,7 +200,8 @@ void tcpopt_init_raw(struct expr *expr, uint8_t type, unsigned int off,
 	else
 		datatype_set(expr, &integer_type);
 
-	if (type >= array_size(tcpopt_protocols))
+	if (type >= array_size(tcpopt_protocols) ||
+	    !tcpopt_protocols[type])
 		return;
 
 	expr->exthdr.desc = tcpopt_protocols[type];

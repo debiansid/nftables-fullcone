@@ -219,3 +219,23 @@
     }
 ]
 
+# meta l4proto tcp dnat to :80
+[
+    {
+        "match": {
+            "left": {
+                "meta": {
+                    "key": "l4proto"
+                }
+            },
+            "op": "==",
+            "right": 6
+        }
+    },
+    {
+        "dnat": {
+            "port": 80
+        }
+    }
+]
+

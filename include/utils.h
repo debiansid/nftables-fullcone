@@ -133,6 +133,7 @@ extern void *xmalloc(size_t size);
 extern void *xmalloc_array(size_t nmemb, size_t size);
 extern void *xrealloc(void *ptr, size_t size);
 extern void *xzalloc(size_t size);
+extern void *xzalloc_array(size_t nmemb, size_t size);
 extern char *xstrdup(const char *s);
 extern void xstrunescape(const char *in, char *out);
 

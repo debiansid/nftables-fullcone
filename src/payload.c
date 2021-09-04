@@ -98,12 +98,16 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	desc = proto_find_upper(base, proto);
 
 	if (!desc) {
-		if (base == &proto_icmp || base == &proto_icmp6) {
+		if (base == &proto_icmp) {
 			/* proto 0 is ECHOREPLY, just pretend its ECHO.
 			 * Not doing this would need an additional marker
 			 * bit to tell when icmp.type was set.
 			 */
 			ctx->th_dep.icmp.type = proto ? proto : ICMP_ECHO;
+		} else if (base == &proto_icmp6) {
+			if (proto == ICMP6_ECHO_REPLY)
+				proto = ICMP6_ECHO_REQUEST;
+			ctx->th_dep.icmp.type = proto;
 		}
 		return;
 	}
@@ -554,33 +558,39 @@ void payload_dependency_reset(struct payload_dep_ctx *ctx)
 	memset(ctx, 0, sizeof(*ctx));
 }
 
-static uint8_t icmp_get_type(const struct proto_desc *desc, uint8_t value)
+static bool payload_dependency_store_icmp_type(struct payload_dep_ctx *ctx,
+					       const struct stmt *stmt)
 {
-	if (desc == &proto_icmp && value == 0)
-		return ICMP_ECHO;
-
-	return value;
-}
-
-static uint8_t icmp_get_dep_type(const struct proto_desc *desc, struct expr *right)
-{
-	if (right->etype == EXPR_VALUE && right->len == BITS_PER_BYTE)
-		return icmp_get_type(desc, mpz_get_uint8(right->value));
-
-	return 0;
-}
-
-static void payload_dependency_store_icmp_type(struct payload_dep_ctx *ctx)
-{
-	struct expr *dep = ctx->pdep->expr;
+	struct expr *dep = stmt->expr;
 	const struct proto_desc *desc;
+	const struct expr *right;
+	uint8_t type;
 
 	if (dep->left->etype != EXPR_PAYLOAD)
-		return;
+		return false;
+
+	right = dep->right;
+	if (right->etype != EXPR_VALUE || right->len != BITS_PER_BYTE)
+		return false;
 
 	desc = dep->left->payload.desc;
-	if (desc == &proto_icmp || desc == &proto_icmp6)
-		ctx->icmp_type = icmp_get_dep_type(dep->left->payload.desc, dep->right);
+	if (desc == &proto_icmp) {
+		type = mpz_get_uint8(right->value);
+
+		if (type == ICMP_ECHOREPLY)
+			type = ICMP_ECHO;
+
+		ctx->icmp_type = type;
+
+		return type == ICMP_ECHO;
+	} else if (desc == &proto_icmp6) {
+		type = mpz_get_uint8(right->value);
+
+		ctx->icmp_type = type;
+		return type == ICMP6_ECHO_REQUEST || type == ICMP6_ECHO_REPLY;
+	}
+
+	return false;
 }
 
 /**
@@ -593,10 +603,13 @@ static void payload_dependency_store_icmp_type(struct payload_dep_ctx *ctx)
 void payload_dependency_store(struct payload_dep_ctx *ctx,
 			      struct stmt *stmt, enum proto_bases base)
 {
-	ctx->pbase = base + 1;
-	ctx->pdep  = stmt;
+	bool ignore_dep = payload_dependency_store_icmp_type(ctx, stmt);
 
-	payload_dependency_store_icmp_type(ctx);
+	if (ignore_dep)
+		return;
+
+	ctx->pdep  = stmt;
+	ctx->pbase = base + 1;
 }
 
 /**

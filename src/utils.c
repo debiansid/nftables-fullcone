@@ -50,6 +50,16 @@ void *xmalloc_array(size_t nmemb, size_t size)
 	return xmalloc(nmemb * size);
 }
 
+void *xzalloc_array(size_t nmemb, size_t size)
+{
+	void *ptr;
+
+	ptr = xmalloc_array(nmemb, size);
+	memset(ptr, 0, nmemb * size);
+
+	return ptr;
+}
+
 void *xrealloc(void *ptr, size_t size)
 {
 	ptr = realloc(ptr, size);

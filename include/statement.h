@@ -159,7 +159,8 @@ struct queue_stmt {
 	uint16_t		flags;
 };
 
-extern struct stmt *queue_stmt_alloc(const struct location *loc);
+extern struct stmt *queue_stmt_alloc(const struct location *loc,
+				     struct expr *e, uint16_t flags);
 
 struct quota_stmt {
 	uint64_t		bytes;

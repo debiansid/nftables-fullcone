@@ -10,6 +10,7 @@
 
 %{
 
+#include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -238,6 +239,7 @@ int nft_lex(void *, void *, void *);
 %token TYPEOF			"typeof"
 
 %token HOOK			"hook"
+%token HOOKS			"hooks"
 %token DEVICE			"device"
 %token DEVICES			"devices"
 %token TABLE			"table"
@@ -326,6 +328,7 @@ int nft_lex(void *, void *, void *);
 %token VLAN			"vlan"
 %token ID			"id"
 %token CFI			"cfi"
+%token DEI			"dei"
 %token PCP			"pcp"
 
 %token ARP			"arp"
@@ -632,11 +635,15 @@ int nft_lex(void *, void *, void *);
 
 %type <handle>			set_identifier flowtableid_spec flowtable_identifier obj_identifier
 %destructor { handle_free(&$$); } set_identifier flowtableid_spec obj_identifier
+
+%type <handle>			basehook_spec
+%destructor { handle_free(&$$); } basehook_spec
+
 %type <val>			family_spec family_spec_explicit
 %type <val32>			int_num	chain_policy
 %type <prio_spec>		extended_prio_spec prio_spec
-%type <string>			extended_prio_name quota_unit
-%destructor { xfree($$); }	extended_prio_name quota_unit
+%type <string>			extended_prio_name quota_unit	basehook_device_name
+%destructor { xfree($$); }	extended_prio_name quota_unit	basehook_device_name
 
 %type <expr>			dev_spec
 %destructor { xfree($$); }	dev_spec
@@ -696,8 +703,10 @@ int nft_lex(void *, void *, void *);
 %destructor { stmt_free($$); }	chain_stmt
 %type <val>			chain_stmt_type
 
-%type <stmt>			queue_stmt queue_stmt_alloc
-%destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc
+%type <stmt>			queue_stmt queue_stmt_alloc	queue_stmt_compat
+%destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc	queue_stmt_compat
+%type <expr>			queue_stmt_expr_simple queue_stmt_expr reject_with_expr
+%destructor { expr_free($$); }	queue_stmt_expr_simple queue_stmt_expr reject_with_expr
 %type <val>			queue_stmt_flags queue_stmt_flag
 %type <stmt>			dup_stmt
 %destructor { stmt_free($$); }	dup_stmt
@@ -913,6 +922,7 @@ close_scope_ip		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IP); };
 close_scope_ip6		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IP6); };
 close_scope_vlan	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_VLAN); };
 close_scope_ipsec	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_IPSEC); };
+close_scope_list	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_LIST); };
 close_scope_limit	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_LIMIT); };
 close_scope_numgen	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_NUMGEN); };
 close_scope_quota	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_QUOTA); };
@@ -962,6 +972,7 @@ common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 				if (symbol_unbind(scope, $2) < 0) {
 					erec_queue(error(&@2, "undefined symbol '%s'", $2),
 						   state->msgs);
+					xfree($2);
 					YYERROR;
 				}
 				xfree($2);
@@ -1004,7 +1015,7 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	INSERT		insert_cmd	{ $$ = $2; }
 			|	DELETE		delete_cmd	{ $$ = $2; }
 			|	GET		get_cmd		{ $$ = $2; }
-			|	LIST		list_cmd	{ $$ = $2; }
+			|	LIST		list_cmd	close_scope_list	{ $$ = $2; }
 			|	RESET		reset_cmd	{ $$ = $2; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
 			|	RENAME		rename_cmd	{ $$ = $2; }
@@ -1302,6 +1313,8 @@ delete_cmd		:	TABLE		table_or_id_spec
 			|	CT	ct_obj_type	obj_spec	ct_obj_alloc	close_scope_ct
 			{
 				$$ = cmd_alloc_obj_ct(CMD_DELETE, $2, &$3, &@$, $4);
+				if ($2 == NFT_OBJECT_CT_TIMEOUT)
+					init_list_head(&$4->ct_timeout.timeout_list);
 			}
 			|	LIMIT		obj_or_id_spec	close_scope_limit
 			{
@@ -1454,6 +1467,30 @@ list_cmd		:	TABLE		table_spec
 			|       CT		ct_cmd_type	TABLE   table_spec	close_scope_ct
 			{
 				$$ = cmd_alloc(CMD_LIST, $2, &$4, &@$, NULL);
+			}
+			|	HOOKS	basehook_spec
+			{
+				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_HOOKS, &$2, &@$, NULL);
+			}
+			;
+
+basehook_device_name	:	DEVICE STRING
+			{
+				$$ = $2;
+			}
+			;
+
+basehook_spec		:	ruleset_spec
+			{
+				$$ = $1;
+			}
+			|	ruleset_spec    basehook_device_name
+			{
+				if ($2) {
+					$1.obj.name = $2;
+					$1.obj.location = @2;
+				}
+				$$ = $1;
 			}
 			;
 
@@ -2000,6 +2037,12 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->flags |= $3;
 				$$ = $1;
 			}
+			|	map_block	stateful_stmt_list		stmt_separator
+			{
+				list_splice_tail($2, &$1->stmt_list);
+				$$ = $1;
+				free($2);
+			}
 			|	map_block	ELEMENTS	'='		set_block_expr
 			{
 				$1->init = $4;
@@ -2113,6 +2156,7 @@ data_type_atom_expr	:	type_identifier
 				if (dtype == NULL) {
 					erec_queue(error(&@1, "unknown datatype %s", $1),
 						   state->msgs);
+					xfree($1);
 					YYERROR;
 				}
 				$$ = constant_expr_alloc(&@1, dtype, dtype->byteorder,
@@ -2668,6 +2712,7 @@ comment_spec		:	COMMENT		string
 					erec_queue(error(&@2, "comment too long, %d characters maximum allowed",
 							 NFTNL_UDATA_COMMENT_MAXLEN),
 						   state->msgs);
+					xfree($2);
 					YYERROR;
 				}
 				$$ = $2;
@@ -3238,42 +3283,59 @@ reject_stmt_alloc	:	_REJECT
 			}
 			;
 
+reject_with_expr	:	STRING
+			{
+				$$ = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+						       current_scope(state), $1);
+				xfree($1);
+			}
+			|	integer_expr	{ $$ = $1; }
+			;
+
 reject_opts		:       /* empty */
 			{
 				$<stmt>0->reject.type = -1;
 				$<stmt>0->reject.icmp_code = -1;
 			}
-			|	WITH	ICMP	TYPE	STRING
+			|	WITH	ICMP	TYPE	reject_with_expr
 			{
 				$<stmt>0->reject.family = NFPROTO_IPV4;
 				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
-				$<stmt>0->reject.expr =
-					symbol_expr_alloc(&@$, SYMBOL_VALUE,
-							  current_scope(state),
-							  $4);
+				$<stmt>0->reject.expr = $4;
 				datatype_set($<stmt>0->reject.expr, &icmp_code_type);
-				xfree($4);
 			}
-			|	WITH	ICMP6	TYPE	STRING
+			|	WITH	ICMP	reject_with_expr
+			{
+				$<stmt>0->reject.family = NFPROTO_IPV4;
+				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
+				$<stmt>0->reject.expr = $3;
+				datatype_set($<stmt>0->reject.expr, &icmp_code_type);
+			}
+			|	WITH	ICMP6	TYPE	reject_with_expr
 			{
 				$<stmt>0->reject.family = NFPROTO_IPV6;
 				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
-				$<stmt>0->reject.expr =
-					symbol_expr_alloc(&@$, SYMBOL_VALUE,
-							  current_scope(state),
-							  $4);
+				$<stmt>0->reject.expr = $4;
 				datatype_set($<stmt>0->reject.expr, &icmpv6_code_type);
-				xfree($4);
 			}
-			|	WITH	ICMPX	TYPE	STRING
+			|	WITH	ICMP6	reject_with_expr
+			{
+				$<stmt>0->reject.family = NFPROTO_IPV6;
+				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
+				$<stmt>0->reject.expr = $3;
+				datatype_set($<stmt>0->reject.expr, &icmpv6_code_type);
+			}
+			|	WITH	ICMPX	TYPE	reject_with_expr
 			{
 				$<stmt>0->reject.type = NFT_REJECT_ICMPX_UNREACH;
-				$<stmt>0->reject.expr =
-					symbol_expr_alloc(&@$, SYMBOL_VALUE,
-							  current_scope(state),
-							  $4);
+				$<stmt>0->reject.expr = $4;
 				datatype_set($<stmt>0->reject.expr, &icmpx_code_type);
-				xfree($4);
+			}
+			|	WITH	ICMPX	reject_with_expr
+			{
+				$<stmt>0->reject.type = NFT_REJECT_ICMPX_UNREACH;
+				$<stmt>0->reject.expr = $3;
+				datatype_set($<stmt>0->reject.expr, &icmpx_code_type);
 			}
 			|	WITH	TCP	RESET
 			{
@@ -3571,28 +3633,24 @@ nat_stmt_args		:	stmt_expr
 			{
 				$<stmt>0->nat.family = $1;
 				$<stmt>0->nat.addr = $4;
-				$<stmt>0->nat.type_flags = STMT_NAT_F_INTERVAL;
 			}
 			|	INTERVAL TO	stmt_expr
 			{
 				$<stmt>0->nat.addr = $3;
-				$<stmt>0->nat.type_flags = STMT_NAT_F_INTERVAL;
 			}
 			|	nf_key_proto PREFIX TO	stmt_expr
 			{
 				$<stmt>0->nat.family = $1;
 				$<stmt>0->nat.addr = $4;
 				$<stmt>0->nat.type_flags =
-						STMT_NAT_F_PREFIX |
-						STMT_NAT_F_INTERVAL;
+						STMT_NAT_F_PREFIX;
 				$<stmt>0->nat.flags |= NF_NAT_RANGE_NETMAP;
 			}
 			|	PREFIX TO	stmt_expr
 			{
 				$<stmt>0->nat.addr = $3;
 				$<stmt>0->nat.type_flags =
-						STMT_NAT_F_PREFIX |
-						STMT_NAT_F_INTERVAL;
+						STMT_NAT_F_PREFIX;
 				$<stmt>0->nat.flags |= NF_NAT_RANGE_NETMAP;
 			}
 			;
@@ -3689,13 +3747,28 @@ nf_nat_flag		:	RANDOM		{ $$ = NF_NAT_RANGE_PROTO_RANDOM; }
 			|	PERSISTENT 	{ $$ = NF_NAT_RANGE_PERSISTENT; }
 			;
 
-queue_stmt		:	queue_stmt_alloc	close_scope_queue
-			|	queue_stmt_alloc	queue_stmt_args	close_scope_queue
+queue_stmt		:	queue_stmt_compat	close_scope_queue
+			|	QUEUE TO queue_stmt_expr	close_scope_queue
+			{
+				$$ = queue_stmt_alloc(&@$, $3, 0);
+			}
+			|	QUEUE FLAGS	queue_stmt_flags TO queue_stmt_expr close_scope_queue
+			{
+				$$ = queue_stmt_alloc(&@$, $5, $3);
+			}
+			|	QUEUE	FLAGS	queue_stmt_flags QUEUENUM queue_stmt_expr_simple close_scope_queue
+			{
+				$$ = queue_stmt_alloc(&@$, $5, $3);
+			}
+			;
+
+queue_stmt_compat	:	queue_stmt_alloc
+			|	queue_stmt_alloc	queue_stmt_args
 			;
 
 queue_stmt_alloc	:	QUEUE
 			{
-				$$ = queue_stmt_alloc(&@$);
+				$$ = queue_stmt_alloc(&@$, NULL, 0);
 			}
 			;
 
@@ -3706,7 +3779,7 @@ queue_stmt_args		:	queue_stmt_arg
 			|	queue_stmt_args	queue_stmt_arg
 			;
 
-queue_stmt_arg		:	QUEUENUM	stmt_expr
+queue_stmt_arg		:	QUEUENUM	queue_stmt_expr_simple
 			{
 				$<stmt>0->queue.queue = $2;
 				$<stmt>0->queue.queue->location = @$;
@@ -3715,6 +3788,15 @@ queue_stmt_arg		:	QUEUENUM	stmt_expr
 			{
 				$<stmt>0->queue.flags |= $1;
 			}
+			;
+
+queue_stmt_expr_simple	:	integer_expr
+			|	range_rhs_expr
+			;
+
+queue_stmt_expr		:	numgen_expr
+			|	hash_expr
+			|	map_expr
 			;
 
 queue_stmt_flags	:	queue_stmt_flag
@@ -3985,8 +4067,10 @@ osf_ttl			:	/* empty */
 				else {
 					erec_queue(error(&@2, "invalid ttl option"),
 						   state->msgs);
+					xfree($2);
 					YYERROR;
 				}
+				xfree($2);
 			}
 			;
 
@@ -4475,6 +4559,7 @@ limit_config		:	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst_pkts
 				uint64_t rate, unit;
 
 				erec = rate_parse(&@$, $4, &rate, &unit);
+				xfree($4);
 				if (erec != NULL) {
 					erec_queue(erec, state->msgs);
 					YYERROR;
@@ -5182,6 +5267,7 @@ vlan_hdr_expr		:	VLAN	vlan_hdr_field	close_scope_vlan
 
 vlan_hdr_field		:	ID		{ $$ = VLANHDR_VID; }
 			|	CFI		{ $$ = VLANHDR_CFI; }
+			|	DEI		{ $$ = VLANHDR_DEI; }
 			|	PCP		{ $$ = VLANHDR_PCP; }
 			|	TYPE		{ $$ = VLANHDR_TYPE; }
 			;

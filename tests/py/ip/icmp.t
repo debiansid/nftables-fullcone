@@ -26,8 +26,6 @@ icmp code 111 accept;ok
 icmp code != 111 accept;ok
 icmp code 33-55;ok
 icmp code != 33-55;ok
-icmp code { 33-55};ok
-icmp code != { 33-55};ok
 icmp code { 2, 4, 54, 33, 56};ok;icmp code { prot-unreachable, frag-needed, 33, 54, 56}
 icmp code != { prot-unreachable, frag-needed, 33, 54, 56};ok
 
@@ -35,8 +33,6 @@ icmp checksum 12343 accept;ok
 icmp checksum != 12343 accept;ok
 icmp checksum 11-343 accept;ok
 icmp checksum != 11-343 accept;ok
-icmp checksum { 11-343} accept;ok
-icmp checksum != { 11-343} accept;ok
 icmp checksum { 1111, 222, 343} accept;ok
 icmp checksum != { 1111, 222, 343} accept;ok
 
@@ -45,8 +41,6 @@ icmp id 22;ok;icmp type { echo-reply, echo-request} icmp id 22
 icmp id != 233;ok;icmp type { echo-reply, echo-request} icmp id != 233
 icmp id 33-45;ok;icmp type { echo-reply, echo-request} icmp id 33-45
 icmp id != 33-45;ok;icmp type { echo-reply, echo-request} icmp id != 33-45
-icmp id { 33-55};ok;icmp type { echo-reply, echo-request} icmp id { 33-55}
-icmp id != { 33-55};ok;icmp type { echo-reply, echo-request} icmp id != { 33-55}
 
 icmp id { 22, 34, 333};ok;icmp type { echo-request, echo-reply} icmp id { 22, 34, 333}
 icmp id != { 22, 34, 333};ok;icmp type { echo-request, echo-reply} icmp id != { 22, 34, 333}
@@ -57,23 +51,18 @@ icmp sequence 33-45;ok;icmp type { echo-reply, echo-request} icmp sequence 33-45
 icmp sequence != 33-45;ok;icmp type { echo-reply, echo-request} icmp sequence != 33-45
 icmp sequence { 33, 55, 67, 88};ok;icmp type { echo-request, echo-reply} icmp sequence { 33, 55, 67, 88}
 icmp sequence != { 33, 55, 67, 88};ok;icmp type { echo-request, echo-reply} icmp sequence != { 33, 55, 67, 88}
-icmp sequence { 33-55};ok;icmp type { echo-request, echo-reply} icmp sequence { 33-55}
-icmp sequence != { 33-55};ok;icmp type { echo-request, echo-reply} icmp sequence != { 33-55}
 icmp id 1 icmp sequence 2;ok;icmp type { echo-reply, echo-request} icmp id 1 icmp sequence 2
 icmp type { echo-reply, echo-request} icmp id 1 icmp sequence 2;ok
+icmp type echo-reply icmp id 1;ok
 
 icmp mtu 33;ok
 icmp mtu 22-33;ok
-icmp mtu { 22-33};ok
-icmp mtu != { 22-33};ok
 icmp mtu 22;ok
 icmp mtu != 233;ok
 icmp mtu 33-45;ok
 icmp mtu != 33-45;ok
 icmp mtu { 33, 55, 67, 88};ok
 icmp mtu != { 33, 55, 67, 88};ok
-icmp mtu { 33-55};ok
-icmp mtu != { 33-55};ok
 
 icmp gateway 22;ok
 icmp gateway != 233;ok
@@ -81,8 +70,6 @@ icmp gateway 33-45;ok
 icmp gateway != 33-45;ok
 icmp gateway { 33, 55, 67, 88};ok
 icmp gateway != { 33, 55, 67, 88};ok
-icmp gateway { 33-55};ok
-icmp gateway != { 33-55};ok
 icmp gateway != 34;ok
 icmp gateway != { 333, 334};ok
 

@@ -1341,6 +1341,7 @@ static const struct expr_ops set_elem_catchall_expr_ops = {
 	.type		= EXPR_SET_ELEM_CATCHALL,
 	.name		= "catch-all set element",
 	.print		= set_elem_catchall_expr_print,
+	.json		= set_elem_catchall_expr_json,
 };
 
 struct expr *set_elem_catchall_expr_alloc(const struct location *loc)
@@ -1357,7 +1358,12 @@ struct expr *set_elem_catchall_expr_alloc(const struct location *loc)
 static void flagcmp_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	expr_print(expr->flagcmp.expr, octx);
-	nft_print(octx, " ");
+
+	if (expr->op == OP_NEQ)
+		nft_print(octx, " != ");
+	else
+		nft_print(octx, " ");
+
 	expr_print(expr->flagcmp.value, octx);
 	nft_print(octx, " / ");
 	expr_print(expr->flagcmp.mask, octx);

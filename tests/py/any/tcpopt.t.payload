@@ -133,6 +133,11 @@ inet
   [ exthdr load tcpopt 1b @ 255 + 0 present => reg 1 ]
   [ cmp eq reg 1 0x00000000 ]
 
+# tcp option 6 exists
+inet
+  [ exthdr load tcpopt 1b @ 6 + 0 present => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+
 # tcp option @255,8,8 255
 inet
   [ exthdr load tcpopt 1b @ 255 + 1 => reg 1 ]

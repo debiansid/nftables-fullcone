@@ -904,7 +904,7 @@ Reject the packet and send the given error reply.
 *type*::
 	Type of reject, either *"tcp reset"*, *"icmpx"*, *"icmp"* or *"icmpv6"*.
 *expr*::
-	ICMP type to reject with.
+	ICMP code to reject with.
 
 All properties are optional.
 

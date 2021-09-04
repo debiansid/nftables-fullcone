@@ -32,6 +32,7 @@ enum opt_indices {
         /* Ruleset input handling */
 	IDX_FILE,
 #define IDX_RULESET_INPUT_START	IDX_FILE
+	IDX_DEFINE,
 	IDX_INTERACTIVE,
         IDX_INCLUDEPATH,
 	IDX_CHECK,
@@ -63,6 +64,7 @@ enum opt_vals {
 	OPT_VERSION_LONG	= 'V',
 	OPT_CHECK		= 'c',
 	OPT_FILE		= 'f',
+	OPT_DEFINE		= 'D',
 	OPT_INTERACTIVE		= 'i',
 	OPT_INCLUDEPATH		= 'I',
 	OPT_JSON		= 'j',
@@ -100,6 +102,8 @@ static const struct nft_opt nft_options[] = {
 				     "Show extended version information"),
 	[IDX_FILE]	    = NFT_OPT("file",			OPT_FILE,		"<filename>",
 				     "Read input from <filename>"),
+	[IDX_DEFINE]	    = NFT_OPT("define",			OPT_DEFINE,		"<name=value>",
+				     "Define variable, e.g. --define foo=1.2.3.4"),
 	[IDX_INTERACTIVE]   = NFT_OPT("interactive",		OPT_INTERACTIVE,	NULL,
 				     "Read input from interactive CLI"),
 	[IDX_INCLUDEPATH]   = NFT_OPT("includepath",		OPT_INCLUDEPATH,	"<directory>",
@@ -332,8 +336,10 @@ static bool nft_options_check(int argc, char * const argv[])
 			} else if (argv[i][1] == 'd' ||
 				   argv[i][1] == 'I' ||
 				   argv[i][1] == 'f' ||
+				   argv[i][1] == 'D' ||
 				   !strcmp(argv[i], "--debug") ||
 				   !strcmp(argv[i], "--includepath") ||
+				   !strcmp(argv[i], "--define") ||
 				   !strcmp(argv[i], "--file")) {
 				skip = true;
 				continue;
@@ -349,10 +355,10 @@ static bool nft_options_check(int argc, char * const argv[])
 int main(int argc, char * const *argv)
 {
 	const struct option *options = get_options();
+	bool interactive = false, define = false;
 	const char *optstring = get_optstring();
 	char *buf = NULL, *filename = NULL;
 	unsigned int output_flags = 0;
-	bool interactive = false;
 	unsigned int debug_mask;
 	unsigned int len;
 	int i, val, rc;
@@ -378,6 +384,15 @@ int main(int argc, char * const *argv)
 		case OPT_VERSION_LONG:
 			show_version();
 			exit(EXIT_SUCCESS);
+		case OPT_DEFINE:
+			if (nft_ctx_add_var(nft, optarg)) {
+				fprintf(stderr,
+					"Failed to define variable '%s'\n",
+					optarg);
+				exit(EXIT_FAILURE);
+			}
+			define = true;
+			break;
 		case OPT_CHECK:
 			nft_ctx_set_dry_run(nft, true);
 			break;
@@ -468,6 +483,11 @@ int main(int argc, char * const *argv)
 		case OPT_INVALID:
 			exit(EXIT_FAILURE);
 		}
+	}
+
+	if (!filename && define) {
+		fprintf(stderr, "Error: -D/--define can only be used with -f/--filename\n");
+		exit(EXIT_FAILURE);
 	}
 
 	nft_ctx_output_set_flags(nft, output_flags);

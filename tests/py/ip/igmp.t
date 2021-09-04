@@ -16,8 +16,6 @@ igmp checksum 12343;ok
 igmp checksum != 12343;ok
 igmp checksum 11-343;ok
 igmp checksum != 11-343;ok
-igmp checksum { 11-343};ok
-igmp checksum != { 11-343};ok
 igmp checksum { 1111, 222, 343};ok
 igmp checksum != { 1111, 222, 343};ok
 

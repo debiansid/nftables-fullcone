@@ -188,3 +188,87 @@
     }
 ]
 
+# ip saddr @set6 drop
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "@set6"
+        }
+    },
+    {
+        "drop": null
+    }
+]
+
+# ip saddr vmap { 1.1.1.1 : drop, * : accept }
+[
+    {
+        "vmap": {
+            "data": {
+                "set": [
+                    [
+                        "1.1.1.1",
+                        {
+                            "drop": null
+                        }
+                    ],
+                    [
+                        "*",
+                        {
+                            "accept": null
+                        }
+                    ]
+                ]
+            },
+            "key": {
+                "payload": {
+                    "field": "saddr",
+                    "protocol": "ip"
+                }
+            }
+        }
+    }
+]
+
+# meta mark set ip saddr map { 1.1.1.1 : 0x00000001, * : 0x00000002 }
+[
+    {
+        "mangle": {
+            "key": {
+                "meta": {
+                    "key": "mark"
+                }
+            },
+            "value": {
+                "map": {
+                    "data": {
+                        "set": [
+                            [
+                                "1.1.1.1",
+                                1
+                            ],
+                            [
+                                "*",
+                                2
+                            ]
+                        ]
+                    },
+                    "key": {
+                        "payload": {
+                            "field": "saddr",
+                            "protocol": "ip"
+                        }
+                    }
+                }
+            }
+        }
+    }
+]
+

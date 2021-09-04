@@ -47,26 +47,6 @@ netdev test-netdev ingress
   [ payload load 2b @ network header + 2 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
-# ip length { 333-535}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00004d01  : 0 [end]	element 00001802  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 2 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip length != { 333-535}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00004d01  : 0 [end]	element 00001802  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 2 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
 # ip id 22
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
@@ -110,26 +90,6 @@ netdev test-netdev ingress
 __set%d test-netdev 3
 __set%d test-netdev 0
 	element 00002100  : 0 [end]	element 00003700  : 0 [end]	element 00004300  : 0 [end]	element 00005800  : 0 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 4 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
-# ip id { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 4 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip id != { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
@@ -186,26 +146,6 @@ netdev test-netdev ingress
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
-# ip frag-off { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 6 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip frag-off != { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 6 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
 # ip ttl 0 drop
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
@@ -243,26 +183,6 @@ netdev test-netdev ingress
 __set%d test-netdev 3
 __set%d test-netdev 0
 	element 0000002b  : 0 [end]	element 00000035  : 0 [end]	element 0000002d  : 0 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
-# ip ttl { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00000021  : 0 [end]	element 00000038  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 1b @ network header + 8 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip ttl != { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00000021  : 0 [end]	element 00000038  : 1 [end]
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
@@ -355,26 +275,6 @@ netdev test-netdev ingress
   [ payload load 2b @ network header + 10 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
-# ip checksum { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 10 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip checksum != { 33-55}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 00002100  : 0 [end]	element 00003800  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 2b @ network header + 10 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
 # ip saddr 192.168.2.0/24
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
@@ -443,26 +343,6 @@ netdev test-netdev ingress
   [ cmp eq reg 1 0x00000008 ]
   [ payload load 4b @ network header + 16 => reg 1 ]
   [ range neq reg 1 0x0100a8c0 0xfa00a8c0 ]
-
-# ip daddr { 192.168.0.1-192.168.0.250}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 0100a8c0  : 0 [end]	element fb00a8c0  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 16 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# ip daddr != { 192.168.0.1-192.168.0.250}
-__set%d test-netdev 7
-__set%d test-netdev 0
-	element 00000000  : 1 [end]	element 0100a8c0  : 0 [end]	element fb00a8c0  : 1 [end]
-netdev test-netdev ingress 
-  [ meta load protocol => reg 1 ]
-  [ cmp eq reg 1 0x00000008 ]
-  [ payload load 4b @ network header + 16 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
 
 # ip daddr { 192.168.5.1, 192.168.5.2, 192.168.5.3 } accept
 __set%d test-netdev 3
@@ -781,4 +661,26 @@ netdev test-netdev ingress
   [ payload load 2b @ network header + 8 => reg 1 ]
   [ bitwise reg 1 = ( reg 1 & 0x000000ff ) ^ 0x00000100 ]
   [ payload write reg 1 => 2b @ network header + 8 csum_type 1 csum_off 10 csum_flags 0x1 ]
+
+# ip saddr . ip daddr { 192.0.2.1 . 10.0.0.1-10.0.0.2 }
+__set%d test-netdev 87 size 1
+__set%d test-netdev 0
+        element 010200c0 0100000a  - 010200c0 0200000a  : 0 [end]
+netdev
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 4b @ network header + 12 => reg 1 ]
+  [ payload load 4b @ network header + 16 => reg 9 ]
+  [ lookup reg 1 set __set%d ]
+
+# ip saddr . ip daddr vmap { 192.168.5.1-192.168.5.128 . 192.168.6.1-192.168.6.128 : accept }
+__map%d test-netdev 8f size 1
+__map%d test-netdev 0
+        element 0105a8c0 0106a8c0  - 8005a8c0 8006a8c0  : accept 0 [end]
+netdev
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 4b @ network header + 12 => reg 1 ]
+  [ payload load 4b @ network header + 16 => reg 9 ]
+  [ lookup reg 1 set __map%d dreg 0 ]
 

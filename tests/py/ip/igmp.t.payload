@@ -62,26 +62,6 @@ ip test-ip4 input
   [ payload load 2b @ transport header + 2 => reg 1 ]
   [ range neq reg 1 0x00000b00 0x00005701 ]
 
-# igmp checksum { 11-343}
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element 00000b00  : 0 [end]	element 00005801  : 1 [end]
-ip test-ip4 input 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000002 ]
-  [ payload load 2b @ transport header + 2 => reg 1 ]
-  [ lookup reg 1 set __set%d ]
-
-# igmp checksum != { 11-343}
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element 00000b00  : 0 [end]	element 00005801  : 1 [end]
-ip test-ip4 input 
-  [ meta load l4proto => reg 1 ]
-  [ cmp eq reg 1 0x00000002 ]
-  [ payload load 2b @ transport header + 2 => reg 1 ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
 # igmp checksum { 1111, 222, 343}
 __set%d test-ip4 3 size 3
 __set%d test-ip4 0

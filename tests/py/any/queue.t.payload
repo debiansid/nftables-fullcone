@@ -30,3 +30,28 @@ ip test-ip4 output
 ip test-ip4 output
   [ queue num 4-5 bypass ]
 
+# queue to symhash mod 65536
+ip
+  [ hash reg 1 = symhash() % mod 65536 ]
+  [ queue sreg_qnum 1 ]
+
+# queue to jhash oif . meta mark mod 32
+ip
+  [ meta load oif => reg 2 ]
+  [ meta load mark => reg 13 ]
+  [ hash reg 1 = jhash(reg 2, 8, 0x0) % mod 32 ]
+  [ queue sreg_qnum 1 ]
+
+# queue flags bypass to numgen inc mod 65536
+ip
+  [ numgen reg 1 = inc mod 65536 ]
+  [ queue sreg_qnum 1 bypass ]
+
+# queue flags bypass to oifname map { "eth0" : 0, "ppp0" : 2, "eth1" : 2 }
+__map%d test-ip4 b size 3
+__map%d test-ip4 0
+	element 30687465 00000000 00000000 00000000  : 00000000 0 [end]	element 30707070 00000000 00000000 00000000  : 00000002 0 [end]	element 31687465 00000000 00000000 00000000  : 00000002 0 [end]
+ip
+  [ meta load oifname => reg 1 ]
+  [ lookup reg 1 set __map%d dreg 1 ]
+  [ queue sreg_qnum 1 bypass ]

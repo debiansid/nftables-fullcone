@@ -115,8 +115,6 @@ meta skgid gt 3000 accept;ok;meta skgid > 3000 accept
 meta skgid eq 3000 accept;ok;meta skgid 3000 accept
 meta skgid 2001-2005 accept;ok
 meta skgid != 2001-2005 accept;ok
-meta skgid { 2001-2005} accept;ok
-meta skgid != { 2001-2005} accept;ok
 
 # BUG: meta nftrace 2 and meta nftrace 1
 # $ sudo nft add rule ip test input meta nftrace 2
@@ -194,8 +192,6 @@ meta cgroup { 1048577, 1048578 };ok
 meta cgroup != { 1048577, 1048578};ok
 meta cgroup 1048577-1048578;ok
 meta cgroup != 1048577-1048578;ok
-meta cgroup {1048577-1048578};ok
-meta cgroup != { 1048577-1048578};ok
 
 meta iif . meta oif { "lo" . "lo" };ok;iif . oif { "lo" . "lo" }
 meta iif . meta oif . meta mark { "lo" . "lo" . 0x0000000a };ok;iif . oif . meta mark { "lo" . "lo" . 0x0000000a }

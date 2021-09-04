@@ -20,8 +20,6 @@
 
 ah hdrlength 11-23;ok
 ah hdrlength != 11-23;ok
-ah hdrlength { 11-23};ok
-ah hdrlength != { 11-23};ok
 ah hdrlength {11, 23, 44 };ok
 ah hdrlength != {11, 23, 44 };ok
 
@@ -31,8 +29,6 @@ ah reserved 33-45;ok
 ah reserved != 33-45;ok
 ah reserved {23, 100};ok
 ah reserved != {23, 100};ok
-ah reserved { 33-55};ok
-ah reserved != { 33-55};ok
 
 ah spi 111;ok
 ah spi != 111;ok
@@ -40,15 +36,11 @@ ah spi 111-222;ok
 ah spi != 111-222;ok
 ah spi {111, 122};ok
 ah spi != {111, 122};ok
-ah spi { 111-122};ok
-ah spi != { 111-122};ok
 
 # sequence
 ah sequence 123;ok
 ah sequence != 123;ok
 ah sequence {23, 25, 33};ok
 ah sequence != {23, 25, 33};ok
-ah sequence { 23-33};ok
-ah sequence != { 23-33};ok
 ah sequence 23-33;ok
 ah sequence != 23-33;ok

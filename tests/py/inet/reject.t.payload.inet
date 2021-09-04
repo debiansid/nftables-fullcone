@@ -1,64 +1,64 @@
-# reject with icmp type host-unreachable
+# reject with icmp host-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 1 ]
 
-# reject with icmp type net-unreachable
+# reject with icmp net-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 0 ]
 
-# reject with icmp type prot-unreachable
+# reject with icmp prot-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 2 ]
 
-# reject with icmp type port-unreachable
+# reject with icmp port-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 3 ]
 
-# reject with icmp type net-prohibited
+# reject with icmp net-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 9 ]
 
-# reject with icmp type host-prohibited
+# reject with icmp host-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 10 ]
 
-# reject with icmp type admin-prohibited
+# reject with icmp admin-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 13 ]
 
-# reject with icmpv6 type no-route
+# reject with icmpv6 no-route
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 0 code 0 ]
 
-# reject with icmpv6 type admin-prohibited
+# reject with icmpv6 admin-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 0 code 1 ]
 
-# reject with icmpv6 type addr-unreachable
+# reject with icmpv6 addr-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 0 code 3 ]
 
-# reject with icmpv6 type port-unreachable
+# reject with icmpv6 port-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]
@@ -88,41 +88,45 @@ inet test-inet input
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 0 code 4 ]
 
-# reject with icmpx type host-unreachable
+# reject with icmpx host-unreachable
 inet test-inet input
   [ reject type 2 code 2 ]
 
-# reject with icmpx type no-route
+# reject with icmpx no-route
 inet test-inet input
   [ reject type 2 code 0 ]
 
-# reject with icmpx type admin-prohibited
+# reject with icmpx admin-prohibited
 inet test-inet input
   [ reject type 2 code 3 ]
 
-# reject with icmpx type port-unreachable
+# reject with icmpx port-unreachable
 inet test-inet input
   [ reject type 2 code 1 ]
 
-# meta nfproto ipv4 reject with icmp type host-unreachable
+# reject with icmpx 3
+inet test-inet input
+  [ reject type 2 code 3 ]
+
+# meta nfproto ipv4 reject with icmp host-unreachable
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 0 code 1 ]
 
-# meta nfproto ipv6 reject with icmpv6 type no-route
+# meta nfproto ipv6 reject with icmpv6 no-route
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 0 code 0 ]
 
-# meta nfproto ipv4 reject with icmpx type admin-prohibited
+# meta nfproto ipv4 reject with icmpx admin-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x00000002 ]
   [ reject type 2 code 3 ]
 
-# meta nfproto ipv6 reject with icmpx type admin-prohibited
+# meta nfproto ipv6 reject with icmpx admin-prohibited
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]

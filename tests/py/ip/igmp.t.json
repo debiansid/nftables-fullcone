@@ -196,56 +196,6 @@
     }
 ]
 
-# igmp checksum { 11-343}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "checksum",
-                    "protocol": "igmp"
-                }
-            },
-            "op": "==",
-            "right": {
-                "set": [
-                    {
-                        "range": [
-                            11,
-                            343
-                        ]
-                    }
-                ]
-            }
-        }
-    }
-]
-
-# igmp checksum != { 11-343}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "checksum",
-                    "protocol": "igmp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    {
-                        "range": [
-                            11,
-                            343
-                        ]
-                    }
-                ]
-            }
-        }
-    }
-]
-
 # igmp checksum { 1111, 222, 343}
 [
     {

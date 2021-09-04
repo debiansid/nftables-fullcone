@@ -5,7 +5,7 @@
     }
 ]
 
-# reject with icmpv6 type no-route
+# reject with icmpv6 no-route
 [
     {
         "reject": {
@@ -15,7 +15,7 @@
     }
 ]
 
-# reject with icmpv6 type admin-prohibited
+# reject with icmpv6 admin-prohibited
 [
     {
         "reject": {
@@ -25,7 +25,7 @@
     }
 ]
 
-# reject with icmpv6 type addr-unreachable
+# reject with icmpv6 addr-unreachable
 [
     {
         "reject": {
@@ -35,7 +35,7 @@
     }
 ]
 
-# reject with icmpv6 type port-unreachable
+# reject with icmpv6 port-unreachable
 [
     {
         "reject": {
@@ -45,7 +45,7 @@
     }
 ]
 
-# reject with icmpv6 type policy-fail
+# reject with icmpv6 policy-fail
 [
     {
         "reject": {
@@ -55,11 +55,21 @@
     }
 ]
 
-# reject with icmpv6 type reject-route
+# reject with icmpv6 reject-route
 [
     {
         "reject": {
             "expr": "reject-route",
+            "type": "icmpv6"
+        }
+    }
+]
+
+# reject with icmpv6 3
+[
+    {
+        "reject": {
+            "expr": "addr-unreachable",
             "type": "icmpv6"
         }
     }

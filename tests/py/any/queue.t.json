@@ -84,3 +84,93 @@
     }
 ]
 
+# queue to symhash mod 65536
+[
+    {
+        "queue": {
+            "num": {
+                "symhash": {
+                    "mod": 65536
+                }
+            }
+        }
+    }
+]
+
+# queue flags bypass to numgen inc mod 65536
+[
+    {
+        "queue": {
+            "flags": "bypass",
+            "num": {
+                "numgen": {
+                    "mod": 65536,
+                    "mode": "inc",
+                    "offset": 0
+                }
+            }
+        }
+    }
+]
+
+# queue to jhash oif . meta mark mod 32
+[
+    {
+        "queue": {
+            "num": {
+                "jhash": {
+                    "expr": {
+                        "concat": [
+                            {
+                                "meta": {
+                                    "key": "oif"
+                                }
+                            },
+                            {
+                                "meta": {
+                                    "key": "mark"
+                                }
+                            }
+                        ]
+                    },
+                    "mod": 32
+                }
+            }
+        }
+    }
+]
+
+# queue flags bypass to oifname map { "eth0" : 0, "ppp0" : 2, "eth1" : 2 }
+[
+    {
+        "queue": {
+            "flags": "bypass",
+            "num": {
+                "map": {
+                    "data": {
+                        "set": [
+                            [
+                                "eth0",
+                                0
+                            ],
+                            [
+                                "ppp0",
+                                2
+                            ],
+                            [
+                                "eth1",
+                                2
+                            ]
+                        ]
+                    },
+                    "key": {
+                        "meta": {
+                            "key": "oifname"
+                        }
+                    }
+                }
+            }
+        }
+    }
+]
+

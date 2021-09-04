@@ -1,3 +1,9 @@
+nftables (1.0.0-1) experimental; urgency=medium
+
+  * [3d9fb4f] New upstream version 1.0.0
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Sat, 04 Sep 2021 18:45:41 +0200
+
 nftables (0.9.9-1~exp1) experimental; urgency=medium
 
   * [8f1a46c] src:nftables: run wrap-and-sort

@@ -163,9 +163,9 @@ REJECT STATEMENT
 ____
 *reject* [ *with* 'REJECT_WITH' ]
 
-'REJECT_WITH' := *icmp type* 'icmp_code' |
-                 *icmpv6 type* 'icmpv6_code' |
-                 *icmpx type* 'icmpx_code' |
+'REJECT_WITH' := *icmp* 'icmp_code' |
+                 *icmpv6* 'icmpv6_code' |
+                 *icmpx* 'icmpx_code' |
                  *tcp reset*
 ____
 
@@ -589,13 +589,19 @@ for details.
 
 [verse]
 ____
-*queue* [*num* 'queue_number'] [*bypass*]
-*queue* [*num* 'queue_number_from' - 'queue_number_to'] ['QUEUE_FLAGS']
+*queue* [*flags* 'QUEUE_FLAGS'] [*num* 'queue_number']
+*queue* [*flags* 'QUEUE_FLAGS'] [*num* 'queue_number_from' - 'queue_number_to']
+*queue* [*flags* 'QUEUE_FLAGS'] [*to* 'QUEUE_EXPRESSION' ]
 
 'QUEUE_FLAGS' := 'QUEUE_FLAG' [*,* 'QUEUE_FLAGS']
 'QUEUE_FLAG'  := *bypass* | *fanout*
+'QUEUE_EXPRESSION' := *numgen* | *hash* | *symhash* | *MAP STATEMENT*
 ____
 
+QUEUE_EXPRESSION can be used to compute a queue number
+at run-time with the hash or numgen expressions. It also
+allows to use the map statement to assign fixed queue numbers
+based on external inputs such as the source ip address or interface names.
 
 .queue statement values
 [options="header"]

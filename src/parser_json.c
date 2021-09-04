@@ -315,15 +315,6 @@ static struct expr *json_parse_constant(struct json_ctx *ctx, const char *name)
 	return NULL;
 }
 
-static struct expr *wildcard_expr_alloc(void)
-{
-	struct expr *expr;
-
-	expr = constant_expr_alloc(int_loc, &integer_type,
-				   BYTEORDER_HOST_ENDIAN, 0, NULL);
-	return prefix_expr_alloc(int_loc, expr, 0);
-}
-
 /* this is a combination of symbol_expr, integer_expr, boolean_expr ... */
 static struct expr *json_parse_immediate(struct json_ctx *ctx, json_t *root)
 {
@@ -338,7 +329,7 @@ static struct expr *json_parse_immediate(struct json_ctx *ctx, json_t *root)
 			symtype = SYMBOL_SET;
 			str++;
 		} else if (str[0] == '*' && str[1] == '\0') {
-			return wildcard_expr_alloc();
+			return set_elem_catchall_expr_alloc(int_loc);
 		} else if (is_keyword(str)) {
 			return symbol_expr_alloc(int_loc,
 						 SYMBOL_VALUE, NULL, str);
@@ -612,11 +603,11 @@ static struct expr *json_parse_tcp_option_expr(struct json_ctx *ctx,
 			"base", &kind, "offset", &offset, "len", &len)) {
 		uint32_t flag = 0;
 
-		expr = tcpopt_expr_alloc(int_loc, kind,
-					 TCPOPT_COMMON_KIND);
-
 		if (kind < 0 || kind > 255)
 			return NULL;
+
+		expr = tcpopt_expr_alloc(int_loc, kind,
+					 TCPOPT_COMMON_KIND);
 
 		if (offset == TCPOPT_COMMON_KIND && len == 8)
 			flag = NFT_EXTHDR_F_PRESENT;
@@ -1135,7 +1126,7 @@ static struct expr *json_parse_binop_expr(struct json_ctx *ctx,
 		json_error(ctx, "Failed to parse LHS of binop expression.");
 		return NULL;
 	}
-	right = json_parse_primary_expr(ctx, jright);
+	right = json_parse_rhs_expr(ctx, jright);
 	if (!right) {
 		json_error(ctx, "Failed to parse RHS of binop expression.");
 		expr_free(left);
@@ -2568,14 +2559,14 @@ static int queue_flag_parse(const char *name, uint16_t *flags)
 static struct stmt *json_parse_queue_stmt(struct json_ctx *ctx,
 					  const char *key, json_t *value)
 {
-	struct stmt *stmt = queue_stmt_alloc(int_loc);
+	struct expr *qexpr = NULL;
+	uint16_t flags = 0;
 	json_t *tmp;
 
 	if (!json_unpack(value, "{s:o}", "num", &tmp)) {
-		stmt->queue.queue = json_parse_stmt_expr(ctx, tmp);
-		if (!stmt->queue.queue) {
+		qexpr = json_parse_stmt_expr(ctx, tmp);
+		if (!qexpr) {
 			json_error(ctx, "Invalid queue num.");
-			stmt_free(stmt);
 			return NULL;
 		}
 	}
@@ -2587,15 +2578,15 @@ static struct stmt *json_parse_queue_stmt(struct json_ctx *ctx,
 		if (json_is_string(tmp)) {
 			flag = json_string_value(tmp);
 
-			if (queue_flag_parse(flag, &stmt->queue.flags)) {
+			if (queue_flag_parse(flag, &flags)) {
 				json_error(ctx, "Invalid queue flag '%s'.",
 					   flag);
-				stmt_free(stmt);
+				expr_free(qexpr);
 				return NULL;
 			}
 		} else if (!json_is_array(tmp)) {
 			json_error(ctx, "Unexpected object type in queue flags.");
-			stmt_free(stmt);
+			expr_free(qexpr);
 			return NULL;
 		}
 
@@ -2603,20 +2594,20 @@ static struct stmt *json_parse_queue_stmt(struct json_ctx *ctx,
 			if (!json_is_string(val)) {
 				json_error(ctx, "Invalid object in queue flag array at index %zu.",
 					   index);
-				stmt_free(stmt);
+				expr_free(qexpr);
 				return NULL;
 			}
 			flag = json_string_value(val);
 
-			if (queue_flag_parse(flag, &stmt->queue.flags)) {
+			if (queue_flag_parse(flag, &flags)) {
 				json_error(ctx, "Invalid queue flag '%s'.",
 					   flag);
-				stmt_free(stmt);
+				expr_free(qexpr);
 				return NULL;
 			}
 		}
 	}
-	return stmt;
+	return queue_stmt_alloc(int_loc, qexpr, flags);
 }
 
 static struct stmt *json_parse_connlimit_stmt(struct json_ctx *ctx,
@@ -3213,7 +3204,6 @@ static int json_parse_ct_timeout_policy(struct json_ctx *ctx,
 		return 1;
 	}
 
-	init_list_head(&obj->ct_timeout.timeout_list);
 	json_object_foreach(tmp, key, val) {
 		struct timeout_state *ts;
 
@@ -3360,6 +3350,7 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 		}
 		obj->ct_helper.l3proto = l3proto;
 
+		init_list_head(&obj->ct_timeout.timeout_list);
 		if (json_parse_ct_timeout_policy(ctx, root, obj)) {
 			obj_free(obj);
 			return NULL;

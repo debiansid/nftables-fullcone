@@ -1,64 +1,64 @@
-# reject with icmp type host-unreachable
+# reject with icmp host-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 1 ]
 
-# reject with icmp type net-unreachable
+# reject with icmp net-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 0 ]
 
-# reject with icmp type prot-unreachable
+# reject with icmp prot-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 2 ]
 
-# reject with icmp type port-unreachable
+# reject with icmp port-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 3 ]
 
-# reject with icmp type net-prohibited
+# reject with icmp net-prohibited
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 9 ]
 
-# reject with icmp type host-prohibited
+# reject with icmp host-prohibited
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 10 ]
 
-# reject with icmp type admin-prohibited
+# reject with icmp admin-prohibited
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 0 code 13 ]
 
-# reject with icmpv6 type no-route
+# reject with icmpv6 no-route
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]
   [ reject type 0 code 0 ]
 
-# reject with icmpv6 type admin-prohibited
+# reject with icmpv6 admin-prohibited
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]
   [ reject type 0 code 1 ]
 
-# reject with icmpv6 type addr-unreachable
+# reject with icmpv6 addr-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]
   [ reject type 0 code 3 ]
 
-# reject with icmpv6 type port-unreachable
+# reject with icmpv6 port-unreachable
 bridge test-bridge input
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]
@@ -90,29 +90,29 @@ bridge test-bridge input
   [ cmp eq reg 1 0x0000dd86 ]
   [ reject type 0 code 4 ]
 
-# reject with icmpx type host-unreachable
+# reject with icmpx host-unreachable
 bridge test-bridge input
   [ reject type 2 code 2 ]
 
-# reject with icmpx type no-route
+# reject with icmpx no-route
 bridge test-bridge input
   [ reject type 2 code 0 ]
 
-# reject with icmpx type admin-prohibited
+# reject with icmpx admin-prohibited
 bridge test-bridge input
   [ reject type 2 code 3 ]
 
-# reject with icmpx type port-unreachable
+# reject with icmpx port-unreachable
 bridge test-bridge input
   [ reject type 2 code 1 ]
 
-# ether type ip reject with icmpx type admin-prohibited
+# ether type ip reject with icmpx admin-prohibited
 bridge test-bridge input
   [ payload load 2b @ link header + 12 => reg 1 ]
   [ cmp eq reg 1 0x00000008 ]
   [ reject type 2 code 3 ]
 
-# ether type ip6 reject with icmpx type admin-prohibited
+# ether type ip6 reject with icmpx admin-prohibited
 bridge test-bridge input
   [ payload load 2b @ link header + 12 => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]
@@ -132,7 +132,7 @@ bridge
   [ cmp eq reg 1 0x00000081 ]
   [ reject type 1 code 0 ]
 
-# ether type 8021q reject with icmpx type admin-prohibited
+# ether type 8021q reject with icmpx admin-prohibited
 bridge
   [ payload load 2b @ link header + 12 => reg 1 ]
   [ cmp eq reg 1 0x00000081 ]

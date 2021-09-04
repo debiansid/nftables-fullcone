@@ -12,3 +12,15 @@ RULESET="table ip x {
 }"
 
 $NFT -f - <<< $RULESET
+
+RULESET="table ip x {
+	set new-connlimit {
+		type ipv4_addr
+		size 65535
+		flags dynamic
+		ct count over 20
+		elements = { 84.245.120.167 }
+	}
+}"
+
+$NFT -f - <<< $RULESET

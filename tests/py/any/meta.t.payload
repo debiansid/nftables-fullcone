@@ -961,44 +961,6 @@ ip test-ip4 input
   [ meta load oifgroup => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
-# meta skgid { 2001-2005} accept
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element d1070000  : 0 [end]	element d6070000  : 1 [end]
-ip test-ip4 input 
-  [ meta load skgid => reg 1 ]
-  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
-  [ lookup reg 1 set __set%d ]
-  [ immediate reg 0 accept ]
-
-# meta skgid != { 2001-2005} accept
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element d1070000  : 0 [end]	element d6070000  : 1 [end]
-ip test-ip4 input 
-  [ meta load skgid => reg 1 ]
-  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
-  [ lookup reg 1 set __set%d 0x1 ]
-  [ immediate reg 0 accept ]
-
-# meta cgroup {1048577-1048578}
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element 01001000  : 0 [end]	element 03001000  : 1 [end]
-ip test-ip4 input 
-  [ meta load cgroup => reg 1 ]
-  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
-  [ lookup reg 1 set __set%d ]
-
-# meta cgroup != { 1048577-1048578}
-__set%d test-ip4 7 size 3
-__set%d test-ip4 0
-	element 00000000  : 1 [end]	element 01001000  : 0 [end]	element 03001000  : 1 [end]
-ip test-ip4 input 
-  [ meta load cgroup => reg 1 ]
-  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
-  [ lookup reg 1 set __set%d 0x1 ]
-
 # meta time "1970-05-23 21:07:14" drop
 ip meta-test input
   [ meta load time => reg 1 ]

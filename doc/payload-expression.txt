@@ -21,7 +21,7 @@ ether_type
 VLAN HEADER EXPRESSION
 ~~~~~~~~~~~~~~~~~~~~~~
 [verse]
-*vlan* {*id* | *cfi* | *pcp* | *type*}
+*vlan* {*id* | *dei* | *pcp* | *type*}
 
 .VLAN header expression
 [options="header"]
@@ -30,8 +30,8 @@ VLAN HEADER EXPRESSION
 |id|
 VLAN ID (VID) |
 integer (12 bit)
-|cfi|
-Canonical Format Indicator|
+|dei|
+Drop Eligible Indicator|
 integer (1 bit)
 |pcp|
 Priority code point|
@@ -699,8 +699,8 @@ is true for the *zone*, if a direction is given, the zone is only matched if the
 zone id is tied to the given direction. +
 
 [verse]
-*ct* {*state* | *direction* | *status* | *mark* | *expiration* | *helper* | *label*}
-*ct* [*original* | *reply*] {*l3proto* | *protocol* | *bytes* | *packets* | *avgpkt* | *zone* | *id*}
+*ct* {*state* | *direction* | *status* | *mark* | *expiration* | *helper* | *label* | *count* | *id*}
+*ct* [*original* | *reply*] {*l3proto* | *protocol* | *bytes* | *packets* | *avgpkt* | *zone*}
 *ct* {*original* | *reply*} {*proto-src* | *proto-dst*}
 *ct* {*original* | *reply*} {*ip* | *ip6*} {*saddr* | *daddr*}
 

@@ -10,7 +10,7 @@ EXPECTED="table ip x {
 
             chain y {
                     type nat hook postrouting priority srcnat; policy accept;
-                    snat ip interval to ip saddr map @y
+                    snat to ip saddr map @y
             }
      }
 "

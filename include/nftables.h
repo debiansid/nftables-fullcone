@@ -100,12 +100,23 @@ struct mnl_socket;
 struct parser_state;
 struct scope;
 
+struct nft_vars {
+	const char	*key;
+	const char	*value;
+};
+
 #define MAX_INCLUDE_DEPTH	16
 
 struct nft_ctx {
 	struct mnl_socket	*nf_sock;
 	char			**include_paths;
 	unsigned int		num_include_paths;
+	struct nft_vars		*vars;
+	struct {
+		const char	*buf;
+		struct list_head indesc_list;
+	} vars_ctx;
+	unsigned int		num_vars;
 	unsigned int		parser_max_errors;
 	unsigned int		debug_mask;
 	struct output_ctx	output;

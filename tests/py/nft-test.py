@@ -407,7 +407,11 @@ def set_add_elements(set_element, set_name, state, filename, lineno):
         ret = execute_cmd(cmd, filename, lineno)
 
         if (state == "fail" and ret == 0) or (state == "ok" and ret != 0):
-            test_state = "This rule should have failed."
+            if state == "fail":
+                    test_state = "This rule should have failed."
+            else:
+                    test_state = "This rule should not have failed."
+
             reason = cmd + ": " + test_state
             print_error(reason, filename, lineno)
             return -1
@@ -1345,6 +1349,33 @@ def run_test_file(filename, force_all_family_option, specific_file):
 
     return [tests, passed, total_warning, total_error, total_unit_run]
 
+def spawn_netns():
+    # prefer unshare module
+    try:
+        import unshare
+        unshare.unshare(unshare.CLONE_NEWNET)
+        return True
+    except:
+        pass
+
+    # sledgehammer style:
+    # - call ourselves prefixed by 'unshare -n' if found
+    # - pass extra --no-netns parameter to avoid another recursion
+    try:
+        import shutil
+
+        unshare = shutil.which("unshare")
+        if unshare is None:
+            return False
+
+        sys.argv.append("--no-netns")
+        if debug_option:
+            print("calling: ", [unshare, "-n", sys.executable] + sys.argv)
+        os.execv(unshare, [unshare, "-n", sys.executable] + sys.argv)
+    except:
+        pass
+
+    return False
 
 def main():
     parser = argparse.ArgumentParser(description='Run nft tests')
@@ -1372,6 +1403,10 @@ def main():
     parser.add_argument('-l', '--library', default=None,
                         help='path to libntables.so.1, overrides --host')
 
+    parser.add_argument('-N', '--no-netns', action='store_true',
+                        dest='no_netns',
+                        help='Do not run in own network namespace')
+
     parser.add_argument('-s', '--schema', action='store_true',
                         dest='enable_schema',
                         help='verify json input/output against schema')
@@ -1396,14 +1431,11 @@ def main():
         print("You need to be root to run this, sorry")
         return
 
+    if not args.no_netns and not spawn_netns():
+        print_warning("cannot run in own namespace, connectivity might break")
+
     # Change working directory to repository root
     os.chdir(TESTS_PATH + "/../..")
-
-    try:
-        import unshare
-        unshare.unshare(unshare.CLONE_NEWNET)
-    except:
-        print_warning("cannot run in own namespace, connectivity might break")
 
     check_lib_path = True
     if args.library is None:

@@ -1032,6 +1032,7 @@ const struct proto_desc proto_vlan = {
 	},
 	.templates	= {
 		[VLANHDR_PCP]		= VLANHDR_BITFIELD("pcp", 0, 3),
+		[VLANHDR_DEI]		= VLANHDR_BITFIELD("dei", 3, 1),
 		[VLANHDR_CFI]		= VLANHDR_BITFIELD("cfi", 3, 1),
 		[VLANHDR_VID]		= VLANHDR_BITFIELD("id", 4, 12),
 		[VLANHDR_TYPE]		= VLANHDR_TYPE("type", &ethertype_type, vlan_type),

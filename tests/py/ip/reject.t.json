@@ -5,7 +5,7 @@
     }
 ]
 
-# reject with icmp type host-unreachable
+# reject with icmp host-unreachable
 [
     {
         "reject": {
@@ -15,7 +15,7 @@
     }
 ]
 
-# reject with icmp type net-unreachable
+# reject with icmp net-unreachable
 [
     {
         "reject": {
@@ -25,7 +25,7 @@
     }
 ]
 
-# reject with icmp type prot-unreachable
+# reject with icmp prot-unreachable
 [
     {
         "reject": {
@@ -35,7 +35,7 @@
     }
 ]
 
-# reject with icmp type port-unreachable
+# reject with icmp port-unreachable
 [
     {
         "reject": {
@@ -45,7 +45,7 @@
     }
 ]
 
-# reject with icmp type net-prohibited
+# reject with icmp net-prohibited
 [
     {
         "reject": {
@@ -55,7 +55,7 @@
     }
 ]
 
-# reject with icmp type host-prohibited
+# reject with icmp host-prohibited
 [
     {
         "reject": {
@@ -65,11 +65,21 @@
     }
 ]
 
-# reject with icmp type admin-prohibited
+# reject with icmp admin-prohibited
 [
     {
         "reject": {
             "expr": "admin-prohibited",
+            "type": "icmp"
+        }
+    }
+]
+
+# reject with icmp 3
+[
+    {
+        "reject": {
+            "expr": "port-unreachable",
             "type": "icmp"
         }
     }

@@ -55,7 +55,7 @@
     }
 ]
 
-# meta nfproto ipv4 reject with icmp type host-unreachable
+# meta nfproto ipv4 reject with icmp host-unreachable
 [
     {
         "reject": {
@@ -65,7 +65,7 @@
     }
 ]
 
-# meta nfproto ipv6 reject with icmpv6 type no-route
+# meta nfproto ipv6 reject with icmpv6 no-route
 [
     {
         "reject": {

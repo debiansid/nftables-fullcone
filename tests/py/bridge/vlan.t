@@ -8,20 +8,21 @@ vlan id 4094;ok
 vlan id 0;ok
 # bad vlan id
 vlan id 4096;fail
-vlan id 4094 vlan cfi 0;ok
-vlan id 4094 vlan cfi != 1;ok
-vlan id 4094 vlan cfi 1;ok
-# bad cfi
-vlan id 4094 vlan cfi 2;fail
-vlan id 4094 vlan cfi 1 vlan pcp 8;fail
-vlan id 4094 vlan cfi 1 vlan pcp 7;ok
-vlan id 4094 vlan cfi 1 vlan pcp 3;ok
+vlan id 4094 vlan dei 0;ok
+vlan id 4094 vlan dei 1;ok
+vlan id 4094 vlan dei != 1;ok
+vlan id 4094 vlan cfi 1;ok;vlan id 4094 vlan dei 1
+# bad dei
+vlan id 4094 vlan dei 2;fail
+vlan id 4094 vlan dei 1 vlan pcp 8;fail
+vlan id 4094 vlan dei 1 vlan pcp 7;ok
+vlan id 4094 vlan dei 1 vlan pcp 3;ok
 
 ether type vlan vlan id 4094;ok;vlan id 4094
 ether type vlan vlan id 0;ok;vlan id 0
-ether type vlan vlan id 4094 vlan cfi 0;ok;vlan id 4094 vlan cfi 0
-ether type vlan vlan id 4094 vlan cfi 1;ok;vlan id 4094 vlan cfi 1
-ether type vlan vlan id 4094 vlan cfi 2;fail
+ether type vlan vlan id 4094 vlan dei 0;ok;vlan id 4094 vlan dei 0
+ether type vlan vlan id 4094 vlan dei 1;ok;vlan id 4094 vlan dei 1
+ether type vlan vlan id 4094 vlan dei 2;fail
 
 vlan id 4094 tcp dport 22;ok
 vlan id 1 ip saddr 10.0.0.1;ok

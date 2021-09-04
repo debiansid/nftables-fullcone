@@ -112,46 +112,6 @@
     }
 ]
 
-# tcp dport { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "dport",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp dport != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "dport",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
 # tcp dport {telnet, http, https} accept
 [
     {
@@ -391,46 +351,6 @@
                     55,
                     67,
                     88
-                ]
-            }
-        }
-    }
-]
-
-# tcp sport { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sport",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp sport != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sport",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
                 ]
             }
         }
@@ -753,46 +673,6 @@
     }
 ]
 
-# tcp sequence { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sequence",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp sequence != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "sequence",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
 # tcp ackseq 42949672 drop
 [
     {
@@ -920,46 +800,6 @@
                     55,
                     67,
                     88
-                ]
-            }
-        }
-    }
-]
-
-# tcp ackseq { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "ackseq",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp ackseq != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "ackseq",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
                 ]
             }
         }
@@ -1254,46 +1094,6 @@
     }
 ]
 
-# tcp window { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "window",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp window != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "window",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
 # tcp checksum 22
 [
     {
@@ -1402,46 +1202,6 @@
                     55,
                     67,
                     88
-                ]
-            }
-        }
-    }
-]
-
-# tcp checksum { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "checksum",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp checksum != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "checksum",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
                 ]
             }
         }
@@ -1581,46 +1341,6 @@
     }
 ]
 
-# tcp urgptr { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "urgptr",
-                    "protocol": "tcp"
-                }
-            },
-	    "op": "==",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
-# tcp urgptr != { 33-55}
-[
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "urgptr",
-                    "protocol": "tcp"
-                }
-            },
-            "op": "!=",
-            "right": {
-                "set": [
-                    { "range": [ 33, 55 ] }
-                ]
-            }
-        }
-    }
-]
-
 # tcp doff 8
 [
     {
@@ -1749,3 +1469,331 @@
         }
     }
 ]
+
+# tcp flags fin,syn / fin,syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn"
+                    ]
+                ]
+            },
+            "op": "==",
+            "right": [
+                "fin",
+                "syn"
+            ]
+        }
+    }
+]
+
+# tcp flags != syn / fin,syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn"
+                    ]
+                ]
+            },
+            "op": "!=",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & syn == 0
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "flags",
+                    "protocol": "tcp"
+                }
+            },
+            "op": "!",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & syn != 0
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "flags",
+                    "protocol": "tcp"
+                }
+            },
+            "op": "in",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & (syn | ack) != 0
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "flags",
+                    "protocol": "tcp"
+                }
+            },
+            "op": "in",
+            "right": [
+                "syn",
+                "ack"
+            ]
+        }
+    }
+]
+
+# tcp flags & (syn | ack) == 0
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "flags",
+                    "protocol": "tcp"
+                }
+            },
+            "op": "!",
+            "right": [
+                "syn",
+                "ack"
+            ]
+        }
+    }
+]
+
+# tcp flags & syn == syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    "syn"
+                ]
+            },
+            "op": "==",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & syn != syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    "syn"
+                ]
+            },
+            "op": "!=",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & (fin | syn | rst | ack) syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn",
+                        "rst",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "==",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & (fin | syn | rst | ack) == syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn",
+                        "rst",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "==",
+            "right": "syn"
+        }
+    }
+]
+
+
+# tcp flags & (fin | syn | rst | ack) != syn
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn",
+                        "rst",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "!=",
+            "right": "syn"
+        }
+    }
+]
+
+# tcp flags & (fin | syn | rst | ack) == (syn | ack)
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn",
+                        "rst",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "==",
+            "right": [
+                "syn",
+                "ack"
+            ]
+        }
+    }
+]
+
+# tcp flags & (fin | syn | rst | ack) != (syn | ack)
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "fin",
+                        "syn",
+                        "rst",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "!=",
+            "right": [
+                "syn",
+                "ack"
+            ]
+        }
+    }
+]
+
+# tcp flags & (syn | ack) == (syn | ack)
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "flags",
+                            "protocol": "tcp"
+                        }
+                    },
+                    [
+                        "syn",
+                        "ack"
+                    ]
+                ]
+            },
+            "op": "==",
+            "right": [
+                "syn",
+                "ack"
+            ]
+        }
+    }
+]
+

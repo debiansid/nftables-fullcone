@@ -8,6 +8,6 @@ table ip x {
 
 	chain y {
 		type nat hook postrouting priority srcnat; policy accept;
-		snat ip interval to ip saddr map @y
+		snat ip to ip saddr map @y
 	}
 }

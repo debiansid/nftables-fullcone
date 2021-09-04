@@ -1,5 +1,5 @@
-AC_INIT([nftables], [0.9.9], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Prudence Pimpleton"], [Release name])
+AC_INIT([nftables], [1.0.0], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Fearless Fosdick #2"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])

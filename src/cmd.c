@@ -27,16 +27,42 @@ static int nft_cmd_enoent_table(struct netlink_ctx *ctx, const struct cmd *cmd,
 	return 1;
 }
 
+static int table_fuzzy_check(struct netlink_ctx *ctx, const struct cmd *cmd,
+			     const struct table *table)
+{
+	if (table_cache_find(&ctx->nft->cache.table_cache,
+			     cmd->handle.table.name, cmd->handle.family))
+		return 0;
+
+	if (strcmp(cmd->handle.table.name, table->handle.table.name) ||
+	    cmd->handle.family != table->handle.family) {
+		netlink_io_error(ctx, &cmd->handle.table.location,
+				 "%s; did you mean table ‘%s’ in family %s?",
+				 strerror(ENOENT), table->handle.table.name,
+				 family2str(table->handle.family));
+		return 1;
+	}
+
+	return 0;
+}
+
 static int nft_cmd_enoent_chain(struct netlink_ctx *ctx, const struct cmd *cmd,
 				const struct location *loc)
 {
-	const struct table *table;
+	const struct table *table = NULL;
 	struct chain *chain;
 
 	if (!cmd->handle.chain.name)
 		return 0;
 
 	chain = chain_lookup_fuzzy(&cmd->handle, &ctx->nft->cache, &table);
+	/* check table first. */
+	if (!table)
+		return 0;
+
+	if (table_fuzzy_check(ctx, cmd, table))
+		return 1;
+
 	if (!chain)
 		return 0;
 
@@ -52,24 +78,24 @@ static int nft_cmd_enoent_rule(struct netlink_ctx *ctx, const struct cmd *cmd,
 {
 	unsigned int flags = NFT_CACHE_TABLE |
 			     NFT_CACHE_CHAIN;
-	const struct table *table;
+	const struct table *table = NULL;
 	struct chain *chain;
 
 	if (nft_cache_update(ctx->nft, flags, ctx->msgs) < 0)
 		return 0;
 
-	table = table_lookup_fuzzy(&cmd->handle, &ctx->nft->cache);
-	if (table && strcmp(cmd->handle.table.name, table->handle.table.name)) {
-		netlink_io_error(ctx, loc, "%s; did you mean table ‘%s’ in family %s?",
-				 strerror(ENOENT), table->handle.table.name,
-				 family2str(table->handle.family));
-		return 1;
-	} else if (!table) {
-		return 0;
-	}
-
 	chain = chain_lookup_fuzzy(&cmd->handle, &ctx->nft->cache, &table);
-	if (chain && strcmp(cmd->handle.chain.name, chain->handle.chain.name)) {
+	/* check table first. */
+	if (!table)
+		return 0;
+
+	if (table_fuzzy_check(ctx, cmd, table))
+		return 1;
+
+	if (!chain)
+		return 0;
+
+	if (strcmp(cmd->handle.chain.name, chain->handle.chain.name)) {
 		netlink_io_error(ctx, loc, "%s; did you mean chain ‘%s’ in table %s ‘%s’?",
 				 strerror(ENOENT),
 				 chain->handle.chain.name,
@@ -84,13 +110,20 @@ static int nft_cmd_enoent_rule(struct netlink_ctx *ctx, const struct cmd *cmd,
 static int nft_cmd_enoent_set(struct netlink_ctx *ctx, const struct cmd *cmd,
 			      const struct location *loc)
 {
-	const struct table *table;
+	const struct table *table = NULL;
 	struct set *set;
 
 	if (!cmd->handle.set.name)
 		return 0;
 
 	set = set_lookup_fuzzy(cmd->handle.set.name, &ctx->nft->cache, &table);
+	/* check table first. */
+	if (!table)
+		return 0;
+
+	if (table_fuzzy_check(ctx, cmd, table))
+		return 1;
+
 	if (!set)
 		return 0;
 
@@ -106,13 +139,20 @@ static int nft_cmd_enoent_set(struct netlink_ctx *ctx, const struct cmd *cmd,
 static int nft_cmd_enoent_obj(struct netlink_ctx *ctx, const struct cmd *cmd,
 			      const struct location *loc)
 {
-	const struct table *table;
+	const struct table *table = NULL;
 	struct obj *obj;
 
 	if (!cmd->handle.obj.name)
 		return 0;
 
 	obj = obj_lookup_fuzzy(cmd->handle.obj.name, &ctx->nft->cache, &table);
+	/* check table first. */
+	if (!table)
+		return 0;
+
+	if (table_fuzzy_check(ctx, cmd, table))
+		return 1;
+
 	if (!obj)
 		return 0;
 
@@ -127,7 +167,7 @@ static int nft_cmd_enoent_flowtable(struct netlink_ctx *ctx,
 				    const struct cmd *cmd,
 				    const struct location *loc)
 {
-	const struct table *table;
+	const struct table *table = NULL;
 	struct flowtable *ft;
 
 	if (!cmd->handle.flowtable.name)
@@ -135,6 +175,13 @@ static int nft_cmd_enoent_flowtable(struct netlink_ctx *ctx,
 
 	ft = flowtable_lookup_fuzzy(cmd->handle.flowtable.name,
 				    &ctx->nft->cache, &table);
+	/* check table first. */
+	if (!table)
+		return 0;
+
+	if (table_fuzzy_check(ctx, cmd, table))
+		return 1;
+
 	if (!ft)
 		return 0;
 

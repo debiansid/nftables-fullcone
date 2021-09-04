@@ -414,6 +414,23 @@
     }
 ]
 
+# tcp option 6 exists
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "base": 6,
+                    "len": 8,
+                    "offset": 0
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]
+
 # tcp option 255 missing
 [
     {

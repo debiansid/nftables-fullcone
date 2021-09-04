@@ -77,3 +77,10 @@ inet
   [ immediate reg 2 0x00005000 ]
   [ nat dnat ip addr_min reg 1 proto_min reg 2 flags 0x2 ]
 
+# meta l4proto tcp dnat to :80
+inet
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x00000006 ]
+  [ immediate reg 1 0x00005000 ]
+  [ nat dnat inet proto_min reg 1 flags 0x2 ]
+

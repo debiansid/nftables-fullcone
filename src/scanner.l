@@ -207,6 +207,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_SCTP
 %s SCANSTATE_SECMARK
 %s SCANSTATE_VLAN
+%s SCANSTATE_CMD_LIST
 %s SCANSTATE_EXPR_FIB
 %s SCANSTATE_EXPR_HASH
 %s SCANSTATE_EXPR_IPSEC
@@ -317,7 +318,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "insert"		{ return INSERT; }
 "delete"		{ return DELETE; }
 "get"			{ return GET; }
-"list"			{ return LIST; }
+"list"			{ scanner_push_start_cond(yyscanner, SCANSTATE_CMD_LIST); return LIST; }
 "reset"			{ return RESET; }
 "flush"			{ return FLUSH; }
 "rename"		{ return RENAME; }
@@ -346,9 +347,15 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "flow"			{ return FLOW; }
 "offload"		{ return OFFLOAD; }
 "meter"			{ return METER; }
-"meters"		{ return METERS; }
 
-"flowtables"		{ return FLOWTABLES; }
+<SCANSTATE_CMD_LIST>{
+	"meters"		{ return METERS; }
+	"flowtables"		{ return FLOWTABLES; }
+	"limits"		{ return LIMITS; }
+	"secmarks"		{ return SECMARKS; }
+	"synproxys"		{ return SYNPROXYS; }
+	"hooks"			{ return HOOKS; }
+}
 
 "counter"		{ scanner_push_start_cond(yyscanner, SCANSTATE_COUNTER); return COUNTER; }
 "name"			{ return NAME; }
@@ -357,8 +364,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "counters"		{ return COUNTERS; }
 "quotas"		{ return QUOTAS; }
-"limits"		{ return LIMITS; }
-"synproxys"		{ return SYNPROXYS; }
 
 "log"			{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_LOG); return LOG; }
 "prefix"		{ return PREFIX; }
@@ -424,6 +429,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "id"			{ return ID; }
 <SCANSTATE_VLAN>{
 	"cfi"		{ return CFI; }
+	"dei"		{ return DEI; }
 	"pcp"		{ return PCP; }
 }
 "8021ad"		{ yylval->string = xstrdup(yytext); return STRING; }
@@ -687,7 +693,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 }
 
 "secmark"		{ scanner_push_start_cond(yyscanner, SCANSTATE_SECMARK); return SECMARK; }
-"secmarks"		{ return SECMARKS; }
 
 {addrstring}		{
 				yylval->string = xstrdup(yytext);

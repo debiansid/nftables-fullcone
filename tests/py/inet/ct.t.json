@@ -39,7 +39,7 @@
     }
 ]
 
-# ct original ip daddr {1.2.3.4} accept
+# ct original ip daddr 1.2.3.4 accept
 [
     {
         "match": {
@@ -50,11 +50,7 @@
                 }
             },
             "op": "==",
-            "right": {
-                "set": [
-                    "1.2.3.4"
-                ]
-            }
+            "right": "1.2.3.4"
         }
     },
     {

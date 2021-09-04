@@ -1,7 +1,7 @@
 LIBNFTABLES_1 {
 global:
   nft_ctx_add_include_path;
-  nft_ctx_clear_include_pat;
+  nft_ctx_clear_include_paths;
   nft_ctx_new;
   nft_ctx_buffer_output;
   nft_ctx_unbuffer_output;
@@ -23,3 +23,8 @@ global:
 
 local: *;
 };
+
+LIBNFTABLES_2 {
+  nft_ctx_add_var;
+  nft_ctx_clear_vars;
+} LIBNFTABLES_1;

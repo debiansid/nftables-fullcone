@@ -31,6 +31,7 @@ tcp option timestamp length 1;ok
 tcp option timestamp tsval 1;ok
 tcp option timestamp tsecr 1;ok
 tcp option 255 missing;ok
+tcp option 6 exists;ok
 tcp option @255,8,8 255;ok
 
 tcp option foobar;fail

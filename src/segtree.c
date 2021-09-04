@@ -288,6 +288,7 @@ out:
 
 	return 0;
 err:
+	mpz_clear(p);
 	errno = EEXIST;
 	if (new->expr->etype == EXPR_MAPPING) {
 		new_expr = new->expr->left;
@@ -435,10 +436,10 @@ static int set_to_segtree(struct list_head *msgs, struct set *set,
 			  struct expr *init, struct seg_tree *tree,
 			  bool add, bool merge)
 {
-	struct elementary_interval *intervals[init->size];
+	struct elementary_interval **intervals;
 	struct expr *i, *next;
-	unsigned int n;
-	int err;
+	unsigned int n, m;
+	int err = 0;
 
 	/* We are updating an existing set with new elements, check if the new
 	 * interval overlaps with any of the existing ones.
@@ -449,6 +450,7 @@ static int set_to_segtree(struct list_head *msgs, struct set *set,
 			return err;
 	}
 
+	intervals = xmalloc_array(init->size, sizeof(intervals[0]));
 	n = expr_to_intervals(init, tree->keylen, intervals);
 
 	list_for_each_entry_safe(i, next, &init->expressions, list) {
@@ -466,11 +468,23 @@ static int set_to_segtree(struct list_head *msgs, struct set *set,
 	 */
 	for (n = 0; n < init->size; n++) {
 		err = ei_insert(msgs, tree, intervals[n], merge);
-		if (err < 0)
-			return err;
+		if (err < 0) {
+			struct elementary_interval *ei;
+			struct rb_node *node, *next;
+
+			for (m = n; m < init->size; m++)
+				ei_destroy(intervals[m]);
+
+			rb_for_each_entry_safe(ei, node, next, &tree->root, rb_node) {
+				ei_remove(tree, ei);
+				ei_destroy(ei);
+			}
+			break;
+		}
 	}
 
-	return 0;
+	xfree(intervals);
+	return err;
 }
 
 static bool segtree_needs_first_segment(const struct set *set,
@@ -535,7 +549,7 @@ static void segtree_linearize(struct list_head *list, const struct set *set,
 			 */
 			mpz_add_ui(p, prev->right, 1);
 			if (mpz_cmp(p, ei->left) < 0 ||
-			    (!(set->flags & NFT_SET_ANONYMOUS) && !merge)) {
+			    (!set_is_anonymous(set->flags) && !merge)) {
 				mpz_sub_ui(q, ei->left, 1);
 				nei = ei_alloc(p, q, NULL, EI_F_INTERVAL_END);
 				list_add_tail(&nei->list, list);

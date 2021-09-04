@@ -201,7 +201,7 @@ struct stmt *meter_stmt_alloc(const struct location *loc)
 
 static void connlimit_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	nft_print(octx, "ct count %s%u ",
+	nft_print(octx, "ct count %s%u",
 		  stmt->connlimit.flags ? "over " : "", stmt->connlimit.count);
 }
 
@@ -493,20 +493,30 @@ struct stmt *limit_stmt_alloc(const struct location *loc)
 
 static void queue_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
-	const char *delim = " ";
+	struct expr *e = stmt->queue.queue;
+	const char *delim = " flags ";
 
 	nft_print(octx, "queue");
-	if (stmt->queue.queue != NULL) {
-		nft_print(octx, " num ");
-		expr_print(stmt->queue.queue, octx);
-	}
+
 	if (stmt->queue.flags & NFT_QUEUE_FLAG_BYPASS) {
 		nft_print(octx, "%sbypass", delim);
 		delim = ",";
 	}
+
 	if (stmt->queue.flags & NFT_QUEUE_FLAG_CPU_FANOUT)
 		nft_print(octx, "%sfanout", delim);
 
+	if (e) {
+		if (e->etype == EXPR_VALUE || e->etype == EXPR_RANGE) {
+			nft_print(octx, " num ");
+			expr_print(stmt->queue.queue, octx);
+		} else {
+			nft_print(octx, " to ");
+			expr_print(stmt->queue.queue, octx);
+		}
+	} else {
+		nft_print(octx, " num 0");
+	}
 }
 
 static void queue_stmt_destroy(struct stmt *stmt)
@@ -522,9 +532,15 @@ static const struct stmt_ops queue_stmt_ops = {
 	.destroy	= queue_stmt_destroy,
 };
 
-struct stmt *queue_stmt_alloc(const struct location *loc)
+struct stmt *queue_stmt_alloc(const struct location *loc, struct expr *e, uint16_t flags)
 {
-	return stmt_alloc(loc, &queue_stmt_ops);
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &queue_stmt_ops);
+	stmt->queue.queue = e;
+	stmt->queue.flags = flags;
+
+	return stmt;
 }
 
 static void quota_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
@@ -569,7 +585,7 @@ static void reject_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 	case NFT_REJECT_ICMPX_UNREACH:
 		if (stmt->reject.icmp_code == NFT_REJECT_ICMPX_PORT_UNREACH)
 			break;
-		nft_print(octx, " with icmpx type ");
+		nft_print(octx, " with icmpx ");
 		expr_print(stmt->reject.expr, octx);
 		break;
 	case NFT_REJECT_ICMP_UNREACH:
@@ -578,14 +594,14 @@ static void reject_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 			if (!stmt->reject.verbose_print &&
 			     stmt->reject.icmp_code == ICMP_PORT_UNREACH)
 				break;
-			nft_print(octx, " with icmp type ");
+			nft_print(octx, " with icmp ");
 			expr_print(stmt->reject.expr, octx);
 			break;
 		case NFPROTO_IPV6:
 			if (!stmt->reject.verbose_print &&
 			    stmt->reject.icmp_code == ICMP6_DST_UNREACH_NOPORT)
 				break;
-			nft_print(octx, " with icmpv6 type ");
+			nft_print(octx, " with icmpv6 ");
 			expr_print(stmt->reject.expr, octx);
 			break;
 		}
@@ -657,12 +673,8 @@ static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 			break;
 		}
 
-		if (stmt->nat.type_flags & STMT_NAT_F_CONCAT)
-			nft_print(octx, " addr . port");
-		else if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
+		if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
 			nft_print(octx, " prefix");
-		else if (stmt->nat.type_flags & STMT_NAT_F_INTERVAL)
-			nft_print(octx, " interval");
 
 		nft_print(octx, " to");
 	}

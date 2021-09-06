@@ -1,4 +1,4 @@
-nftables (1.0.0-1) experimental; urgency=medium
+nftables (1.0.0-1) unstable; urgency=medium
 
   * [3d9fb4f] New upstream version 1.0.0
 

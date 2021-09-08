@@ -13,10 +13,10 @@ Build-Depends: asciidoc-base,
                libeditreadline-dev,
                libgmp-dev,
                libjansson-dev,
-               libmnl-dev (>= 1.0.4),
+               libmnl-dev,
                libnftnl-dev (>= 1.2.0),
-               libtool (>= 2.2.6),
-               libxtables-dev (>= 1.6.1),
+               libtool,
+               libxtables-dev,
                python3-all
 Standards-Version: 4.5.1
 Homepage: https://www.netfilter.org/
@@ -25,7 +25,6 @@ Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 
 Package: nftables
 Architecture: linux-any
-Pre-Depends: dpkg (>= 1.15.7.2)
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Suggests: firewalld
 Description: Program to control packet filtering rules by Netfilter project

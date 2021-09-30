@@ -18,7 +18,7 @@ Files: py/nftables.py
 Copyright: 2018 Phil Sutter <phil@nwl.cc>
 License: GPL-2
 
-Files: src/libnftables.c include/nftables/nftables.h
+Files: src/libnftables.c include/nftables/libnftables.h
 Copyright: 2017 Eric Leblond <eric@regit.org>
 License: GPL-2
 

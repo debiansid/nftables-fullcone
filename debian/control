@@ -18,7 +18,7 @@ Build-Depends: asciidoc-base,
                libtool,
                libxtables-dev,
                python3-all
-Standards-Version: 4.5.1
+Standards-Version: 4.6.0
 Homepage: https://www.netfilter.org/
 Vcs-Git: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables.git
 Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables

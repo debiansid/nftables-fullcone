@@ -26,6 +26,7 @@ Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 Package: nftables
 Architecture: linux-any
 Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Recommends: netbase
 Suggests: firewalld
 Description: Program to control packet filtering rules by Netfilter project
  This software provides an in-kernel packet classification framework that is

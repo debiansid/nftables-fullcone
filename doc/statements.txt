@@ -93,10 +93,11 @@ packets, such as header fields, via the kernel log (where it can be read with
 dmesg(1) or read in the syslog).
 
 In the second form of invocation (if 'nflog_group' is specified), the Linux
-kernel will pass the packet to nfnetlink_log which will multicast the packet
-through a netlink socket to the specified multicast group. One or more userspace
-processes may subscribe to the group to receive the packets, see
-libnetfilter_queue documentation for details.
+kernel will pass the packet to nfnetlink_log which will send the log through a
+netlink socket to the specified group. One userspace process may subscribe to
+the group to receive the logs, see man(8) ulogd for the Netfilter userspace log
+daemon and libnetfilter_log documentation for details in case you would like to
+develop a custom program to digest your logs.
 
 In the third form of invocation (if level audit is specified), the Linux
 kernel writes a message into the audit buffer suitably formatted for reading
@@ -589,8 +590,8 @@ for details.
 
 [verse]
 ____
-*queue* [*flags* 'QUEUE_FLAGS'] [*num* 'queue_number']
-*queue* [*flags* 'QUEUE_FLAGS'] [*num* 'queue_number_from' - 'queue_number_to']
+*queue* [*flags* 'QUEUE_FLAGS'] [*to* 'queue_number']
+*queue* [*flags* 'QUEUE_FLAGS'] [*to* 'queue_number_from' - 'queue_number_to']
 *queue* [*flags* 'QUEUE_FLAGS'] [*to* 'QUEUE_EXPRESSION' ]
 
 'QUEUE_FLAGS' := 'QUEUE_FLAG' [*,* 'QUEUE_FLAGS']
@@ -657,7 +658,7 @@ string
 ip filter forward dup to 10.2.3.4 device "eth0"
 
 # copy raw frame to another interface
-netdetv ingress dup to "eth0"
+netdev ingress dup to "eth0"
 dup to "eth0"
 
 # combine with map dst addr to gateways
@@ -667,8 +668,8 @@ dup to ip daddr map { 192.168.7.1 : "eth0", 192.168.7.2 : "eth1" }
 FWD STATEMENT
 ~~~~~~~~~~~~~
 The fwd statement is used to redirect a raw packet to another interface. It is
-only available in the netdev family ingress hook. It is similar to the dup
-statement except that no copy is made.
+only available in the netdev family ingress and egress hooks. It is similar to
+the dup statement except that no copy is made.
 
 *fwd to* 'device'
 

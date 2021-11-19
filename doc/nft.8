@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
-.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 08/19/2021
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 11/18/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "08/19/2021" "\ \&" "\ \&"
+.TH "NFT" "8" "11/18/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -285,7 +285,7 @@ T{
 \fBnetdev\fR
 T}:T{
 .sp
-Netdev address family, handling packets from ingress\&.
+Netdev address family, handling packets on ingress and egress\&.
 T}
 .TE
 .sp 1
@@ -402,7 +402,7 @@ The bridge address family handles Ethernet packets traversing bridge devices\&.
 The list of supported hooks is identical to IPv4/IPv6/Inet address families above\&.
 .SS "NETDEV ADDRESS FAMILY"
 .sp
-The Netdev address family handles packets from the device ingress path\&. This family allows you to filter packets of any ethertype such as ARP, VLAN 802\&.1q, VLAN 802\&.1ad (Q\-in\-Q) as well as IPv4 and IPv6 packets\&.
+The Netdev address family handles packets from the device ingress and egress path\&. This family allows you to filter packets of any ethertype such as ARP, VLAN 802\&.1q, VLAN 802\&.1ad (Q\-in\-Q) as well as IPv4 and IPv6 packets\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -418,6 +418,7 @@ T}:T{
 Description
 T}
 .T&
+lt lt
 lt lt.
 T{
 .sp
@@ -426,8 +427,21 @@ T}:T{
 .sp
 All packets entering the system are processed by this hook\&. It is invoked after the network taps (ie\&. \fBtcpdump\fR), right after \fBtc\fR ingress and before layer 3 protocol handlers, it can be used for early filtering and policing\&.
 T}
+T{
+.sp
+egress
+T}:T{
+.sp
+All packets leaving the system are processed by this hook\&. It is invoked after layer 3 protocol handlers and before \fBtc\fR egress\&. It can be used for late filtering and policing\&.
+T}
 .TE
 .sp 1
+.sp
+Tunneled packets (such as \fBvxlan\fR) are processed by netdev family hooks both in decapsulated and encapsulated (tunneled) form\&. So a packet can be filtered on the overlay network as well as on the underlying network\&.
+.sp
+Note that the order of netfilter and \fBtc\fR is mirrored on ingress versus egress\&. This ensures symmetry for NAT and other packet mangling\&.
+.sp
+Ingress packets which are redirected out some other interface are only processed by netfilter on egress if they have passed through netfilter ingress processing before\&. Thus, ingress packets which are redirected by \fBtc\fR are not subjected to netfilter\&. But they are if they are redirected by \fBnetfilter\fR on ingress\&. Conceptually, tc and netfilter can be thought of as layers, with netfilter layered above tc: If the packet hasn\(cqt been passed up from the tc layer to the netfilter layer, it\(cqs not subjected to netfilter on egress\&.
 .SH "RULESET"
 .sp
 .if n \{\
@@ -471,7 +485,7 @@ By design, \fBlist ruleset\fR command output may be used as input to \fBnft \-f\
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBcreate\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR [\fB{ flags\fR \fIflags\fR \fB; }\fR]
+{\fBadd\fR | \fBcreate\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR [ {\fBcomment\fR \fIcomment\fR \fB;\fR\fI} \fR\fI\fB{ flags\fR\fR\fI \*(Aqflags\fR \fB; }\fR]
 {\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR
 \fBlist tables\fR [\fIfamily\fR]
 \fBdelete table\fR [\fIfamily\fR] \fBhandle\fR \fIhandle\fR
@@ -577,8 +591,8 @@ T}
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBcreate\fR} \fBchain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR [\fB{ type\fR \fItype\fR \fBhook\fR \fIhook\fR [\fBdevice\fR \fIdevice\fR] \fBpriority\fR \fIpriority\fR \fB;\fR [\fBpolicy\fR \fIpolicy\fR \fB;\fR] \fB}\fR]
-{\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBchain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR
+{\fBadd\fR | \fBcreate\fR} \fBchain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR [\fB{ type\fR \fItype\fR \fBhook\fR \fIhook\fR [\fBdevice\fR \fIdevice\fR] \fBpriority\fR \fIpriority\fR \fB;\fR [\fBpolicy\fR \fIpolicy\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] \fR\fI\fB}\fR\fR\fI]
+{\fR\fI\fBdelete\fR\fR\fI | \fR\fI\fBlist\fR\fR\fI | \fR\fI\fBflush\fR\fR\fI} \fR\fI\fBchain\fR\fR\fI [\*(Aqfamily\fR] \fItable\fR \fIchain\fR
 \fBlist chains\fR [\fIfamily\fR]
 \fBdelete chain\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBrename chain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fInewname\fR
@@ -716,13 +730,17 @@ Apart from the special cases illustrated above (e\&.g\&. \fBnat\fR type not supp
 .sp -1
 .IP \(bu 2.3
 .\}
-The netdev family supports merely a single combination, namely
+The netdev family supports merely two combinations, namely
 \fBfilter\fR
-type and
+type with
 \fBingress\fR
+hook and
+\fBfilter\fR
+type with
+\fBegress\fR
 hook\&. Base chains in this family also require the
 \fBdevice\fR
-parameter to be present since they exist per incoming interface only\&.
+parameter to be present since they exist per interface only\&.
 .RE
 .sp
 .RS 4
@@ -1071,7 +1089,7 @@ The sets allowed_hosts and allowed_ports need to be created first\&. The next se
 .RS 4
 .\}
 .nf
-\fBadd set\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR \fB;\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBtimeout\fR \fItimeout\fR \fB;\fR] [\fBgc\-interval\fR \fIgc\-interval\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBpolicy\fR \fIpolicy\fR \fB;\fR] [\fBauto\-merge ;\fR] \fB}\fR
+\fBadd set\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR \fB;\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBtimeout\fR \fItimeout\fR \fB;\fR] [\fBgc\-interval\fR \fIgc\-interval\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] [\fBauto\-merge ;\fR] \fB}\fR
 {\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBset\fR [\fIfamily\fR] \fItable\fR \fIset\fR
 \fBlist sets\fR [\fIfamily\fR]
 \fBdelete set\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
@@ -1241,7 +1259,7 @@ T}
 .RS 4
 .\}
 .nf
-\fBadd map\fR [\fIfamily\fR] \fItable\fR \fImap\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBpolicy\fR \fIpolicy\fR \fB;\fR] \fB}\fR
+\fBadd map\fR [\fIfamily\fR] \fItable\fR \fImap\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] \fB}\fR
 {\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBmap\fR [\fIfamily\fR] \fItable\fR \fImap\fR
 \fBlist maps\fR [\fIfamily\fR]
 .fi
@@ -1569,7 +1587,9 @@ T}
 .RS 4
 .\}
 .nf
-\fBct helper\fR \fIhelper\fR \fB{ type\fR \fItype\fR \fBprotocol\fR \fIprotocol\fR \fB;\fR [\fBl3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBadd\fR \fBct helper\fR [\fIfamily\fR] \fItable\fR \fIname\fR \fB{ type\fR \fItype\fR \fBprotocol\fR \fIprotocol\fR \fB;\fR [\fBl3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBdelete\fR \fBct helper\fR [\fIfamily\fR] \fItable\fR \fIname\fR
+\fBlist\fR \fBct helpers\fR
 .fi
 .if n \{\
 .RE
@@ -1593,6 +1613,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt.
@@ -1626,6 +1647,16 @@ T}:T{
 .sp
 address family (e\&.g\&. ip)
 T}
+T{
+.sp
+comment
+T}:T{
+.sp
+per ct helper comment field
+T}:T{
+.sp
+string
+T}
 .TE
 .sp 1
 .PP
@@ -1658,7 +1689,9 @@ table inet myhelpers {
 .RS 4
 .\}
 .nf
-\fBct timeout\fR \fIname\fR \fB{ protocol\fR \fIprotocol\fR \fB; policy = {\fR \fIstate\fR\fB:\fR \fIvalue\fR [\fB,\fR \&...] \fB} ;\fR [\fBl3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBadd\fR \fBct timeout\fR  [\fIfamily\fR] \fItable\fR \fIname\fR \fB{ protocol\fR \fIprotocol\fR \fB; policy = {\fR \fIstate\fR\fB:\fR \fIvalue\fR [\fB,\fR \&...] \fB} ;\fR [\fBl3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBdelete\fR \fBct timeout\fR [\fIfamily\fR] \fItable\fR \fIname\fR
+\fBlist\fR \fBct timeouts\fR
 .fi
 .if n \{\
 .RE
@@ -1682,6 +1715,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -1726,8 +1760,28 @@ T}:T{
 .sp
 address family (e\&.g\&. ip)
 T}
+T{
+.sp
+comment
+T}:T{
+.sp
+per ct timeout comment field
+T}:T{
+.sp
+string
+T}
 .TE
 .sp 1
+.sp
+tcp connection state names that can have a specific timeout value are:
+.sp
+\fIclose\fR, \fIclose_wait\fR, \fIestablished\fR, \fIfin_wait\fR, \fIlast_ack\fR, \fIretrans\fR, \fIsyn_recv\fR, \fIsyn_sent\fR, \fItime_wait\fR and \fIunack\fR\&.
+.sp
+You can use \fIsysctl \-a |grep net\&.netfilter\&.nf_conntrack_tcp_timeout_\fR to view and change the system\-wide defaults\&. \fIct timeout\fR allows for flow\-specific settings, without changing the global timeouts\&.
+.sp
+For example, tcp port 53 could have much lower settings than other traffic\&.
+.sp
+udp state names that can have a specific timeout value are \fIreplied\fR and \fIunreplied\fR\&.
 .PP
 \fBdefining and assigning ct timeout policy\fR. 
 .sp
@@ -1776,7 +1830,9 @@ sport=41360 dport=22
 .RS 4
 .\}
 .nf
-\fBct expectation\fR \fIname\fR \fB{ protocol\fR \fIprotocol\fR \fB; dport\fR \fIdport\fR \fB; timeout\fR \fItimeout\fR \fB; size\fR \fIsize\fR \fB; [*l3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBadd\fR \fBct expectation\fR  [\fIfamily\fR] \fItable\fR \fIname\fR \fB{ protocol\fR \fIprotocol\fR \fB; dport\fR \fIdport\fR \fB; timeout\fR \fItimeout\fR \fB; size\fR \fIsize\fR \fB; [*l3proto\fR \fIfamily\fR \fB;\fR] \fB}\fR
+\fBdelete\fR \fBct expectation\fR  [\fIfamily\fR] \fItable\fR \fIname\fR
+\fBlist\fR \fBct expectations\fR
 .fi
 .if n \{\
 .RE
@@ -1800,6 +1856,7 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -1855,6 +1912,16 @@ T}:T{
 .sp
 address family (e\&.g\&. ip)
 T}
+T{
+.sp
+comment
+T}:T{
+.sp
+per ct expectation comment field
+T}:T{
+.sp
+string
+T}
 .TE
 .sp 1
 .PP
@@ -1889,7 +1956,9 @@ table ip filter {
 .RS 4
 .\}
 .nf
-\fBcounter\fR [\fIpackets bytes\fR]
+\fBadd\fR \fBcounter\fR [\fIfamily\fR] \fItable\fR \fIname\fR [\fB{\fR [ \fBpackets\fR \fIpackets\fR \fBbytes\fR \fIbytes\fR \fI;\fR ] [ \fBcomment\fR \fIcomment\fR \fI;\fR \fB}\fR]
+\fBdelete\fR \fBcounter\fR [\fIfamily\fR] \fItable\fR \fIname\fR
+\fBlist\fR \fBcounters\fR
 .fi
 .if n \{\
 .RE
@@ -1912,6 +1981,7 @@ Type
 T}
 .T&
 lt lt lt
+lt lt lt
 lt lt lt.
 T{
 .sp
@@ -1933,15 +2003,56 @@ T}:T{
 .sp
 unsigned integer (64 bit)
 T}
+T{
+.sp
+comment
+T}:T{
+.sp
+per counter comment field
+T}:T{
+.sp
+string
+T}
 .TE
 .sp 1
+.PP
+\fBUsing named counters\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+nft add counter filter http
+nft add rule filter input tcp dport 80 counter name \e"http\e"
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBUsing named counters with maps\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+nft add counter filter http
+nft add counter filter https
+nft add rule filter input counter name tcp dport map { 80 : \e"http\e", 443 : \e"https\e" }
+.fi
+.if n \{\
+.RE
+.\}
+.sp
 .SS "QUOTA"
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-\fBquota\fR [\fBover\fR | \fBuntil\fR] [\fIused\fR]
+\fBadd\fR \fBquota\fR [\fIfamily\fR] \fItable\fR \fIname\fR \fB{\fR [\fBover\fR|\fBuntil\fR] \fIbytes\fR \fIBYTE_UNIT\fR [ \fBused\fR \fIbytes\fR \fIBYTE_UNIT\fR ] \fI;\fR [ \fBcomment\fR \fIcomment\fR \fI;\fR ] \fB}\fR
+BYTE_UNIT := bytes | kbytes | mbytes
+\fBdelete\fR \fBquota\fR [\fIfamily\fR] \fItable\fR \fIname\fR
+\fBlist\fR \fBquotas\fR
 .fi
 .if n \{\
 .RE
@@ -1964,6 +2075,7 @@ Type
 T}
 .T&
 lt lt lt
+lt lt lt
 lt lt lt.
 T{
 .sp
@@ -1985,8 +2097,46 @@ T}:T{
 .sp
 Two arguments, unsigned integer (64 bit) and string: bytes, kbytes, mbytes
 T}
+T{
+.sp
+comment
+T}:T{
+.sp
+per quota comment field
+T}:T{
+.sp
+string
+T}
 .TE
 .sp 1
+.PP
+\fBUsing named quotas\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+nft add quota filter user123 { over 20 mbytes }
+nft add rule filter input ip saddr 192\&.168\&.10\&.123 quota name \e"user123\e"
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBUsing named quotas with maps\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+nft add quota filter user123 { over 20 mbytes }
+nft add quota filter user124 { over 20 mbytes }
+nft add rule filter input quota name ip saddr map { 192\&.168\&.10\&.123 : \e"user123\e", 192\&.168\&.10\&.124 : \e"user124\e" }
+.fi
+.if n \{\
+.RE
+.\}
+.sp
 .SH "EXPRESSIONS"
 .sp
 Expressions represent values, either constants like network addresses, port numbers, etc\&., or data gathered from the packet during ruleset evaluation\&. Expressions can be combined using binary, logical, relational and other types of expressions to form complex or relational (match) expressions\&. They are also used as arguments to certain types of operations, like NAT, packet marking etc\&.
@@ -7440,7 +7590,7 @@ tcp flags syn tcp option maxseg size set rt mtu
 .sp
 The log statement enables logging of matching packets\&. When this statement is used from a rule, the Linux kernel will print some information on all matching packets, such as header fields, via the kernel log (where it can be read with dmesg(1) or read in the syslog)\&.
 .sp
-In the second form of invocation (if \fInflog_group\fR is specified), the Linux kernel will pass the packet to nfnetlink_log which will multicast the packet through a netlink socket to the specified multicast group\&. One or more userspace processes may subscribe to the group to receive the packets, see libnetfilter_queue documentation for details\&.
+In the second form of invocation (if \fInflog_group\fR is specified), the Linux kernel will pass the packet to nfnetlink_log which will send the log through a netlink socket to the specified group\&. One userspace process may subscribe to the group to receive the logs, see man(8) ulogd for the Netfilter userspace log daemon and libnetfilter_log documentation for details in case you would like to develop a custom program to digest your logs\&.
 .sp
 In the third form of invocation (if level audit is specified), the Linux kernel writes a message into the audit buffer suitably formatted for reading with auditd\&. Therefore no further formatting options (such as prefix or flags) are allowed in this mode\&.
 .sp
@@ -8372,8 +8522,8 @@ This statement passes the packet to userspace using the nfnetlink_queue handler\
 .RS 4
 .\}
 .nf
-\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBnum\fR \fIqueue_number\fR]
-\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBnum\fR \fIqueue_number_from\fR \- \fIqueue_number_to\fR]
+\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBto\fR \fIqueue_number\fR]
+\fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBto\fR \fIqueue_number_from\fR \- \fIqueue_number_to\fR]
 \fBqueue\fR [\fBflags\fR \fIQUEUE_FLAGS\fR] [\fBto\fR \fIQUEUE_EXPRESSION\fR ]
 
 \fIQUEUE_FLAGS\fR := \fIQUEUE_FLAG\fR [\fB,\fR \fIQUEUE_FLAGS\fR]
@@ -8536,7 +8686,7 @@ T}
 ip filter forward dup to 10\&.2\&.3\&.4 device "eth0"
 
 # copy raw frame to another interface
-netdetv ingress dup to "eth0"
+netdev ingress dup to "eth0"
 dup to "eth0"
 
 # combine with map dst addr to gateways
@@ -8548,7 +8698,7 @@ dup to ip daddr map { 192\&.168\&.7\&.1 : "eth0", 192\&.168\&.7\&.2 : "eth1" }
 .sp
 .SS "FWD STATEMENT"
 .sp
-The fwd statement is used to redirect a raw packet to another interface\&. It is only available in the netdev family ingress hook\&. It is similar to the dup statement except that no copy is made\&.
+The fwd statement is used to redirect a raw packet to another interface\&. It is only available in the netdev family ingress and egress hooks\&. It is similar to the dup statement except that no copy is made\&.
 .sp
 \fBfwd to\fR \fIdevice\fR
 .SS "SET STATEMENT"

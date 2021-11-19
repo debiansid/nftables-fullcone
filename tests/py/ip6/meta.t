@@ -9,5 +9,8 @@ meta l4proto icmp icmp type echo-request;ok;icmp type echo-request
 meta l4proto 1 icmp type echo-request;ok;icmp type echo-request
 icmp type echo-request;ok
 
+meta protocol ip udp dport 67;ok
+meta protocol ip6 udp dport 67;ok;udp dport 67
+
 meta sdif "lo" accept;ok
 meta sdifname != "vrf1" accept;ok

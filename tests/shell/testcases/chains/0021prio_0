@@ -69,6 +69,7 @@ done
 family=netdev
 echo "add table $family x"
 gen_chains $family ingress filter lo
+gen_chains $family egress filter lo
 
 family=bridge
 echo "add table $family x"

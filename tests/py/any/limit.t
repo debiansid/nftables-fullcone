@@ -1,12 +1,13 @@
 :output;type filter hook output priority 0
 :ingress;type filter hook ingress device lo priority 0
+:egress;type filter hook egress device lo priority 0
 
 *ip;test-ip4;output
 *ip6;test-ip6;output
 *inet;test-inet;output
 *arp;test-arp;output
 *bridge;test-bridge;output
-*netdev;test-netdev;ingress
+*netdev;test-netdev;ingress,egress
 
 limit rate 400/minute;ok
 limit rate 20/second;ok
@@ -23,6 +24,11 @@ limit rate 1023 mbytes/second;ok
 limit rate 10230 mbytes/second;ok
 limit rate 1023000 mbytes/second;ok
 limit rate 512 kbytes/second burst 5 packets;fail
+
+limit rate 1 bytes / second;ok;limit rate 1 bytes/second
+limit rate 1 kbytes / second;ok;limit rate 1 kbytes/second
+limit rate 1 mbytes / second;ok;limit rate 1 mbytes/second
+limit rate 1 gbytes / second;fail
 
 limit rate 1025 bytes/second burst 512 bytes;ok
 limit rate 1025 kbytes/second burst 1023 kbytes;ok

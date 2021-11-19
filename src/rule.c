@@ -72,7 +72,7 @@ static uint32_t tcp_dflt_timeout[] = {
 
 static uint32_t udp_dflt_timeout[] = {
 	[NFTNL_CTTIMEOUT_UDP_UNREPLIED]		= 30,
-	[NFTNL_CTTIMEOUT_UDP_REPLIED]		= 180,
+	[NFTNL_CTTIMEOUT_UDP_REPLIED]		= 120,
 };
 
 struct timeout_protocol timeout_protocol[IPPROTO_MAX] = {
@@ -366,21 +366,21 @@ static void set_print_declaration(const struct set *set,
 		nft_print(octx, "%s", opts->stmt_separator);
 	}
 
-	if (!list_empty(&set->stmt_list))
+	if (!list_empty(&set->stmt_list)) {
+		unsigned int flags = octx->flags;
+
 		nft_print(octx, "%s%s", opts->tab, opts->tab);
 
-	if (!list_empty(&set->stmt_list)) {
 		octx->flags |= NFT_CTX_OUTPUT_STATELESS;
 		list_for_each_entry(stmt, &set->stmt_list, list) {
 			stmt_print(stmt, octx);
 			if (!list_is_last(&stmt->list, &set->stmt_list))
 				nft_print(octx, " ");
 		}
-		octx->flags &= ~NFT_CTX_OUTPUT_STATELESS;
-	}
+		octx->flags = flags;
 
-	if (!list_empty(&set->stmt_list))
 		nft_print(octx, "%s", opts->stmt_separator);
+	}
 
 	if (set->automerge)
 		nft_print(octx, "%s%sauto-merge%s", opts->tab, opts->tab,
@@ -675,6 +675,7 @@ static const char * const chain_hookname_str_array[] = {
 	"postrouting",
 	"output",
 	"ingress",
+	"egress",
 	NULL,
 };
 
@@ -832,6 +833,8 @@ const char *hooknum2str(unsigned int family, unsigned int hooknum)
 		switch (hooknum) {
 		case NF_NETDEV_INGRESS:
 			return "ingress";
+		case NF_NETDEV_EGRESS:
+			return "egress";
 		}
 		break;
 	default:
@@ -1811,13 +1814,12 @@ static void obj_print_data(const struct obj *obj,
 			nft_print(octx, " # handle %" PRIu64, obj->handle.handle.id);
 
 		obj_print_comment(obj, opts, octx);
-		nft_print(octx, "%s%s%s", opts->nl, opts->tab, opts->tab);
-		if (nft_output_stateless(octx)) {
-			nft_print(octx, "packets 0 bytes 0");
-			break;
-		}
-		nft_print(octx, "packets %" PRIu64 " bytes %" PRIu64 "%s",
-			  obj->counter.packets, obj->counter.bytes, opts->nl);
+		if (nft_output_stateless(octx))
+			nft_print(octx, "%s", opts->nl);
+		else
+			nft_print(octx, "%s%s%spackets %" PRIu64 " bytes %" PRIu64 "%s",
+				  opts->nl, opts->tab, opts->tab,
+				  obj->counter.packets, obj->counter.bytes, opts->nl);
 		break;
 	case NFT_OBJECT_QUOTA: {
 		const char *data_unit;
@@ -2757,9 +2759,14 @@ static void payload_do_merge(struct stmt *sa[], unsigned int n)
 }
 
 /**
- * payload_try_merge - try to merge consecutive payload match statements
+ * stmt_reduce - reduce statements in rule
  *
  * @rule:	nftables rule
+ *
+ * This function aims to:
+ *
+ * - remove redundant statement, e.g. remove 'meta protocol ip' if family is ip
+ * - merge consecutive payload match statements
  *
  * Locate sequences of payload match statements referring to adjacent
  * header locations and merge those using only equality relations.
@@ -2767,39 +2774,65 @@ static void payload_do_merge(struct stmt *sa[], unsigned int n)
  * As a side-effect, payload match statements are ordered in ascending
  * order according to the location of the payload.
  */
-static void payload_try_merge(const struct rule *rule)
+static void stmt_reduce(const struct rule *rule)
 {
+	struct stmt *stmt, *dstmt = NULL, *next;
 	struct stmt *sa[rule->num_stmts];
-	struct stmt *stmt, *next;
 	unsigned int idx = 0;
 
 	list_for_each_entry_safe(stmt, next, &rule->stmts, list) {
-		/* Must not merge across other statements */
-		if (stmt->ops->type != STMT_EXPRESSION)
-			goto do_merge;
+		/* delete this redundant statement */
+		if (dstmt) {
+			list_del(&dstmt->list);
+			stmt_free(dstmt);
+			dstmt = NULL;
+		}
 
-		if (stmt->expr->etype != EXPR_RELATIONAL)
-			continue;
-		if (stmt->expr->left->etype != EXPR_PAYLOAD)
-			continue;
-		if (stmt->expr->right->etype != EXPR_VALUE)
-			continue;
-		switch (stmt->expr->op) {
-		case OP_EQ:
-		case OP_IMPLICIT:
-		case OP_NEQ:
-			break;
-		default:
+		/* Must not merge across other statements */
+		if (stmt->ops->type != STMT_EXPRESSION) {
+			if (idx < 2)
+				continue;
+
+			payload_do_merge(sa, idx);
+			idx = 0;
 			continue;
 		}
 
-		sa[idx++] = stmt;
-		continue;
-do_merge:
-		if (idx < 2)
+		if (stmt->expr->etype != EXPR_RELATIONAL)
 			continue;
-		payload_do_merge(sa, idx);
-		idx = 0;
+		if (stmt->expr->right->etype != EXPR_VALUE)
+			continue;
+
+		if (stmt->expr->left->etype == EXPR_PAYLOAD) {
+			switch (stmt->expr->op) {
+			case OP_EQ:
+			case OP_IMPLICIT:
+			case OP_NEQ:
+				break;
+			default:
+				continue;
+			}
+
+			sa[idx++] = stmt;
+		} else if (stmt->expr->left->etype == EXPR_META) {
+			switch (stmt->expr->op) {
+			case OP_EQ:
+			case OP_IMPLICIT:
+				if (stmt->expr->left->meta.key == NFT_META_PROTOCOL) {
+					uint16_t protocol;
+
+					protocol = mpz_get_uint16(stmt->expr->right->value);
+					if ((rule->handle.family == NFPROTO_IPV4 &&
+					     protocol == ETH_P_IP) ||
+					    (rule->handle.family == NFPROTO_IPV6 &&
+					     protocol == ETH_P_IPV6))
+						dstmt = stmt;
+				}
+				break;
+			default:
+				break;
+			}
+		}
 	}
 
 	if (idx > 1)
@@ -2808,6 +2841,6 @@ do_merge:
 
 struct error_record *rule_postprocess(struct rule *rule)
 {
-	payload_try_merge(rule);
+	stmt_reduce(rule);
 	return NULL;
 }

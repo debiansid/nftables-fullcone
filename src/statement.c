@@ -507,15 +507,10 @@ static void queue_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 		nft_print(octx, "%sfanout", delim);
 
 	if (e) {
-		if (e->etype == EXPR_VALUE || e->etype == EXPR_RANGE) {
-			nft_print(octx, " num ");
-			expr_print(stmt->queue.queue, octx);
-		} else {
-			nft_print(octx, " to ");
-			expr_print(stmt->queue.queue, octx);
-		}
+		nft_print(octx, " to ");
+		expr_print(stmt->queue.queue, octx);
 	} else {
-		nft_print(octx, " num 0");
+		nft_print(octx, " to 0");
 	}
 }
 

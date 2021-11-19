@@ -1,5 +1,4 @@
 :input;type filter hook input priority 0
-:ingress;type filter hook ingress device lo priority 0
 
 *ip;test-ip;input
 

@@ -734,3 +734,30 @@
         }
     }
 ]
+
+# vlan id 1 vlan id set 2
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "id",
+                    "protocol": "vlan"
+                }
+            },
+            "op": "==",
+            "right": 1
+        }
+    },
+    {
+        "mangle": {
+            "key": {
+                "payload": {
+                    "field": "id",
+                    "protocol": "vlan"
+                }
+            },
+            "value": 2
+        }
+    }
+]

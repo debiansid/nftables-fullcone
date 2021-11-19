@@ -371,7 +371,7 @@ netdev test-netdev ingress
 # ip6 saddr vmap { ::/64 : accept}
 __map%d test-netdev f
 __map%d test-netdev 0
-	element 00000000 00000000 00000000 00000000  : accept 0 [end]	element 00000000 01000000 00000000 00000000  : drop 1 [end]
+	element 00000000 00000000 00000000 00000000  : accept 0 [end]	element 00000000 01000000 00000000 00000000  : 1 [end]
 netdev test-netdev ingress 
   [ meta load protocol => reg 1 ]
   [ cmp eq reg 1 0x0000dd86 ]

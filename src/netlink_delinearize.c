@@ -134,6 +134,50 @@ err:
 	return NULL;
 }
 
+static struct expr *netlink_parse_concat_key(struct netlink_parse_ctx *ctx,
+					       const struct location *loc,
+					       unsigned int reg,
+					       const struct expr *key)
+{
+	uint32_t type = key->dtype->type;
+	unsigned int n, len = key->len;
+	struct expr *concat, *expr;
+	unsigned int consumed;
+
+	concat = concat_expr_alloc(loc);
+	n = div_round_up(fls(type), TYPE_BITS);
+
+	while (len > 0) {
+		const struct datatype *i;
+
+		expr = netlink_get_register(ctx, loc, reg);
+		if (expr == NULL) {
+			netlink_error(ctx, loc,
+				      "Concat expression size mismatch");
+			goto err;
+		}
+
+		if (n > 0 && concat_subtype_id(type, --n)) {
+			i = concat_subtype_lookup(type, n);
+
+			expr_set_type(expr, i, i->byteorder);
+		}
+
+		compound_expr_add(concat, expr);
+
+		consumed = netlink_padded_len(expr->len);
+		assert(consumed > 0);
+		len -= consumed;
+		reg += netlink_register_space(expr->len);
+	}
+
+	return concat;
+
+err:
+	expr_free(concat);
+	return NULL;
+}
+
 static struct expr *netlink_parse_concat_data(struct netlink_parse_ctx *ctx,
 					      const struct location *loc,
 					      unsigned int reg,
@@ -1572,7 +1616,7 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 
 	if (expr->len < set->key->len) {
 		expr_free(expr);
-		expr = netlink_parse_concat_expr(ctx, loc, sreg, set->key->len);
+		expr = netlink_parse_concat_key(ctx, loc, sreg, set->key);
 		if (expr == NULL)
 			return;
 	}
@@ -1750,46 +1794,26 @@ static const struct expr_handler netlink_parsers[] = {
 	{ .name = "synproxy",	.parse = netlink_parse_synproxy },
 };
 
-static const struct expr_handler **expr_handle_ht;
-
-#define NFT_EXPR_HSIZE	4096
-
-void expr_handler_init(void)
-{
-	unsigned int i;
-	uint32_t hash;
-
-	expr_handle_ht = xzalloc_array(NFT_EXPR_HSIZE,
-				       sizeof(expr_handle_ht[0]));
-
-	for (i = 0; i < array_size(netlink_parsers); i++) {
-		hash = djb_hash(netlink_parsers[i].name) % NFT_EXPR_HSIZE;
-		assert(expr_handle_ht[hash] == NULL);
-		expr_handle_ht[hash] = &netlink_parsers[i];
-	}
-}
-
-void expr_handler_exit(void)
-{
-	xfree(expr_handle_ht);
-}
-
 static int netlink_parse_expr(const struct nftnl_expr *nle,
 			      struct netlink_parse_ctx *ctx)
 {
 	const char *type = nftnl_expr_get_str(nle, NFTNL_EXPR_NAME);
 	struct location loc;
-	uint32_t hash;
+	unsigned int i;
 
 	memset(&loc, 0, sizeof(loc));
 	loc.indesc = &indesc_netlink;
 	loc.nle = nle;
 
-	hash = djb_hash(type) % NFT_EXPR_HSIZE;
-	if (expr_handle_ht[hash])
-		expr_handle_ht[hash]->parse(ctx, &loc, nle);
-	else
-		netlink_error(ctx, &loc, "unknown expression type '%s'", type);
+	for (i = 0; i < array_size(netlink_parsers); i++) {
+		if (strcmp(type, netlink_parsers[i].name))
+			continue;
+
+		netlink_parsers[i].parse(ctx, &loc, nle);
+
+		return 0;
+	}
+	netlink_error(ctx, &loc, "unknown expression type '%s'", type);
 
 	return 0;
 }
@@ -1983,6 +2007,55 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 	}
 }
 
+static uint8_t ether_type_to_nfproto(uint16_t l3proto)
+{
+	switch(l3proto) {
+	case ETH_P_IP:
+		return NFPROTO_IPV4;
+	case ETH_P_IPV6:
+		return NFPROTO_IPV6;
+	default:
+		break;
+	}
+
+	return NFPROTO_UNSPEC;
+}
+
+static bool __meta_dependency_may_kill(const struct expr *dep, uint8_t *nfproto)
+{
+	uint16_t l3proto;
+
+	switch (dep->left->etype) {
+	case EXPR_META:
+		switch (dep->left->meta.key) {
+		case NFT_META_NFPROTO:
+			*nfproto = mpz_get_uint8(dep->right->value);
+			break;
+		case NFT_META_PROTOCOL:
+			l3proto = mpz_get_uint16(dep->right->value);
+			*nfproto = ether_type_to_nfproto(l3proto);
+			break;
+		default:
+			return true;
+		}
+		break;
+	case EXPR_PAYLOAD:
+		if (dep->left->payload.base != PROTO_BASE_LL_HDR)
+			return true;
+
+		if (dep->left->dtype != &ethertype_type)
+			return true;
+
+		l3proto = mpz_get_uint16(dep->right->value);
+		*nfproto = ether_type_to_nfproto(l3proto);
+		break;
+	default:
+		return true;
+	}
+
+	return false;
+}
+
 /* We have seen a protocol key expression that restricts matching at the network
  * base, leave it in place since this is meaninful in bridge, inet and netdev
  * families. Exceptions are ICMP and ICMPv6 where this code assumes that can
@@ -1992,11 +2065,13 @@ static bool meta_may_dependency_kill(struct payload_dep_ctx *ctx,
 				     unsigned int family,
 				     const struct expr *expr)
 {
+	uint8_t l4proto, nfproto = NFPROTO_UNSPEC;
 	struct expr *dep = ctx->pdep->expr;
-	uint16_t l3proto;
-	uint8_t l4proto;
 
 	if (ctx->pbase != PROTO_BASE_NETWORK_HDR)
+		return true;
+
+	if (__meta_dependency_may_kill(dep, &nfproto))
 		return true;
 
 	switch (family) {
@@ -2005,37 +2080,18 @@ static bool meta_may_dependency_kill(struct payload_dep_ctx *ctx,
 	case NFPROTO_BRIDGE:
 		break;
 	default:
+		if (family == NFPROTO_IPV4 &&
+		    nfproto != NFPROTO_IPV4)
+			return false;
+		else if (family == NFPROTO_IPV6 &&
+			 nfproto != NFPROTO_IPV6)
+			return false;
+
 		return true;
 	}
 
 	if (expr->left->meta.key != NFT_META_L4PROTO)
 		return true;
-
-	l3proto = mpz_get_uint16(dep->right->value);
-
-	switch (dep->left->etype) {
-	case EXPR_META:
-		if (dep->left->meta.key != NFT_META_NFPROTO)
-			return true;
-		break;
-	case EXPR_PAYLOAD:
-		if (dep->left->payload.base != PROTO_BASE_LL_HDR)
-			return true;
-
-		switch(l3proto) {
-		case ETH_P_IP:
-			l3proto = NFPROTO_IPV4;
-			break;
-		case ETH_P_IPV6:
-			l3proto = NFPROTO_IPV6;
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
 
 	l4proto = mpz_get_uint8(expr->right->value);
 
@@ -2047,8 +2103,8 @@ static bool meta_may_dependency_kill(struct payload_dep_ctx *ctx,
 		return false;
 	}
 
-	if ((l3proto == NFPROTO_IPV4 && l4proto == IPPROTO_ICMPV6) ||
-	    (l3proto == NFPROTO_IPV6 && l4proto == IPPROTO_ICMP))
+	if ((nfproto == NFPROTO_IPV4 && l4proto == IPPROTO_ICMPV6) ||
+	    (nfproto == NFPROTO_IPV6 && l4proto == IPPROTO_ICMP))
 		return false;
 
 	return true;

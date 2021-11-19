@@ -363,6 +363,10 @@ int main(int argc, char * const *argv)
 	unsigned int len;
 	int i, val, rc;
 
+	/* nftables cannot be used with setuid in a safe way. */
+	if (getuid() != geteuid())
+		_exit(111);
+
 	if (!nft_options_check(argc, argv))
 		exit(EXIT_FAILURE);
 

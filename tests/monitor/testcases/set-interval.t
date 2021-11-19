@@ -23,3 +23,8 @@ J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "ex
 I add rule ip t c tcp dport { 20, 30-40 }
 O -
 J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "expr": [{"match": {"op": "==", "left": {"payload": {"protocol": "tcp", "field": "dport"}}, "right": {"set": [20, {"range": [30, 40]}]}}}]}}}
+
+# ... and anon concat range
+I add rule ip t c ether saddr . ip saddr { 08:00:27:40:f7:09 . 192.168.56.10-192.168.56.12 }
+O -
+{"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "expr": [{"match": {"op": "==", "left": {"concat": [{"payload": {"protocol": "ether", "field": "saddr"}}, {"payload": {"protocol": "ip", "field": "saddr"}}]}, "right": {"set": [{"concat": ["08:00:27:40:f7:09", {"range": ["192.168.56.10", "192.168.56.12"]}]}]}}}]}}}

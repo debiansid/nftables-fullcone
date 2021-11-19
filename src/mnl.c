@@ -1518,33 +1518,102 @@ static int set_elem_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-static int mnl_nft_setelem_batch(struct nftnl_set *nls,
+static bool mnl_nft_attr_nest_overflow(struct nlmsghdr *nlh,
+				       const struct nlattr *from,
+				       const struct nlattr *to)
+{
+	int len = (void *)to + to->nla_len - (void *)from;
+
+	/* The attribute length field is 16 bits long, thus the maximum payload
+	 * that an attribute can convey is UINT16_MAX. In case of overflow,
+	 * discard the last attribute that did not fit into the nest.
+	 */
+	if (len > UINT16_MAX) {
+		nlh->nlmsg_len -= to->nla_len;
+		return true;
+	}
+	return false;
+}
+
+static void netlink_dump_setelem(const struct nftnl_set_elem *nlse,
+				 struct netlink_ctx *ctx)
+{
+	FILE *fp = ctx->nft->output.output_fp;
+	char buf[4096];
+
+	if (!(ctx->nft->debug_mask & NFT_DEBUG_NETLINK) || !fp)
+		return;
+
+	nftnl_set_elem_snprintf(buf, sizeof(buf), nlse, NFTNL_OUTPUT_DEFAULT, 0);
+	fprintf(fp, "\t%s", buf);
+}
+
+static void netlink_dump_setelem_done(struct netlink_ctx *ctx)
+{
+	FILE *fp = ctx->nft->output.output_fp;
+
+	if (!(ctx->nft->debug_mask & NFT_DEBUG_NETLINK) || !fp)
+		return;
+
+	fprintf(fp, "\n");
+}
+
+static int mnl_nft_setelem_batch(const struct nftnl_set *nls,
 				 struct nftnl_batch *batch,
 				 enum nf_tables_msg_types cmd,
-				 unsigned int flags, uint32_t seqnum)
+				 unsigned int flags, uint32_t seqnum,
+				 const struct expr *set,
+				 struct netlink_ctx *ctx)
 {
+	struct nlattr *nest1, *nest2;
+	struct nftnl_set_elem *nlse;
 	struct nlmsghdr *nlh;
-	struct nftnl_set_elems_iter *iter;
-	int ret;
-
-	iter = nftnl_set_elems_iter_create(nls);
-	if (iter == NULL)
-		memory_allocation_error();
+	struct expr *expr = NULL;
+	int i = 0;
 
 	if (cmd == NFT_MSG_NEWSETELEM)
 		flags |= NLM_F_CREATE;
 
-	while (nftnl_set_elems_iter_cur(iter)) {
-		nlh = nftnl_nlmsg_build_hdr(nftnl_batch_buffer(batch), cmd,
-					    nftnl_set_get_u32(nls, NFTNL_SET_FAMILY),
-					    flags, seqnum);
-		ret = nftnl_set_elems_nlmsg_build_payload_iter(nlh, iter);
-		mnl_nft_batch_continue(batch);
-		if (ret <= 0)
-			break;
+	if (set)
+		expr = list_first_entry(&set->expressions, struct expr, list);
+
+next:
+	nlh = nftnl_nlmsg_build_hdr(nftnl_batch_buffer(batch), cmd,
+				    nftnl_set_get_u32(nls, NFTNL_SET_FAMILY),
+				    flags, seqnum);
+
+	if (nftnl_set_is_set(nls, NFTNL_SET_TABLE)) {
+                mnl_attr_put_strz(nlh, NFTA_SET_ELEM_LIST_TABLE,
+				  nftnl_set_get_str(nls, NFTNL_SET_TABLE));
+	}
+	if (nftnl_set_is_set(nls, NFTNL_SET_NAME)) {
+		mnl_attr_put_strz(nlh, NFTA_SET_ELEM_LIST_SET,
+				  nftnl_set_get_str(nls, NFTNL_SET_NAME));
+	}
+	if (nftnl_set_is_set(nls, NFTNL_SET_ID)) {
+		mnl_attr_put_u32(nlh, NFTA_SET_ELEM_LIST_SET_ID,
+				 htonl(nftnl_set_get_u32(nls, NFTNL_SET_ID)));
 	}
 
-	nftnl_set_elems_iter_destroy(iter);
+	if (!set || list_empty(&set->expressions))
+		return 0;
+
+	assert(expr);
+	nest1 = mnl_attr_nest_start(nlh, NFTA_SET_ELEM_LIST_ELEMENTS);
+	list_for_each_entry_from(expr, &set->expressions, list) {
+		nlse = alloc_nftnl_setelem(set, expr);
+		nest2 = nftnl_set_elem_nlmsg_build(nlh, nlse, ++i);
+		netlink_dump_setelem(nlse, ctx);
+		nftnl_set_elem_free(nlse);
+		if (mnl_nft_attr_nest_overflow(nlh, nest1, nest2)) {
+			mnl_attr_nest_end(nlh, nest1);
+			mnl_nft_batch_continue(batch);
+			goto next;
+		}
+	}
+	mnl_attr_nest_end(nlh, nest1);
+	mnl_nft_batch_continue(batch);
+	netlink_dump_setelem_done(ctx);
 
 	return 0;
 }
@@ -1569,11 +1638,10 @@ int mnl_nft_setelem_add(struct netlink_ctx *ctx, const struct set *set,
 		nftnl_set_set_u32(nls, NFTNL_SET_DATA_TYPE,
 				  dtype_map_to_kernel(set->data->dtype));
 
-	alloc_setelem_cache(expr, nls);
 	netlink_dump_set(nls, ctx);
 
-	err = mnl_nft_setelem_batch(nls, ctx->batch, NFT_MSG_NEWSETELEM, flags,
-				    ctx->seqnum);
+	err = mnl_nft_setelem_batch(nls, ctx->batch, NFT_MSG_NEWSETELEM,
+				    flags, ctx->seqnum, expr, ctx);
 	nftnl_set_free(nls);
 
 	return err;
@@ -1626,12 +1694,10 @@ int mnl_nft_setelem_del(struct netlink_ctx *ctx, const struct cmd *cmd)
 	else if (h->handle.id)
 		nftnl_set_set_u64(nls, NFTNL_SET_HANDLE, h->handle.id);
 
-	if (cmd->expr)
-		alloc_setelem_cache(cmd->expr, nls);
 	netlink_dump_set(nls, ctx);
 
 	err = mnl_nft_setelem_batch(nls, ctx->batch, NFT_MSG_DELSETELEM, 0,
-				    ctx->seqnum);
+				    ctx->seqnum, cmd->expr, ctx);
 	nftnl_set_free(nls);
 
 	return err;

@@ -254,6 +254,7 @@ extern const struct datatype verdict_type;
 extern const struct datatype nfproto_type;
 extern const struct datatype bitmask_type;
 extern const struct datatype integer_type;
+extern const struct datatype xinteger_type;
 extern const struct datatype string_type;
 extern const struct datatype lladdr_type;
 extern const struct datatype ipaddr_type;
@@ -308,6 +309,10 @@ extern struct error_record *rate_parse(const struct location *loc,
 
 extern struct error_record *data_unit_parse(const struct location *loc,
 					    const char *str, uint64_t *rate);
+
+struct limit_rate {
+	uint64_t rate, unit;
+};
 
 extern void expr_chain_export(const struct expr *e, char *chain);
 

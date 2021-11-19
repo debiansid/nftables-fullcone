@@ -371,7 +371,7 @@ inet test-inet input
 # ip6 saddr vmap { ::/64 : accept}
 __map%d test-inet f
 __map%d test-inet 0
-	element 00000000 00000000 00000000 00000000  : accept 0 [end]	element 00000000 01000000 00000000 00000000  : drop 1 [end]
+	element 00000000 00000000 00000000 00000000  : accept 0 [end]	element 00000000 01000000 00000000 00000000  : 1 [end]
 inet test-inet input
   [ meta load nfproto => reg 1 ]
   [ cmp eq reg 1 0x0000000a ]

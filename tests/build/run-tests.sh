@@ -52,4 +52,4 @@ done
 rm -rf $tmpdir
 
 echo "results: [OK] $ok [FAILED] $failed [TOTAL] $((ok+failed))"
-exit $failed
+[ "$failed" -eq 0 ]

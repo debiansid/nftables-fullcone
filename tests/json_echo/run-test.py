@@ -95,25 +95,25 @@ add_quota = { "add": {
 # helper functions
 
 def exit_err(msg):
-    print("Error: %s" %msg)
+    print("Error: %s" %msg, file=sys.stderr)
     sys.exit(1)
 
 def exit_dump(e, obj):
-    print("FAIL: {}".format(e))
-    print("Output was:")
-    json.dumps(out, sort_keys = True, indent = 4, separators = (',', ': '))
-    sys.exit(1)
+    msg = "{}\n".format(e)
+    msg += "Output was:\n"
+    msg += json.dumps(obj, sort_keys = True, indent = 4, separators = (',', ': '))
+    exit_err(msg)
 
 def do_flush():
     rc, out, err = nftables.json_cmd({ "nftables": [flush_ruleset] })
-    if not rc is 0:
+    if rc != 0:
         exit_err("flush ruleset failed: {}".format(err))
 
 def do_command(cmd):
     if not type(cmd) is list:
         cmd = [cmd]
     rc, out, err = nftables.json_cmd({ "nftables": cmd })
-    if not rc is 0:
+    if rc != 0:
         exit_err("command failed: {}".format(err))
     return out
 

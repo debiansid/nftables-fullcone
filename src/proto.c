@@ -28,6 +28,7 @@ const char *proto_base_names[] = {
 	[PROTO_BASE_LL_HDR]		= "link layer",
 	[PROTO_BASE_NETWORK_HDR]	= "network layer",
 	[PROTO_BASE_TRANSPORT_HDR]	= "transport layer",
+	[PROTO_BASE_INNER_HDR]		= "payload data",
 };
 
 const char *proto_base_tokens[] = {
@@ -35,6 +36,7 @@ const char *proto_base_tokens[] = {
 	[PROTO_BASE_LL_HDR]		= "ll",
 	[PROTO_BASE_NETWORK_HDR]	= "nh",
 	[PROTO_BASE_TRANSPORT_HDR]	= "th",
+	[PROTO_BASE_INNER_HDR]		= "ih",
 };
 
 const struct proto_hdr_template proto_unknown_template =

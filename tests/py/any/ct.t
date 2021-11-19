@@ -69,7 +69,7 @@ ct event set {new, related, destroy, label};fail
 
 ct expiration 30s;ok
 ct expiration 30000ms;ok;ct expiration 30s
-ct expiration 1m-1h;ok
+ct expiration 1m-1h;ok;ct expiration 60s-3600s
 ct expiration 1d-1h;fail
 ct expiration > 4d23h59m59s;ok
 ct expiration != 233;ok;ct expiration != 3m53s
@@ -77,8 +77,8 @@ ct expiration 33-45;ok;ct expiration 33s-45s
 ct expiration != 33-45;ok;ct expiration != 33s-45s
 ct expiration {33, 55, 67, 88};ok;ct expiration { 1m7s, 33s, 55s, 1m28s}
 ct expiration != {33, 55, 67, 88};ok;ct expiration != { 1m7s, 33s, 55s, 1m28s}
-ct expiration {33-55, 66-88};ok;ct expiration { 33s-55s, 1m6s-1m28s}
-ct expiration != {33-55, 66-88};ok;ct expiration != { 33s-55s, 1m6s-1m28s}
+ct expiration {33-55, 66-88};ok;ct expiration { 33s-55s, 66s-88s}
+ct expiration != {33-55, 66-88};ok;ct expiration != { 33s-55s, 66s-88s}
 
 ct helper "ftp";ok
 ct helper "12345678901234567";fail

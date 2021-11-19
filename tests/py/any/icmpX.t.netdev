@@ -1,6 +1,7 @@
 :ingress;type filter hook ingress device lo priority 0
+:egress;type filter hook egress device lo priority 0
 
-*netdev;test-netdev;ingress
+*netdev;test-netdev;ingress,egress
 
 ip protocol icmp icmp type echo-request;ok;icmp type echo-request
 icmp type echo-request;ok

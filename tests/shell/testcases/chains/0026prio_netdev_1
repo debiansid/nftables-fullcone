@@ -1,7 +1,8 @@
 #!/bin/bash
 
 family=netdev
-	hook=ingress
+	for hook in ingress egress
+	do
 		for prioname in raw mangle dstnat security srcnat
 		do
 			$NFT add table $family x || exit 1
@@ -12,4 +13,5 @@ family=netdev
 				exit 1
 			fi
 		done
+	done
 exit 0

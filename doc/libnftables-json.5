@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: libnftables-json
 .\"    Author: Phil Sutter <phil@nwl.cc>
-.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 08/19/2021
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 11/18/2021
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES\-JSON" "5" "08/19/2021" "\ \&" "\ \&"
+.TH "LIBNFTABLES\-JSON" "5" "11/18/2021" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -109,14 +109,15 @@ translates into JSON as such:
         { "add": { "chain": {
                         "family": "inet",
                         "table": "mytable",
-                        "chain": "mychain"
-        }}}
+                        "name": "mychain"
+        }}},
         { "add": { "rule": {
                         "family": "inet",
                         "table": "mytable",
                         "chain": "mychain",
                         "expr": [
                                 { "match": {
+                                        "op": "==",
                                         "left": { "payload": {
                                                         "protocol": "tcp",
                                                         "field": "dport"

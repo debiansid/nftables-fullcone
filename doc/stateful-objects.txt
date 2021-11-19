@@ -1,7 +1,9 @@
 CT HELPER
 ~~~~~~~~~
 [verse]
-*ct helper* 'helper' *{ type* 'type' *protocol* 'protocol' *;* [*l3proto* 'family' *;*] *}*
+*add* *ct helper* ['family'] 'table' 'name' *{ type* 'type' *protocol* 'protocol' *;* [*l3proto* 'family' *;*] *}*
+*delete* *ct helper* ['family'] 'table' 'name'
+*list* *ct helpers*
 
 Ct helper is used to define connection tracking helpers that can then be used in
 combination with the *ct helper set* statement. 'type' and 'protocol' are
@@ -22,6 +24,9 @@ string (e.g. ip)
 |l3proto |
 layer 3 protocol of the helper |
 address family (e.g. ip)
+|comment |
+per ct helper comment field |
+string
 |=================
 
 .defining and assigning ftp helper
@@ -43,7 +48,9 @@ table inet myhelpers {
 CT TIMEOUT
 ~~~~~~~~~~
 [verse]
-*ct timeout* 'name' *{ protocol* 'protocol' *; policy = {* 'state'*:* 'value' [*,* ...] *} ;* [*l3proto* 'family' *;*] *}*
+*add* *ct timeout*  ['family'] 'table' 'name' *{ protocol* 'protocol' *; policy = {* 'state'*:* 'value' [*,* ...] *} ;* [*l3proto* 'family' *;*] *}*
+*delete* *ct timeout* ['family'] 'table' 'name'
+*list* *ct timeouts*
 
 Ct timeout is used to update connection tracking timeout values.Timeout policies are assigned
 with the *ct timeout set* statement. 'protocol' and 'policy' are
@@ -65,7 +72,21 @@ unsigned integer
 |l3proto |
 layer 3 protocol of the timeout object |
 address family (e.g. ip)
+|comment |
+per ct timeout comment field |
+string
 |=================
+
+tcp connection state names that can have a specific timeout value are:
+
+'close', 'close_wait', 'established', 'fin_wait', 'last_ack', 'retrans', 'syn_recv', 'syn_sent', 'time_wait' and 'unack'.
+
+You can use 'sysctl -a |grep net.netfilter.nf_conntrack_tcp_timeout_' to view and change the system-wide defaults.
+'ct timeout' allows for flow-specific settings, without changing the global timeouts.
+
+For example, tcp port 53 could have much lower settings than other traffic.
+
+udp state names that can have a specific timeout value are 'replied' and 'unreplied'.
 
 .defining and assigning ct timeout policy
 ----------------------------------
@@ -98,7 +119,9 @@ sport=41360 dport=22
 CT EXPECTATION
 ~~~~~~~~~~~~~~
 [verse]
-*ct expectation* 'name' *{ protocol* 'protocol' *; dport* 'dport' *; timeout* 'timeout' *; size* 'size' *; [*l3proto* 'family' *;*] *}*
+*add* *ct expectation*  ['family'] 'table' 'name' *{ protocol* 'protocol' *; dport* 'dport' *; timeout* 'timeout' *; size* 'size' *; [*l3proto* 'family' *;*] *}*
+*delete* *ct expectation*  ['family'] 'table' 'name'
+*list* *ct expectations*
 
 Ct expectation is used to create connection expectations. Expectations are
 assigned with the *ct expectation set* statement. 'protocol', 'dport',
@@ -124,6 +147,9 @@ unsigned integer
 |l3proto |
 layer 3 protocol of the expectation object |
 address family (e.g. ip)
+|comment |
+per ct expectation comment field |
+string
 |=================
 
 .defining and assigning ct expectation policy
@@ -147,7 +173,9 @@ table ip filter {
 COUNTER
 ~~~~~~~
 [verse]
-*counter* ['packets bytes']
+*add* *counter* ['family'] 'table' 'name' [*{* [ *packets* 'packets' *bytes* 'bytes' ';' ] [ *comment* 'comment' ';' *}*]
+*delete* *counter* ['family'] 'table' 'name'
+*list* *counters*
 
 .Counter specifications
 [options="header"]
@@ -159,12 +187,31 @@ unsigned integer (64 bit)
 |bytes |
 initial count of bytes |
 unsigned integer (64 bit)
+|comment |
+per counter comment field |
+string
 |=================
+
+.*Using named counters*
+------------------
+nft add counter filter http
+nft add rule filter input tcp dport 80 counter name \"http\"
+------------------
+
+.*Using named counters with maps*
+------------------
+nft add counter filter http
+nft add counter filter https
+nft add rule filter input counter name tcp dport map { 80 : \"http\", 443 : \"https\" }
+------------------
 
 QUOTA
 ~~~~~
 [verse]
-*quota* [*over* | *until*] ['used']
+*add* *quota* ['family'] 'table' 'name' *{* [*over*|*until*] 'bytes' 'BYTE_UNIT' [ *used* 'bytes' 'BYTE_UNIT' ] ';' [ *comment* 'comment' ';' ] *}*
+BYTE_UNIT := bytes | kbytes | mbytes
+*delete* *quota* ['family'] 'table' 'name'
+*list* *quotas*
 
 .Quota specifications
 [options="header"]
@@ -177,4 +224,20 @@ Two arguments, unsigned integer (64 bit) and string: bytes, kbytes, mbytes.
 |used |
 initial value of used quota |
 Two arguments, unsigned integer (64 bit) and string: bytes, kbytes, mbytes
+|comment |
+per quota comment field |
+string
 |=================
+
+.*Using named quotas*
+------------------
+nft add quota filter user123 { over 20 mbytes }
+nft add rule filter input ip saddr 192.168.10.123 quota name \"user123\"
+------------------
+
+.*Using named quotas with maps*
+------------------
+nft add quota filter user123 { over 20 mbytes }
+nft add quota filter user124 { over 20 mbytes }
+nft add rule filter input quota name ip saddr map { 192.168.10.123 : \"user123\", 192.168.10.124 : \"user124\" }
+------------------

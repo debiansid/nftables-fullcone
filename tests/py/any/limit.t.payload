@@ -46,6 +46,19 @@ ip test-ip4 output
 ip test-ip4 output
   [ limit rate 1072693248000/second burst 5 type bytes flags 0x0 ]
 
+# limit rate 1 bytes / second
+ip
+  [ limit rate 1/second burst 5 type bytes flags 0x0 ]
+
+# limit rate 1 kbytes / second
+ip
+  [ limit rate 1024/second burst 5 type bytes flags 0x0 ]
+
+# limit rate 1 mbytes / second
+ip
+  [ limit rate 1048576/second burst 5 type bytes flags 0x0 ]
+
+
 # limit rate 1025 bytes/second burst 512 bytes
 ip test-ip4 output
   [ limit rate 1025/second burst 512 type bytes flags 0x0 ]

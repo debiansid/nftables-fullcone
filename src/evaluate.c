@@ -1439,7 +1439,7 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 			list_for_each_entry(j, &i->left->key->expressions, list) {
 				new = mapping_expr_alloc(&i->location,
 							 expr_get(j),
-							 expr_clone(i->right));
+							 expr_get(i->right));
 				list_add_tail(&new->list, &set->expressions);
 				set->size++;
 			}
@@ -1457,7 +1457,7 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 
 		if (elem->etype == EXPR_SET_ELEM &&
 		    elem->key->etype == EXPR_SET) {
-			struct expr *new = expr_clone(elem->key);
+			struct expr *new = expr_get(elem->key);
 
 			set->set_flags |= elem->key->set_flags;
 			list_replace(&i->list, &new->list);
@@ -2187,7 +2187,16 @@ static int expr_evaluate_osf(struct eval_ctx *ctx, struct expr **expr)
 
 static int expr_evaluate_variable(struct eval_ctx *ctx, struct expr **exprp)
 {
-	struct expr *new = expr_clone((*exprp)->sym->expr);
+	struct symbol *sym = (*exprp)->sym;
+	struct expr *new;
+
+	/* If variable is reused from different locations in the ruleset, then
+	 * clone expression.
+	 */
+	if (sym->refcnt > 2)
+		new = expr_clone(sym->expr);
+	else
+		new = expr_get(sym->expr);
 
 	if (expr_evaluate(ctx, &new) < 0) {
 		expr_free(new);
@@ -2446,6 +2455,9 @@ static bool stmt_evaluate_payload_need_csum(const struct expr *payload)
 {
 	const struct proto_desc *desc;
 
+	if (payload->payload.base == PROTO_BASE_INNER_HDR)
+		return true;
+
 	desc = payload->payload.desc;
 
 	return desc && desc->checksum_key;
@@ -2554,6 +2566,7 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 			 payload_byte_offset * BITS_PER_BYTE,
 			 payload_byte_size * BITS_PER_BYTE);
 
+	payload_bytes->payload.is_raw = 1;
 	payload_bytes->payload.desc	 = payload->payload.desc;
 	payload_bytes->byteorder	 = payload->byteorder;
 
@@ -3080,6 +3093,11 @@ static bool nat_evaluate_addr_has_th_expr(const struct expr *map)
 	list_for_each_entry(i, &concat->expressions, list) {
 		enum proto_bases base;
 
+		if (i->etype == EXPR_PAYLOAD &&
+		    i->payload.base == PROTO_BASE_TRANSPORT_HDR &&
+		    i->payload.desc != &proto_th)
+			return true;
+
 		if ((i->flags & EXPR_F_PROTOCOL) == 0)
 			continue;
 
@@ -3159,6 +3177,7 @@ static int stmt_evaluate_addr(struct eval_ctx *ctx, struct stmt *stmt,
 
 static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
 {
+	struct proto_ctx *pctx = &ctx->pctx;
 	struct expr *one, *two, *data, *tmp;
 	const struct datatype *dtype;
 	int addr_type, err;
@@ -3178,6 +3197,13 @@ static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
 	expr_set_context(&ctx->ectx, dtype, dtype->size);
 	if (expr_evaluate(ctx, &stmt->nat.addr))
 		return -1;
+
+	if (pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc == NULL &&
+	    !nat_evaluate_addr_has_th_expr(stmt->nat.addr)) {
+		return stmt_binary_error(ctx, stmt->nat.addr, stmt,
+					 "transport protocol mapping is only "
+					 "valid after transport protocol match");
+	}
 
 	if (stmt->nat.addr->etype != EXPR_MAP)
 		return 0;
@@ -3243,7 +3269,8 @@ static bool nat_concat_map(struct eval_ctx *ctx, struct stmt *stmt)
 		if (expr_evaluate(ctx, &stmt->nat.addr->mappings))
 			return false;
 
-		if (stmt->nat.addr->mappings->set->data->etype == EXPR_CONCAT) {
+		if (stmt->nat.addr->mappings->set->data->etype == EXPR_CONCAT ||
+		    stmt->nat.addr->mappings->set->data->dtype->subtypes) {
 			stmt->nat.type_flags |= STMT_NAT_F_CONCAT;
 			return true;
 		}
@@ -4296,6 +4323,8 @@ static uint32_t str2hooknum(uint32_t family, const char *hook)
 	case NFPROTO_NETDEV:
 		if (!strcmp(hook, "ingress"))
 			return NF_NETDEV_INGRESS;
+		else if (!strcmp(hook, "egress"))
+			return NF_NETDEV_EGRESS;
 		break;
 	default:
 		break;

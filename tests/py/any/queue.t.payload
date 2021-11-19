@@ -55,3 +55,27 @@ ip
   [ meta load oifname => reg 1 ]
   [ lookup reg 1 set __map%d dreg 1 ]
   [ queue sreg_qnum 1 bypass ]
+
+# queue to 2
+ip
+  [ queue num 2 ]
+
+# queue to 65535
+ip
+  [ queue num 65535 ]
+
+# queue flags bypass to 65535
+ip
+  [ queue num 65535 bypass ]
+
+# queue flags bypass to 1-65535
+ip
+  [ queue num 1-65535 bypass ]
+
+# queue flags bypass,fanout to 1-65535
+ip
+  [ queue num 1-65535 bypass fanout ]
+
+# queue to 1-65535
+ip
+  [ queue num 1-65535 ]

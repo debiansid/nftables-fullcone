@@ -1,9 +1,10 @@
 :input;type filter hook input priority 0
 :ingress;type filter hook ingress device lo priority 0
+:egress;type filter hook egress device lo priority 0
 
 *inet;test-inet;input
 *bridge;test-inet;input
-*netdev;test-netdev;ingress
+*netdev;test-netdev;ingress,egress
 
 !set1 type ipv4_addr timeout 60s;ok
 ?set1 192.168.3.4 timeout 30s, 10.2.1.1;ok

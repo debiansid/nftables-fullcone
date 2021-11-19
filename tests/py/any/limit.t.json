@@ -125,6 +125,45 @@
     }
 ]
 
+# limit rate 1 bytes / second
+[
+    {
+        "limit": {
+            "burst": 5,
+            "burst_unit": "bytes",
+            "per": "second",
+            "rate": 1,
+            "rate_unit": "bytes"
+        }
+    }
+]
+
+# limit rate 1 kbytes / second
+[
+    {
+        "limit": {
+            "burst": 5,
+            "burst_unit": "bytes",
+            "per": "second",
+            "rate": 1,
+            "rate_unit": "kbytes"
+        }
+    }
+]
+
+# limit rate 1 mbytes / second
+[
+    {
+        "limit": {
+            "burst": 5,
+            "burst_unit": "bytes",
+            "per": "second",
+            "rate": 1,
+            "rate_unit": "mbytes"
+        }
+    }
+]
+
 # limit rate 1025 bytes/second burst 512 bytes
 [
     {

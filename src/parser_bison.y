@@ -186,6 +186,7 @@ int nft_lex(void *, void *, void *);
 	struct handle_spec	handle_spec;
 	struct position_spec	position_spec;
 	struct prio_spec	prio_spec;
+	struct limit_rate	limit_rate;
 }
 
 %token TOKEN_EOF 0		"end of file"
@@ -607,6 +608,9 @@ int nft_lex(void *, void *, void *);
 %token IN			"in"
 %token OUT			"out"
 
+%type <limit_rate>		limit_rate_pkts
+%type <limit_rate>		limit_rate_bytes
+
 %type <string>			identifier type_identifier string comment_spec
 %destructor { xfree($$); }	identifier type_identifier string comment_spec
 
@@ -689,7 +693,7 @@ int nft_lex(void *, void *, void *);
 %type <val>			level_type log_flags log_flags_tcp log_flag_tcp
 %type <stmt>			limit_stmt quota_stmt connlimit_stmt
 %destructor { stmt_free($$); }	limit_stmt quota_stmt connlimit_stmt
-%type <val>			limit_burst_pkts limit_burst_bytes limit_mode time_unit quota_mode
+%type <val>			limit_burst_pkts limit_burst_bytes limit_mode limit_bytes time_unit quota_mode
 %type <stmt>			reject_stmt reject_stmt_alloc
 %destructor { stmt_free($$); }	reject_stmt reject_stmt_alloc
 %type <stmt>			nat_stmt nat_stmt_alloc masq_stmt masq_stmt_alloc redir_stmt redir_stmt_alloc
@@ -705,8 +709,8 @@ int nft_lex(void *, void *, void *);
 
 %type <stmt>			queue_stmt queue_stmt_alloc	queue_stmt_compat
 %destructor { stmt_free($$); }	queue_stmt queue_stmt_alloc	queue_stmt_compat
-%type <expr>			queue_stmt_expr_simple queue_stmt_expr reject_with_expr
-%destructor { expr_free($$); }	queue_stmt_expr_simple queue_stmt_expr reject_with_expr
+%type <expr>			queue_stmt_expr_simple queue_stmt_expr queue_expr reject_with_expr
+%destructor { expr_free($$); }	queue_stmt_expr_simple queue_stmt_expr queue_expr reject_with_expr
 %type <val>			queue_stmt_flags queue_stmt_flag
 %type <stmt>			dup_stmt
 %destructor { stmt_free($$); }	dup_stmt
@@ -3145,42 +3149,31 @@ log_flag_tcp		:	SEQUENCE
 			}
 			;
 
-limit_stmt		:	LIMIT	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst_pkts	close_scope_limit
+limit_stmt		:	LIMIT	RATE	limit_mode	limit_rate_pkts	limit_burst_pkts	close_scope_limit
 	    		{
-				if ($7 == 0) {
-					erec_queue(error(&@7, "limit burst must be > 0"),
+				if ($5 == 0) {
+					erec_queue(error(&@5, "limit burst must be > 0"),
 						   state->msgs);
 					YYERROR;
 				}
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate	= $4;
-				$$->limit.unit	= $6;
-				$$->limit.burst	= $7;
+				$$->limit.rate	= $4.rate;
+				$$->limit.unit	= $4.unit;
+				$$->limit.burst	= $5;
 				$$->limit.type	= NFT_LIMIT_PKTS;
 				$$->limit.flags = $3;
 			}
-			|	LIMIT	RATE	limit_mode	NUM	STRING	limit_burst_bytes	close_scope_limit
+			|	LIMIT	RATE	limit_mode	limit_rate_bytes	limit_burst_bytes	close_scope_limit
 			{
-				struct error_record *erec;
-				uint64_t rate, unit;
-
-				if ($6 == 0) {
-					erec_queue(error(&@6, "limit burst must be > 0"),
+				if ($5 == 0) {
+					erec_queue(error(&@5, "limit burst must be > 0"),
 						   state->msgs);
 					YYERROR;
 				}
-
-				erec = rate_parse(&@$, $5, &rate, &unit);
-				xfree($5);
-				if (erec != NULL) {
-					erec_queue(erec, state->msgs);
-					YYERROR;
-				}
-
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate	= rate * $4;
-				$$->limit.unit	= unit;
-				$$->limit.burst	= $6;
+				$$->limit.rate	= $4.rate;
+				$$->limit.unit	= $4.unit;
+				$$->limit.burst	= $5;
 				$$->limit.type	= NFT_LIMIT_PKT_BYTES;
 				$$->limit.flags = $3;
 			}
@@ -3250,20 +3243,51 @@ limit_burst_pkts	:	/* empty */			{ $$ = 5; }
 			|	BURST	NUM	PACKETS		{ $$ = $2; }
 			;
 
+limit_rate_pkts		:	NUM     SLASH	time_unit
+			{
+				$$.rate = $1;
+				$$.unit = $3;
+			}
+			;
+
 limit_burst_bytes	:	/* empty */			{ $$ = 5; }
-			|	BURST	NUM	BYTES		{ $$ = $2; }
-			|	BURST	NUM	STRING
+			|	BURST	limit_bytes		{ $$ = $2; }
+			;
+
+limit_rate_bytes	:	NUM     STRING
 			{
 				struct error_record *erec;
-				uint64_t rate;
+				uint64_t rate, unit;
 
-				erec = data_unit_parse(&@$, $3, &rate);
-				xfree($3);
+				erec = rate_parse(&@$, $2, &rate, &unit);
+				xfree($2);
 				if (erec != NULL) {
 					erec_queue(erec, state->msgs);
 					YYERROR;
 				}
-				$$ = $2 * rate;
+				$$.rate = rate * $1;
+				$$.unit = unit;
+			}
+			|	limit_bytes SLASH time_unit
+			{
+				$$.rate = $1;
+				$$.unit = $3;
+			}
+			;
+
+limit_bytes		:	NUM	BYTES		{ $$ = $1; }
+			|	NUM	STRING
+			{
+				struct error_record *erec;
+				uint64_t rate;
+
+				erec = data_unit_parse(&@$, $2, &rate);
+				xfree($2);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+				$$ = $1 * rate;
 			}
 			;
 
@@ -3790,13 +3814,22 @@ queue_stmt_arg		:	QUEUENUM	queue_stmt_expr_simple
 			}
 			;
 
+queue_expr		:	variable_expr
+			|	integer_expr
+			;
+
 queue_stmt_expr_simple	:	integer_expr
-			|	range_rhs_expr
+			|	variable_expr
+			|	queue_expr	DASH	queue_expr
+			{
+				$$ = range_expr_alloc(&@$, $1, $3);
+			}
 			;
 
 queue_stmt_expr		:	numgen_expr
 			|	hash_expr
 			|	map_expr
+			|	queue_stmt_expr_simple
 			;
 
 queue_stmt_flags	:	queue_stmt_flag
@@ -4271,44 +4304,34 @@ set_elem_stmt		:	COUNTER	close_scope_counter
 				$$->counter.packets = $3;
 				$$->counter.bytes = $5;
 			}
-			|	LIMIT   RATE    limit_mode      NUM     SLASH   time_unit       limit_burst_pkts	close_scope_limit
+			|	LIMIT   RATE    limit_mode      limit_rate_pkts       limit_burst_pkts	close_scope_limit
 			{
-				if ($7 == 0) {
-					erec_queue(error(&@7, "limit burst must be > 0"),
+				if ($5 == 0) {
+					erec_queue(error(&@5, "limit burst must be > 0"),
 						   state->msgs);
 					YYERROR;
 				}
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate  = $4;
-				$$->limit.unit  = $6;
-				$$->limit.burst = $7;
+				$$->limit.rate  = $4.rate;
+				$$->limit.unit  = $4.unit;
+				$$->limit.burst = $5;
 				$$->limit.type  = NFT_LIMIT_PKTS;
 				$$->limit.flags = $3;
 			}
-			|       LIMIT   RATE    limit_mode      NUM     STRING  limit_burst_bytes	close_scope_limit
+			|       LIMIT   RATE    limit_mode      limit_rate_bytes  limit_burst_bytes	close_scope_limit
 			{
-				struct error_record *erec;
-				uint64_t rate, unit;
-
-				if ($6 == 0) {
+				if ($5 == 0) {
 					erec_queue(error(&@6, "limit burst must be > 0"),
 						   state->msgs);
 					YYERROR;
 				}
-				erec = rate_parse(&@$, $5, &rate, &unit);
-				xfree($5);
-				if (erec != NULL) {
-					erec_queue(erec, state->msgs);
-					YYERROR;
-				}
-
 				$$ = limit_stmt_alloc(&@$);
-				$$->limit.rate  = rate * $4;
-				$$->limit.unit  = unit;
-				$$->limit.burst = $6;
+				$$->limit.rate  = $4.rate;
+				$$->limit.unit  = $4.unit;
+				$$->limit.burst = $5;
 				$$->limit.type  = NFT_LIMIT_PKT_BYTES;
 				$$->limit.flags = $3;
-                        }
+			}
 			|	CT	COUNT	NUM	close_scope_ct
 			{
 				$$ = connlimit_stmt_alloc(&@$);
@@ -4541,34 +4564,25 @@ ct_obj_alloc		:	/* empty */
 			}
 			;
 
-limit_config		:	RATE	limit_mode	NUM	SLASH	time_unit	limit_burst_pkts
+limit_config		:	RATE	limit_mode	limit_rate_pkts	limit_burst_pkts
 			{
 				struct limit *limit;
 
 				limit = &$<obj>0->limit;
-				limit->rate	= $3;
-				limit->unit	= $5;
-				limit->burst	= $6;
+				limit->rate	= $3.rate;
+				limit->unit	= $3.unit;
+				limit->burst	= $4;
 				limit->type	= NFT_LIMIT_PKTS;
 				limit->flags	= $2;
 			}
-			|	RATE	limit_mode	NUM	STRING	limit_burst_bytes
+			|	RATE	limit_mode	limit_rate_bytes	limit_burst_bytes
 			{
 				struct limit *limit;
-				struct error_record *erec;
-				uint64_t rate, unit;
-
-				erec = rate_parse(&@$, $4, &rate, &unit);
-				xfree($4);
-				if (erec != NULL) {
-					erec_queue(erec, state->msgs);
-					YYERROR;
-				}
 
 				limit = &$<obj>0->limit;
-				limit->rate	= rate * $3;
-				limit->unit	= unit;
-				limit->burst	= $5;
+				limit->rate	= $3.rate;
+				limit->unit	= $3.unit;
+				limit->burst	= $4;
 				limit->type	= NFT_LIMIT_PKT_BYTES;
 				limit->flags	= $2;
 			}
@@ -5246,6 +5260,17 @@ payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
 payload_base_spec	:	LL_HDR		{ $$ = PROTO_BASE_LL_HDR; }
 			|	NETWORK_HDR	{ $$ = PROTO_BASE_NETWORK_HDR; }
 			|	TRANSPORT_HDR	{ $$ = PROTO_BASE_TRANSPORT_HDR; }
+			|	STRING
+			{
+				if (!strcmp($1, "ih")) {
+					$$ = PROTO_BASE_INNER_HDR;
+				} else {
+					erec_queue(error(&@1, "unknown raw payload base"), state->msgs);
+					xfree($1);
+					YYERROR;
+				}
+				xfree($1);
+			}
 			;
 
 eth_hdr_expr		:	ETHER	eth_hdr_field	close_scope_eth

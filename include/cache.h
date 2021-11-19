@@ -32,17 +32,42 @@ enum cache_level_flags {
 				  NFT_CACHE_CHAIN_BIT |
 				  NFT_CACHE_RULE_BIT,
 	NFT_CACHE_FULL		= __NFT_CACHE_MAX_BIT - 1,
+	NFT_CACHE_SETELEM_MAYBE	= (1 << 28),
 	NFT_CACHE_REFRESH	= (1 << 29),
 	NFT_CACHE_UPDATE	= (1 << 30),
 	NFT_CACHE_FLUSHED	= (1 << 31),
 };
 
+struct nft_filter_obj {
+	struct list_head list;
+	uint32_t	family;
+	const char	*table;
+	const char	*set;
+};
+
+#define NFT_CACHE_HSIZE	8192
+
+struct nft_cache_filter {
+	struct {
+		uint32_t	family;
+		const char	*table;
+		const char	*chain;
+		const char	*set;
+	} list;
+
+	struct {
+		struct list_head head;
+	} obj[NFT_CACHE_HSIZE];
+};
+
 struct nft_cache;
 enum cmd_ops;
 
-unsigned int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds);
+unsigned int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds,
+				struct nft_cache_filter *filter);
 int nft_cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
-		     struct list_head *msgs);
+		     struct list_head *msgs,
+		     const struct nft_cache_filter *filter);
 bool nft_cache_needs_update(struct nft_cache *cache);
 void nft_cache_release(struct nft_cache *cache);
 
@@ -56,7 +81,8 @@ static inline uint32_t djb_hash(const char *key)
 	return hash;
 }
 
-#define NFT_CACHE_HSIZE 8192
+struct nft_cache_filter *nft_cache_filter_init(void);
+void nft_cache_filter_fini(struct nft_cache_filter *filter);
 
 struct table;
 struct chain;

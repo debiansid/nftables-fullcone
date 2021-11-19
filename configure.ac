@@ -1,5 +1,5 @@
-AC_INIT([nftables], [1.0.0], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Fearless Fosdick #2"], [Release name])
+AC_INIT([nftables], [1.0.1], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Fearless Fosdick #3"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -57,7 +57,7 @@ AS_IF([test "x$enable_man_doc" = "xyes"], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.4])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.0])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.1])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],
@@ -69,7 +69,7 @@ AM_CONDITIONAL([BUILD_MINIGMP], [test "x$with_mini_gmp" = xyes])
 
 AC_ARG_WITH([cli], [AS_HELP_STRING([--without-cli],
             [disable interactive CLI (libreadline, editline or linenoise support)])],
-            [], [with_cli=readline])
+            [], [with_cli=editline])
 
 AS_IF([test "x$with_cli" = xreadline], [
 AC_CHECK_LIB([readline], [readline], ,

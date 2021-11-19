@@ -388,27 +388,17 @@ static void date_type_print(const struct expr *expr, struct output_ctx *octx)
 	/* Convert from nanoseconds to seconds */
 	tstamp /= 1000000000L;
 
-	if (!nft_output_seconds(octx)) {
-		/* Obtain current tm, to add tm_gmtoff to the timestamp */
-		cur_tm = localtime((time_t *) &tstamp);
+	/* Obtain current tm, to add tm_gmtoff to the timestamp */
+	cur_tm = localtime((time_t *) &tstamp);
 
-		if (cur_tm)
-			tstamp += cur_tm->tm_gmtoff;
+	if (cur_tm)
+		tstamp += cur_tm->tm_gmtoff;
 
-		if ((tm = gmtime((time_t *) &tstamp)) != NULL &&
-			strftime(timestr, sizeof(timestr) - 1, "%F %T", tm))
-			nft_print(octx, "\"%s\"", timestr);
-		else
-			nft_print(octx, "Error converting timestamp to printed time");
-
-		return;
-	}
-
-	/*
-	 * Do our own printing. The default print function will print in
-	 * nanoseconds, which is ugly.
-	 */
-	nft_print(octx, "%" PRIu64, tstamp);
+	if ((tm = gmtime((time_t *) &tstamp)) != NULL &&
+	     strftime(timestr, sizeof(timestr) - 1, "%F %T", tm))
+		nft_print(octx, "\"%s\"", timestr);
+	else
+		nft_print(octx, "Error converting timestamp to printed time");
 }
 
 static time_t parse_iso_date(const char *sym)
@@ -497,11 +487,6 @@ static void hour_type_print(const struct expr *expr, struct output_ctx *octx)
 	uint32_t seconds = mpz_get_uint32(expr->value), minutes, hours;
 	struct tm *cur_tm;
 	time_t ts;
-
-	if (nft_output_seconds(octx)) {
-		expr_basetype(expr)->print(expr, octx);
-		return;
-	}
 
 	/* Obtain current tm, so that we can add tm_gmtoff */
 	ts = time(NULL);

@@ -72,6 +72,8 @@ struct netlink_ctx {
 
 extern struct nftnl_expr *alloc_nft_expr(const char *name);
 extern void alloc_setelem_cache(const struct expr *set, struct nftnl_set *nls);
+struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
+					   const struct expr *expr);
 
 extern struct nftnl_table *netlink_table_alloc(const struct nlmsghdr *nlh);
 extern struct nftnl_chain *netlink_chain_alloc(const struct nlmsghdr *nlh);
@@ -121,8 +123,6 @@ extern struct expr *netlink_alloc_value(const struct location *loc,
 extern struct expr *netlink_alloc_data(const struct location *loc,
 				       const struct nft_data_delinearize *nld,
 				       enum nft_registers dreg);
-
-extern int netlink_list_rules(struct netlink_ctx *ctx, const struct handle *h);
 
 struct netlink_linearize_ctx;
 extern void netlink_linearize_rule(struct netlink_ctx *ctx,
@@ -214,9 +214,6 @@ int netlink_events_trace_cb(const struct nlmsghdr *nlh, int type,
 			    struct netlink_mon_handler *monh);
 
 enum nft_data_types dtype_map_to_kernel(const struct datatype *dtype);
-
-void expr_handler_init(void);
-void expr_handler_exit(void);
 
 void netlink_linearize_init(struct netlink_linearize_ctx *lctx,
 			    struct nftnl_rule *nlr);

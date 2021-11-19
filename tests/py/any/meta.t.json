@@ -662,6 +662,26 @@
     }
 ]
 
+# meta mark 0xffffff00/24
+[
+    {
+        "match": {
+            "left": {
+                "meta": {
+                    "key": "mark"
+                }
+            },
+            "op": "==",
+            "right": {
+                "prefix": {
+                    "addr": 4294967040,
+                    "len": 24
+                }
+            }
+        }
+    }
+]
+
 # meta mark or 0x03 == 0x01
 [
     {

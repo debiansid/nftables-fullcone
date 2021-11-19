@@ -31,3 +31,14 @@ EXPECTED="table ip nat {
 }"
 
 $NFT -f - <<< $EXPECTED
+
+EXPECTED="table ip nat {
+	map fwdtoip_th {
+		type ipv4_addr . inet_service : interval ipv4_addr . inet_service
+		flags interval
+		elements = { 1.2.3.4 . 10000-20000 : 192.168.3.4 . 30000-40000 }
+	}
+}"
+
+$NFT -f - <<< $EXPECTED
+$NFT add rule ip nat prerouting meta l4proto { tcp, udp } dnat to ip daddr . th dport map @fwdtoip_th

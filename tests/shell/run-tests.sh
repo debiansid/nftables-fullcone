@@ -160,4 +160,4 @@ echo ""
 msg_info "results: [OK] $ok [FAILED] $failed [TOTAL] $((ok+failed))"
 
 kernel_cleanup
-exit $failed
+[ "$failed" -eq 0 ]

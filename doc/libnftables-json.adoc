@@ -91,14 +91,15 @@ translates into JSON as such:
 	{ "add": { "chain": {
 			"family": "inet",
 			"table": "mytable",
-			"chain": "mychain"
-	}}}
+			"name": "mychain"
+	}}},
 	{ "add": { "rule": {
 			"family": "inet",
 			"table": "mytable",
 			"chain": "mychain",
 			"expr": [
 				{ "match": {
+					"op": "==",
 					"left": { "payload": {
 							"protocol": "tcp",
 							"field": "dport"

@@ -548,7 +548,8 @@ static void netlink_gen_relational(struct netlink_linearize_ctx *ctx,
 	case EXPR_PREFIX:
 		sreg = get_register(ctx, expr->left);
 		if (expr_basetype(expr->left)->type != TYPE_STRING &&
-		    (!expr->right->prefix_len ||
+		    (expr->right->byteorder != BYTEORDER_BIG_ENDIAN ||
+		     !expr->right->prefix_len ||
 		     expr->right->prefix_len % BITS_PER_BYTE)) {
 			len = div_round_up(expr->right->len, BITS_PER_BYTE);
 			netlink_gen_expr(ctx, expr->left, sreg);
@@ -1027,8 +1028,9 @@ static void netlink_gen_payload_stmt(struct netlink_linearize_ctx *ctx,
 		nftnl_expr_set_u32(nle, NFTNL_EXPR_PAYLOAD_CSUM_OFFSET,
 				   csum_off / BITS_PER_BYTE);
 	}
-	if (expr->payload.base == PROTO_BASE_NETWORK_HDR && desc &&
-	    payload_needs_l4csum_update_pseudohdr(expr, desc))
+	if ((expr->payload.base == PROTO_BASE_NETWORK_HDR && desc &&
+	     payload_needs_l4csum_update_pseudohdr(expr, desc)) ||
+	    expr->payload.base == PROTO_BASE_INNER_HDR)
 		nftnl_expr_set_u32(nle, NFTNL_EXPR_PAYLOAD_FLAGS,
 				   NFT_PAYLOAD_L4CSUM_PSEUDOHDR);
 

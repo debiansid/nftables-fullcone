@@ -100,8 +100,8 @@ struct nftnl_expr *alloc_nft_expr(const char *name)
 void __netlink_gen_data(const struct expr *expr,
 			struct nft_data_linearize *data, bool expand);
 
-static struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
-						  const struct expr *expr)
+struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
+					   const struct expr *expr)
 {
 	const struct expr *elem, *data;
 	struct nftnl_set_elem *nlse;
@@ -481,48 +481,6 @@ void netlink_dump_expr(const struct nftnl_expr *nle,
 
 	nftnl_expr_fprintf(fp, nle, 0, 0);
 	fprintf(fp, "\n");
-}
-
-static int list_rule_cb(struct nftnl_rule *nlr, void *arg)
-{
-	struct netlink_ctx *ctx = arg;
-	const struct handle *h = ctx->data;
-	struct rule *rule;
-	const char *table, *chain;
-	uint32_t family;
-
-	family = nftnl_rule_get_u32(nlr, NFTNL_RULE_FAMILY);
-	table  = nftnl_rule_get_str(nlr, NFTNL_RULE_TABLE);
-	chain  = nftnl_rule_get_str(nlr, NFTNL_RULE_CHAIN);
-
-	if (h->family != family ||
-	    strcmp(table, h->table.name) != 0 ||
-	    (h->chain.name && strcmp(chain, h->chain.name) != 0))
-		return 0;
-
-	netlink_dump_rule(nlr, ctx);
-	rule = netlink_delinearize_rule(ctx, nlr);
-	list_add_tail(&rule->list, &ctx->list);
-
-	return 0;
-}
-
-int netlink_list_rules(struct netlink_ctx *ctx, const struct handle *h)
-{
-	struct nftnl_rule_list *rule_cache;
-
-	rule_cache = mnl_nft_rule_dump(ctx, h->family);
-	if (rule_cache == NULL) {
-		if (errno == EINTR)
-			return -1;
-
-		return 0;
-	}
-
-	ctx->data = h;
-	nftnl_rule_list_foreach(rule_cache, list_rule_cb, ctx);
-	nftnl_rule_list_free(rule_cache);
-	return 0;
 }
 
 void netlink_dump_chain(const struct nftnl_chain *nlc, struct netlink_ctx *ctx)
@@ -1048,45 +1006,54 @@ void alloc_setelem_cache(const struct expr *set, struct nftnl_set *nls)
 	}
 }
 
-static bool mpz_bitmask_is_prefix(mpz_t bitmask, uint32_t len)
+static bool range_expr_is_prefix(const struct expr *range, uint32_t *prefix_len)
 {
+	const struct expr *right = range->right;
+	const struct expr *left = range->left;
+	uint32_t len = left->len;
 	unsigned long n1, n2;
+	uint32_t plen;
+	mpz_t bitmask;
 
-        n1 = mpz_scan0(bitmask, 0);
-        if (n1 == ULONG_MAX)
-                return false;
+	mpz_init2(bitmask, left->len);
+	mpz_xor(bitmask, left->value, right->value);
 
-        n2 = mpz_scan1(bitmask, n1 + 1);
-        if (n2 < len)
-                return false;
+	n1 = mpz_scan0(bitmask, 0);
+	if (n1 == ULONG_MAX)
+		goto not_a_prefix;
 
-        return true;
-}
+	n2 = mpz_scan1(bitmask, n1 + 1);
+	if (n2 < len)
+		goto not_a_prefix;
 
-static uint32_t mpz_bitmask_to_prefix(mpz_t bitmask, uint32_t len)
-{
-	return len - mpz_scan0(bitmask, 0);
+	plen = len - n1;
+
+	if (mpz_scan1(left->value, 0) < len - plen)
+		goto not_a_prefix;
+
+	mpz_clear(bitmask);
+	*prefix_len = plen;
+
+	return true;
+
+not_a_prefix:
+	mpz_clear(bitmask);
+
+	return false;
 }
 
 struct expr *range_expr_to_prefix(struct expr *range)
 {
-	struct expr *left = range->left, *right = range->right, *prefix;
-	uint32_t len = left->len, prefix_len;
-	mpz_t bitmask;
+	struct expr *prefix;
+	uint32_t prefix_len;
 
-	mpz_init2(bitmask, len);
-	mpz_xor(bitmask, left->value, right->value);
-
-	if (mpz_bitmask_is_prefix(bitmask, len)) {
-		prefix_len = mpz_bitmask_to_prefix(bitmask, len);
-		prefix = prefix_expr_alloc(&range->location, expr_get(left),
+	if (range_expr_is_prefix(range, &prefix_len)) {
+		prefix = prefix_expr_alloc(&range->location,
+					   expr_get(range->left),
 					   prefix_len);
-		mpz_clear(bitmask);
 		expr_free(range);
-
 		return prefix;
 	}
-	mpz_clear(bitmask);
 
 	return range;
 }
@@ -1315,7 +1282,7 @@ key_end:
 		nftnl_set_elem_expr_foreach(nlse, set_elem_parse_expressions,
 					    &setelem_parse_ctx);
 	}
-	list_splice_tail(&setelem_parse_ctx.stmt_list, &expr->stmt_list);
+	list_splice_tail_init(&setelem_parse_ctx.stmt_list, &expr->stmt_list);
 
 	if (flags & NFT_SET_ELEM_INTERVAL_END) {
 		expr->flags |= EXPR_F_INTERVAL_END;

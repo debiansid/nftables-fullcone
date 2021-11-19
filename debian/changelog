@@ -1,3 +1,17 @@
+nftables (1.0.1-1) unstable; urgency=medium
+
+  [ Jenkins ]
+  * [5be1165] Remove constraints unnecessary since buster
+
+  [ Arturo Borrero Gonzalez ]
+  * [ddc89dc] nftables: recommend netbase (Closes: #995343)
+  * [1187467] src:nftables: bump std-version to 4.6.0
+  * [ca1f8ef] d/copyright: refresh reference to libnftables.h
+  * [6d3871a] New upstream version 1.0.1
+  * [48ae700] src:nftables: bump build-dep on libnftnl to 1.2.1
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Fri, 19 Nov 2021 14:59:06 +0100
+
 nftables (1.0.0-1) unstable; urgency=medium
 
   * [3d9fb4f] New upstream version 1.0.0

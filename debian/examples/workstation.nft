@@ -16,7 +16,7 @@ table inet filter {
 		#tcp dport { 22, 80, 443 } ct state new accept
 
 		# accept neighbour discovery otherwise IPv6 connectivity breaks.
-		ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit,  nd-router-advert, nd-neighbor-advert } accept
+		icmpv6 type { nd-neighbor-solicit,  nd-router-advert, nd-neighbor-advert } accept
 
 		# count and drop any other traffic
 		counter drop

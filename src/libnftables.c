@@ -128,9 +128,7 @@ int nft_ctx_add_var(struct nft_ctx *ctx, const char *var)
 	if (!separator)
 		return -1;
 
-	tmp = realloc(ctx->vars, (pcount + 1) * sizeof(struct nft_vars));
-	if (!tmp)
-		return -1;
+	tmp = xrealloc(ctx->vars, (pcount + 1) * sizeof(struct nft_vars));
 
 	*separator = '\0';
 	value = separator + 1;
@@ -162,9 +160,7 @@ int nft_ctx_add_include_path(struct nft_ctx *ctx, const char *path)
 	char **tmp;
 	int pcount = ctx->num_include_paths;
 
-	tmp = realloc(ctx->include_paths, (pcount + 1) * sizeof(char *));
-	if (!tmp)
-		return -1;
+	tmp = xrealloc(ctx->include_paths, (pcount + 1) * sizeof(char *));
 
 	ctx->include_paths = tmp;
 
@@ -395,6 +391,18 @@ void nft_ctx_set_dry_run(struct nft_ctx *ctx, bool dry)
 	ctx->check = dry;
 }
 
+EXPORT_SYMBOL(nft_ctx_get_optimize);
+uint32_t nft_ctx_get_optimize(struct nft_ctx *ctx)
+{
+	return ctx->optimize_flags;
+}
+
+EXPORT_SYMBOL(nft_ctx_set_optimize);
+void nft_ctx_set_optimize(struct nft_ctx *ctx, uint32_t flags)
+{
+	ctx->optimize_flags = flags;
+}
+
 EXPORT_SYMBOL(nft_ctx_output_get_flags);
 unsigned int nft_ctx_output_get_flags(struct nft_ctx *ctx)
 {
@@ -424,13 +432,14 @@ static const struct input_descriptor indesc_cmdline = {
 };
 
 static int nft_parse_bison_buffer(struct nft_ctx *nft, const char *buf,
-				  struct list_head *msgs, struct list_head *cmds)
+				  struct list_head *msgs, struct list_head *cmds,
+				  const struct input_descriptor *indesc)
 {
 	int ret;
 
 	parser_init(nft, nft->state, msgs, cmds, nft->top_scope);
 	nft->scanner = scanner_init(nft->state);
-	scanner_push_buffer(nft->scanner, &indesc_cmdline, buf);
+	scanner_push_buffer(nft->scanner, indesc, buf);
 
 	ret = nft_parse(nft, nft->scanner, nft->state);
 	if (ret != 0 || nft->state->nerrs > 0)
@@ -439,10 +448,41 @@ static int nft_parse_bison_buffer(struct nft_ctx *nft, const char *buf,
 	return 0;
 }
 
+static char *stdin_to_buffer(void)
+{
+	unsigned int bufsiz = 16384, consumed = 0;
+	int numbytes;
+	char *buf;
+
+	buf = xmalloc(bufsiz);
+
+	numbytes = read(STDIN_FILENO, buf, bufsiz);
+	while (numbytes > 0) {
+		consumed += numbytes;
+		if (consumed == bufsiz) {
+			bufsiz *= 2;
+			buf = xrealloc(buf, bufsiz);
+		}
+		numbytes = read(STDIN_FILENO, buf + consumed, bufsiz - consumed);
+	}
+	buf[consumed] = '\0';
+
+	return buf;
+}
+
+static const struct input_descriptor indesc_stdin = {
+	.type	= INDESC_STDIN,
+	.name	= "/dev/stdin",
+};
+
 static int nft_parse_bison_filename(struct nft_ctx *nft, const char *filename,
 				    struct list_head *msgs, struct list_head *cmds)
 {
 	int ret;
+
+	if (nft->stdin_buf)
+		return nft_parse_bison_buffer(nft, nft->stdin_buf, msgs, cmds,
+					      &indesc_stdin);
 
 	parser_init(nft, nft->state, msgs, cmds, nft->top_scope);
 	nft->scanner = scanner_init(nft->state);
@@ -510,7 +550,8 @@ int nft_run_cmd_from_buffer(struct nft_ctx *nft, const char *buf)
 	if (nft_output_json(&nft->output))
 		rc = nft_parse_json_buffer(nft, nlbuf, &msgs, &cmds);
 	if (rc == -EINVAL)
-		rc = nft_parse_bison_buffer(nft, nlbuf, &msgs, &cmds);
+		rc = nft_parse_bison_buffer(nft, nlbuf, &msgs, &cmds,
+					    &indesc_cmdline);
 
 	parser_rc = rc;
 
@@ -578,7 +619,7 @@ retry:
 	}
 	snprintf(buf + offset, bufsize - offset, "\n");
 
-	rc = nft_parse_bison_buffer(ctx, buf, msgs, &cmds);
+	rc = nft_parse_bison_buffer(ctx, buf, msgs, &cmds, &indesc_cmdline);
 
 	assert(list_empty(&cmds));
 	/* Stash the buffer that contains the variable definitions and zap the
@@ -593,8 +634,7 @@ retry:
 	return rc;
 }
 
-EXPORT_SYMBOL(nft_run_cmd_from_filename);
-int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
+static int __nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 {
 	struct cmd *cmd, *next;
 	int rc, parser_rc;
@@ -605,9 +645,6 @@ int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 	if (rc < 0)
 		goto err;
 
-	if (!strcmp(filename, "-"))
-		filename = "/dev/stdin";
-
 	rc = -EINVAL;
 	if (nft_output_json(&nft->output))
 		rc = nft_parse_json_filename(nft, filename, &msgs, &cmds);
@@ -615,6 +652,9 @@ int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 		rc = nft_parse_bison_filename(nft, filename, &msgs, &cmds);
 
 	parser_rc = rc;
+
+	if (nft->optimize_flags)
+		nft_optimize(nft, &cmds);
 
 	rc = nft_evaluate(nft, &msgs, &cmds);
 	if (rc < 0)
@@ -656,5 +696,52 @@ err:
 		json_print_echo(nft);
 	if (rc)
 		nft_cache_release(&nft->cache);
+
 	return rc;
+}
+
+static int nft_run_optimized_file(struct nft_ctx *nft, const char *filename)
+{
+	uint32_t optimize_flags;
+	bool check;
+	int ret;
+
+	check = nft->check;
+	nft->check = true;
+	optimize_flags = nft->optimize_flags;
+	nft->optimize_flags = 0;
+
+	/* First check the original ruleset loads fine as is. */
+	ret = __nft_run_cmd_from_filename(nft, filename);
+	if (ret < 0)
+		return ret;
+
+	nft->check = check;
+	nft->optimize_flags = optimize_flags;
+
+	return __nft_run_cmd_from_filename(nft, filename);
+}
+
+EXPORT_SYMBOL(nft_run_cmd_from_filename);
+int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
+{
+	int ret;
+
+	if (!strcmp(filename, "-"))
+		filename = "/dev/stdin";
+
+	if (!strcmp(filename, "/dev/stdin") &&
+	    !nft_output_json(&nft->output))
+		nft->stdin_buf = stdin_to_buffer();
+
+	if (nft->optimize_flags) {
+		ret = nft_run_optimized_file(nft, filename);
+		xfree(nft->stdin_buf);
+		return ret;
+	}
+
+	ret = __nft_run_cmd_from_filename(nft, filename);
+	xfree(nft->stdin_buf);
+
+	return ret;
 }

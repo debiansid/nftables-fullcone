@@ -508,3 +508,11 @@ ip6
   [ bitwise reg 1 = ( reg 1 & 0x00000020 ) ^ 0x00000000 ]
   [ cmp eq reg 1 0x00000000 ]
 
+# ct count 3
+ip test-ip4 output
+  [ connlimit count 3 flags 0 ]
+
+# ct count over 3
+ip test-ip4 output
+  [ connlimit count 3 flags 1 ]
+

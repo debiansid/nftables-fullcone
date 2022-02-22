@@ -599,7 +599,7 @@ static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
 
 /* dependency supersede.
  *
- * 'inet' is a 'phony' l2 dependency used by NFPROTO_INET to fulfill network
+ * 'inet' is a 'phony' l2 dependency used by NFPROTO_INET to fulfil network
  * header dependency, i.e. ensure that 'ip saddr 1.2.3.4' only sees ip headers.
  *
  * If a match expression that depends on a particular L2 header, e.g. ethernet,
@@ -611,7 +611,7 @@ static int expr_evaluate_exthdr(struct eval_ctx *ctx, struct expr **exprp)
  * Example: inet filter in ip saddr 1.2.3.4 ether saddr a:b:c:d:e:f
  *
  * ip saddr adds meta dependency on ipv4 packets
- * ether saddr adds another dependeny on ethernet frames.
+ * ether saddr adds another dependency on ethernet frames.
  */
 static int meta_iiftype_gen_dependency(struct eval_ctx *ctx,
 				       struct expr *payload, struct stmt **res)
@@ -2556,9 +2556,9 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 	mpz_clear(ff);
 
 	assert(sizeof(data) * BITS_PER_BYTE >= masklen);
-	mpz_export_data(data, bitmask, BYTEORDER_HOST_ENDIAN, sizeof(data));
+	mpz_export_data(data, bitmask, payload->byteorder, payload_byte_size);
 	mask = constant_expr_alloc(&payload->location, expr_basetype(payload),
-				   BYTEORDER_HOST_ENDIAN, masklen, data);
+				   payload->byteorder, masklen, data);
 	mpz_clear(bitmask);
 
 	payload_bytes = payload_expr_alloc(&payload->location, NULL, 0);
@@ -2751,19 +2751,22 @@ static int stmt_evaluate_reject_inet_family(struct eval_ctx *ctx,
 		protocol = proto_find_num(base, desc);
 		switch (protocol) {
 		case NFPROTO_IPV4:
+		case __constant_htons(ETH_P_IP):
 			if (stmt->reject.family == NFPROTO_IPV4)
 				break;
 			return stmt_binary_error(ctx, stmt->reject.expr,
 				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
 				  "conflicting protocols specified: ip vs ip6");
 		case NFPROTO_IPV6:
+		case __constant_htons(ETH_P_IPV6):
 			if (stmt->reject.family == NFPROTO_IPV6)
 				break;
 			return stmt_binary_error(ctx, stmt->reject.expr,
 				  &ctx->pctx.protocol[PROTO_BASE_NETWORK_HDR],
 				  "conflicting protocols specified: ip vs ip6");
 		default:
-			BUG("unsupported family");
+			return stmt_error(ctx, stmt,
+				  "cannot infer ICMP reject variant to use: explicit value required.\n");
 		}
 		break;
 	}
@@ -2923,10 +2926,12 @@ static int stmt_evaluate_reject_default(struct eval_ctx *ctx,
 		protocol = proto_find_num(base, desc);
 		switch (protocol) {
 		case NFPROTO_IPV4:
+		case __constant_htons(ETH_P_IP):
 			stmt->reject.family = NFPROTO_IPV4;
 			stmt->reject.icmp_code = ICMP_PORT_UNREACH;
 			break;
 		case NFPROTO_IPV6:
+		case __constant_htons(ETH_P_IPV6):
 			stmt->reject.family = NFPROTO_IPV6;
 			stmt->reject.icmp_code = ICMP6_DST_UNREACH_NOPORT;
 			break;
@@ -3616,6 +3621,7 @@ static int stmt_evaluate_log(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 {
+	struct set *this_set;
 	struct stmt *this;
 
 	expr_set_context(&ctx->ectx, NULL, 0);
@@ -3645,6 +3651,15 @@ static int stmt_evaluate_set(struct eval_ctx *ctx, struct stmt *stmt)
 					  "statement must be stateful");
 	}
 
+	this_set = stmt->set.set->set;
+
+	/* Make sure EVAL flag is set on set definition so that kernel
+	 * picks a set that allows updates from the packet path.
+	 *
+	 * Alternatively we could error out in case 'flags dynamic' was
+	 * not given, but we can repair this here.
+	 */
+	this_set->flags |= NFT_SET_EVAL;
 	return 0;
 }
 

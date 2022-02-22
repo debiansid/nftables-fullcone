@@ -62,6 +62,11 @@ understanding of their meaning. You can get information about options by running
 *--check*::
 	Check commands validity without actually applying the changes.
 
+*-o*::
+*--optimize*::
+	Optimize your ruleset. You can combine this option with '-c' to inspect
+        the proposed optimizations.
+
 .Ruleset list output formatting that modify the output of the list ruleset command:
 
 *-a*::
@@ -165,17 +170,23 @@ SYMBOLIC VARIABLES
 ~~~~~~~~~~~~~~~~~~
 [verse]
 *define* 'variable' *=* 'expr'
+*undefine* 'variable'
+*redefine* 'variable' *=* 'expr'
 *$variable*
 
 Symbolic variables can be defined using the *define* statement. Variable
 references are expressions and can be used to initialize other variables. The scope
 of a definition is the current block and all blocks contained within.
+Symbolic variables can be undefined using the *undefine* statement, and modified
+using the *redefine* statement.
 
 .Using symbolic variables
 ---------------------------------------
 define int_if1 = eth0
 define int_if2 = eth1
 define int_ifs = { $int_if1, $int_if2 }
+redefine int_if2 = wlan0
+undefine int_if2
 
 filter input iif $int_ifs accept
 ---------------------------------------

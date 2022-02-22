@@ -123,11 +123,13 @@ struct nft_ctx {
 	bool			check;
 	struct nft_cache	cache;
 	uint32_t		flags;
+	uint32_t		optimize_flags;
 	struct parser_state	*state;
 	void			*scanner;
 	struct scope		*top_scope;
 	void			*json_root;
 	json_t			*json_echo;
+	const char		*stdin_buf;
 };
 
 enum nftables_exit_codes {
@@ -175,6 +177,7 @@ enum input_descriptor_types {
 	INDESC_FILE,
 	INDESC_CLI,
 	INDESC_NETLINK,
+	INDESC_STDIN,
 };
 
 /**
@@ -221,6 +224,8 @@ int nft_print(struct output_ctx *octx, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
 int nft_gmp_print(struct output_ctx *octx, const char *fmt, ...)
 	__attribute__((format(printf, 2, 0)));
+
+int nft_optimize(struct nft_ctx *nft, struct list_head *cmds);
 
 #define __NFT_OUTPUT_NOTSUPP	UINT_MAX
 

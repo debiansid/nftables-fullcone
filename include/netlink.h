@@ -39,6 +39,7 @@ struct netlink_parse_ctx {
 	struct stmt		*stmt;
 	struct expr		*registers[MAX_REGS + 1];
 	unsigned int		debug_mask;
+	struct netlink_ctx	*nlctx;
 };
 
 struct rule_pp_ctx {
@@ -135,7 +136,8 @@ extern int netlink_list_chains(struct netlink_ctx *ctx, const struct handle *h);
 extern struct chain *netlink_delinearize_chain(struct netlink_ctx *ctx,
 					       const struct nftnl_chain *nlc);
 
-extern int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h);
+extern int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
+			       const struct nft_cache_filter *filter);
 extern struct table *netlink_delinearize_table(struct netlink_ctx *ctx,
 					       const struct nftnl_table *nlt);
 

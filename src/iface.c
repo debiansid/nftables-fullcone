@@ -59,13 +59,13 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_OK;
 }
 
-void iface_cache_update(void)
+static int iface_mnl_talk(struct mnl_socket *nl, uint32_t portid)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct mnl_socket *nl;
 	struct nlmsghdr *nlh;
 	struct rtgenmsg *rt;
-	uint32_t seq, portid;
+	bool eintr = false;
+	uint32_t seq;
 	int ret;
 
 	nlh = mnl_nlmsg_put_header(buf);
@@ -74,6 +74,38 @@ void iface_cache_update(void)
 	nlh->nlmsg_seq = seq = time(NULL);
 	rt = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
 	rt->rtgen_family = AF_PACKET;
+
+	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
+		return -1;
+
+	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+	while (ret > 0) {
+		ret = mnl_cb_run(buf, ret, seq, portid, data_cb, NULL);
+		if (ret == 0)
+			break;
+		if (ret < 0) {
+			if (errno != EINTR)
+				return ret;
+
+			/* process all pending messages before reporting EINTR */
+			eintr = true;
+		}
+		ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+	}
+
+	if (eintr) {
+		ret = -1;
+		errno = EINTR;
+	}
+
+	return ret;
+}
+
+void iface_cache_update(void)
+{
+	struct mnl_socket *nl;
+	uint32_t portid;
+	int ret;
 
 	nl = mnl_socket_open(NETLINK_ROUTE);
 	if (nl == NULL)
@@ -84,16 +116,10 @@ void iface_cache_update(void)
 
 	portid = mnl_socket_get_portid(nl);
 
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
-		netlink_init_error();
+	do {
+		ret = iface_mnl_talk(nl, portid);
+	} while (ret < 0 && errno == EINTR);
 
-	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	while (ret > 0) {
-		ret = mnl_cb_run(buf, ret, seq, portid, data_cb, NULL);
-		if (ret <= MNL_CB_STOP)
-			break;
-		ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	}
 	if (ret == -1)
 		netlink_init_error();
 

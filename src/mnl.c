@@ -377,7 +377,7 @@ static int mnl_batch_extack_cb(const struct nlmsghdr *nlh, void *data)
 	return MNL_CB_ERROR;
 }
 
-#define NFT_MNL_ECHO_RCVBUFF_DEFAULT	(MNL_SOCKET_BUFFER_SIZE * 1024)
+#define NFT_MNL_ECHO_RCVBUFF_DEFAULT	(MNL_SOCKET_BUFFER_SIZE * 1024U)
 #define NFT_MNL_ACK_MAXSIZE		((sizeof(struct nlmsghdr) + \
 					  sizeof(struct nfgenmsg) + (1 << 16)) + \
 					  MNL_SOCKET_BUFFER_SIZE)
@@ -653,13 +653,24 @@ err_free:
 	return MNL_CB_OK;
 }
 
-struct nftnl_rule_list *mnl_nft_rule_dump(struct netlink_ctx *ctx,
-					  int family)
+struct nftnl_rule_list *mnl_nft_rule_dump(struct netlink_ctx *ctx, int family,
+					  const char *table, const char *chain)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_rule_list *nlr_list;
+	struct nftnl_rule *nlr = NULL;
 	struct nlmsghdr *nlh;
 	int ret;
+
+	if (table) {
+		nlr = nftnl_rule_alloc();
+		if (!nlr)
+			memory_allocation_error();
+
+		nftnl_rule_set_str(nlr, NFTNL_RULE_TABLE, table);
+		if (chain)
+			nftnl_rule_set_str(nlr, NFTNL_RULE_CHAIN, chain);
+	}
 
 	nlr_list = nftnl_rule_list_alloc();
 	if (nlr_list == NULL)
@@ -667,6 +678,10 @@ struct nftnl_rule_list *mnl_nft_rule_dump(struct netlink_ctx *ctx,
 
 	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETRULE, family,
 				    NLM_F_DUMP, ctx->seqnum);
+	if (nlr) {
+		nftnl_rule_nlmsg_build_payload(nlh, nlr);
+		nftnl_rule_free(nlr);
+	}
 
 	ret = nft_mnl_talk(ctx, nlh, nlh->nlmsg_len, rule_cb, nlr_list);
 	if (ret < 0)
@@ -889,10 +904,12 @@ err_free:
 }
 
 struct nftnl_chain_list *mnl_nft_chain_dump(struct netlink_ctx *ctx,
-					    int family)
+					    int family, const char *table,
+					    const char *chain)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_chain_list *nlc_list;
+	struct nftnl_chain *nlc = NULL;
 	struct nlmsghdr *nlh;
 	int ret;
 
@@ -900,11 +917,24 @@ struct nftnl_chain_list *mnl_nft_chain_dump(struct netlink_ctx *ctx,
 	if (nlc_list == NULL)
 		memory_allocation_error();
 
+	if (table && chain) {
+		nlc = nftnl_chain_alloc();
+		if (!nlc)
+			memory_allocation_error();
+
+		nftnl_chain_set_str(nlc, NFTNL_CHAIN_TABLE, table);
+		nftnl_chain_set_str(nlc, NFTNL_CHAIN_NAME, chain);
+	}
+
 	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETCHAIN, family,
-				    NLM_F_DUMP, ctx->seqnum);
+				    nlc ? NLM_F_ACK : NLM_F_DUMP, ctx->seqnum);
+	if (nlc) {
+		nftnl_chain_nlmsg_build_payload(nlh, nlc);
+		nftnl_chain_free(nlc);
+	}
 
 	ret = nft_mnl_talk(ctx, nlh, nlh->nlmsg_len, chain_cb, nlc_list);
-	if (ret < 0)
+	if (ret < 0 && errno != ENOENT)
 		goto err;
 
 	return nlc_list;
@@ -1016,10 +1046,12 @@ err_free:
 }
 
 struct nftnl_table_list *mnl_nft_table_dump(struct netlink_ctx *ctx,
-					    int family)
+					    int family, const char *table)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_table_list *nlt_list;
+	struct nftnl_table *nlt = NULL;
+	int flags = NLM_F_DUMP;
 	struct nlmsghdr *nlh;
 	int ret;
 
@@ -1027,11 +1059,25 @@ struct nftnl_table_list *mnl_nft_table_dump(struct netlink_ctx *ctx,
 	if (nlt_list == NULL)
 		return NULL;
 
+	if (table) {
+		nlt = nftnl_table_alloc();
+		if (!nlt)
+			memory_allocation_error();
+
+		nftnl_table_set_u32(nlt, NFTNL_TABLE_FAMILY, family);
+		nftnl_table_set_str(nlt, NFTNL_TABLE_NAME, table);
+		flags = NLM_F_ACK;
+	}
+
 	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETTABLE, family,
-				    NLM_F_DUMP, ctx->seqnum);
+				    flags, ctx->seqnum);
+	if (nlt) {
+		nftnl_table_nlmsg_build_payload(nlh, nlt);
+		nftnl_table_free(nlt);
+	}
 
 	ret = nft_mnl_talk(ctx, nlh, nlh->nlmsg_len, table_cb, nlt_list);
-	if (ret < 0)
+	if (ret < 0 && errno != ENOENT)
 		goto err;
 
 	return nlt_list;
@@ -1252,10 +1298,12 @@ err_free:
 }
 
 struct nftnl_set_list *
-mnl_nft_set_dump(struct netlink_ctx *ctx, int family, const char *table)
+mnl_nft_set_dump(struct netlink_ctx *ctx, int family,
+		 const char *table, const char *set)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_set_list *nls_list;
+	int flags = NLM_F_DUMP;
 	struct nlmsghdr *nlh;
 	struct nftnl_set *s;
 	int ret;
@@ -1264,10 +1312,15 @@ mnl_nft_set_dump(struct netlink_ctx *ctx, int family, const char *table)
 	if (s == NULL)
 		memory_allocation_error();
 
-	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETSET, family,
-				    NLM_F_DUMP, ctx->seqnum);
 	if (table != NULL)
 		nftnl_set_set_str(s, NFTNL_SET_TABLE, table);
+	if (set) {
+		nftnl_set_set_str(s, NFTNL_SET_NAME, set);
+		flags = NLM_F_ACK;
+	}
+
+	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETSET, family,
+				    flags, ctx->seqnum);
 	nftnl_set_nlmsg_build_payload(nlh, s);
 	nftnl_set_free(s);
 
@@ -1276,7 +1329,7 @@ mnl_nft_set_dump(struct netlink_ctx *ctx, int family, const char *table)
 		memory_allocation_error();
 
 	ret = nft_mnl_talk(ctx, nlh, nlh->nlmsg_len, set_cb, nls_list);
-	if (ret < 0)
+	if (ret < 0 && errno != ENOENT)
 		goto err;
 
 	return nls_list;
@@ -1771,11 +1824,13 @@ err_free:
 }
 
 struct nftnl_flowtable_list *
-mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family, const char *table)
+mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family,
+		       const char *table, const char *ft)
 {
 	struct nftnl_flowtable_list *nln_list;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_flowtable *n;
+	int flags = NLM_F_DUMP;
 	struct nlmsghdr *nlh;
 	int ret;
 
@@ -1783,10 +1838,14 @@ mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family, const char *table)
 	if (n == NULL)
 		memory_allocation_error();
 
-	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETFLOWTABLE, family,
-				    NLM_F_DUMP, ctx->seqnum);
 	if (table != NULL)
 		nftnl_flowtable_set_str(n, NFTNL_FLOWTABLE_TABLE, table);
+	if (ft) {
+		nftnl_flowtable_set_str(n, NFTNL_FLOWTABLE_NAME, ft);
+		flags = NLM_F_ACK;
+	}
+	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETFLOWTABLE, family,
+				    flags, ctx->seqnum);
 	nftnl_flowtable_nlmsg_build_payload(nlh, n);
 	nftnl_flowtable_free(n);
 
@@ -1795,7 +1854,7 @@ mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family, const char *table)
 		memory_allocation_error();
 
 	ret = nft_mnl_talk(ctx, nlh, nlh->nlmsg_len, flowtable_cb, nln_list);
-	if (ret < 0)
+	if (ret < 0 && errno != ENOENT)
 		goto err;
 
 	return nln_list;

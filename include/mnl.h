@@ -33,8 +33,8 @@ int mnl_nft_rule_add(struct netlink_ctx *ctx, struct cmd *cmd,
 int mnl_nft_rule_del(struct netlink_ctx *ctx, struct cmd *cmd);
 int mnl_nft_rule_replace(struct netlink_ctx *ctx, struct cmd *cmd);
 
-struct nftnl_rule_list *mnl_nft_rule_dump(struct netlink_ctx *ctx,
-					  int family);
+struct nftnl_rule_list *mnl_nft_rule_dump(struct netlink_ctx *ctx, int family,
+					  const char *table, const char *chain);
 
 int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		      unsigned int flags);
@@ -43,21 +43,22 @@ int mnl_nft_chain_rename(struct netlink_ctx *ctx, const struct cmd *cmd,
 			 const struct chain *chain);
 
 struct nftnl_chain_list *mnl_nft_chain_dump(struct netlink_ctx *ctx,
-					    int family);
+					    int family, const char *table,
+					    const char *chain);
 
 int mnl_nft_table_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		      unsigned int flags);
 int mnl_nft_table_del(struct netlink_ctx *ctx, struct cmd *cmd);
 
 struct nftnl_table_list *mnl_nft_table_dump(struct netlink_ctx *ctx,
-					    int family);
+					    int family, const char *table);
 
 int mnl_nft_set_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		    unsigned int flags);
 int mnl_nft_set_del(struct netlink_ctx *ctx, struct cmd *cmd);
 
 struct nftnl_set_list *mnl_nft_set_dump(struct netlink_ctx *ctx, int family,
-					const char *table);
+					const char *table, const char *set);
 
 int mnl_nft_setelem_add(struct netlink_ctx *ctx, const struct set *set,
 			const struct expr *expr, unsigned int flags);
@@ -76,7 +77,8 @@ int mnl_nft_obj_add(struct netlink_ctx *ctx, struct cmd *cmd,
 int mnl_nft_obj_del(struct netlink_ctx *ctx, struct cmd *cmd, int type);
 
 struct nftnl_flowtable_list *
-mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family, const char *table);
+mnl_nft_flowtable_dump(struct netlink_ctx *ctx, int family,
+		       const char *table, const char *ft);
 
 int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 			  unsigned int flags);

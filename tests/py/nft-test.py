@@ -809,17 +809,26 @@ def rule_add(rule, filename, lineno, force_all_family_option, filename_path):
             if state == "ok" and not payload_check(table_payload_expected,
                                                    payload_log, cmd):
                 error += 1
-                gotf = open("%s.got" % payload_path, 'a')
+
+                try:
+                    gotf = open("%s.got" % payload_path)
+                    gotf_payload_expected = payload_find_expected(gotf, rule[0])
+                    gotf.close()
+                except:
+                    gotf_payload_expected = None
                 payload_log.seek(0, 0)
-                gotf.write("# %s\n" % rule[0])
-                while True:
-                    line = payload_log.readline()
-                    if line == "":
-                        break
-                    gotf.write(line)
-                gotf.close()
-                print_warning("Wrote payload for rule %s" % rule[0],
-                              gotf.name, 1)
+                if not payload_check(gotf_payload_expected, payload_log, cmd):
+                    gotf = open("%s.got" % payload_path, 'a')
+                    payload_log.seek(0, 0)
+                    gotf.write("# %s\n" % rule[0])
+                    while True:
+                        line = payload_log.readline()
+                        if line == "":
+                            break
+                        gotf.write(line)
+                    gotf.close()
+                    print_warning("Wrote payload for rule %s" % rule[0],
+                                  gotf.name, 1)
 
             # Check for matching ruleset listing
             numeric_proto_old = nftables.set_numeric_proto_output(True)

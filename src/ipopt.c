@@ -66,27 +66,8 @@ const struct exthdr_desc *ipopt_protocols[UINT8_MAX] = {
 	[IPOPT_RA]		= &ipopt_ra,
 };
 
-static unsigned int calc_offset(const struct exthdr_desc *desc,
-				const struct proto_hdr_template *tmpl,
-				unsigned int arg)
-{
-	if (!desc || tmpl == &ipopt_unknown_template)
-		return 0;
-
-	switch (desc->type) {
-	case IPOPT_RR:
-	case IPOPT_LSRR:
-	case IPOPT_SSRR:
-		if (tmpl == &desc->templates[IPOPT_FIELD_ADDR_0])
-			return (tmpl->offset < 24) ? 0 : arg;
-		return 0;
-	default:
-		return 0;
-	}
-}
-
 struct expr *ipopt_expr_alloc(const struct location *loc, uint8_t type,
-			       uint8_t field, uint8_t ptr)
+			       uint8_t field)
 {
 	const struct proto_hdr_template *tmpl;
 	const struct exthdr_desc *desc;
@@ -97,12 +78,15 @@ struct expr *ipopt_expr_alloc(const struct location *loc, uint8_t type,
 	if (!tmpl)
 		return NULL;
 
+	if (!tmpl->len)
+		return NULL;
+
 	expr = expr_alloc(loc, EXPR_EXTHDR, tmpl->dtype,
 			  BYTEORDER_BIG_ENDIAN, tmpl->len);
 	expr->exthdr.desc   = desc;
 	expr->exthdr.tmpl   = tmpl;
 	expr->exthdr.op     = NFT_EXTHDR_OP_IPV4;
-	expr->exthdr.offset = tmpl->offset + calc_offset(desc, tmpl, ptr);
+	expr->exthdr.offset = tmpl->offset;
 	expr->exthdr.raw_type = desc->type;
 
 	return expr;

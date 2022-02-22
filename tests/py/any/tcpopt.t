@@ -4,17 +4,16 @@
 *ip6;test-ip6;input
 *inet;test-inet;input
 
-tcp option eol kind 1;ok
-tcp option nop kind 1;ok
-tcp option maxseg kind 1;ok
+tcp option eol exists;ok
+tcp option nop exists;ok
+tcp option maxseg exists;ok
 tcp option maxseg length 1;ok
 tcp option maxseg size 1;ok
-tcp option window kind 1;ok
 tcp option window length 1;ok
 tcp option window count 1;ok
-tcp option sack-perm kind 1;ok
+tcp option sack-perm exists;ok
 tcp option sack-perm length 1;ok
-tcp option sack kind 1;ok
+tcp option sack exists;ok
 tcp option sack length 1;ok
 tcp option sack left 1;ok
 tcp option sack0 left 1;ok;tcp option sack left 1
@@ -26,7 +25,7 @@ tcp option sack0 right 1;ok;tcp option sack right 1
 tcp option sack1 right 1;ok
 tcp option sack2 right 1;ok
 tcp option sack3 right 1;ok
-tcp option timestamp kind 1;ok
+tcp option timestamp exists;ok
 tcp option timestamp length 1;ok
 tcp option timestamp tsval 1;ok
 tcp option timestamp tsecr 1;ok
@@ -47,3 +46,11 @@ tcp option window exists;ok
 tcp option window missing;ok
 
 tcp option maxseg size set 1360;ok
+
+tcp option md5sig exists;ok
+tcp option fastopen exists;ok
+tcp option mptcp exists;ok
+
+tcp option mptcp subtype 0;ok
+tcp option mptcp subtype 1;ok
+tcp option mptcp subtype { 0, 2};ok

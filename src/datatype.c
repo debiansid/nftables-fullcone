@@ -1068,6 +1068,7 @@ static struct error_record *time_type_parse(struct parse_ctx *ctx,
 					    struct expr **res)
 {
 	struct error_record *erec;
+	uint32_t s32;
 	uint64_t s;
 
 	erec = time_parse(&sym->location, sym->identifier, &s);
@@ -1077,9 +1078,10 @@ static struct error_record *time_type_parse(struct parse_ctx *ctx,
 	if (s > UINT32_MAX)
 		return error(&sym->location, "value too large");
 
+	s32 = s;
 	*res = constant_expr_alloc(&sym->location, &time_type,
 				   BYTEORDER_HOST_ENDIAN,
-				   sizeof(uint32_t) * BITS_PER_BYTE, &s);
+				   sizeof(uint32_t) * BITS_PER_BYTE, &s32);
 	return NULL;
 }
 
@@ -1088,7 +1090,7 @@ const struct datatype time_type = {
 	.name		= "time",
 	.desc		= "relative time",
 	.byteorder	= BYTEORDER_HOST_ENDIAN,
-	.size		= 8 * BITS_PER_BYTE,
+	.size		= 4 * BITS_PER_BYTE,
 	.basetype	= &integer_type,
 	.print		= time_type_print,
 	.json		= time_type_json,

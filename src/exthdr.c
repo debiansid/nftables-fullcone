@@ -46,6 +46,9 @@ static const struct exthdr_desc *exthdr_find_desc(enum exthdr_desc_id desc_id)
 
 static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
+	const char *name = expr->exthdr.desc ?
+		expr->exthdr.desc->name : "unknown-exthdr";
+
 	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT) {
 		/* Offset calculation is a bit hacky at this point.
 		 * There might be a tcp option one day with another
@@ -65,14 +68,14 @@ static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 			return;
 		}
 
-		nft_print(octx, "tcp option %s", expr->exthdr.desc->name);
+		nft_print(octx, "tcp option %s", name);
 		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
 			return;
 		if (offset)
 			nft_print(octx, "%d", offset);
 		nft_print(octx, " %s", expr->exthdr.tmpl->token);
 	} else if (expr->exthdr.op == NFT_EXTHDR_OP_IPV4) {
-		nft_print(octx, "ip option %s", expr->exthdr.desc->name);
+		nft_print(octx, "ip option %s", name);
 		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
 			return;
 		nft_print(octx, " %s", expr->exthdr.tmpl->token);
@@ -83,10 +86,9 @@ static void exthdr_expr_print(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, " %s", expr->exthdr.tmpl->token);
 	} else {
 		if (expr->exthdr.flags & NFT_EXTHDR_F_PRESENT)
-			nft_print(octx, "exthdr %s", expr->exthdr.desc->name);
+			nft_print(octx, "exthdr %s", name);
 		else {
-			nft_print(octx, "%s %s",
-				  expr->exthdr.desc ? expr->exthdr.desc->name : "unknown-exthdr",
+			nft_print(octx, "%s %s", name,
 				  expr->exthdr.tmpl->token);
 		}
 	}
@@ -113,7 +115,8 @@ static void exthdr_expr_clone(struct expr *new, const struct expr *expr)
 
 #define NFTNL_UDATA_EXTHDR_DESC 0
 #define NFTNL_UDATA_EXTHDR_TYPE 1
-#define NFTNL_UDATA_EXTHDR_MAX 2
+#define NFTNL_UDATA_EXTHDR_OP	2
+#define NFTNL_UDATA_EXTHDR_MAX 3
 
 static int exthdr_parse_udata(const struct nftnl_udata *attr, void *data)
 {
@@ -124,6 +127,7 @@ static int exthdr_parse_udata(const struct nftnl_udata *attr, void *data)
 	switch (type) {
 	case NFTNL_UDATA_EXTHDR_DESC:
 	case NFTNL_UDATA_EXTHDR_TYPE:
+	case NFTNL_UDATA_EXTHDR_OP:
 		if (len != sizeof(uint32_t))
 			return -1;
 		break;
@@ -138,6 +142,7 @@ static int exthdr_parse_udata(const struct nftnl_udata *attr, void *data)
 static struct expr *exthdr_expr_parse_udata(const struct nftnl_udata *attr)
 {
 	const struct nftnl_udata *ud[NFTNL_UDATA_EXTHDR_MAX + 1] = {};
+	enum nft_exthdr_op op = NFT_EXTHDR_OP_IPV6;
 	const struct exthdr_desc *desc;
 	unsigned int type;
 	uint32_t desc_id;
@@ -152,22 +157,37 @@ static struct expr *exthdr_expr_parse_udata(const struct nftnl_udata *attr)
 	    !ud[NFTNL_UDATA_EXTHDR_TYPE])
 		return NULL;
 
-	desc_id = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_DESC]);
-	desc = exthdr_find_desc(desc_id);
-	if (!desc)
-		return NULL;
+	if (ud[NFTNL_UDATA_EXTHDR_OP])
+		op = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_OP]);
 
+	desc_id = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_DESC]);
 	type = nftnl_udata_get_u32(ud[NFTNL_UDATA_EXTHDR_TYPE]);
 
-	return exthdr_expr_alloc(&internal_location, desc, type);
+	switch (op) {
+	case NFT_EXTHDR_OP_IPV6:
+		desc = exthdr_find_desc(desc_id);
+
+		return exthdr_expr_alloc(&internal_location, desc, type);
+	case NFT_EXTHDR_OP_TCPOPT:
+		return tcpopt_expr_alloc(&internal_location,
+					 desc_id, type);
+	case NFT_EXTHDR_OP_IPV4:
+		return ipopt_expr_alloc(&internal_location,
+					 desc_id, type);
+	case NFT_EXTHDR_OP_SCTP:
+		return sctp_chunk_expr_alloc(&internal_location,
+					     desc_id, type);
+	case __NFT_EXTHDR_OP_MAX:
+		return NULL;
+	}
+
+	return NULL;
 }
 
 static unsigned int expr_exthdr_type(const struct exthdr_desc *desc,
 				     const struct proto_hdr_template *tmpl)
 {
-	unsigned int offset = (unsigned int)(tmpl - &desc->templates[0]);
-
-	return offset / sizeof(*tmpl);
+	return (unsigned int)(tmpl - &desc->templates[0]);
 }
 
 static int exthdr_expr_build_udata(struct nftnl_udata_buf *udbuf,
@@ -176,9 +196,22 @@ static int exthdr_expr_build_udata(struct nftnl_udata_buf *udbuf,
 	const struct proto_hdr_template *tmpl = expr->exthdr.tmpl;
 	const struct exthdr_desc *desc = expr->exthdr.desc;
 	unsigned int type = expr_exthdr_type(desc, tmpl);
+	enum nft_exthdr_op op = expr->exthdr.op;
 
-	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_DESC, desc->id);
 	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_TYPE, type);
+	switch (op) {
+	case NFT_EXTHDR_OP_IPV6:
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_DESC, desc->id);
+		break;
+	case NFT_EXTHDR_OP_TCPOPT:
+	case NFT_EXTHDR_OP_IPV4:
+	case NFT_EXTHDR_OP_SCTP:
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_OP, op);
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_EXTHDR_DESC, expr->exthdr.raw_type);
+		break;
+	default:
+		return -1;
+	}
 
 	return 0;
 }
@@ -348,16 +381,7 @@ static unsigned int mask_length(const struct expr *mask)
 bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned int *shift)
 {
 	unsigned int off, mask_offset, mask_len;
-
-	if (expr->exthdr.op != NFT_EXTHDR_OP_IPV4 &&
-	    expr->exthdr.tmpl != &exthdr_unknown_template)
-		return false;
-
-	/* In case we are handling tcp options instead of the default ipv6
-	 * extension headers.
-	 */
-	if (expr->exthdr.op == NFT_EXTHDR_OP_TCPOPT)
-		return tcpopt_find_template(expr, mask, shift);
+	bool found;
 
 	mask_offset = mpz_scan1(mask->value, 0);
 	mask_len = mask_length(mask);
@@ -366,24 +390,31 @@ bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned i
 	off += round_up(mask->len, BITS_PER_BYTE) - mask_len;
 
 	/* Handle ip options after the offset and mask have been calculated. */
-	if (expr->exthdr.op == NFT_EXTHDR_OP_IPV4) {
-		if (ipopt_find_template(expr, off, mask_len - mask_offset)) {
-			*shift = mask_offset;
-			return true;
-		} else {
+	switch (expr->exthdr.op) {
+	case NFT_EXTHDR_OP_IPV4:
+		found = ipopt_find_template(expr, off, mask_len - mask_offset);
+		break;
+	case NFT_EXTHDR_OP_TCPOPT:
+		found = tcpopt_find_template(expr, off, mask_len - mask_offset);
+		break;
+	case NFT_EXTHDR_OP_IPV6:
+		exthdr_init_raw(expr, expr->exthdr.desc->type,
+				off, mask_len - mask_offset, expr->exthdr.op, 0);
+
+		/* still failed to find a template... Bug. */
+		if (expr->exthdr.tmpl == &exthdr_unknown_template)
 			return false;
-		}
+		found = true;
+		break;
+	default:
+		found = false;
+		break;
 	}
 
-	exthdr_init_raw(expr, expr->exthdr.desc->type,
-			off, mask_len - mask_offset, expr->exthdr.op, 0);
+	if (found)
+		*shift = mask_offset;
 
-	/* still failed to find a template... Bug. */
-	if (expr->exthdr.tmpl == &exthdr_unknown_template)
-		return false;
-
-	*shift = mask_offset;
-	return true;
+	return found;
 }
 
 #define HDR_TEMPLATE(__name, __dtype, __type, __member)			\

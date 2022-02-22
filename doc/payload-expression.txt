@@ -614,37 +614,37 @@ Segment Routing Header
 |Keyword| Description | TCP option fields
 |eol|
 End if option list|
-kind
+-
 |nop|
 1 Byte TCP Nop padding option |
-kind
+-
 |maxseg|
 TCP Maximum Segment Size|
-kind, length, size
+length, size
 |window|
 TCP Window Scaling |
-kind, length, count
+length, count
 |sack-perm |
 TCP SACK permitted |
-kind, length
+length
 |sack|
 TCP Selective Acknowledgement (alias of block 0) |
-kind, length, left, right
+length, left, right
 |sack0|
 TCP Selective Acknowledgement (block 0) |
-kind, length, left, right
+length, left, right
 |sack1|
 TCP Selective Acknowledgement (block 1) |
-kind, length, left, right
+length, left, right
 |sack2|
 TCP Selective Acknowledgement (block 2) |
-kind, length, left, right
+length, left, right
 |sack3|
 TCP Selective Acknowledgement (block 3) |
-kind, length, left, right
+length, left, right
 |timestamp|
 TCP Timestamps |
-kind, length, tsval, tsecr
+length, tsval, tsecr
 |============================
 
 TCP option matching also supports raw expression syntax to access arbitrary options:
@@ -673,7 +673,12 @@ type, length, ptr, addr
 
 .finding TCP options
 --------------------
-filter input tcp option sack-perm kind 1 counter
+filter input tcp option sack-perm exists counter
+--------------------
+
+.matching TCP options
+--------------------
+filter input tcp option maxseg size lt 536
 --------------------
 
 .matching IPv6 exthdr

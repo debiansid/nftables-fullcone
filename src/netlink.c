@@ -59,7 +59,7 @@ void __noreturn __netlink_abi_error(const char *file, int line,
 {
 	fprintf(stderr, "E: Contact urgently your Linux kernel vendor. "
 		"Netlink ABI is broken: %s:%d %s\n", file, line, reason);
-	exit(NFT_EXIT_FAILURE);
+	abort();
 }
 
 int netlink_io_error(struct netlink_ctx *ctx, const struct location *loc,
@@ -135,7 +135,8 @@ struct nftnl_set_elem *alloc_nftnl_setelem(const struct expr *set,
 	default:
 		__netlink_gen_data(key, &nld, false);
 		nftnl_set_elem_set(nlse, NFTNL_SET_ELEM_KEY, &nld.value, nld.len);
-		if (set->set_flags & NFT_SET_INTERVAL && key->field_count > 1) {
+		if (set->set_flags & NFT_SET_INTERVAL &&
+		    key->etype == EXPR_CONCAT && key->field_count > 1) {
 			key->flags |= EXPR_F_INTERVAL_END;
 			__netlink_gen_data(key, &nld, false);
 			key->flags &= ~EXPR_F_INTERVAL_END;
@@ -664,11 +665,19 @@ static int list_table_cb(struct nftnl_table *nlt, void *arg)
 	return 0;
 }
 
-int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h)
+int netlink_list_tables(struct netlink_ctx *ctx, const struct handle *h,
+			const struct nft_cache_filter *filter)
 {
 	struct nftnl_table_list *table_cache;
+	uint32_t family = h->family;
+	const char *table = NULL;
 
-	table_cache = mnl_nft_table_dump(ctx, h->family);
+	if (filter) {
+		family = filter->list.family;
+		table = filter->list.table;
+	}
+
+	table_cache = mnl_nft_table_dump(ctx, family, table);
 	if (table_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -1713,7 +1722,8 @@ int netlink_list_flowtables(struct netlink_ctx *ctx, const struct handle *h)
 	struct nftnl_flowtable_list *flowtable_cache;
 	int err;
 
-	flowtable_cache = mnl_nft_flowtable_dump(ctx, h->family, h->table.name);
+	flowtable_cache = mnl_nft_flowtable_dump(ctx, h->family,
+						 h->table.name, NULL);
 	if (flowtable_cache == NULL) {
 		if (errno == EINTR)
 			return -1;
@@ -1859,7 +1869,6 @@ static void trace_gen_stmts(struct list_head *stmts,
 	const void *hdr;
 	uint32_t hlen;
 	unsigned int n;
-	bool stacked;
 
 	if (!nftnl_trace_is_set(nlt, attr))
 		return;
@@ -1914,6 +1923,8 @@ restart:
 	n = 0;
 next:
 	list_for_each_entry(stmt, &unordered, list) {
+		enum proto_bases b = base;
+
 		rel = stmt->expr;
 		lhs = rel->left;
 
@@ -1926,18 +1937,14 @@ next:
 		list_move_tail(&stmt->list, stmts);
 		n++;
 
-		stacked = payload_is_stacked(desc, rel);
+		if (payload_is_stacked(desc, rel))
+			b--;
 
-		if (lhs->flags & EXPR_F_PROTOCOL &&
-		    pctx->pbase == PROTO_BASE_INVALID) {
-			payload_dependency_store(pctx, stmt, base - stacked);
-		} else {
-			/* Don't strip 'icmp type' from payload dump. */
-			if (pctx->icmp_type == 0)
-				payload_dependency_kill(pctx, lhs, ctx->family);
-			if (lhs->flags & EXPR_F_PROTOCOL)
-				payload_dependency_store(pctx, stmt, base - stacked);
-		}
+		/* Don't strip 'icmp type' from payload dump. */
+		if (pctx->icmp_type == 0)
+			payload_dependency_kill(pctx, lhs, ctx->family);
+		if (lhs->flags & EXPR_F_PROTOCOL)
+			payload_dependency_store(pctx, stmt, b);
 
 		goto next;
 	}

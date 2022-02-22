@@ -144,3 +144,6 @@ ct set invalid original 42;fail
 ct set invalid 42;fail
 
 notrack;ok
+
+ct count 3;ok
+ct count over 3;ok

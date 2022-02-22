@@ -190,7 +190,7 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
-DIST_SUBDIRS = src include files doc py
+DIST_SUBDIRS = src include files doc examples py
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/libnftables.pc.in $(top_srcdir)/build-aux/ar-lib \
 	$(top_srcdir)/build-aux/compile \
@@ -380,7 +380,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = src include files doc $(am__append_1)
+SUBDIRS = src include files doc examples $(am__append_1)
 EXTRA_DIST = tests	\
 		files
 

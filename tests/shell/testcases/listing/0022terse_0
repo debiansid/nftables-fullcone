@@ -9,7 +9,7 @@ RULESET="table inet filter {
 
 	chain input {
 		type filter hook prerouting priority filter; policy accept;
-		ip saddr @example drop
+		ip saddr != { 10.10.10.100, 10.10.10.111 } ip saddr @example drop
 	}
 }"
 
@@ -31,7 +31,7 @@ EXPECTED="table inet filter {
 
 	chain input {
 		type filter hook prerouting priority filter; policy accept;
-		ip saddr @example drop
+		ip saddr != { 10.10.10.100, 10.10.10.111 } ip saddr @example drop
 	}
 }"
 

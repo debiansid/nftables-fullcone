@@ -1122,6 +1122,13 @@ json_t *expr_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 	return expr_print_json(stmt->expr, octx);
 }
 
+json_t *flow_offload_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	return json_pack("{s:{s:s, s:s+}}", "flow",
+			 "op", "add", "flowtable",
+			 "@", stmt->flow.table_name);
+}
+
 json_t *payload_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 {
 	return json_pack("{s: {s:o, s:o}}", "mangle",

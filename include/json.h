@@ -69,6 +69,7 @@ json_t *uid_type_json(const struct expr *expr, struct output_ctx *octx);
 json_t *gid_type_json(const struct expr *expr, struct output_ctx *octx);
 
 json_t *expr_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+json_t *flow_offload_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *payload_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *exthdr_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *quota_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
@@ -169,6 +170,7 @@ EXPR_PRINT_STUB(uid_type)
 EXPR_PRINT_STUB(gid_type)
 
 STMT_PRINT_STUB(expr)
+STMT_PRINT_STUB(flow_offload)
 STMT_PRINT_STUB(payload)
 STMT_PRINT_STUB(exthdr)
 STMT_PRINT_STUB(quota)

@@ -6,6 +6,6 @@ table inet x {
 
 	chain y {
 		type nat hook prerouting priority dstnat; policy accept;
-		meta nfproto ipv4 dnat ip to ip saddr . ip protocol . tcp dport map @z
+		dnat ip to ip saddr . ip protocol . tcp dport map @z
 	}
 }

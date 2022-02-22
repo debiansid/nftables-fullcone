@@ -132,3 +132,13 @@ inet test-inet input
   [ cmp eq reg 1 0x0000000a ]
   [ reject type 2 code 3 ]
 
+# ether saddr aa:bb:cc:dd:ee:ff ip daddr 192.168.0.1 reject
+inet test-inet input
+  [ meta load iiftype => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ payload load 8b @ link header + 6 => reg 1 ]
+  [ cmp eq reg 1 0xddccbbaa 0x0008ffee ]
+  [ payload load 4b @ network header + 16 => reg 1 ]
+  [ cmp eq reg 1 0x0100a8c0 ]
+  [ reject type 0 code 3 ]
+

@@ -6,7 +6,7 @@
 #include <statement.h>
 
 extern struct expr *ipopt_expr_alloc(const struct location *loc,
-				      uint8_t type, uint8_t field, uint8_t ptr);
+				      uint8_t type, uint8_t field);
 
 extern void ipopt_init_raw(struct expr *expr, uint8_t type,
 			    unsigned int offset, unsigned int len,

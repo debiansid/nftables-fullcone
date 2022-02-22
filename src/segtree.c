@@ -788,6 +788,8 @@ int get_set_decompose(struct set *cache_set, struct set *set)
 			mpz_sub_ui(i->key->value, i->key->value, 1);
 			range = get_set_interval_find(cache_set, left, i);
 			if (!range) {
+				expr_free(left);
+				expr_free(i);
 				expr_free(new_init);
 				errno = ENOENT;
 				return -1;

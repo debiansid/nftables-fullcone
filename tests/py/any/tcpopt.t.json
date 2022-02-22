@@ -1,47 +1,44 @@
-# tcp option eol kind 1
+# tcp option eol exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "eol"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
 
-# tcp option nop kind 1
+# tcp option nop exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "nop"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
 
-# tcp option maxseg kind 1
+# tcp option maxseg exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "maxseg"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
@@ -70,22 +67,6 @@
                 "tcp option": {
                     "field": "size",
                     "name": "maxseg"
-                }
-            },
-            "op": "==",
-            "right": 1
-        }
-    }
-]
-
-# tcp option window kind 1
-[
-    {
-        "match": {
-            "left": {
-                "tcp option": {
-                    "field": "kind",
-                    "name": "window"
                 }
             },
             "op": "==",
@@ -126,18 +107,17 @@
     }
 ]
 
-# tcp option sack-perm kind 1
+# tcp option sack-perm exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "sack-perm"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
@@ -158,18 +138,17 @@
     }
 ]
 
-# tcp option sack kind 1
+# tcp option sack exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "sack"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
@@ -213,7 +192,7 @@
             "left": {
                 "tcp option": {
                     "field": "left",
-                    "name": "sack0"
+                    "name": "sack"
                 }
             },
             "op": "==",
@@ -293,7 +272,7 @@
             "left": {
                 "tcp option": {
                     "field": "right",
-                    "name": "sack0"
+                    "name": "sack"
                 }
             },
             "op": "==",
@@ -350,18 +329,17 @@
     }
 ]
 
-# tcp option timestamp kind 1
+# tcp option timestamp exists
 [
     {
         "match": {
             "left": {
                 "tcp option": {
-                    "field": "kind",
                     "name": "timestamp"
                 }
             },
             "op": "==",
-            "right": 1
+            "right": true
         }
     }
 ]
@@ -414,23 +392,6 @@
     }
 ]
 
-# tcp option 6 exists
-[
-    {
-        "match": {
-            "left": {
-                "tcp option": {
-                    "base": 6,
-                    "len": 8,
-                    "offset": 0
-                }
-            },
-            "op": "==",
-            "right": true
-        }
-    }
-]
-
 # tcp option 255 missing
 [
     {
@@ -444,6 +405,23 @@
             },
             "op": "==",
             "right": false
+        }
+    }
+]
+
+# tcp option 6 exists
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "base": 6,
+                    "len": 8,
+                    "offset": 0
+                }
+            },
+            "op": "==",
+            "right": true
         }
     }
 ]
@@ -510,3 +488,100 @@
     }
 ]
 
+# tcp option md5sig exists
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "name": "md5sig"
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]
+
+# tcp option fastopen exists
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "name": "fastopen"
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]
+
+# tcp option mptcp exists
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "name": "mptcp"
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]
+
+# tcp option mptcp subtype 0
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "field": "subtype",
+                    "name": "mptcp"
+                }
+            },
+            "op": "==",
+            "right": 0
+        }
+    }
+]
+
+# tcp option mptcp subtype 1
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "field": "subtype",
+                    "name": "mptcp"
+                }
+            },
+            "op": "==",
+            "right": 1
+        }
+    }
+]
+
+# tcp option mptcp subtype { 0, 2}
+[
+    {
+        "match": {
+            "left": {
+                "tcp option": {
+                    "field": "subtype",
+                    "name": "mptcp"
+                }
+            },
+            "op": "==",
+            "right": {
+                "set": [
+                    0,
+                    2
+                ]
+            }
+        }
+   }
+]

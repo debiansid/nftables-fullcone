@@ -91,6 +91,34 @@ static const struct exthdr_desc tcpopt_timestamp = {
 	},
 };
 
+static const struct exthdr_desc tcpopt_fastopen = {
+	.name		= "fastopen",
+	.type		= TCPOPT_KIND_FASTOPEN,
+	.templates	= {
+		[TCPOPT_COMMON_KIND]	= PHT("kind",   0, 8),
+		[TCPOPT_COMMON_LENGTH]	= PHT("length", 8, 8),
+	},
+};
+
+static const struct exthdr_desc tcpopt_md5sig = {
+	.name		= "md5sig",
+	.type		= TCPOPT_KIND_MD5SIG,
+	.templates	= {
+		[TCPOPT_COMMON_KIND]	= PHT("kind",   0, 8),
+		[TCPOPT_COMMON_LENGTH]	= PHT("length", 8, 8),
+	},
+};
+
+
+static const struct exthdr_desc tcpopt_mptcp = {
+	.name		= "mptcp",
+	.type		= TCPOPT_KIND_MPTCP,
+	.templates	= {
+		[TCPOPT_MPTCP_KIND]	= PHT("kind",   0,   8),
+		[TCPOPT_MPTCP_LENGTH]	= PHT("length", 8,  8),
+		[TCPOPT_MPTCP_SUBTYPE]  = PHT("subtype", 16, 4),
+	},
+};
 #undef PHT
 
 const struct exthdr_desc *tcpopt_protocols[] = {
@@ -101,6 +129,9 @@ const struct exthdr_desc *tcpopt_protocols[] = {
 	[TCPOPT_KIND_SACK_PERMITTED]	= &tcpopt_sack_permitted,
 	[TCPOPT_KIND_SACK]		= &tcpopt_sack,
 	[TCPOPT_KIND_TIMESTAMP]		= &tcpopt_timestamp,
+	[TCPOPT_KIND_MD5SIG]		= &tcpopt_md5sig,
+	[TCPOPT_KIND_MPTCP]		= &tcpopt_mptcp,
+	[TCPOPT_KIND_FASTOPEN]		= &tcpopt_fastopen,
 };
 
 /**
@@ -194,6 +225,7 @@ void tcpopt_init_raw(struct expr *expr, uint8_t type, unsigned int off,
 	expr->exthdr.flags = flags;
 	expr->exthdr.offset = off;
 	expr->exthdr.op = NFT_EXTHDR_OP_TCPOPT;
+	expr->exthdr.tmpl = &tcpopt_unknown_template;
 
 	if (flags & NFT_EXTHDR_F_PRESENT)
 		datatype_set(expr, &boolean_type);
@@ -221,14 +253,12 @@ void tcpopt_init_raw(struct expr *expr, uint8_t type, unsigned int off,
 	}
 }
 
-bool tcpopt_find_template(struct expr *expr, const struct expr *mask,
-			  unsigned int *shift)
+bool tcpopt_find_template(struct expr *expr, unsigned int offset, unsigned int len)
 {
 	if (expr->exthdr.tmpl != &tcpopt_unknown_template)
 		return false;
 
-	tcpopt_init_raw(expr, expr->exthdr.desc->type, expr->exthdr.offset,
-			expr->len, 0);
+	tcpopt_init_raw(expr, expr->exthdr.desc->type, offset, len, 0);
 
 	if (expr->exthdr.tmpl == &tcpopt_unknown_template)
 		return false;

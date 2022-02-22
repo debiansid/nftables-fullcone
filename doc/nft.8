@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 11/18/2021
+.\"      Date: 02/21/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "11/18/2021" "\ \&" "\ \&"
+.TH "NFT" "8" "02/21/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -91,6 +91,13 @@ to the list of directories to be searched for included files\&. This option may 
 \fB\-c\fR, \fB\-\-check\fR
 .RS 4
 Check commands validity without actually applying the changes\&.
+.RE
+.PP
+\fB\-o\fR, \fB\-\-optimize\fR
+.RS 4
+Optimize your ruleset\&. You can combine this option with
+\fI\-c\fR
+to inspect the proposed optimizations\&.
 .RE
 .PP
 \fBRuleset list output formatting that modify the output of the list ruleset command:\fR
@@ -210,13 +217,15 @@ Include statements support the usual shell wildcard symbols (\fB,?,[])\&. Having
 .\}
 .nf
 \fBdefine\fR \fIvariable\fR \fB=\fR \fIexpr\fR
+\fBundefine\fR \fIvariable\fR
+\fBredefine\fR \fIvariable\fR \fB=\fR \fIexpr\fR
 \fB$variable\fR
 .fi
 .if n \{\
 .RE
 .\}
 .sp
-Symbolic variables can be defined using the \fBdefine\fR statement\&. Variable references are expressions and can be used to initialize other variables\&. The scope of a definition is the current block and all blocks contained within\&.
+Symbolic variables can be defined using the \fBdefine\fR statement\&. Variable references are expressions and can be used to initialize other variables\&. The scope of a definition is the current block and all blocks contained within\&. Symbolic variables can be undefined using the \fBundefine\fR statement, and modified using the \fBredefine\fR statement\&.
 .PP
 \fBUsing symbolic variables\fR. 
 .sp
@@ -227,6 +236,8 @@ Symbolic variables can be defined using the \fBdefine\fR statement\&. Variable r
 define int_if1 = eth0
 define int_if2 = eth1
 define int_ifs = { $int_if1, $int_if2 }
+redefine int_if2 = wlan0
+undefine int_if2
 
 filter input iif $int_ifs accept
 .fi
@@ -6920,7 +6931,7 @@ T}:T{
 End if option list
 T}:T{
 .sp
-kind
+\-
 T}
 T{
 .sp
@@ -6930,7 +6941,7 @@ T}:T{
 1 Byte TCP Nop padding option
 T}:T{
 .sp
-kind
+\-
 T}
 T{
 .sp
@@ -6940,7 +6951,7 @@ T}:T{
 TCP Maximum Segment Size
 T}:T{
 .sp
-kind, length, size
+length, size
 T}
 T{
 .sp
@@ -6950,7 +6961,7 @@ T}:T{
 TCP Window Scaling
 T}:T{
 .sp
-kind, length, count
+length, count
 T}
 T{
 .sp
@@ -6960,7 +6971,7 @@ T}:T{
 TCP SACK permitted
 T}:T{
 .sp
-kind, length
+length
 T}
 T{
 .sp
@@ -6970,7 +6981,7 @@ T}:T{
 TCP Selective Acknowledgement (alias of block 0)
 T}:T{
 .sp
-kind, length, left, right
+length, left, right
 T}
 T{
 .sp
@@ -6980,7 +6991,7 @@ T}:T{
 TCP Selective Acknowledgement (block 0)
 T}:T{
 .sp
-kind, length, left, right
+length, left, right
 T}
 T{
 .sp
@@ -6990,7 +7001,7 @@ T}:T{
 TCP Selective Acknowledgement (block 1)
 T}:T{
 .sp
-kind, length, left, right
+length, left, right
 T}
 T{
 .sp
@@ -7000,7 +7011,7 @@ T}:T{
 TCP Selective Acknowledgement (block 2)
 T}:T{
 .sp
-kind, length, left, right
+length, left, right
 T}
 T{
 .sp
@@ -7010,7 +7021,7 @@ T}:T{
 TCP Selective Acknowledgement (block 3)
 T}:T{
 .sp
-kind, length, left, right
+length, left, right
 T}
 T{
 .sp
@@ -7020,7 +7031,7 @@ T}:T{
 TCP Timestamps
 T}:T{
 .sp
-kind, length, tsval, tsecr
+length, tsval, tsecr
 T}
 .TE
 .sp 1
@@ -7116,7 +7127,19 @@ T}
 .RS 4
 .\}
 .nf
-filter input tcp option sack\-perm kind 1 counter
+filter input tcp option sack\-perm exists counter
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBmatching TCP options\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+filter input tcp option maxseg size lt 536
 .fi
 .if n \{\
 .RE

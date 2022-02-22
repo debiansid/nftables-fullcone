@@ -17,3 +17,8 @@ RULESET="table ip x {
 $NFT -f - <<< $RULESET
 $NFT delete element x y { \* : 192.168.0.3 }
 $NFT add element x y { \* : 192.168.0.4 }
+
+$NFT add chain x y
+$NFT add rule x y snat to ip saddr map @z
+$NFT 'add rule x y snat to ip saddr map { 10.141.0.0/24 : 192.168.0.2, * : 192.168.0.3 }'
+$NFT 'add rule x y snat to ip saddr . ip daddr map { 10.141.0.0/24 . 10.0.0.0/8 : 192.168.0.2, 192.168.9.0/24 . 192.168.10.0/24 : 192.168.0.4, * : 192.168.0.3 }'

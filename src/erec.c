@@ -81,11 +81,58 @@ struct error_record *erec_create(enum error_record_types type,
 	return erec;
 }
 
+void print_location(FILE *f, const struct input_descriptor *indesc,
+		    const struct location *loc)
+{
+	const struct input_descriptor *tmp;
+	const struct location *iloc;
+
+	if (indesc->location.indesc != NULL) {
+		const char *prefix = "In file included from";
+		iloc = &indesc->location;
+		for (tmp = iloc->indesc;
+		     tmp != NULL && tmp->type != INDESC_INTERNAL;
+		     tmp = iloc->indesc) {
+			fprintf(f, "%s %s:%u:%u-%u:\n", prefix,
+				tmp->name,
+				iloc->first_line, iloc->first_column,
+				iloc->last_column);
+			prefix = "                 from";
+			iloc = &tmp->location;
+		}
+	}
+	if (indesc->type != INDESC_BUFFER && indesc->name) {
+		fprintf(f, "%s:%u:%u-%u: ", indesc->name,
+			loc->first_line, loc->first_column,
+			loc->last_column);
+	}
+}
+
+const char *line_location(const struct input_descriptor *indesc,
+			  const struct location *loc, char *buf, size_t bufsiz)
+{
+	const char *line = NULL;
+	FILE *f;
+
+	f = fopen(indesc->name, "r");
+	if (!f)
+		return NULL;
+
+	if (!fseek(f, loc->line_offset, SEEK_SET) &&
+	    fread(buf, 1, bufsiz - 1, f) > 0) {
+		*strchrnul(buf, '\n') = '\0';
+		line = buf;
+	}
+	fclose(f);
+
+	return line;
+}
+
 void erec_print(struct output_ctx *octx, const struct error_record *erec,
 		unsigned int debug_mask)
 {
-	const struct location *loc = erec->locations, *iloc;
-	const struct input_descriptor *indesc = loc->indesc, *tmp;
+	const struct location *loc = erec->locations;
+	const struct input_descriptor *indesc = loc->indesc;
 	const char *line = NULL;
 	char buf[1024] = {};
 	char *pbuf = NULL;
@@ -99,17 +146,13 @@ void erec_print(struct output_ctx *octx, const struct error_record *erec,
 		line = indesc->data;
 		*strchrnul(line, '\n') = '\0';
 		break;
+	case INDESC_STDIN:
+		line = indesc->data;
+		line += loc->line_offset;
+		*strchrnul(line, '\n') = '\0';
+		break;
 	case INDESC_FILE:
-		f = fopen(indesc->name, "r");
-		if (!f)
-			break;
-
-		if (!fseek(f, loc->line_offset, SEEK_SET) &&
-		    fread(buf, 1, sizeof(buf) - 1, f) > 0) {
-			*strchrnul(buf, '\n') = '\0';
-			line = buf;
-		}
-		fclose(f);
+		line = line_location(indesc, loc, buf, sizeof(buf));
 		break;
 	case INDESC_INTERNAL:
 	case INDESC_NETLINK:
@@ -132,24 +175,8 @@ void erec_print(struct output_ctx *octx, const struct error_record *erec,
 		return;
 	}
 
-	if (indesc->location.indesc != NULL) {
-		const char *prefix = "In file included from";
-		iloc = &indesc->location;
-		for (tmp = iloc->indesc;
-		     tmp != NULL && tmp->type != INDESC_INTERNAL;
-		     tmp = iloc->indesc) {
-			fprintf(f, "%s %s:%u:%u-%u:\n", prefix,
-				tmp->name,
-				iloc->first_line, iloc->first_column,
-				iloc->last_column);
-			prefix = "                 from";
-			iloc = &tmp->location;
-		}
-	}
-	if (indesc->name != NULL)
-		fprintf(f, "%s:%u:%u-%u: ", indesc->name,
-			loc->first_line, loc->first_column,
-			loc->last_column);
+	print_location(f, indesc, loc);
+
 	if (error_record_names[erec->type])
 		fprintf(f, "%s: ", error_record_names[erec->type]);
 	fprintf(f, "%s\n", erec->msg);

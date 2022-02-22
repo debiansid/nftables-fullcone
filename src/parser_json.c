@@ -689,7 +689,7 @@ static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
 
 	if (json_unpack(root, "{s:s}", "field", &field)) {
 		expr = ipopt_expr_alloc(int_loc, descval,
-					 IPOPT_FIELD_TYPE, 0);
+					 IPOPT_FIELD_TYPE);
 		expr->exthdr.flags = NFT_EXTHDR_F_PRESENT;
 
 		return expr;
@@ -698,7 +698,7 @@ static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
 		json_error(ctx, "Unknown ip option field '%s'.", field);
 		return NULL;
 	}
-	return ipopt_expr_alloc(int_loc, descval, fieldval, 0);
+	return ipopt_expr_alloc(int_loc, descval, fieldval);
 }
 
 static int json_parse_sctp_chunk_field(const struct exthdr_desc *desc,
@@ -1903,6 +1903,28 @@ out_err:
 	return NULL;
 }
 
+static struct stmt *json_parse_flow_offload_stmt(struct json_ctx *ctx,
+						 const char *key, json_t *value)
+{
+	const char *opstr, *flowtable;
+
+	if (json_unpack_err(ctx, value, "{s:s, s:s}",
+			    "op", &opstr, "flowtable", &flowtable))
+		return NULL;
+
+	if (strcmp(opstr, "add")) {
+		json_error(ctx, "Unknown flow offload statement op '%s'.", opstr);
+		return NULL;
+	}
+
+	if (flowtable[0] != '@') {
+		json_error(ctx, "Illegal flowtable reference in flow offload statement.");
+		return NULL;
+	}
+
+	return flow_offload_stmt_alloc(int_loc, xstrdup(flowtable + 1));
+}
+
 static struct stmt *json_parse_notrack_stmt(struct json_ctx *ctx,
 					const char *key, json_t *value)
 {
@@ -2647,6 +2669,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "mangle", json_parse_mangle_stmt },
 		{ "quota", json_parse_quota_stmt },
 		{ "limit", json_parse_limit_stmt },
+		{ "flow", json_parse_flow_offload_stmt },
 		{ "fwd", json_parse_fwd_stmt },
 		{ "notrack", json_parse_notrack_stmt },
 		{ "dup", json_parse_dup_stmt },
@@ -3102,7 +3125,9 @@ static struct expr *json_parse_flowtable_devs(struct json_ctx *ctx,
 	size_t index;
 
 	if (!json_unpack(root, "s", &dev)) {
-		tmp = symbol_expr_alloc(int_loc, SYMBOL_VALUE, NULL, dev);
+		tmp = constant_expr_alloc(int_loc, &string_type,
+					  BYTEORDER_HOST_ENDIAN,
+					  strlen(dev) * BITS_PER_BYTE, dev);
 		compound_expr_add(expr, tmp);
 		return expr;
 	}
@@ -3118,7 +3143,9 @@ static struct expr *json_parse_flowtable_devs(struct json_ctx *ctx,
 			expr_free(expr);
 			return NULL;
 		}
-		tmp = symbol_expr_alloc(int_loc, SYMBOL_VALUE, NULL, dev);
+		tmp = constant_expr_alloc(int_loc, &string_type,
+					  BYTEORDER_HOST_ENDIAN,
+					  strlen(dev) * BITS_PER_BYTE, dev);
 		compound_expr_add(expr, tmp);
 	}
 	return expr;
@@ -3131,7 +3158,7 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 	const char *family, *hook, *hookstr;
 	struct flowtable *flowtable;
 	struct handle h = { 0 };
-	json_t *devs;
+	json_t *devs = NULL;
 	int prio;
 
 	if (json_unpack_err(ctx, root, "{s:s, s:s}",
@@ -3160,13 +3187,14 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 	if (op == CMD_DELETE || op == CMD_LIST)
 		return cmd_alloc(op, cmd_obj, &h, int_loc, NULL);
 
-	if (json_unpack_err(ctx, root, "{s:s, s:I, s:o}",
+	if (json_unpack_err(ctx, root, "{s:s, s:I}",
 			    "hook", &hook,
-			    "prio", &prio,
-			    "dev", &devs)) {
+			    "prio", &prio)) {
 		handle_free(&h);
 		return NULL;
 	}
+
+	json_unpack(root, "{s:o}", &devs);
 
 	hookstr = chain_hookname_lookup(hook);
 	if (!hookstr) {
@@ -3182,12 +3210,14 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 				    BYTEORDER_HOST_ENDIAN,
 				    sizeof(int) * BITS_PER_BYTE, &prio);
 
-	flowtable->dev_expr = json_parse_flowtable_devs(ctx, devs);
-	if (!flowtable->dev_expr) {
-		json_error(ctx, "Invalid flowtable dev.");
-		flowtable_free(flowtable);
-		handle_free(&h);
-		return NULL;
+	if (devs) {
+		flowtable->dev_expr = json_parse_flowtable_devs(ctx, devs);
+		if (!flowtable->dev_expr) {
+			json_error(ctx, "Invalid flowtable dev.");
+			flowtable_free(flowtable);
+			handle_free(&h);
+			return NULL;
+		}
 	}
 	return cmd_alloc(op, cmd_obj, &h, int_loc, flowtable);
 }

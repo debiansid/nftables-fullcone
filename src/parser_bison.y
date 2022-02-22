@@ -187,6 +187,10 @@ int nft_lex(void *, void *, void *);
 	struct position_spec	position_spec;
 	struct prio_spec	prio_spec;
 	struct limit_rate	limit_rate;
+	struct tcp_kind_field {
+		uint16_t kind; /* must allow > 255 for SACK1, 2.. hack */
+		uint8_t field;
+	} tcp_kind_field;
 }
 
 %token TOKEN_EOF 0		"end of file"
@@ -404,6 +408,7 @@ int nft_lex(void *, void *, void *);
 %token OPTION			"option"
 %token ECHO			"echo"
 %token EOL			"eol"
+%token MPTCP			"mptcp"
 %token NOP			"nop"
 %token SACK			"sack"
 %token SACK0			"sack0"
@@ -411,13 +416,15 @@ int nft_lex(void *, void *, void *);
 %token SACK2			"sack2"
 %token SACK3			"sack3"
 %token SACK_PERM		"sack-permitted"
+%token FASTOPEN			"fastopen"
+%token MD5SIG			"md5sig"
 %token TIMESTAMP		"timestamp"
-%token KIND			"kind"
 %token COUNT			"count"
 %token LEFT			"left"
 %token RIGHT			"right"
 %token TSVAL			"tsval"
 %token TSECR			"tsecr"
+%token SUBTYPE			"subtype"
 
 %token DCCP			"dccp"
 
@@ -874,7 +881,10 @@ int nft_lex(void *, void *, void *);
 %type <expr>			tcp_hdr_expr
 %destructor { expr_free($$); }	tcp_hdr_expr
 %type <val>			tcp_hdr_field
-%type <val>			tcp_hdr_option_type tcp_hdr_option_field
+%type <val>			tcp_hdr_option_type
+%type <val>			tcp_hdr_option_sack
+%type <val>			tcpopt_field_maxseg	tcpopt_field_mptcp	tcpopt_field_sack	 tcpopt_field_tsopt	tcpopt_field_window
+%type <tcp_kind_field>		tcp_hdr_option_kind_and_field
 
 %type <expr>			boolean_expr
 %destructor { expr_free($$); }	boolean_expr
@@ -930,6 +940,7 @@ close_scope_list	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_LIST); }
 close_scope_limit	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_LIMIT); };
 close_scope_numgen	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_NUMGEN); };
 close_scope_quota	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_QUOTA); };
+close_scope_tcp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_TCP); }
 close_scope_queue	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_QUEUE); };
 close_scope_rt		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_RT); };
 close_scope_sctp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_SCTP); };
@@ -1973,6 +1984,7 @@ map_block_obj_type	:	COUNTER	close_scope_counter { $$ = NFT_OBJECT_COUNTER; }
 			|	QUOTA	close_scope_quota { $$ = NFT_OBJECT_QUOTA; }
 			|	LIMIT	close_scope_limit { $$ = NFT_OBJECT_LIMIT; }
 			|	SECMARK close_scope_secmark { $$ = NFT_OBJECT_SECMARK; }
+			|	SYNPROXY { $$ = NFT_OBJECT_SYNPROXY; }
 			;
 
 map_block		:	/* empty */	{ $$ = $<set>-1; }
@@ -2140,7 +2152,14 @@ flowtable_list_expr	:	flowtable_expr_member
 			|	flowtable_list_expr	COMMA	opt_newline
 			;
 
-flowtable_expr_member	:	STRING
+flowtable_expr_member	:	QUOTED_STRING
+			{
+				$$ = constant_expr_alloc(&@$, &string_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 strlen($1) * BITS_PER_BYTE, $1);
+				xfree($1);
+			}
+			|	STRING
 			{
 				$$ = constant_expr_alloc(&@$, &string_type,
 							 BYTEORDER_HOST_ENDIAN,
@@ -3110,7 +3129,7 @@ level_type		:	string
 			}
 			;
 
-log_flags		:	TCP	log_flags_tcp
+log_flags		:	TCP	log_flags_tcp	close_scope_tcp
 			{
 				$$ = $2;
 			}
@@ -3361,7 +3380,7 @@ reject_opts		:       /* empty */
 				$<stmt>0->reject.expr = $3;
 				datatype_set($<stmt>0->reject.expr, &icmpx_code_type);
 			}
-			|	WITH	TCP	RESET
+			|	WITH	TCP	close_scope_tcp RESET
 			{
 				$<stmt>0->reject.type = NFT_REJECT_TCP_RST;
 			}
@@ -4461,7 +4480,7 @@ ct_cmd_type		:	HELPERS		{ $$ = CMD_OBJ_CT_HELPERS; }
 			|	EXPECTATION	{ $$ = CMD_OBJ_CT_EXPECT; }
 			;
 
-ct_l4protoname		:	TCP	{ $$ = IPPROTO_TCP; }
+ct_l4protoname		:	TCP	close_scope_tcp	{ $$ = IPPROTO_TCP; }
 			|	UDP	{ $$ = IPPROTO_UDP; }
 			;
 
@@ -4735,7 +4754,7 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 			|	integer_expr		{ $$ = $1; }
 			|	boolean_expr		{ $$ = $1; }
 			|	keyword_expr		{ $$ = $1; }
-			|	TCP
+			|	TCP	close_scope_tcp
 			{
 				uint8_t data = IPPROTO_TCP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
@@ -5242,7 +5261,7 @@ payload_expr		:	payload_raw_expr
 			|	comp_hdr_expr
 			|	udp_hdr_expr
 			|	udplite_hdr_expr
-			|	tcp_hdr_expr
+			|	tcp_hdr_expr	close_scope_tcp
 			|	dccp_hdr_expr
 			|	sctp_hdr_expr
 			|	th_hdr_expr
@@ -5320,11 +5339,15 @@ ip_hdr_expr		:	IP	ip_hdr_field	close_scope_ip
 			}
 			|	IP	OPTION	ip_option_type ip_option_field	close_scope_ip
 			{
-				$$ = ipopt_expr_alloc(&@$, $3, $4, 0);
+				$$ = ipopt_expr_alloc(&@$, $3, $4);
+				if (!$$) {
+					erec_queue(error(&@1, "unknown ip option type/field"), state->msgs);
+					YYERROR;
+				}
 			}
 			|	IP	OPTION	ip_option_type close_scope_ip
 			{
-				$$ = ipopt_expr_alloc(&@$, $3, IPOPT_FIELD_TYPE, 0);
+				$$ = ipopt_expr_alloc(&@$, $3, IPOPT_FIELD_TYPE);
 				$$->exthdr.flags = NFT_EXTHDR_F_PRESENT;
 			}
 			;
@@ -5477,14 +5500,14 @@ tcp_hdr_expr		:	TCP	tcp_hdr_field
 			{
 				$$ = payload_expr_alloc(&@$, &proto_tcp, $2);
 			}
-			|	TCP	OPTION	tcp_hdr_option_type tcp_hdr_option_field
-			{
-				$$ = tcpopt_expr_alloc(&@$, $3, $4);
-			}
 			|	TCP	OPTION	tcp_hdr_option_type
 			{
 				$$ = tcpopt_expr_alloc(&@$, $3, TCPOPT_COMMON_KIND);
 				$$->exthdr.flags = NFT_EXTHDR_F_PRESENT;
+			}
+			|	TCP	OPTION	tcp_hdr_option_kind_and_field
+			{
+				$$ = tcpopt_expr_alloc(&@$, $3.kind, $3.field);
 			}
 			|	TCP	OPTION	AT tcp_hdr_option_type	COMMA	NUM	COMMA	NUM
 			{
@@ -5505,19 +5528,57 @@ tcp_hdr_field		:	SPORT		{ $$ = TCPHDR_SPORT; }
 			|	URGPTR		{ $$ = TCPHDR_URGPTR; }
 			;
 
-tcp_hdr_option_type	:	EOL		{ $$ = TCPOPT_KIND_EOL; }
-			|	NOP		{ $$ = TCPOPT_KIND_NOP; }
-			|	MSS  	  	{ $$ = TCPOPT_KIND_MAXSEG; }
-			|	WINDOW		{ $$ = TCPOPT_KIND_WINDOW; }
-			|	SACK_PERM	{ $$ = TCPOPT_KIND_SACK_PERMITTED; }
-			|	SACK		{ $$ = TCPOPT_KIND_SACK; }
+tcp_hdr_option_kind_and_field	:	MSS	tcpopt_field_maxseg
+				{
+					struct tcp_kind_field kind_field = { .kind = TCPOPT_KIND_MAXSEG, .field = $2 };
+					$$ = kind_field;
+				}
+				|	tcp_hdr_option_sack	tcpopt_field_sack
+				{
+					struct tcp_kind_field kind_field = { .kind = $1, .field = $2 };
+					$$ = kind_field;
+				}
+				|	WINDOW	tcpopt_field_window
+				{
+					struct tcp_kind_field kind_field = { .kind = TCPOPT_KIND_WINDOW, .field = $2 };
+					$$ = kind_field;
+				}
+				|	TIMESTAMP	tcpopt_field_tsopt
+				{
+					struct tcp_kind_field kind_field = { .kind = TCPOPT_KIND_TIMESTAMP, .field = $2 };
+					$$ = kind_field;
+				}
+				|	tcp_hdr_option_type	LENGTH
+				{
+					struct tcp_kind_field kind_field = { .kind = $1, .field = TCPOPT_COMMON_LENGTH };
+					$$ = kind_field;
+				}
+				|	MPTCP	tcpopt_field_mptcp
+				{
+					struct tcp_kind_field kind_field = { .kind = TCPOPT_KIND_MPTCP, .field = $2 };
+					$$ = kind_field;
+				}
+				;
+
+tcp_hdr_option_sack	:	SACK		{ $$ = TCPOPT_KIND_SACK; }
 			|	SACK0		{ $$ = TCPOPT_KIND_SACK; }
 			|	SACK1		{ $$ = TCPOPT_KIND_SACK1; }
 			|	SACK2		{ $$ = TCPOPT_KIND_SACK2; }
 			|	SACK3		{ $$ = TCPOPT_KIND_SACK3; }
-			|	ECHO		{ $$ = TCPOPT_KIND_ECHO; }
-			|	TIMESTAMP	{ $$ = TCPOPT_KIND_TIMESTAMP; }
-			|	NUM		{
+			;
+
+tcp_hdr_option_type	:	ECHO			{ $$ = TCPOPT_KIND_ECHO; }
+			|	EOL			{ $$ = TCPOPT_KIND_EOL; }
+			|	FASTOPEN		{ $$ = TCPOPT_KIND_FASTOPEN; }
+			|	MD5SIG			{ $$ = TCPOPT_KIND_MD5SIG; }
+			|	MPTCP			{ $$ = TCPOPT_KIND_MPTCP; }
+			|	MSS			{ $$ = TCPOPT_KIND_MAXSEG; }
+			|	NOP			{ $$ = TCPOPT_KIND_NOP; }
+			|	SACK_PERM		{ $$ = TCPOPT_KIND_SACK_PERMITTED; }
+			|       TIMESTAMP               { $$ = TCPOPT_KIND_TIMESTAMP; }
+			|       WINDOW                  { $$ = TCPOPT_KIND_WINDOW; }
+			|	tcp_hdr_option_sack	{ $$ = $1; }
+			|	NUM			{
 				if ($1 > 255) {
 					erec_queue(error(&@1, "value too large"), state->msgs);
 					YYERROR;
@@ -5526,14 +5587,21 @@ tcp_hdr_option_type	:	EOL		{ $$ = TCPOPT_KIND_EOL; }
 			}
 			;
 
-tcp_hdr_option_field	:	KIND		{ $$ = TCPOPT_COMMON_KIND; }
-			|	LENGTH		{ $$ = TCPOPT_COMMON_LENGTH; }
-			|	SIZE		{ $$ = TCPOPT_MAXSEG_SIZE; }
-			|	COUNT		{ $$ = TCPOPT_WINDOW_COUNT; }
-			|	LEFT		{ $$ = TCPOPT_SACK_LEFT; }
+tcpopt_field_sack	: 	LEFT		{ $$ = TCPOPT_SACK_LEFT; }
 			|	RIGHT		{ $$ = TCPOPT_SACK_RIGHT; }
-			|	TSVAL		{ $$ = TCPOPT_TS_TSVAL; }
+			;
+
+tcpopt_field_window	:	COUNT           { $$ = TCPOPT_WINDOW_COUNT; }
+			;
+
+tcpopt_field_tsopt	:	TSVAL           { $$ = TCPOPT_TS_TSVAL; }
 			|	TSECR		{ $$ = TCPOPT_TS_TSECR; }
+			;
+
+tcpopt_field_maxseg	:	SIZE		{ $$ = TCPOPT_MAXSEG_SIZE; }
+			;
+
+tcpopt_field_mptcp	:	SUBTYPE		{ $$ = TCPOPT_MPTCP_SUBTYPE; }
 			;
 
 dccp_hdr_expr		:	DCCP	dccp_hdr_field

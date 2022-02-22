@@ -1502,3 +1502,22 @@
     }
 ]
 
+# ct count 3
+[
+    {
+        "ct count": {
+            "val": 3
+        }
+    }
+]
+
+# ct count over 3
+[
+    {
+        "ct count": {
+            "inv": true,
+            "val": 3
+        }
+    }
+]
+

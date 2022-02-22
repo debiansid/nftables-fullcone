@@ -167,9 +167,9 @@ am__libnftables_la_SOURCES_DIST = rule.c statement.c cache.c cmd.c \
 	fib.c hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c \
 	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
 	monitor.c owner.c segtree.c rbtree.c gmputil.c utils.c erec.c \
-	mnl.c iface.c mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c \
-	print.c sctp_chunk.c libnftables.c libnftables.map xt.c json.c \
-	parser_json.c
+	mnl.c iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
+	socket.c print.c sctp_chunk.c libnftables.c libnftables.map \
+	xt.c json.c parser_json.c
 @BUILD_JSON_TRUE@am__objects_1 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
 	datatype.lo expression.lo evaluate.lo proto.lo payload.lo \
@@ -177,8 +177,9 @@ am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
 	ct.lo xfrm.lo netlink.lo netlink_linearize.lo \
 	netlink_delinearize.lo misspell.lo monitor.lo owner.lo \
 	segtree.lo rbtree.lo gmputil.lo utils.lo erec.lo mnl.lo \
-	iface.lo mergesort.lo osf.lo nfnl_osf.lo tcpopt.lo socket.lo \
-	print.lo sctp_chunk.lo libnftables.lo xt.lo $(am__objects_1)
+	iface.lo mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
+	socket.lo print.lo sctp_chunk.lo libnftables.lo xt.lo \
+	$(am__objects_1)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
 libnftables_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -227,11 +228,11 @@ am__depfiles_remade = ./$(DEPDIR)/cache.Plo ./$(DEPDIR)/cli.Po \
 	./$(DEPDIR)/monitor.Plo ./$(DEPDIR)/netlink.Plo \
 	./$(DEPDIR)/netlink_delinearize.Plo \
 	./$(DEPDIR)/netlink_linearize.Plo ./$(DEPDIR)/nfnl_osf.Plo \
-	./$(DEPDIR)/numgen.Plo ./$(DEPDIR)/osf.Plo \
-	./$(DEPDIR)/owner.Plo ./$(DEPDIR)/parser_json.Plo \
-	./$(DEPDIR)/payload.Plo ./$(DEPDIR)/print.Plo \
-	./$(DEPDIR)/proto.Plo ./$(DEPDIR)/rbtree.Plo \
-	./$(DEPDIR)/rt.Plo ./$(DEPDIR)/rule.Plo \
+	./$(DEPDIR)/numgen.Plo ./$(DEPDIR)/optimize.Plo \
+	./$(DEPDIR)/osf.Plo ./$(DEPDIR)/owner.Plo \
+	./$(DEPDIR)/parser_json.Plo ./$(DEPDIR)/payload.Plo \
+	./$(DEPDIR)/print.Plo ./$(DEPDIR)/proto.Plo \
+	./$(DEPDIR)/rbtree.Plo ./$(DEPDIR)/rt.Plo ./$(DEPDIR)/rule.Plo \
 	./$(DEPDIR)/sctp_chunk.Plo ./$(DEPDIR)/segtree.Plo \
 	./$(DEPDIR)/socket.Plo ./$(DEPDIR)/statement.Plo \
 	./$(DEPDIR)/tcpopt.Plo ./$(DEPDIR)/utils.Plo \
@@ -460,7 +461,6 @@ top_srcdir = @top_srcdir@
 # </snippet>
 #
 libnftables_LIBVERSION = 2:0:1
-CLEANFILES = scanner.c parser_bison.c
 AM_CPPFLAGS = -I$(top_srcdir)/include \
 	-DDEFAULT_INCLUDE_PATH="\"${sysconfdir}\"" ${LIBMNL_CFLAGS} \
 	${LIBNFTNL_CFLAGS} $(am__append_1) $(am__append_2) \
@@ -480,9 +480,9 @@ libnftables_la_SOURCES = rule.c statement.c cache.c cmd.c datatype.c \
 	hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c netlink.c \
 	netlink_linearize.c netlink_delinearize.c misspell.c monitor.c \
 	owner.c segtree.c rbtree.c gmputil.c utils.c erec.c mnl.c \
-	iface.c mergesort.c osf.c nfnl_osf.c tcpopt.c socket.c print.c \
-	sctp_chunk.c libnftables.c libnftables.map xt.c \
-	$(am__append_10)
+	iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
+	socket.c print.c sctp_chunk.c libnftables.c libnftables.map \
+	xt.c $(am__append_10)
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la $(am__append_6)
@@ -687,6 +687,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_linearize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nfnl_osf.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/numgen.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/optimize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/osf.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/owner.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parser_json.Plo@am__quote@ # am--include-marker
@@ -885,7 +886,6 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -934,6 +934,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/netlink_linearize.Plo
 	-rm -f ./$(DEPDIR)/nfnl_osf.Plo
 	-rm -f ./$(DEPDIR)/numgen.Plo
+	-rm -f ./$(DEPDIR)/optimize.Plo
 	-rm -f ./$(DEPDIR)/osf.Plo
 	-rm -f ./$(DEPDIR)/owner.Plo
 	-rm -f ./$(DEPDIR)/parser_json.Plo
@@ -1026,6 +1027,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/netlink_linearize.Plo
 	-rm -f ./$(DEPDIR)/nfnl_osf.Plo
 	-rm -f ./$(DEPDIR)/numgen.Plo
+	-rm -f ./$(DEPDIR)/optimize.Plo
 	-rm -f ./$(DEPDIR)/osf.Plo
 	-rm -f ./$(DEPDIR)/owner.Plo
 	-rm -f ./$(DEPDIR)/parser_json.Plo

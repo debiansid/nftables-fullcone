@@ -206,6 +206,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_QUOTA
 %s SCANSTATE_SCTP
 %s SCANSTATE_SECMARK
+%s SCANSTATE_TCP
 %s SCANSTATE_VLAN
 %s SCANSTATE_CMD_LIST
 %s SCANSTATE_EXPR_FIB
@@ -285,7 +286,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "set"			{ return SET; }
 "element"		{ return ELEMENT; }
 "map"			{ return MAP; }
-"maps"			{ return MAPS; }
 "flowtable"		{ return FLOWTABLE; }
 "handle"		{ return HANDLE; }
 "ruleset"		{ return RULESET; }
@@ -352,6 +352,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"meters"		{ return METERS; }
 	"flowtables"		{ return FLOWTABLES; }
 	"limits"		{ return LIMITS; }
+	"maps"			{ return MAPS; }
 	"secmarks"		{ return SECMARKS; }
 	"synproxys"		{ return SYNPROXYS; }
 	"hooks"			{ return HOOKS; }
@@ -384,6 +385,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_LIMIT>{
 	"rate"			{ return RATE; }
 	"burst"			{ return BURST; }
+
+	/* time_unit */
+	"second"		{ return SECOND; }
+	"minute"		{ return MINUTE; }
+	"week"			{ return WEEK; }
 }
 <SCANSTATE_CT,SCANSTATE_LIMIT,SCANSTATE_QUOTA>"over"		{ return OVER; }
 
@@ -393,11 +399,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"until"		{ return UNTIL; }
 }
 
-"second"		{ return SECOND; }
-"minute"		{ return MINUTE; }
 "hour"			{ return HOUR; }
 "day"			{ return DAY; }
-"week"			{ return WEEK; }
 
 "reject"		{ return _REJECT; }
 "with"			{ return WITH; }
@@ -465,10 +468,13 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"value"			{ return VALUE; }
 }
 
+<SCANSTATE_TCP>{
 "echo"			{ return ECHO; }
 "eol"			{ return EOL; }
-"maxseg"		{ return MSS; }
-"mss"			{ return MSS; }
+"fastopen"		{ return FASTOPEN; }
+"mptcp"			{ return MPTCP; }
+"md5sig"		{ return MD5SIG; }
+"subtype"		{ return SUBTYPE; }
 "nop"			{ return NOP; }
 "noop"			{ return NOP; }
 "sack"			{ return SACK; }
@@ -476,17 +482,19 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "sack1"			{ return SACK1; }
 "sack2"			{ return SACK2; }
 "sack3"			{ return SACK3; }
-"sack-permitted"	{ return SACK_PERM; }
-"sack-perm"		{ return SACK_PERM; }
-"timestamp"		{ return TIMESTAMP; }
 "time"			{ return TIME; }
 
-"kind"			{ return KIND; }
 "count"			{ return COUNT; }
 "left"			{ return LEFT; }
 "right"			{ return RIGHT; }
 "tsval"			{ return TSVAL; }
 "tsecr"			{ return TSECR; }
+}
+"maxseg"		{ return MSS; }
+"mss"			{ return MSS; }
+"sack-permitted"	{ return SACK_PERM; }
+"sack-perm"		{ return SACK_PERM; }
+"timestamp"		{ return TIMESTAMP; }
 
 "icmp"			{ return ICMP; }
 "code"			{ return CODE; }
@@ -525,7 +533,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "dport"			{ return DPORT; }
 "port"			{ return PORT; }
 
-"tcp"			{ return TCP; }
+"tcp"			{ scanner_push_start_cond(yyscanner, SCANSTATE_TCP); return TCP; }
 "ackseq"		{ return ACKSEQ; }
 "doff"			{ return DOFF; }
 "window"		{ return WINDOW; }
@@ -561,6 +569,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"asconf"		{ return ASCONF; }
 
 	"tsn"			{ return TSN; }
+	"sack"			{ return SACK; }
 	"stream"		{ return STREAM; }
 	"ssn"			{ return SSN; }
 	"ppid"			{ return PPID; }
@@ -581,7 +590,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "rt0"			{ return RT0; }
 "rt2"			{ return RT2; }
 "srh"			{ return RT4; }
-"seg-left"		{ return SEG_LEFT; }
 "addr"			{ return ADDR; }
 "last-entry"		{ return LAST_ENT; }
 "tag"			{ return TAG; }
@@ -622,6 +630,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_EXPR_RT>{
 	"classid"		{ return CLASSID; }
 	"nexthop"		{ return NEXTHOP; }
+	"seg-left"		{ return SEG_LEFT; }
 }
 
 "ct"			{ scanner_push_start_cond(yyscanner, SCANSTATE_CT); return CT; }
@@ -642,6 +651,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"label"			{ return LABEL; }
 	"state"			{ return STATE; }
 	"status"		{ return STATUS; }
+	"count"			{ return COUNT; }
 }
 
 "numgen"		{ scanner_push_start_cond(yyscanner, SCANSTATE_EXPR_NUMGEN); return NUMGEN; }
@@ -1024,7 +1034,7 @@ void scanner_push_buffer(void *scanner, const struct input_descriptor *indesc,
 	new_indesc = xzalloc(sizeof(struct input_descriptor));
 	memcpy(new_indesc, indesc, sizeof(*new_indesc));
 	new_indesc->data = buffer;
-	new_indesc->name = NULL;
+	new_indesc->name = xstrdup(indesc->name);
 	scanner_push_indesc(state, new_indesc);
 
 	b = yy_scan_string(buffer, scanner);

@@ -610,8 +610,7 @@ void payload_dependency_store(struct payload_dep_ctx *ctx,
 	if (ignore_dep)
 		return;
 
-	ctx->pdep  = stmt;
-	ctx->pbase = base + 1;
+	ctx->pdeps[base + 1] = stmt;
 }
 
 /**
@@ -626,20 +625,53 @@ void payload_dependency_store(struct payload_dep_ctx *ctx,
 bool payload_dependency_exists(const struct payload_dep_ctx *ctx,
 			       enum proto_bases base)
 {
-	return ctx->pbase != PROTO_BASE_INVALID &&
-	       ctx->pdep != NULL &&
-	       (ctx->pbase == base || (base == PROTO_BASE_TRANSPORT_HDR && ctx->pbase == base + 1));
+	if (ctx->pdeps[base])
+		return true;
+
+	return	base == PROTO_BASE_TRANSPORT_HDR &&
+		ctx->pdeps[PROTO_BASE_INNER_HDR];
 }
 
-void payload_dependency_release(struct payload_dep_ctx *ctx)
+/**
+ * payload_dependency_get - return a payload dependency if available
+ * @ctx: payload dependency context
+ * @base: payload protocol base
+ *
+ * If we have seen a protocol key payload expression for this base, we return
+ * it.
+ */
+struct expr *payload_dependency_get(struct payload_dep_ctx *ctx,
+				    enum proto_bases base)
 {
-	list_del(&ctx->pdep->list);
-	stmt_free(ctx->pdep);
+	if (ctx->pdeps[base])
+		return ctx->pdeps[base]->expr;
 
-	ctx->pbase = PROTO_BASE_INVALID;
-	if (ctx->pdep == ctx->prev)
+	if (base == PROTO_BASE_TRANSPORT_HDR &&
+	    ctx->pdeps[PROTO_BASE_INNER_HDR])
+		return ctx->pdeps[PROTO_BASE_INNER_HDR]->expr;
+
+	return NULL;
+}
+
+static void __payload_dependency_release(struct payload_dep_ctx *ctx,
+					 enum proto_bases base)
+{
+	list_del(&ctx->pdeps[base]->list);
+	stmt_free(ctx->pdeps[base]);
+
+	if (ctx->pdeps[base] == ctx->prev)
 		ctx->prev = NULL;
-	ctx->pdep  = NULL;
+	ctx->pdeps[base] = NULL;
+}
+
+void payload_dependency_release(struct payload_dep_ctx *ctx,
+				enum proto_bases base)
+{
+	if (ctx->pdeps[base])
+		__payload_dependency_release(ctx, base);
+	else if (base == PROTO_BASE_TRANSPORT_HDR &&
+		 ctx->pdeps[PROTO_BASE_INNER_HDR])
+		__payload_dependency_release(ctx, PROTO_BASE_INNER_HDR);
 }
 
 static uint8_t icmp_dep_to_type(enum icmp_hdr_field_type t)
@@ -661,7 +693,7 @@ static uint8_t icmp_dep_to_type(enum icmp_hdr_field_type t)
 
 static bool payload_may_dependency_kill_icmp(struct payload_dep_ctx *ctx, struct expr *expr)
 {
-	const struct expr *dep = ctx->pdep->expr;
+	const struct expr *dep = payload_dependency_get(ctx, expr->payload.base);
 	uint8_t icmp_type;
 
 	icmp_type = expr->payload.tmpl->icmp_dep;
@@ -678,9 +710,11 @@ static bool payload_may_dependency_kill_icmp(struct payload_dep_ctx *ctx, struct
 
 static bool payload_may_dependency_kill_ll(struct payload_dep_ctx *ctx, struct expr *expr)
 {
-	const struct expr *dep = ctx->pdep->expr;
+	const struct expr *dep = payload_dependency_get(ctx, expr->payload.base);
 
-	/* Never remove a 'vlan type 0x...' expression, they are never added implicitly */
+	/* Never remove a 'vlan type 0x...' expression, they are never added
+	 * implicitly
+	 */
 	if (dep->left->payload.desc == &proto_vlan)
 		return false;
 
@@ -697,7 +731,7 @@ static bool payload_may_dependency_kill_ll(struct payload_dep_ctx *ctx, struct e
 static bool payload_may_dependency_kill(struct payload_dep_ctx *ctx,
 					unsigned int family, struct expr *expr)
 {
-	struct expr *dep = ctx->pdep->expr;
+	struct expr *dep = payload_dependency_get(ctx, expr->payload.base);
 
 	/* Protocol key payload expression at network base such as 'ip6 nexthdr'
 	 * need to be left in place since it implicitly restricts matching to
@@ -733,13 +767,17 @@ static bool payload_may_dependency_kill(struct payload_dep_ctx *ctx,
 		break;
 	}
 
-	if (expr->payload.base == PROTO_BASE_TRANSPORT_HDR &&
-	    dep->left->payload.base == PROTO_BASE_TRANSPORT_HDR) {
-		if (dep->left->payload.desc == &proto_icmp)
-			return payload_may_dependency_kill_icmp(ctx, expr);
-		if (dep->left->payload.desc == &proto_icmp6)
-			return payload_may_dependency_kill_icmp(ctx, expr);
-	}
+	if (expr->payload.base != PROTO_BASE_TRANSPORT_HDR)
+		return true;
+
+	if (dep->left->payload.base != PROTO_BASE_TRANSPORT_HDR)
+		return true;
+
+	if (dep->left->payload.desc == &proto_icmp)
+		return payload_may_dependency_kill_icmp(ctx, expr);
+
+	if (dep->left->payload.desc == &proto_icmp6)
+		return payload_may_dependency_kill_icmp(ctx, expr);
 
 	return true;
 }
@@ -759,7 +797,7 @@ void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 {
 	if (payload_dependency_exists(ctx, expr->payload.base) &&
 	    payload_may_dependency_kill(ctx, family, expr))
-		payload_dependency_release(ctx);
+		payload_dependency_release(ctx, expr->payload.base);
 }
 
 void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
@@ -768,15 +806,15 @@ void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 	switch (expr->exthdr.op) {
 	case NFT_EXTHDR_OP_TCPOPT:
 		if (payload_dependency_exists(ctx, PROTO_BASE_TRANSPORT_HDR))
-			payload_dependency_release(ctx);
+			payload_dependency_release(ctx, PROTO_BASE_TRANSPORT_HDR);
 		break;
 	case NFT_EXTHDR_OP_IPV6:
 		if (payload_dependency_exists(ctx, PROTO_BASE_NETWORK_HDR))
-			payload_dependency_release(ctx);
+			payload_dependency_release(ctx, PROTO_BASE_NETWORK_HDR);
 		break;
 	case NFT_EXTHDR_OP_IPV4:
 		if (payload_dependency_exists(ctx, PROTO_BASE_NETWORK_HDR))
-			payload_dependency_release(ctx);
+			payload_dependency_release(ctx, PROTO_BASE_NETWORK_HDR);
 		break;
 	default:
 		break;
@@ -809,6 +847,9 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 		tmpl = &desc->templates[i];
 		if (tmpl->offset != expr->payload.offset ||
 		    tmpl->len    != expr->len)
+			continue;
+
+		if (tmpl->meta_key && i == 0)
 			continue;
 
 		if (tmpl->icmp_dep && ctx->th_dep.icmp.type &&

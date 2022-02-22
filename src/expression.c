@@ -135,12 +135,12 @@ void expr_describe(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, "datatype %s (%s)",
 			  dtype->name, dtype->desc);
 		len = dtype->size;
-	} else if (dtype != &invalid_type) {
+	} else {
 		nft_print(octx, "%s expression, datatype %s (%s)",
 			  expr_name(expr), dtype->name, dtype->desc);
-	} else {
-		nft_print(octx, "datatype %s is invalid\n", expr->identifier);
-		return;
+
+		if (dtype == &invalid_type)
+			return;
 	}
 
 	if (dtype->basetype != NULL) {
@@ -300,8 +300,7 @@ struct expr *verdict_expr_alloc(const struct location *loc,
 
 static void symbol_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
-	nft_print(octx, "%s%s", expr->scope != NULL ? "$" : "",
-		  expr->identifier);
+	nft_print(octx, "%s", expr->identifier);
 }
 
 static void symbol_expr_clone(struct expr *new, const struct expr *expr)
@@ -1186,14 +1185,40 @@ struct expr *mapping_expr_alloc(const struct location *loc,
 	return expr;
 }
 
+static bool __set_expr_is_vmap(const struct expr *mappings)
+{
+	const struct expr *mapping;
+
+	if (list_empty(&mappings->expressions))
+		return false;
+
+	mapping = list_first_entry(&mappings->expressions, struct expr, list);
+	if (mapping->etype == EXPR_MAPPING &&
+	    mapping->right->etype == EXPR_VERDICT)
+		return true;
+
+	return false;
+}
+
+static bool set_expr_is_vmap(const struct expr *expr)
+{
+
+	if (expr->mappings->etype == EXPR_SET)
+		return __set_expr_is_vmap(expr->mappings);
+
+	return false;
+}
+
 static void map_expr_print(const struct expr *expr, struct output_ctx *octx)
 {
 	expr_print(expr->map, octx);
-	if (expr->mappings->etype == EXPR_SET_REF &&
-	    expr->mappings->set->data->dtype->type == TYPE_VERDICT)
+	if ((expr->mappings->etype == EXPR_SET_REF &&
+	     expr->mappings->set->data->dtype->type == TYPE_VERDICT) ||
+	    set_expr_is_vmap(expr))
 		nft_print(octx, " vmap ");
 	else
 		nft_print(octx, " map ");
+
 	expr_print(expr->mappings, octx);
 }
 

@@ -76,17 +76,6 @@
     {
         "match": {
             "left": {
-                "meta": {
-                    "key": "nfproto"
-                }
-            },
-            "op": "==",
-            "right": "ipv4"
-        }
-    },
-    {
-        "match": {
-            "left": {
                 "concat": [
                     {
                         "payload": {

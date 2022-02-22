@@ -295,3 +295,37 @@
     }
 ]
 
+# ether saddr aa:bb:cc:dd:ee:ff ip daddr 192.168.0.1 reject
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr",
+                    "protocol": "ether"
+                }
+            },
+            "op": "==",
+            "right": "aa:bb:cc:dd:ee:ff"
+        }
+    },
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "daddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "192.168.0.1"
+        }
+    },
+    {
+        "reject": {
+            "expr": "port-unreachable",
+            "type": "icmp"
+        }
+    }
+]
+

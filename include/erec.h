@@ -76,4 +76,9 @@ extern int __fmtstring(4, 5) __stmt_binary_error(struct eval_ctx *ctx,
 #define stmt_binary_error(ctx, s1, s2, fmt, args...) \
 	__stmt_binary_error(ctx, &(s1)->location, &(s2)->location, fmt, ## args)
 
+void print_location(FILE *f, const struct input_descriptor *indesc,
+		    const struct location *loc);
+const char *line_location(const struct input_descriptor *indesc,
+			  const struct location *loc, char *buf, size_t bufsiz);
+
 #endif /* NFTABLES_EREC_H */

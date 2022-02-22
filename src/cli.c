@@ -26,7 +26,6 @@
 #include <readline/history.h>
 #elif defined(HAVE_LIBEDIT)
 #include <editline/readline.h>
-#include <editline/history.h>
 #else
 #include <linenoise.h>
 #endif
@@ -153,13 +152,6 @@ static void cli_complete(char *line)
 	nft_run_cmd_from_buffer(cli_nft, line);
 	free(line);
 }
-
-void cli_exit(void)
-{
-	rl_callback_handler_remove();
-	rl_deprep_terminal();
-	write_history(histfile);
-}
 #endif
 
 #if defined(HAVE_LIBREADLINE)
@@ -189,6 +181,13 @@ int cli_init(struct nft_ctx *nft)
 	return 0;
 }
 
+void cli_exit(void)
+{
+	rl_callback_handler_remove();
+	rl_deprep_terminal();
+	write_history(histfile);
+}
+
 #elif defined(HAVE_LIBEDIT)
 
 int cli_init(struct nft_ctx *nft)
@@ -213,8 +212,15 @@ int cli_init(struct nft_ctx *nft)
 
 		cli_complete(line);
 	}
+	cli_exit();
 
 	return 0;
+}
+
+void cli_exit(void)
+{
+	rl_deprep_terminal();
+	write_history(histfile);
 }
 
 #else /* HAVE_LINENOISE */

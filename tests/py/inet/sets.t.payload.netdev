@@ -15,9 +15,9 @@ netdev test-netdev ingress
   [ immediate reg 0 accept ]
 
 # ip saddr . ip daddr . tcp dport @set3 accept
-inet 
-  [ meta load nfproto => reg 1 ]
-  [ cmp eq reg 1 0x00000002 ]
+netdev
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
   [ meta load l4proto => reg 1 ]
   [ cmp eq reg 1 0x00000006 ]
   [ payload load 4b @ network header + 12 => reg 1 ]

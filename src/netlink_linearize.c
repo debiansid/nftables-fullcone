@@ -1673,5 +1673,16 @@ void netlink_linearize_rule(struct netlink_ctx *ctx,
 		nftnl_udata_buf_free(udata);
 	}
 
-	netlink_dump_rule(lctx->nlr, ctx);
+	if (ctx->nft->debug_mask & NFT_DEBUG_NETLINK) {
+		nftnl_rule_set_str(lctx->nlr, NFTNL_RULE_TABLE,
+				   rule->handle.table.name);
+		if (rule->handle.chain.name)
+			nftnl_rule_set_str(lctx->nlr, NFTNL_RULE_CHAIN,
+					   rule->handle.chain.name);
+
+		netlink_dump_rule(lctx->nlr, ctx);
+
+		nftnl_rule_unset(lctx->nlr, NFTNL_RULE_CHAIN);
+		nftnl_rule_unset(lctx->nlr, NFTNL_RULE_TABLE);
+	}
 }

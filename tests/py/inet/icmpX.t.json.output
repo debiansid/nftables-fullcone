@@ -71,15 +71,6 @@
     {
         "match": {
             "left": {
-                "meta": { "key": "l4proto" }
-            },
-	    "op": "==",
-            "right": 58
-        }
-    },
-    {
-        "match": {
-            "left": {
                 "payload": {
                     "field": "type",
                     "protocol": "icmpv6"

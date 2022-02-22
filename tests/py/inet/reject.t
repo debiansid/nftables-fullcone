@@ -37,3 +37,5 @@ meta l4proto udp reject with tcp reset;fail
 
 meta nfproto ipv4 reject with icmpx admin-prohibited;ok
 meta nfproto ipv6 reject with icmpx admin-prohibited;ok
+
+ether saddr aa:bb:cc:dd:ee:ff ip daddr 192.168.0.1 reject;ok;ether saddr aa:bb:cc:dd:ee:ff ip daddr 192.168.0.1 reject with icmp port-unreachable

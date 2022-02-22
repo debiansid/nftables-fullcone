@@ -32,6 +32,7 @@ enum cache_level_flags {
 				  NFT_CACHE_CHAIN_BIT |
 				  NFT_CACHE_RULE_BIT,
 	NFT_CACHE_FULL		= __NFT_CACHE_MAX_BIT - 1,
+	NFT_CACHE_TERSE		= (1 << 27),
 	NFT_CACHE_SETELEM_MAYBE	= (1 << 28),
 	NFT_CACHE_REFRESH	= (1 << 29),
 	NFT_CACHE_UPDATE	= (1 << 30),
@@ -53,6 +54,7 @@ struct nft_cache_filter {
 		const char	*table;
 		const char	*chain;
 		const char	*set;
+		const char	*ft;
 	} list;
 
 	struct {
@@ -131,5 +133,8 @@ struct nft_cache {
 	uint32_t		seqnum;
 	uint32_t		flags;
 };
+
+void nft_chain_cache_update(struct netlink_ctx *ctx, struct table *table,
+			    const char *chain);
 
 #endif /* _NFT_CACHE_H_ */

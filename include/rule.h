@@ -311,7 +311,6 @@ void rule_stmt_append(struct rule *rule, struct stmt *stmt);
 void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
 			 struct stmt *stmt);
 
-
 /**
  * struct set - nftables set
  *

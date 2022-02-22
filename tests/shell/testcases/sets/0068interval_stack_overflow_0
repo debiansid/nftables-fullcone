@@ -9,7 +9,7 @@ trap 'rm -f "$ruleset_file"' EXIT
 {
 	echo 'define big_set = {'
 	for ((i = 1; i < 255; i++)); do
-		for ((j = 1; j < 80; j++)); do
+		for ((j = 1; j < 255; j++)); do
 			echo "10.0.$i.$j,"
 		done
 	done
@@ -26,4 +26,4 @@ table inet test68_table {
 }
 EOF
 
-( ulimit -s 128 && $NFT -f "$ruleset_file" )
+( ulimit -s 400 && $NFT -f "$ruleset_file" )

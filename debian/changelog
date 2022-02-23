@@ -1,3 +1,18 @@
+nftables (1.0.2-1) unstable; urgency=medium
+
+  [ Arturo Borrero Gonzalez ]
+  * d/examples/workstation.nft: update icmpv6 example (Closes: #1000407)
+
+  [ Sven Strickroth ]
+  * Add rules for ICMPv6 packets which must not be dropped
+
+  [ Arturo Borrero Gonzalez ]
+  * New upstream version 1.0.2
+  * d/patches: add 0001-examples-compile.patch
+  * libnftables-dev: include some code examples
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 23 Feb 2022 12:30:25 +0100
+
 nftables (1.0.1-1) unstable; urgency=medium
 
   [ Jenkins ]

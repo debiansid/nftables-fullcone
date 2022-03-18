@@ -1,0 +1,44 @@
+From e98a9b83cd52c7c75bedb3dad46539b197ed17ba Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Thu, 24 Feb 2022 19:45:42 +0000
+Subject: [PATCH] libnftables.map: export new nft_ctx_{get,set}_optimize API
+
+[ Remove incorrect symbol names were exported via .map file ]
+
+Without this, we're not explicitly saying this is part of the
+public API.
+
+This new API was added in 1.0.2 and is used by e.g. the main
+nft binary. Noticed when fixing the version-script option
+(separate patch) which picked up this problem when .map
+was missing symbols (related to when symbol visibility
+options get set).
+
+Signed-off-by: Sam James <sam@gentoo.org>
+Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+
+Origin: upstream, http://git.netfilter.org/nftables/commit/?id=e98a9b83cd
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1965464
+Bug: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1007888
+Last-Update: 2022-03-23
+
+---
+ src/libnftables.map | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/libnftables.map b/src/libnftables.map
+index a511dd78..a46a3ad5 100644
+--- a/src/libnftables.map
++++ b/src/libnftables.map
+@@ -30,6 +30,6 @@ LIBNFTABLES_2 {
+ } LIBNFTABLES_1;
+ 
+ LIBNFTABLES_3 {
+-  nft_set_optimize;
+-  nft_get_optimize;
++  nft_ctx_set_optimize;
++  nft_ctx_get_optimize;
+ } LIBNFTABLES_2;
+-- 
+2.35.1
+

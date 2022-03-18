@@ -1,1 +1,3 @@
 0001-examples-compile.patch
+lp-1965464-libnftables.map-export-new-nft_ctx_-get-set-_optimiz.patch
+lp-1965464-build-explicitly-pass-version-script-to-linker.patch

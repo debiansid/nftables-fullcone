@@ -164,20 +164,20 @@ libnftables_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_2) $(am__DEPENDENCIES_1)
 am__libnftables_la_SOURCES_DIST = rule.c statement.c cache.c cmd.c \
 	datatype.c expression.c evaluate.c proto.c payload.c exthdr.c \
-	fib.c hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c \
-	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
-	monitor.c owner.c segtree.c rbtree.c gmputil.c utils.c erec.c \
-	mnl.c iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
-	socket.c print.c sctp_chunk.c libnftables.c libnftables.map \
-	xt.c json.c parser_json.c
+	fib.c hash.c intervals.c ipopt.c meta.c rt.c numgen.c ct.c \
+	xfrm.c netlink.c netlink_linearize.c netlink_delinearize.c \
+	misspell.c monitor.c owner.c segtree.c gmputil.c utils.c \
+	erec.c mnl.c iface.c mergesort.c optimize.c osf.c nfnl_osf.c \
+	tcpopt.c socket.c print.c sctp_chunk.c libnftables.c \
+	libnftables.map xt.c json.c parser_json.c
 @BUILD_JSON_TRUE@am__objects_1 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
 	datatype.lo expression.lo evaluate.lo proto.lo payload.lo \
-	exthdr.lo fib.lo hash.lo ipopt.lo meta.lo rt.lo numgen.lo \
-	ct.lo xfrm.lo netlink.lo netlink_linearize.lo \
+	exthdr.lo fib.lo hash.lo intervals.lo ipopt.lo meta.lo rt.lo \
+	numgen.lo ct.lo xfrm.lo netlink.lo netlink_linearize.lo \
 	netlink_delinearize.lo misspell.lo monitor.lo owner.lo \
-	segtree.lo rbtree.lo gmputil.lo utils.lo erec.lo mnl.lo \
-	iface.lo mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
+	segtree.lo gmputil.lo utils.lo erec.lo mnl.lo iface.lo \
+	mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
 	socket.lo print.lo sctp_chunk.lo libnftables.lo xt.lo \
 	$(am__objects_1)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
@@ -218,8 +218,9 @@ am__depfiles_remade = ./$(DEPDIR)/cache.Plo ./$(DEPDIR)/cli.Po \
 	./$(DEPDIR)/evaluate.Plo ./$(DEPDIR)/expression.Plo \
 	./$(DEPDIR)/exthdr.Plo ./$(DEPDIR)/fib.Plo \
 	./$(DEPDIR)/gmputil.Plo ./$(DEPDIR)/hash.Plo \
-	./$(DEPDIR)/iface.Plo ./$(DEPDIR)/ipopt.Plo \
-	./$(DEPDIR)/json.Plo ./$(DEPDIR)/libminigmp_la-mini-gmp.Plo \
+	./$(DEPDIR)/iface.Plo ./$(DEPDIR)/intervals.Plo \
+	./$(DEPDIR)/ipopt.Plo ./$(DEPDIR)/json.Plo \
+	./$(DEPDIR)/libminigmp_la-mini-gmp.Plo \
 	./$(DEPDIR)/libnftables.Plo \
 	./$(DEPDIR)/libparser_la-parser_bison.Plo \
 	./$(DEPDIR)/libparser_la-scanner.Plo ./$(DEPDIR)/main.Po \
@@ -231,12 +232,11 @@ am__depfiles_remade = ./$(DEPDIR)/cache.Plo ./$(DEPDIR)/cli.Po \
 	./$(DEPDIR)/numgen.Plo ./$(DEPDIR)/optimize.Plo \
 	./$(DEPDIR)/osf.Plo ./$(DEPDIR)/owner.Plo \
 	./$(DEPDIR)/parser_json.Plo ./$(DEPDIR)/payload.Plo \
-	./$(DEPDIR)/print.Plo ./$(DEPDIR)/proto.Plo \
-	./$(DEPDIR)/rbtree.Plo ./$(DEPDIR)/rt.Plo ./$(DEPDIR)/rule.Plo \
-	./$(DEPDIR)/sctp_chunk.Plo ./$(DEPDIR)/segtree.Plo \
-	./$(DEPDIR)/socket.Plo ./$(DEPDIR)/statement.Plo \
-	./$(DEPDIR)/tcpopt.Plo ./$(DEPDIR)/utils.Plo \
-	./$(DEPDIR)/xfrm.Plo ./$(DEPDIR)/xt.Plo
+	./$(DEPDIR)/print.Plo ./$(DEPDIR)/proto.Plo ./$(DEPDIR)/rt.Plo \
+	./$(DEPDIR)/rule.Plo ./$(DEPDIR)/sctp_chunk.Plo \
+	./$(DEPDIR)/segtree.Plo ./$(DEPDIR)/socket.Plo \
+	./$(DEPDIR)/statement.Plo ./$(DEPDIR)/tcpopt.Plo \
+	./$(DEPDIR)/utils.Plo ./$(DEPDIR)/xfrm.Plo ./$(DEPDIR)/xt.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -477,9 +477,9 @@ BUILT_SOURCES = parser_bison.h
 lib_LTLIBRARIES = libnftables.la
 libnftables_la_SOURCES = rule.c statement.c cache.c cmd.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c fib.c \
-	hash.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c netlink.c \
-	netlink_linearize.c netlink_delinearize.c misspell.c monitor.c \
-	owner.c segtree.c rbtree.c gmputil.c utils.c erec.c mnl.c \
+	hash.c intervals.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c \
+	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
+	monitor.c owner.c segtree.c gmputil.c utils.c erec.c mnl.c \
 	iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
 	socket.c print.c sctp_chunk.c libnftables.c libnftables.map \
 	xt.c $(am__append_10)
@@ -498,7 +498,7 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 libnftables_la_LIBADD = ${LIBMNL_LIBS} ${LIBNFTNL_LIBS} libparser.la \
 	$(am__append_7) $(am__append_8) $(am__append_11)
 libnftables_la_LDFLAGS = -version-info ${libnftables_LIBVERSION} \
-			 --version-script=$(srcdir)/libnftables.map
+			 -Wl,--version-script=$(srcdir)/libnftables.map
 
 @BUILD_MINIGMP_TRUE@libminigmp_la_SOURCES = mini-gmp.c
 @BUILD_MINIGMP_TRUE@libminigmp_la_CFLAGS = ${AM_CFLAGS} -Wno-sign-compare
@@ -670,6 +670,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gmputil.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/iface.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/intervals.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ipopt.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/json.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libminigmp_la-mini-gmp.Plo@am__quote@ # am--include-marker
@@ -694,7 +695,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/payload.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/print.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proto.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rbtree.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rule.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sctp_chunk.Plo@am__quote@ # am--include-marker
@@ -917,6 +917,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/gmputil.Plo
 	-rm -f ./$(DEPDIR)/hash.Plo
 	-rm -f ./$(DEPDIR)/iface.Plo
+	-rm -f ./$(DEPDIR)/intervals.Plo
 	-rm -f ./$(DEPDIR)/ipopt.Plo
 	-rm -f ./$(DEPDIR)/json.Plo
 	-rm -f ./$(DEPDIR)/libminigmp_la-mini-gmp.Plo
@@ -941,7 +942,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/payload.Plo
 	-rm -f ./$(DEPDIR)/print.Plo
 	-rm -f ./$(DEPDIR)/proto.Plo
-	-rm -f ./$(DEPDIR)/rbtree.Plo
 	-rm -f ./$(DEPDIR)/rt.Plo
 	-rm -f ./$(DEPDIR)/rule.Plo
 	-rm -f ./$(DEPDIR)/sctp_chunk.Plo
@@ -1010,6 +1010,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/gmputil.Plo
 	-rm -f ./$(DEPDIR)/hash.Plo
 	-rm -f ./$(DEPDIR)/iface.Plo
+	-rm -f ./$(DEPDIR)/intervals.Plo
 	-rm -f ./$(DEPDIR)/ipopt.Plo
 	-rm -f ./$(DEPDIR)/json.Plo
 	-rm -f ./$(DEPDIR)/libminigmp_la-mini-gmp.Plo
@@ -1034,7 +1035,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/payload.Plo
 	-rm -f ./$(DEPDIR)/print.Plo
 	-rm -f ./$(DEPDIR)/proto.Plo
-	-rm -f ./$(DEPDIR)/rbtree.Plo
 	-rm -f ./$(DEPDIR)/rt.Plo
 	-rm -f ./$(DEPDIR)/rule.Plo
 	-rm -f ./$(DEPDIR)/sctp_chunk.Plo

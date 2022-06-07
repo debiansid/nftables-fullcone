@@ -1136,7 +1136,7 @@ void datatype_set(struct expr *expr, const struct datatype *dtype)
 	expr->dtype = datatype_get(dtype);
 }
 
-static struct datatype *dtype_clone(const struct datatype *orig_dtype)
+struct datatype *dtype_clone(const struct datatype *orig_dtype)
 {
 	struct datatype *dtype;
 

@@ -39,7 +39,7 @@ signal_received = 0
 
 
 class Colors:
-    if sys.stdout.isatty():
+    if sys.stdout.isatty() and sys.stderr.isatty():
         HEADER = '\033[95m'
         GREEN = '\033[92m'
         YELLOW = '\033[93m'

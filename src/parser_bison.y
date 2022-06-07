@@ -886,6 +886,9 @@ int nft_lex(void *, void *, void *);
 %type <val>			tcpopt_field_maxseg	tcpopt_field_mptcp	tcpopt_field_sack	 tcpopt_field_tsopt	tcpopt_field_window
 %type <tcp_kind_field>		tcp_hdr_option_kind_and_field
 
+%type <stmt>			optstrip_stmt
+%destructor { stmt_free($$); }	optstrip_stmt
+
 %type <expr>			boolean_expr
 %destructor { expr_free($$); }	boolean_expr
 %type <val8>			boolean_keys
@@ -926,29 +929,58 @@ opt_newline		:	NEWLINE
 		 	|	/* empty */
 			;
 
+close_scope_ah		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_AH); };
 close_scope_arp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_ARP); };
+close_scope_at		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_AT); };
+close_scope_comp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_COMP); };
 close_scope_ct		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CT); };
 close_scope_counter	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_COUNTER); };
+close_scope_dccp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_DCCP); };
+close_scope_dst		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_DST); };
+close_scope_dup		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_DUP); };
+close_scope_esp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_ESP); };
 close_scope_eth		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_ETH); };
+close_scope_export	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_EXPORT); };
 close_scope_fib		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FIB); };
+close_scope_flags	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_FLAGS); };
+close_scope_frag	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FRAG); };
+close_scope_fwd		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_FWD); };
 close_scope_hash	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_HASH); };
+close_scope_hbh		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_HBH); };
 close_scope_ip		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IP); };
 close_scope_ip6		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IP6); };
 close_scope_vlan	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_VLAN); };
+close_scope_icmp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_ICMP); };
+close_scope_igmp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IGMP); };
+close_scope_import	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_IMPORT); };
 close_scope_ipsec	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_IPSEC); };
 close_scope_list	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_LIST); };
 close_scope_limit	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_LIMIT); };
+close_scope_meta	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_META); };
+close_scope_mh		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_MH); };
+close_scope_monitor	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_MONITOR); };
+close_scope_nat		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_NAT); };
 close_scope_numgen	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_NUMGEN); };
+close_scope_osf		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_OSF); };
+close_scope_policy	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_POLICY); };
 close_scope_quota	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_QUOTA); };
-close_scope_tcp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_TCP); }
 close_scope_queue	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_QUEUE); };
+close_scope_reject	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_REJECT); };
+close_scope_reset	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_RESET); };
 close_scope_rt		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_RT); };
 close_scope_sctp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_SCTP); };
 close_scope_sctp_chunk	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_SCTP_CHUNK); };
 close_scope_secmark	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_SECMARK); };
 close_scope_socket	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_SOCKET); }
+close_scope_tcp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_TCP); };
+close_scope_tproxy	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_TPROXY); };
+close_scope_type	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_TYPE); };
+close_scope_th		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_TH); };
+close_scope_udp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_UDP); };
+close_scope_udplite	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_UDPLITE); };
 
 close_scope_log		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_LOG); }
+close_scope_synproxy	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_SYNPROXY); }
 
 common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 			{
@@ -1031,12 +1063,12 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	DELETE		delete_cmd	{ $$ = $2; }
 			|	GET		get_cmd		{ $$ = $2; }
 			|	LIST		list_cmd	close_scope_list	{ $$ = $2; }
-			|	RESET		reset_cmd	{ $$ = $2; }
+			|	RESET		reset_cmd	close_scope_reset	{ $$ = $2; }
 			|	FLUSH		flush_cmd	{ $$ = $2; }
 			|	RENAME		rename_cmd	{ $$ = $2; }
-			|       IMPORT          import_cmd      { $$ = $2; }
-			|	EXPORT		export_cmd	{ $$ = $2; }
-			|	MONITOR		monitor_cmd	{ $$ = $2; }
+			|       IMPORT          import_cmd	close_scope_import	{ $$ = $2; }
+			|	EXPORT		export_cmd	close_scope_export	{ $$ = $2; }
+			|	MONITOR		monitor_cmd	close_scope_monitor	{ $$ = $2; }
 			|	DESCRIBE	describe_cmd	{ $$ = $2; }
 			;
 
@@ -1149,11 +1181,11 @@ add_cmd			:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SECMARK, &$2, &@$, $3);
 			}
-			|	SYNPROXY	obj_spec	synproxy_obj	synproxy_config
+			|	SYNPROXY	obj_spec	synproxy_obj	synproxy_config	close_scope_synproxy
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SYNPROXY, &$2, &@$, $3);
 			}
-			|	SYNPROXY	obj_spec	synproxy_obj	'{' synproxy_block '}'
+			|	SYNPROXY	obj_spec	synproxy_obj	'{' synproxy_block '}'	close_scope_synproxy
 			{
 				$$ = cmd_alloc(CMD_ADD, CMD_OBJ_SYNPROXY, &$2, &@$, $3);
 			}
@@ -1250,7 +1282,7 @@ create_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SECMARK, &$2, &@$, $3);
 			}
-			|	SYNPROXY	obj_spec	synproxy_obj	synproxy_config
+			|	SYNPROXY	obj_spec	synproxy_obj	synproxy_config	close_scope_synproxy
 			{
 				$$ = cmd_alloc(CMD_CREATE, CMD_OBJ_SYNPROXY, &$2, &@$, $3);
 			}
@@ -1339,7 +1371,7 @@ delete_cmd		:	TABLE		table_or_id_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SECMARK, &$2, &@$, NULL);
 			}
-			|	SYNPROXY	obj_or_id_spec
+			|	SYNPROXY	obj_or_id_spec	close_scope_synproxy
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_SYNPROXY, &$2, &@$, NULL);
 			}
@@ -1435,7 +1467,7 @@ list_cmd		:	TABLE		table_spec
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_SYNPROXYS, &$3, &@$, NULL);
 			}
-			|	SYNPROXY	obj_spec
+			|	SYNPROXY	obj_spec	close_scope_synproxy
 			{
 				$$ = cmd_alloc(CMD_LIST, CMD_OBJ_SYNPROXY, &$2, &@$, NULL);
 			}
@@ -1647,7 +1679,7 @@ table_block_alloc	:	/* empty */
 			}
 			;
 
-table_options		:	FLAGS		STRING
+table_options		:	FLAGS		STRING	close_scope_flags
 			{
 				if (strcmp($2, "dormant") == 0) {
 					$<table>0->flags |= TABLE_F_DORMANT;
@@ -1791,7 +1823,7 @@ table_block		:	/* empty */	{ $$ = $<table>-1; }
 			}
 			|	table_block	SYNPROXY	obj_identifier
 					obj_block_alloc '{'	synproxy_block	'}'
-					stmt_separator
+					stmt_separator	close_scope_synproxy
 			{
 				$4->location = @3;
 				$4->type = NFT_OBJECT_SYNPROXY;
@@ -1903,7 +1935,7 @@ set_block_alloc		:	/* empty */
 set_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	set_block	common_block
 			|	set_block	stmt_separator
-			|	set_block	TYPE		data_type_expr	stmt_separator
+			|	set_block	TYPE		data_type_expr	stmt_separator	close_scope_type
 			{
 				$1->key = $3;
 				$$ = $1;
@@ -1914,7 +1946,7 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				datatype_set($1->key, $3->dtype);
 				$$ = $1;
 			}
-			|	set_block	FLAGS		set_flag_list	stmt_separator
+			|	set_block	FLAGS		set_flag_list	stmt_separator	close_scope_flags
 			{
 				$1->flags = $3;
 				$$ = $1;
@@ -1997,7 +2029,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	map_block	TYPE
 						data_type_expr	COLON	data_type_expr
-						stmt_separator
+						stmt_separator	close_scope_type
 			{
 				$1->key = $3;
 				$1->data = $5;
@@ -2007,7 +2039,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	map_block	TYPE
 						data_type_expr	COLON	INTERVAL	data_type_expr
-						stmt_separator
+						stmt_separator	close_scope_type
 			{
 				$1->key = $3;
 				$1->data = $6;
@@ -2041,14 +2073,14 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			}
 			|	map_block	TYPE
 						data_type_expr	COLON	map_block_obj_type
-						stmt_separator
+						stmt_separator	close_scope_type
 			{
 				$1->key = $3;
 				$1->objtype = $5;
 				$1->flags  |= NFT_SET_OBJECT;
 				$$ = $1;
 			}
-			|	map_block	FLAGS		set_flag_list	stmt_separator
+			|	map_block	FLAGS		set_flag_list	stmt_separator	close_scope_flags
 			{
 				$1->flags |= $3;
 				$$ = $1;
@@ -2076,7 +2108,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	set_mechanism	stmt_separator
 			;
 
-set_mechanism		:	POLICY		set_policy_spec
+set_mechanism		:	POLICY		set_policy_spec	close_scope_policy
 			{
 				$<set>0->policy = $2;
 			}
@@ -2121,7 +2153,7 @@ flowtable_block		:	/* empty */	{ $$ = $<flowtable>-1; }
 			{
 				$$->flags |= NFT_FLOWTABLE_COUNTER;
 			}
-			|	flowtable_block	FLAGS	OFFLOAD	stmt_separator
+			|	flowtable_block	FLAGS	OFFLOAD	stmt_separator	close_scope_flags
 			{
 				$$->flags |= FLOWTABLE_F_HW_OFFLOAD;
 			}
@@ -2358,33 +2390,33 @@ type_identifier		:	STRING	{ $$ = $1; }
 			|	CLASSID { $$ = xstrdup("classid"); }
 			;
 
-hook_spec		:	TYPE		STRING		HOOK		STRING		dev_spec	prio_spec
+hook_spec		:	TYPE		close_scope_type	STRING		HOOK		STRING		dev_spec	prio_spec
 			{
-				const char *chain_type = chain_type_name_lookup($2);
+				const char *chain_type = chain_type_name_lookup($3);
 
 				if (chain_type == NULL) {
-					erec_queue(error(&@2, "unknown chain type"),
+					erec_queue(error(&@3, "unknown chain type"),
 						   state->msgs);
-					xfree($2);
+					xfree($3);
 					YYERROR;
 				}
-				$<chain>0->type.loc = @2;
+				$<chain>0->type.loc = @3;
 				$<chain>0->type.str = xstrdup(chain_type);
-				xfree($2);
+				xfree($3);
 
 				$<chain>0->loc = @$;
-				$<chain>0->hook.loc = @4;
-				$<chain>0->hook.name = chain_hookname_lookup($4);
+				$<chain>0->hook.loc = @5;
+				$<chain>0->hook.name = chain_hookname_lookup($5);
 				if ($<chain>0->hook.name == NULL) {
-					erec_queue(error(&@4, "unknown chain hook"),
+					erec_queue(error(&@5, "unknown chain hook"),
 						   state->msgs);
-					xfree($4);
+					xfree($5);
 					YYERROR;
 				}
-				xfree($4);
+				xfree($5);
 
-				$<chain>0->dev_expr	= $5;
-				$<chain>0->priority	= $6;
+				$<chain>0->dev_expr	= $6;
+				$<chain>0->priority	= $7;
 				$<chain>0->flags	|= CHAIN_F_BASECHAIN;
 			}
 			;
@@ -2488,13 +2520,13 @@ dev_spec		:	DEVICE	string
 			|	/* empty */		{ $$ = NULL; }
 			;
 
-flags_spec		:	FLAGS		OFFLOAD
+flags_spec		:	FLAGS		OFFLOAD	close_scope_flags
 			{
 				$<chain>0->flags |= CHAIN_F_HW_OFFLOAD;
 			}
 			;
 
-policy_spec		:	POLICY		policy_expr
+policy_spec		:	POLICY		policy_expr	close_scope_policy
 			{
 				if ($<chain>0->policy) {
 					erec_queue(error(&@$, "you cannot set chain policy twice"),
@@ -2815,19 +2847,20 @@ stmt			:	verdict_stmt
 			|	stateful_stmt
 			|	meta_stmt
 			|	log_stmt	close_scope_log
-			|	reject_stmt
-			|	nat_stmt
-			|	tproxy_stmt
+			|	reject_stmt	close_scope_reject
+			|	nat_stmt	close_scope_nat
+			|	tproxy_stmt	close_scope_tproxy
 			|	queue_stmt
 			|	ct_stmt
-			|	masq_stmt
-			|	redir_stmt
-			|	dup_stmt
-			|	fwd_stmt
+			|	masq_stmt	close_scope_nat
+			|	redir_stmt	close_scope_nat
+			|	dup_stmt	close_scope_dup
+			|	fwd_stmt	close_scope_fwd
 			|	set_stmt
 			|	map_stmt
-			|	synproxy_stmt
+			|	synproxy_stmt	close_scope_synproxy
 			|	chain_stmt
+			|	optstrip_stmt
 			;
 
 chain_stmt_type		:	JUMP	{ $$ = NFT_JUMP; }
@@ -3093,7 +3126,7 @@ log_arg			:	PREFIX			string
 				$<stmt>0->log.level	= $2;
 				$<stmt>0->log.flags 	|= STMT_LOG_LEVEL;
 			}
-			|	FLAGS			log_flags
+			|	FLAGS			log_flags	close_scope_flags
 			{
 				$<stmt>0->log.logflags	|= $2;
 			}
@@ -3340,7 +3373,7 @@ reject_opts		:       /* empty */
 				$<stmt>0->reject.type = -1;
 				$<stmt>0->reject.icmp_code = -1;
 			}
-			|	WITH	ICMP	TYPE	reject_with_expr
+			|	WITH	ICMP	TYPE	reject_with_expr close_scope_type close_scope_icmp
 			{
 				$<stmt>0->reject.family = NFPROTO_IPV4;
 				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
@@ -3354,7 +3387,7 @@ reject_opts		:       /* empty */
 				$<stmt>0->reject.expr = $3;
 				datatype_set($<stmt>0->reject.expr, &icmp_code_type);
 			}
-			|	WITH	ICMP6	TYPE	reject_with_expr
+			|	WITH	ICMP6	TYPE	reject_with_expr close_scope_type close_scope_icmp
 			{
 				$<stmt>0->reject.family = NFPROTO_IPV6;
 				$<stmt>0->reject.type = NFT_REJECT_ICMP_UNREACH;
@@ -3368,7 +3401,7 @@ reject_opts		:       /* empty */
 				$<stmt>0->reject.expr = $3;
 				datatype_set($<stmt>0->reject.expr, &icmpv6_code_type);
 			}
-			|	WITH	ICMPX	TYPE	reject_with_expr
+			|	WITH	ICMPX	TYPE	reject_with_expr close_scope_type
 			{
 				$<stmt>0->reject.type = NFT_REJECT_ICMPX_UNREACH;
 				$<stmt>0->reject.expr = $4;
@@ -3380,7 +3413,7 @@ reject_opts		:       /* empty */
 				$<stmt>0->reject.expr = $3;
 				datatype_set($<stmt>0->reject.expr, &icmpx_code_type);
 			}
-			|	WITH	TCP	close_scope_tcp RESET
+			|	WITH	TCP	close_scope_tcp RESET close_scope_reset
 			{
 				$<stmt>0->reject.type = NFT_REJECT_TCP_RST;
 			}
@@ -3795,13 +3828,13 @@ queue_stmt		:	queue_stmt_compat	close_scope_queue
 			{
 				$$ = queue_stmt_alloc(&@$, $3, 0);
 			}
-			|	QUEUE FLAGS	queue_stmt_flags TO queue_stmt_expr close_scope_queue
+			|	QUEUE FLAGS	queue_stmt_flags close_scope_flags TO queue_stmt_expr close_scope_queue
 			{
-				$$ = queue_stmt_alloc(&@$, $5, $3);
+				$$ = queue_stmt_alloc(&@$, $6, $3);
 			}
-			|	QUEUE	FLAGS	queue_stmt_flags QUEUENUM queue_stmt_expr_simple close_scope_queue
+			|	QUEUE	FLAGS	queue_stmt_flags close_scope_flags QUEUENUM queue_stmt_expr_simple close_scope_queue
 			{
-				$$ = queue_stmt_alloc(&@$, $5, $3);
+				$$ = queue_stmt_alloc(&@$, $6, $3);
 			}
 			;
 
@@ -4017,7 +4050,7 @@ set_ref_expr		:	set_ref_symbol_expr
 			|	variable_expr
 			;
 
-set_ref_symbol_expr	:	AT	identifier
+set_ref_symbol_expr	:	AT	identifier	close_scope_at
 			{
 				$$ = symbol_expr_alloc(&@$, SYMBOL_SET,
 						       current_scope(state),
@@ -4079,7 +4112,7 @@ fib_expr		:	FIB	fib_tuple	fib_result	close_scope_fib
 
 fib_result		:	OIF	{ $$ =NFT_FIB_RESULT_OIF; }
 			|	OIFNAME { $$ =NFT_FIB_RESULT_OIFNAME; }
-			|	TYPE	{ $$ =NFT_FIB_RESULT_ADDRTYPE; }
+			|	TYPE	close_scope_type	{ $$ =NFT_FIB_RESULT_ADDRTYPE; }
 			;
 
 fib_flag		:       SADDR	{ $$ = NFTA_FIB_F_SADDR; }
@@ -4096,11 +4129,11 @@ fib_tuple		:  	fib_flag	DOT	fib_tuple
 			|	fib_flag
 			;
 
-osf_expr		:	OSF	osf_ttl		HDRVERSION
+osf_expr		:	OSF	osf_ttl		HDRVERSION	close_scope_osf
 			{
 				$$ = osf_expr_alloc(&@$, $2, NFT_OSF_F_VERSION);
 			}
-			|	OSF	osf_ttl		NAME
+			|	OSF	osf_ttl		NAME	close_scope_osf
 			{
 				$$ = osf_expr_alloc(&@$, $2, 0);
 			}
@@ -4481,10 +4514,10 @@ ct_cmd_type		:	HELPERS		{ $$ = CMD_OBJ_CT_HELPERS; }
 			;
 
 ct_l4protoname		:	TCP	close_scope_tcp	{ $$ = IPPROTO_TCP; }
-			|	UDP	{ $$ = IPPROTO_UDP; }
+			|	UDP	close_scope_udp	{ $$ = IPPROTO_UDP; }
 			;
 
-ct_helper_config		:	TYPE	QUOTED_STRING	PROTOCOL	ct_l4protoname	stmt_separator
+ct_helper_config		:	TYPE	QUOTED_STRING	PROTOCOL	ct_l4protoname	stmt_separator	close_scope_type
 			{
 				struct ct_helper *ct;
 				int ret;
@@ -4541,7 +4574,7 @@ ct_timeout_config	:	PROTOCOL	ct_l4protoname	stmt_separator
 				ct = &$<obj>0->ct_timeout;
 				ct->l4proto = l4proto;
 			}
-			|	POLICY 	'=' 	'{' 	timeout_states 	'}'	 stmt_separator
+			|	POLICY 	'=' 	'{' 	timeout_states 	'}'	 stmt_separator	close_scope_policy
 			{
 				struct ct_timeout *ct;
 
@@ -4741,10 +4774,10 @@ keyword_expr		:	ETHER   close_scope_eth { $$ = symbol_value(&@$, "ether"); }
 			|	IP6	close_scope_ip6 { $$ = symbol_value(&@$, "ip6"); }
 			|	VLAN	close_scope_vlan { $$ = symbol_value(&@$, "vlan"); }
 			|	ARP	close_scope_arp { $$ = symbol_value(&@$, "arp"); }
-			|	DNAT			{ $$ = symbol_value(&@$, "dnat"); }
-			|	SNAT			{ $$ = symbol_value(&@$, "snat"); }
+			|	DNAT	close_scope_nat	{ $$ = symbol_value(&@$, "dnat"); }
+			|	SNAT	close_scope_nat	{ $$ = symbol_value(&@$, "snat"); }
 			|	ECN			{ $$ = symbol_value(&@$, "ecn"); }
-			|	RESET			{ $$ = symbol_value(&@$, "reset"); }
+			|	RESET	close_scope_reset	{ $$ = symbol_value(&@$, "reset"); }
 			|	ORIGINAL		{ $$ = symbol_value(&@$, "original"); }
 			|	REPLY			{ $$ = symbol_value(&@$, "reply"); }
 			|	LABEL			{ $$ = symbol_value(&@$, "label"); }
@@ -4761,35 +4794,35 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	UDP
+			|	UDP	close_scope_udp
 			{
 				uint8_t data = IPPROTO_UDP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	UDPLITE
+			|	UDPLITE	close_scope_udplite
 			{
 				uint8_t data = IPPROTO_UDPLITE;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	ESP
+			|	ESP	close_scope_esp
 			{
 				uint8_t data = IPPROTO_ESP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	AH
+			|	AH	close_scope_ah
 			{
 				uint8_t data = IPPROTO_AH;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	ICMP
+			|	ICMP	close_scope_icmp
 			{
 				uint8_t data = IPPROTO_ICMP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
@@ -4803,21 +4836,21 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	ICMP6
+			|	ICMP6	close_scope_icmp
 			{
 				uint8_t data = IPPROTO_ICMPV6;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	COMP
+			|	COMP	close_scope_comp
 			{
 				uint8_t data = IPPROTO_COMP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	DCCP
+			|	DCCP	close_scope_dccp
 			{
 				uint8_t data = IPPROTO_DCCP;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
@@ -4831,7 +4864,7 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
 			}
-			|	REDIRECT
+			|	REDIRECT	close_scope_nat
 			{
 				uint8_t data = ICMP_REDIRECT;
 				$$ = constant_expr_alloc(&@$, &icmp_type_type,
@@ -4887,7 +4920,7 @@ chain_expr		:	variable_expr
 			}
 			;
 
-meta_expr		:	META	meta_key
+meta_expr		:	META	meta_key	close_scope_meta
 			{
 				$$ = meta_expr_alloc(&@$, $2);
 			}
@@ -4895,7 +4928,7 @@ meta_expr		:	META	meta_key
 			{
 				$$ = meta_expr_alloc(&@$, $1);
 			}
-			|	META	STRING
+			|	META	STRING	close_scope_meta
 			{
 				struct error_record *erec;
 				unsigned int key;
@@ -4948,7 +4981,7 @@ meta_key_unqualified	:	MARK		{ $$ = NFT_META_MARK; }
 			|       HOUR		{ $$ = NFT_META_TIME_HOUR; }
 			;
 
-meta_stmt		:	META	meta_key	SET	stmt_expr
+meta_stmt		:	META	meta_key	SET	stmt_expr	close_scope_meta
 			{
 				switch ($2) {
 				case NFT_META_SECMARK:
@@ -4972,7 +5005,7 @@ meta_stmt		:	META	meta_key	SET	stmt_expr
 			{
 				$$ = meta_stmt_alloc(&@$, $1, $3);
 			}
-			|	META	STRING	SET	stmt_expr
+			|	META	STRING	SET	stmt_expr	close_scope_meta
 			{
 				struct error_record *erec;
 				unsigned int key;
@@ -4990,11 +5023,11 @@ meta_stmt		:	META	meta_key	SET	stmt_expr
 			{
 				$$ = notrack_stmt_alloc(&@$);
 			}
-			|	FLOW	OFFLOAD	AT string
+			|	FLOW	OFFLOAD	AT string	close_scope_at
 			{
 				$$ = flow_offload_stmt_alloc(&@$, $4);
 			}
-			|	FLOW	ADD	AT string
+			|	FLOW	ADD	AT string	close_scope_at
 			{
 				$$ = flow_offload_stmt_alloc(&@$, $4);
 			}
@@ -5267,7 +5300,7 @@ payload_expr		:	payload_raw_expr
 			|	th_hdr_expr
 			;
 
-payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
+payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM	close_scope_at
 			{
 				$$ = payload_expr_alloc(&@$, NULL, 0);
 				payload_init_raw($$, $2, $4, $6);
@@ -5278,7 +5311,7 @@ payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM
 
 payload_base_spec	:	LL_HDR		{ $$ = PROTO_BASE_LL_HDR; }
 			|	NETWORK_HDR	{ $$ = PROTO_BASE_NETWORK_HDR; }
-			|	TRANSPORT_HDR	{ $$ = PROTO_BASE_TRANSPORT_HDR; }
+			|	TRANSPORT_HDR	close_scope_th	{ $$ = PROTO_BASE_TRANSPORT_HDR; }
 			|	STRING
 			{
 				if (!strcmp($1, "ih")) {
@@ -5300,7 +5333,7 @@ eth_hdr_expr		:	ETHER	eth_hdr_field	close_scope_eth
 
 eth_hdr_field		:	SADDR		{ $$ = ETHHDR_SADDR; }
 			|	DADDR		{ $$ = ETHHDR_DADDR; }
-			|	TYPE		{ $$ = ETHHDR_TYPE; }
+			|	TYPE		close_scope_type	{ $$ = ETHHDR_TYPE; }
 			;
 
 vlan_hdr_expr		:	VLAN	vlan_hdr_field	close_scope_vlan
@@ -5313,7 +5346,7 @@ vlan_hdr_field		:	ID		{ $$ = VLANHDR_VID; }
 			|	CFI		{ $$ = VLANHDR_CFI; }
 			|	DEI		{ $$ = VLANHDR_DEI; }
 			|	PCP		{ $$ = VLANHDR_PCP; }
-			|	TYPE		{ $$ = VLANHDR_TYPE; }
+			|	TYPE		close_scope_type	{ $$ = VLANHDR_TYPE; }
 			;
 
 arp_hdr_expr		:	ARP	arp_hdr_field	close_scope_arp
@@ -5372,20 +5405,20 @@ ip_option_type		:	LSRR		{ $$ = IPOPT_LSRR; }
 			|	RA		{ $$ = IPOPT_RA; }
 			;
 
-ip_option_field		:	TYPE		{ $$ = IPOPT_FIELD_TYPE; }
+ip_option_field		:	TYPE		close_scope_type	{ $$ = IPOPT_FIELD_TYPE; }
 			|	LENGTH		{ $$ = IPOPT_FIELD_LENGTH; }
 			|	VALUE		{ $$ = IPOPT_FIELD_VALUE; }
 			|	PTR		{ $$ = IPOPT_FIELD_PTR; }
 			|	ADDR		{ $$ = IPOPT_FIELD_ADDR_0; }
 			;
 
-icmp_hdr_expr		:	ICMP	icmp_hdr_field
+icmp_hdr_expr		:	ICMP	icmp_hdr_field	close_scope_icmp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_icmp, $2);
 			}
 			;
 
-icmp_hdr_field		:	TYPE		{ $$ = ICMPHDR_TYPE; }
+icmp_hdr_field		:	TYPE		close_scope_type	{ $$ = ICMPHDR_TYPE; }
 			|	CODE		{ $$ = ICMPHDR_CODE; }
 			|	CHECKSUM	{ $$ = ICMPHDR_CHECKSUM; }
 			|	ID		{ $$ = ICMPHDR_ID; }
@@ -5394,13 +5427,13 @@ icmp_hdr_field		:	TYPE		{ $$ = ICMPHDR_TYPE; }
 			|	MTU		{ $$ = ICMPHDR_MTU; }
 			;
 
-igmp_hdr_expr		:	IGMP	igmp_hdr_field
+igmp_hdr_expr		:	IGMP	igmp_hdr_field	close_scope_igmp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_igmp, $2);
 			}
 			;
 
-igmp_hdr_field		:	TYPE		{ $$ = IGMPHDR_TYPE; }
+igmp_hdr_field		:	TYPE		close_scope_type	{ $$ = IGMPHDR_TYPE; }
 			|	CHECKSUM	{ $$ = IGMPHDR_CHECKSUM; }
 			|	MRT		{ $$ = IGMPHDR_MRT; }
 			|	GROUP		{ $$ = IGMPHDR_GROUP; }
@@ -5422,13 +5455,13 @@ ip6_hdr_field		:	HDRVERSION	{ $$ = IP6HDR_VERSION; }
 			|	SADDR		{ $$ = IP6HDR_SADDR; }
 			|	DADDR		{ $$ = IP6HDR_DADDR; }
 			;
-icmp6_hdr_expr		:	ICMP6	icmp6_hdr_field
+icmp6_hdr_expr		:	ICMP6	icmp6_hdr_field	close_scope_icmp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_icmp6, $2);
 			}
 			;
 
-icmp6_hdr_field		:	TYPE		{ $$ = ICMP6HDR_TYPE; }
+icmp6_hdr_field		:	TYPE		close_scope_type	{ $$ = ICMP6HDR_TYPE; }
 			|	CODE		{ $$ = ICMP6HDR_CODE; }
 			|	CHECKSUM	{ $$ = ICMP6HDR_CHECKSUM; }
 			|	PPTR		{ $$ = ICMP6HDR_PPTR; }
@@ -5438,7 +5471,7 @@ icmp6_hdr_field		:	TYPE		{ $$ = ICMP6HDR_TYPE; }
 			|	MAXDELAY	{ $$ = ICMP6HDR_MAXDELAY; }
 			;
 
-auth_hdr_expr		:	AH	auth_hdr_field
+auth_hdr_expr		:	AH	auth_hdr_field	close_scope_ah
 			{
 				$$ = payload_expr_alloc(&@$, &proto_ah, $2);
 			}
@@ -5451,7 +5484,7 @@ auth_hdr_field		:	NEXTHDR		{ $$ = AHHDR_NEXTHDR; }
 			|	SEQUENCE	{ $$ = AHHDR_SEQUENCE; }
 			;
 
-esp_hdr_expr		:	ESP	esp_hdr_field
+esp_hdr_expr		:	ESP	esp_hdr_field	close_scope_esp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_esp, $2);
 			}
@@ -5461,18 +5494,18 @@ esp_hdr_field		:	SPI		{ $$ = ESPHDR_SPI; }
 			|	SEQUENCE	{ $$ = ESPHDR_SEQUENCE; }
 			;
 
-comp_hdr_expr		:	COMP	comp_hdr_field
+comp_hdr_expr		:	COMP	comp_hdr_field	close_scope_comp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_comp, $2);
 			}
 			;
 
 comp_hdr_field		:	NEXTHDR		{ $$ = COMPHDR_NEXTHDR; }
-			|	FLAGS		{ $$ = COMPHDR_FLAGS; }
+			|	FLAGS	close_scope_flags	{ $$ = COMPHDR_FLAGS; }
 			|	CPI		{ $$ = COMPHDR_CPI; }
 			;
 
-udp_hdr_expr		:	UDP	udp_hdr_field
+udp_hdr_expr		:	UDP	udp_hdr_field	close_scope_udp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_udp, $2);
 			}
@@ -5484,7 +5517,7 @@ udp_hdr_field		:	SPORT		{ $$ = UDPHDR_SPORT; }
 			|	CHECKSUM	{ $$ = UDPHDR_CHECKSUM; }
 			;
 
-udplite_hdr_expr	:	UDPLITE	udplite_hdr_field
+udplite_hdr_expr	:	UDPLITE	udplite_hdr_field	close_scope_udplite
 			{
 				$$ = payload_expr_alloc(&@$, &proto_udplite, $2);
 			}
@@ -5509,10 +5542,17 @@ tcp_hdr_expr		:	TCP	tcp_hdr_field
 			{
 				$$ = tcpopt_expr_alloc(&@$, $3.kind, $3.field);
 			}
-			|	TCP	OPTION	AT tcp_hdr_option_type	COMMA	NUM	COMMA	NUM
+			|	TCP	OPTION	AT	close_scope_at	tcp_hdr_option_type	COMMA	NUM	COMMA	NUM
 			{
-				$$ = tcpopt_expr_alloc(&@$, $4, 0);
-				tcpopt_init_raw($$, $4, $6, $8, 0);
+				$$ = tcpopt_expr_alloc(&@$, $5, 0);
+				tcpopt_init_raw($$, $5, $7, $9, 0);
+			}
+			;
+
+optstrip_stmt		:	RESET	TCP	OPTION	tcp_hdr_option_type	close_scope_tcp
+			{
+				$$ = optstrip_stmt_alloc(&@$, tcpopt_expr_alloc(&@$,
+										$4, TCPOPT_COMMON_KIND));
 			}
 			;
 
@@ -5522,7 +5562,7 @@ tcp_hdr_field		:	SPORT		{ $$ = TCPHDR_SPORT; }
 			|	ACKSEQ		{ $$ = TCPHDR_ACKSEQ; }
 			|	DOFF		{ $$ = TCPHDR_DOFF; }
 			|	RESERVED	{ $$ = TCPHDR_RESERVED; }
-			|	FLAGS		{ $$ = TCPHDR_FLAGS; }
+			|	FLAGS	close_scope_flags	{ $$ = TCPHDR_FLAGS; }
 			|	WINDOW		{ $$ = TCPHDR_WINDOW; }
 			|	CHECKSUM	{ $$ = TCPHDR_CHECKSUM; }
 			|	URGPTR		{ $$ = TCPHDR_URGPTR; }
@@ -5604,7 +5644,7 @@ tcpopt_field_maxseg	:	SIZE		{ $$ = TCPOPT_MAXSEG_SIZE; }
 tcpopt_field_mptcp	:	SUBTYPE		{ $$ = TCPOPT_MPTCP_SUBTYPE; }
 			;
 
-dccp_hdr_expr		:	DCCP	dccp_hdr_field
+dccp_hdr_expr		:	DCCP	dccp_hdr_field	close_scope_dccp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_dccp, $2);
 			}
@@ -5612,7 +5652,7 @@ dccp_hdr_expr		:	DCCP	dccp_hdr_field
 
 dccp_hdr_field		:	SPORT		{ $$ = DCCPHDR_SPORT; }
 			|	DPORT		{ $$ = DCCPHDR_DPORT; }
-			|	TYPE		{ $$ = DCCPHDR_TYPE; }
+			|	TYPE		close_scope_type	{ $$ = DCCPHDR_TYPE; }
 			;
 
 sctp_chunk_type		:	DATA		{ $$ = SCTP_CHUNK_TYPE_DATA; }
@@ -5635,8 +5675,8 @@ sctp_chunk_type		:	DATA		{ $$ = SCTP_CHUNK_TYPE_DATA; }
 			|	ASCONF		{ $$ = SCTP_CHUNK_TYPE_ASCONF; }
 			;
 
-sctp_chunk_common_field	:	TYPE	{ $$ = SCTP_CHUNK_COMMON_TYPE; }
-			|	FLAGS	{ $$ = SCTP_CHUNK_COMMON_FLAGS; }
+sctp_chunk_common_field	:	TYPE	close_scope_type	{ $$ = SCTP_CHUNK_COMMON_TYPE; }
+			|	FLAGS	close_scope_flags	{ $$ = SCTP_CHUNK_COMMON_FLAGS; }
 			|	LENGTH	{ $$ = SCTP_CHUNK_COMMON_LENGTH; }
 			;
 
@@ -5732,7 +5772,7 @@ sctp_hdr_field		:	SPORT		{ $$ = SCTPHDR_SPORT; }
 			|	CHECKSUM	{ $$ = SCTPHDR_CHECKSUM; }
 			;
 
-th_hdr_expr		:	TRANSPORT_HDR 	th_hdr_field
+th_hdr_expr		:	TRANSPORT_HDR	th_hdr_field	close_scope_th
 			{
 				$$ = payload_expr_alloc(&@$, &proto_th, $2);
 				if ($$)
@@ -5754,7 +5794,7 @@ exthdr_expr		:	hbh_hdr_expr
 			|	mh_hdr_expr
 			;
 
-hbh_hdr_expr		:	HBH	hbh_hdr_field
+hbh_hdr_expr		:	HBH	hbh_hdr_field	close_scope_hbh
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_hbh, $2);
 			}
@@ -5772,11 +5812,11 @@ rt_hdr_expr		:	RT	rt_hdr_field	close_scope_rt
 
 rt_hdr_field		:	NEXTHDR		{ $$ = RTHDR_NEXTHDR; }
 			|	HDRLENGTH	{ $$ = RTHDR_HDRLENGTH; }
-			|	TYPE		{ $$ = RTHDR_TYPE; }
+			|	TYPE		close_scope_type	{ $$ = RTHDR_TYPE; }
 			|	SEG_LEFT	{ $$ = RTHDR_SEG_LEFT; }
 			;
 
-rt0_hdr_expr		:	RT0	rt0_hdr_field
+rt0_hdr_expr		:	RT0	rt0_hdr_field	close_scope_rt
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_rt0, $2);
 			}
@@ -5788,7 +5828,7 @@ rt0_hdr_field		:	ADDR	'['	NUM	']'
 			}
 			;
 
-rt2_hdr_expr		:	RT2	rt2_hdr_field
+rt2_hdr_expr		:	RT2	rt2_hdr_field	close_scope_rt
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_rt2, $2);
 			}
@@ -5797,14 +5837,14 @@ rt2_hdr_expr		:	RT2	rt2_hdr_field
 rt2_hdr_field		:	ADDR		{ $$ = RT2HDR_ADDR; }
 			;
 
-rt4_hdr_expr		:	RT4	rt4_hdr_field
+rt4_hdr_expr		:	RT4	rt4_hdr_field	close_scope_rt
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_rt4, $2);
 			}
 			;
 
 rt4_hdr_field		:	LAST_ENT	{ $$ = RT4HDR_LASTENT; }
-			|	FLAGS		{ $$ = RT4HDR_FLAGS; }
+			|	FLAGS	close_scope_flags	{ $$ = RT4HDR_FLAGS; }
 			|	TAG		{ $$ = RT4HDR_TAG; }
 			|	SID		'['	NUM	']'
 			{
@@ -5812,7 +5852,7 @@ rt4_hdr_field		:	LAST_ENT	{ $$ = RT4HDR_LASTENT; }
 			}
 			;
 
-frag_hdr_expr		:	FRAG	frag_hdr_field
+frag_hdr_expr		:	FRAG	frag_hdr_field	close_scope_frag
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_frag, $2);
 			}
@@ -5826,7 +5866,7 @@ frag_hdr_field		:	NEXTHDR		{ $$ = FRAGHDR_NEXTHDR; }
 			|	ID		{ $$ = FRAGHDR_ID; }
 			;
 
-dst_hdr_expr		:	DST	dst_hdr_field
+dst_hdr_expr		:	DST	dst_hdr_field	close_scope_dst
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_dst, $2);
 			}
@@ -5836,7 +5876,7 @@ dst_hdr_field		:	NEXTHDR		{ $$ = DSTHDR_NEXTHDR; }
 			|	HDRLENGTH	{ $$ = DSTHDR_HDRLENGTH; }
 			;
 
-mh_hdr_expr		:	MH	mh_hdr_field
+mh_hdr_expr		:	MH	mh_hdr_field	close_scope_mh
 			{
 				$$ = exthdr_expr_alloc(&@$, &exthdr_mh, $2);
 			}
@@ -5844,7 +5884,7 @@ mh_hdr_expr		:	MH	mh_hdr_field
 
 mh_hdr_field		:	NEXTHDR		{ $$ = MHHDR_NEXTHDR; }
 			|	HDRLENGTH	{ $$ = MHHDR_HDRLENGTH; }
-			|	TYPE		{ $$ = MHHDR_TYPE; }
+			|	TYPE		close_scope_type	{ $$ = MHHDR_TYPE; }
 			|	RESERVED	{ $$ = MHHDR_RESERVED; }
 			|	CHECKSUM	{ $$ = MHHDR_CHECKSUM; }
 			;
@@ -5863,11 +5903,11 @@ exthdr_exists_expr	:	EXTHDR	exthdr_key
 			}
 			;
 
-exthdr_key		:	HBH	{ $$ = IPPROTO_HOPOPTS; }
+exthdr_key		:	HBH	close_scope_hbh	{ $$ = IPPROTO_HOPOPTS; }
 			|	RT	close_scope_rt	{ $$ = IPPROTO_ROUTING; }
-			|	FRAG	{ $$ = IPPROTO_FRAGMENT; }
-			|	DST	{ $$ = IPPROTO_DSTOPTS; }
-			|	MH	{ $$ = IPPROTO_MH; }
+			|	FRAG	close_scope_frag	{ $$ = IPPROTO_FRAGMENT; }
+			|	DST	close_scope_dst	{ $$ = IPPROTO_DSTOPTS; }
+			|	MH	close_scope_mh	{ $$ = IPPROTO_MH; }
 			;
 
 %%

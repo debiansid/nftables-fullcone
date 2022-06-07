@@ -986,7 +986,7 @@ static void netlink_gen_exthdr_stmt(struct netlink_linearize_ctx *ctx,
 	nle = alloc_nft_expr("exthdr");
 	netlink_put_register(nle, NFTNL_EXPR_EXTHDR_SREG, sreg);
 	nftnl_expr_set_u8(nle, NFTNL_EXPR_EXTHDR_TYPE,
-			  expr->exthdr.desc->type);
+			  expr->exthdr.raw_type);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_EXTHDR_OFFSET, offset / BITS_PER_BYTE);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_EXTHDR_LEN,
 			   div_round_up(expr->len, BITS_PER_BYTE));
@@ -1353,6 +1353,18 @@ static void netlink_gen_fwd_stmt(struct netlink_linearize_ctx *ctx,
 	nft_rule_add_expr(ctx, nle, &stmt->location);
 }
 
+static void netlink_gen_optstrip_stmt(struct netlink_linearize_ctx *ctx,
+				      const struct stmt *stmt)
+{
+	struct nftnl_expr *nle = alloc_nft_expr("exthdr");
+	struct expr *expr = stmt->optstrip.expr;
+
+	nftnl_expr_set_u8(nle, NFTNL_EXPR_EXTHDR_TYPE,
+			  expr->exthdr.raw_type);
+	nftnl_expr_set_u32(nle, NFTNL_EXPR_EXTHDR_OP, expr->exthdr.op);
+	nft_rule_add_expr(ctx, nle, &expr->location);
+}
+
 static void netlink_gen_queue_stmt(struct netlink_linearize_ctx *ctx,
 				 const struct stmt *stmt)
 {
@@ -1616,6 +1628,8 @@ static void netlink_gen_stmt(struct netlink_linearize_ctx *ctx,
 		return netlink_gen_map_stmt(ctx, stmt);
 	case STMT_CHAIN:
 		return netlink_gen_chain_stmt(ctx, stmt);
+	case STMT_OPTSTRIP:
+		return netlink_gen_optstrip_stmt(ctx, stmt);
 	default:
 		BUG("unknown statement type %s\n", stmt->ops->name);
 	}

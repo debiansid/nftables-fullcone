@@ -23,6 +23,7 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 #include <statement.h>
+#include <tcpopt.h>
 #include <utils.h>
 #include <list.h>
 #include <xt.h>
@@ -907,6 +908,37 @@ static const struct stmt_ops fwd_stmt_ops = {
 struct stmt *fwd_stmt_alloc(const struct location *loc)
 {
 	return stmt_alloc(loc, &fwd_stmt_ops);
+}
+
+static void optstrip_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	const struct expr *expr = stmt->optstrip.expr;
+
+	nft_print(octx, "reset ");
+	expr_print(expr, octx);
+}
+
+static void optstrip_stmt_destroy(struct stmt *stmt)
+{
+	expr_free(stmt->optstrip.expr);
+}
+
+static const struct stmt_ops optstrip_stmt_ops = {
+	.type		= STMT_OPTSTRIP,
+	.name		= "optstrip",
+	.print		= optstrip_stmt_print,
+	.json		= optstrip_stmt_json,
+	.destroy	= optstrip_stmt_destroy,
+};
+
+struct stmt *optstrip_stmt_alloc(const struct location *loc, struct expr *e)
+{
+	struct stmt *stmt = stmt_alloc(loc, &optstrip_stmt_ops);
+
+	e->exthdr.flags |= NFT_EXTHDR_F_PRESENT;
+	stmt->optstrip.expr = e;
+
+	return stmt;
 }
 
 static void tproxy_stmt_print(const struct stmt *stmt, struct output_ctx *octx)

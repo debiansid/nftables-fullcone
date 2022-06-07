@@ -29,6 +29,7 @@
 
 #include <expression.h>
 #include <statement.h>
+#include <intervals.h>
 #include <netlink.h>
 #include <time.h>
 #include <rule.h>
@@ -138,6 +139,7 @@ static enum ops byteorder_conversion_op(struct expr *expr,
 static int byteorder_conversion(struct eval_ctx *ctx, struct expr **expr,
 				enum byteorder byteorder)
 {
+	enum datatypes basetype;
 	enum ops op;
 
 	assert(!expr_is_constant(*expr) || expr_is_singleton(*expr));
@@ -149,11 +151,19 @@ static int byteorder_conversion(struct eval_ctx *ctx, struct expr **expr,
 	if ((*expr)->etype == EXPR_CONCAT)
 		return 0;
 
-	if (expr_basetype(*expr)->type != TYPE_INTEGER)
+	basetype = expr_basetype(*expr)->type;
+	switch (basetype) {
+	case TYPE_INTEGER:
+		break;
+	case TYPE_STRING:
+		return 0;
+	default:
 		return expr_error(ctx->msgs, *expr,
-			 	  "Byteorder mismatch: expected %s, got %s",
+				  "Byteorder mismatch: %s expected %s, %s got %s",
 				  byteorder_names[byteorder],
+				  expr_name(*expr),
 				  byteorder_names[(*expr)->byteorder]);
+	}
 
 	if (expr_is_constant(*expr) || (*expr)->len / BITS_PER_BYTE < 2)
 		(*expr)->byteorder = byteorder;
@@ -329,15 +339,18 @@ static int expr_evaluate_string(struct eval_ctx *ctx, struct expr **exprp)
 		*exprp = value;
 		return 0;
 	}
+
+	data[datalen] = 0;
 	value = constant_expr_alloc(&expr->location, ctx->ectx.dtype,
 				    BYTEORDER_HOST_ENDIAN,
-				    datalen * BITS_PER_BYTE, data);
+				    expr->len, data);
 
 	prefix = prefix_expr_alloc(&expr->location, value,
 				   datalen * BITS_PER_BYTE);
 	datatype_set(prefix, ctx->ectx.dtype);
 	prefix->flags |= EXPR_F_CONSTANT;
 	prefix->byteorder = BYTEORDER_HOST_ENDIAN;
+	prefix->len = expr->len;
 
 	expr_free(expr);
 	*exprp = prefix;
@@ -1016,7 +1029,7 @@ static int expr_evaluate_range(struct eval_ctx *ctx, struct expr **expr)
 	left = range->left;
 	right = range->right;
 
-	if (mpz_cmp(left->value, right->value) >= 0)
+	if (mpz_cmp(left->value, right->value) > 0)
 		return expr_error(ctx->msgs, range,
 				  "Range has zero or negative size");
 	datatype_set(range, left->dtype);
@@ -1246,10 +1259,19 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 	uint32_t type = dtype ? dtype->type : 0, ntype = 0;
 	int off = dtype ? dtype->subtypes : 0;
 	unsigned int flags = EXPR_F_CONSTANT | EXPR_F_SINGLETON;
-	struct expr *i, *next;
+	struct expr *i, *next, *key = NULL;
+	const struct expr *key_ctx = NULL;
+	uint32_t size = 0;
+
+	if (ctx->ectx.key && ctx->ectx.key->etype == EXPR_CONCAT) {
+		key_ctx = ctx->ectx.key;
+		assert(!list_empty(&ctx->ectx.key->expressions));
+		key = list_first_entry(&ctx->ectx.key->expressions, struct expr, list);
+	}
 
 	list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
-		unsigned dsize_bytes;
+		enum byteorder bo = BYTEORDER_INVALID;
+		unsigned dsize_bytes, dsize = 0;
 
 		if (i->etype == EXPR_CT &&
 		    (i->ct.key == NFT_CT_SRC ||
@@ -1263,15 +1285,34 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 						 "expecting %s",
 						 dtype->desc);
 
-		if (dtype == NULL)
+		if (key) {
+			tmp = key->dtype;
+			dsize = key->len;
+			bo = key->byteorder;
+			off--;
+		} else if (dtype == NULL) {
 			tmp = datatype_lookup(TYPE_INVALID);
-		else
+		} else {
 			tmp = concat_subtype_lookup(type, --off);
-		expr_set_context(&ctx->ectx, tmp, tmp->size);
+			dsize = tmp->size;
+			bo = tmp->byteorder;
+		}
+
+		__expr_set_context(&ctx->ectx, tmp, bo, dsize, 0);
 
 		if (list_member_evaluate(ctx, &i) < 0)
 			return -1;
 		flags &= i->flags;
+
+		if (!key && i->dtype->type == TYPE_INTEGER) {
+			struct datatype *clone;
+
+			clone = dtype_clone(i->dtype);
+			clone->size = i->len;
+			clone->byteorder = i->byteorder;
+			clone->refcnt = 1;
+			i->dtype = clone;
+		}
 
 		if (dtype == NULL && i->dtype->size == 0)
 			return expr_binary_error(ctx->msgs, i, *expr,
@@ -1279,16 +1320,21 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 						 "data types (%s) in concat "
 						 "expressions",
 						 i->dtype->name);
+		if (dsize == 0) /* reload after evaluation or clone above */
+			dsize = i->dtype->size;
 
 		ntype = concat_subtype_add(ntype, i->dtype->type);
 
-		dsize_bytes = div_round_up(i->dtype->size, BITS_PER_BYTE);
+		dsize_bytes = div_round_up(dsize, BITS_PER_BYTE);
 		(*expr)->field_len[(*expr)->field_count++] = dsize_bytes;
+		size += netlink_padded_len(dsize);
+		if (key)
+			key = list_next_entry(key, list);
 	}
 
 	(*expr)->flags |= flags;
 	datatype_set(*expr, concat_type_alloc(ntype));
-	(*expr)->len   = (*expr)->dtype->size;
+	(*expr)->len   = size;
 
 	if (off > 0)
 		return expr_error(ctx->msgs, *expr,
@@ -1297,6 +1343,10 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 				  dtype->desc, (*expr)->dtype->desc);
 
 	expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->len);
+	if (!key_ctx)
+		ctx->ectx.key = *expr;
+	else
+		ctx->ectx.key = key_ctx;
 
 	return 0;
 }
@@ -1390,6 +1440,7 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 
 		key = ctx->set->key;
 		__expr_set_context(&ctx->ectx, key->dtype, key->byteorder, key->len, 0);
+		ctx->ectx.key = key;
 	}
 
 	if (expr_evaluate(ctx, &elem->key) < 0)
@@ -1420,6 +1471,39 @@ static const struct expr *expr_set_elem(const struct expr *expr)
 		return expr->left;
 
 	return expr;
+}
+
+static int interval_set_eval(struct eval_ctx *ctx, struct set *set,
+			     struct expr *init)
+{
+	int ret;
+
+	if (!init)
+		return 0;
+
+	ret = 0;
+	switch (ctx->cmd->op) {
+	case CMD_CREATE:
+	case CMD_ADD:
+		if (set->automerge) {
+			ret = set_automerge(ctx->msgs, ctx->cmd, set, init,
+					    ctx->nft->debug_mask);
+		} else {
+			ret = set_overlap(ctx->msgs, set, init);
+		}
+		break;
+	case CMD_DELETE:
+		ret = set_delete(ctx->msgs, ctx->cmd, set, init,
+				 ctx->nft->debug_mask);
+		break;
+	case CMD_GET:
+		break;
+	default:
+		BUG("unhandled op %d\n", ctx->cmd->op);
+		break;
+	}
+
+	return ret;
 }
 
 static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
@@ -1509,10 +1593,25 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 	datatype_set(set, ctx->ectx.dtype);
 	set->len   = ctx->ectx.len;
 	set->flags |= EXPR_F_CONSTANT;
+
 	return 0;
 }
 
 static int binop_transfer(struct eval_ctx *ctx, struct expr **expr);
+
+static void map_set_concat_info(struct expr *map)
+{
+	map->mappings->set->flags |= map->mappings->set->init->set_flags;
+
+	if (map->mappings->set->flags & NFT_SET_INTERVAL &&
+	    map->map->etype == EXPR_CONCAT) {
+		memcpy(&map->mappings->set->desc.field_len, &map->map->field_len,
+		       sizeof(map->mappings->set->desc.field_len));
+		map->mappings->set->desc.field_count = map->map->field_count;
+		map->mappings->flags |= NFT_SET_CONCAT;
+	}
+}
+
 static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr_ctx ectx = ctx->ectx;
@@ -1549,14 +1648,21 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 
 	switch (map->mappings->etype) {
 	case EXPR_SET:
-		key = constant_expr_alloc(&map->location,
-					  ctx->ectx.dtype,
-					  ctx->ectx.byteorder,
-					  ctx->ectx.len, NULL);
+		if (ctx->ectx.key && ctx->ectx.key->etype == EXPR_CONCAT) {
+			key = expr_clone(ctx->ectx.key);
+		} else {
+			key = constant_expr_alloc(&map->location,
+						  ctx->ectx.dtype,
+						  ctx->ectx.byteorder,
+						  ctx->ectx.len, NULL);
+		}
 
 		dtype = set_datatype_alloc(ectx.dtype, ectx.byteorder);
-		data = constant_expr_alloc(&netlink_location, dtype,
-					   dtype->byteorder, ectx.len, NULL);
+		if (dtype->type == TYPE_VERDICT)
+			data = verdict_expr_alloc(&netlink_location, 0, NULL);
+		else
+			data = constant_expr_alloc(&netlink_location, dtype,
+						   dtype->byteorder, ectx.len, NULL);
 
 		mappings = implicit_set_declaration(ctx, "__map%d",
 						    key, data,
@@ -1570,6 +1676,12 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 		ctx->set = mappings->set;
 		if (expr_evaluate(ctx, &map->mappings->set->init) < 0)
 			return -1;
+
+		if (set_is_interval(map->mappings->set->init->set_flags) &&
+		    !(map->mappings->set->init->set_flags & NFT_SET_CONCAT) &&
+		    interval_set_eval(ctx, ctx->set, map->mappings->set->init) < 0)
+			return -1;
+
 		expr_set_context(&ctx->ectx, ctx->set->key->dtype, ctx->set->key->len);
 		if (binop_transfer(ctx, expr) < 0)
 			return -1;
@@ -1580,15 +1692,8 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 		ctx->set->key->len = ctx->ectx.len;
 		ctx->set = NULL;
 		map = *expr;
-		map->mappings->set->flags |= map->mappings->set->init->set_flags;
 
-		if (map->mappings->set->flags & NFT_SET_INTERVAL &&
-		    map->map->etype == EXPR_CONCAT) {
-			memcpy(&map->mappings->set->desc.field_len, &map->map->field_len,
-			       sizeof(map->mappings->set->desc.field_len));
-			map->mappings->set->desc.field_count = map->map->field_count;
-			map->mappings->flags |= NFT_SET_CONCAT;
-		}
+		map_set_concat_info(map);
 		break;
 	case EXPR_SYMBOL:
 		if (expr_evaluate(ctx, &map->mappings) < 0)
@@ -3425,6 +3530,7 @@ static int stmt_evaluate_chain(struct eval_ctx *ctx, struct stmt *stmt)
 			struct eval_ctx rule_ctx = {
 				.nft	= ctx->nft,
 				.msgs	= ctx->msgs,
+				.cmd	= ctx->cmd,
 			};
 			struct handle h2 = {};
 
@@ -3446,6 +3552,11 @@ static int stmt_evaluate_chain(struct eval_ctx *ctx, struct stmt *stmt)
 	}
 
 	return 0;
+}
+
+static int stmt_evaluate_optstrip(struct eval_ctx *ctx, struct stmt *stmt)
+{
+	return expr_evaluate(ctx, &stmt->optstrip.expr);
 }
 
 static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
@@ -3743,10 +3854,15 @@ static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
 		ctx->set = mappings->set;
 		if (expr_evaluate(ctx, &map->mappings->set->init) < 0)
 			return -1;
+
+		if (set_is_interval(map->mappings->set->init->set_flags) &&
+		    !(map->mappings->set->init->set_flags & NFT_SET_CONCAT) &&
+		    interval_set_eval(ctx, ctx->set, map->mappings->set->init) < 0)
+			return -1;
+
 		ctx->set = NULL;
 
-		map->mappings->set->flags |=
-			map->mappings->set->init->set_flags;
+		map_set_concat_info(map);
 		/* fall through */
 	case EXPR_SYMBOL:
 		if (expr_evaluate(ctx, &map->mappings) < 0)
@@ -3857,6 +3973,8 @@ int stmt_evaluate(struct eval_ctx *ctx, struct stmt *stmt)
 		return stmt_evaluate_synproxy(ctx, stmt);
 	case STMT_CHAIN:
 		return stmt_evaluate_chain(ctx, stmt);
+	case STMT_OPTSTRIP:
+		return stmt_evaluate_optstrip(ctx, stmt);
 	default:
 		BUG("unknown statement type %s\n", stmt->ops->name);
 	}
@@ -3878,13 +3996,20 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 		return set_not_found(ctx, &ctx->cmd->handle.set.location,
 				     ctx->cmd->handle.set.name);
 
+	set->existing_set = set;
 	ctx->set = set;
 	expr_set_context(&ctx->ectx, set->key->dtype, set->key->len);
 	if (expr_evaluate(ctx, &cmd->expr) < 0)
 		return -1;
-	ctx->set = NULL;
 
 	cmd->elem.set = set_get(set);
+
+	if (set_is_interval(ctx->set->flags) &&
+	    !(set->flags & NFT_SET_CONCAT) &&
+	    interval_set_eval(ctx, ctx->set, cmd->expr) < 0)
+		return -1;
+
+	ctx->set = NULL;
 
 	return 0;
 }
@@ -3906,8 +4031,8 @@ static int set_key_data_error(struct eval_ctx *ctx, const struct set *set,
 static int set_expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 {
 	unsigned int flags = EXPR_F_CONSTANT | EXPR_F_SINGLETON;
+	uint32_t ntype = 0, size = 0;
 	struct expr *i, *next;
-	uint32_t ntype = 0;
 
 	list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
 		unsigned dsize_bytes;
@@ -3918,32 +4043,49 @@ static int set_expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 			return expr_error(ctx->msgs, i,
 					  "specify either ip or ip6 for address matching");
 
-		if (i->dtype->size == 0)
+		if (i->etype == EXPR_PAYLOAD &&
+		    i->dtype->type == TYPE_INTEGER) {
+			struct datatype *dtype;
+
+			dtype = dtype_clone(i->dtype);
+			dtype->size = i->len;
+			dtype->byteorder = i->byteorder;
+			dtype->refcnt = 1;
+			i->dtype = dtype;
+		}
+
+		if (i->dtype->size == 0 && i->len == 0)
 			return expr_binary_error(ctx->msgs, i, *expr,
 						 "can not use variable sized "
 						 "data types (%s) in concat "
 						 "expressions",
 						 i->dtype->name);
 
+		if (i->dtype->size)
+			assert(i->len == i->dtype->size);
+
 		flags &= i->flags;
 
 		ntype = concat_subtype_add(ntype, i->dtype->type);
 
-		dsize_bytes = div_round_up(i->dtype->size, BITS_PER_BYTE);
+		dsize_bytes = div_round_up(i->len, BITS_PER_BYTE);
 		(*expr)->field_len[(*expr)->field_count++] = dsize_bytes;
+		size += netlink_padded_len(i->len);
 	}
 
 	(*expr)->flags |= flags;
 	datatype_set(*expr, concat_type_alloc(ntype));
-	(*expr)->len   = (*expr)->dtype->size;
+	(*expr)->len   = size;
 
 	expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->len);
+	ctx->ectx.key = *expr;
 
 	return 0;
 }
 
 static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 {
+	struct set *existing_set = NULL;
 	unsigned int num_stmts = 0;
 	struct table *table;
 	struct stmt *stmt;
@@ -3956,7 +4098,8 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 		if (table == NULL)
 			return table_not_found(ctx);
 
-		if (!set_cache_find(table, set->handle.set.name))
+		existing_set = set_cache_find(table, set->handle.set.name);
+		if (!existing_set)
 			set_cache_add(set_get(set), table);
 	}
 
@@ -4020,9 +4163,16 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	if (num_stmts > 1)
 		set->flags |= NFT_SET_EXPR;
 
-	if (set_is_anonymous(set->flags))
-		return 0;
+	if (set_is_anonymous(set->flags)) {
+		if (set_is_interval(set->init->set_flags) &&
+		    !(set->init->set_flags & NFT_SET_CONCAT) &&
+		    interval_set_eval(ctx, set, set->init) < 0)
+			return -1;
 
+		return 0;
+	}
+
+	set->existing_set = existing_set;
 	ctx->set = set;
 	if (set->init != NULL) {
 		__expr_set_context(&ctx->ectx, set->key->dtype,
@@ -4033,6 +4183,12 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 			return expr_error(ctx->msgs, set->init, "Set %s: Unexpected initial type %s, missing { }?",
 					  set->handle.set.name, expr_name(set->init));
 	}
+
+	if (set_is_interval(ctx->set->flags) &&
+	    !(ctx->set->flags & NFT_SET_CONCAT) &&
+	    interval_set_eval(ctx, ctx->set, set->init) < 0)
+		return -1;
+
 	ctx->set = NULL;
 
 	return 0;

@@ -188,3 +188,15 @@ inet
   [ exthdr load tcpopt 1b @ 30 + 2 => reg 1 ]
   [ bitwise reg 1 = ( reg 1 & 0x000000f0 ) ^ 0x00000000 ]
   [ lookup reg 1 set __set%d ]
+
+# reset tcp option mptcp
+ip test-ip4 input
+  [ exthdr reset tcpopt 30 ]
+
+# reset tcp option 2
+ip test-ip4 input
+  [ exthdr reset tcpopt 2 ]
+
+# reset tcp option 123
+ip test-ip4 input
+  [ exthdr reset tcpopt 123 ]

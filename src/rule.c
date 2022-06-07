@@ -26,6 +26,7 @@
 #include <json.h>
 #include <cache.h>
 #include <owner.h>
+#include <intervals.h>
 
 #include <libnftnl/common.h>
 #include <libnftnl/ruleset.h>
@@ -758,6 +759,9 @@ struct chain *chain_lookup_fuzzy(const struct handle *h,
 	struct table *table;
 	struct chain *chain;
 
+	if (!h->chain.name)
+		return NULL;
+
 	string_misspell_init(&st);
 
 	list_for_each_entry(table, &cache->table_cache.list, cache.list) {
@@ -1472,16 +1476,6 @@ static int __do_add_elements(struct netlink_ctx *ctx, struct set *set,
 	if (mnl_nft_setelem_add(ctx, set, expr, flags) < 0)
 		return -1;
 
-	if (!set_is_anonymous(set->flags) &&
-	    set->init != NULL && set->init != expr &&
-	    set->flags & NFT_SET_INTERVAL &&
-	    set->desc.field_count <= 1) {
-		interval_map_decompose(expr);
-		list_splice_tail_init(&expr->expressions, &set->init->expressions);
-		set->init->size += expr->size;
-		expr->size = 0;
-	}
-
 	return 0;
 }
 
@@ -1492,9 +1486,7 @@ static int do_add_elements(struct netlink_ctx *ctx, struct cmd *cmd,
 	struct set *set = cmd->elem.set;
 
 	if (set_is_non_concat_range(set) &&
-	    set_to_intervals(ctx->msgs, set, init, true,
-			     ctx->nft->debug_mask, set->automerge,
-			     &ctx->nft->output) < 0)
+	    set_to_intervals(set, init, true) < 0)
 		return -1;
 
 	return __do_add_elements(ctx, set, init, flags);
@@ -1519,9 +1511,7 @@ static int do_add_set(struct netlink_ctx *ctx, struct cmd *cmd,
 		 * comes too late which might result in spurious ENFILE errors.
 		 */
 		if (set_is_non_concat_range(set) &&
-		    set_to_intervals(ctx->msgs, set, set->init, true,
-				     ctx->nft->debug_mask, set->automerge,
-				     &ctx->nft->output) < 0)
+		    set_to_intervals(set, set->init, true) < 0)
 			return -1;
 	}
 
@@ -1598,12 +1588,10 @@ static int do_delete_setelems(struct netlink_ctx *ctx, struct cmd *cmd)
 	struct set *set = cmd->elem.set;
 
 	if (set_is_non_concat_range(set) &&
-	    set_to_intervals(ctx->msgs, set, expr, false,
-			     ctx->nft->debug_mask, set->automerge,
-			     &ctx->nft->output) < 0)
+	    set_to_intervals(set, expr, false) < 0)
 		return -1;
 
-	if (mnl_nft_setelem_del(ctx, cmd) < 0)
+	if (mnl_nft_setelem_del(ctx, &cmd->handle, cmd->elem.expr) < 0)
 		return -1;
 
 	return 0;
@@ -2321,13 +2309,9 @@ static int do_list_chain(struct netlink_ctx *ctx, struct cmd *cmd,
 
 	table_print_declaration(table, &ctx->nft->output);
 
-	list_for_each_entry(chain, &table->chain_cache.list, cache.list) {
-		if (chain->handle.family != cmd->handle.family ||
-		    strcmp(cmd->handle.chain.name, chain->handle.chain.name) != 0)
-			continue;
-
+	chain = chain_cache_find(table, cmd->handle.chain.name);
+	if (chain)
 		chain_print(chain, &ctx->nft->output);
-	}
 
 	nft_print(&ctx->nft->output, "}\n");
 

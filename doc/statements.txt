@@ -71,13 +71,20 @@ EXTENSION HEADER STATEMENT
 
 The extension header statement alters packet content in variable-sized headers.
 This can currently be used to alter the TCP Maximum segment size of packets,
-similar to TCPMSS.
+similar to the TCPMSS target in iptables.
 
 .change tcp mss
 ---------------
 tcp flags syn tcp option maxseg size set 1360
 # set a size based on route information:
 tcp flags syn tcp option maxseg size set rt mtu
+---------------
+
+You can also remove tcp options via reset keyword.
+
+.remove tcp option
+---------------
+tcp flags syn reset tcp option sack-perm
 ---------------
 
 LOG STATEMENT

@@ -259,6 +259,10 @@ static int netlink_gen_concat_data_expr(int end, const struct expr *i,
 			mpz_t v;
 
 			mpz_init_bitmask(v, i->len - i->prefix_len);
+
+			if (i->byteorder == BYTEORDER_HOST_ENDIAN)
+				mpz_switch_byteorder(v, i->len / BITS_PER_BYTE);
+
 			mpz_add(v, i->prefix->value, v);
 			count = netlink_export_pad(data, v, i);
 			mpz_clear(v);
@@ -805,7 +809,7 @@ static struct expr *set_make_key(const struct nftnl_udata *attr)
 	return expr;
 }
 
-static bool set_udata_key_valid(const struct expr *e, const struct datatype *d, uint32_t len)
+static bool set_udata_key_valid(const struct expr *e, uint32_t len)
 {
 	if (!e)
 		return false;
@@ -935,7 +939,7 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 		dtype = set_datatype_alloc(datatype, databyteorder);
 		klen = nftnl_set_get_u32(nls, NFTNL_SET_DATA_LEN) * BITS_PER_BYTE;
 
-		if (set_udata_key_valid(typeof_expr_data, dtype, klen)) {
+		if (set_udata_key_valid(typeof_expr_data, klen)) {
 			datatype_free(datatype_get(dtype));
 			set->data = typeof_expr_data;
 		} else {
@@ -960,7 +964,7 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	dtype = set_datatype_alloc(keytype, keybyteorder);
 	klen = nftnl_set_get_u32(nls, NFTNL_SET_KEY_LEN) * BITS_PER_BYTE;
 
-	if (set_udata_key_valid(typeof_expr_key, dtype, klen)) {
+	if (set_udata_key_valid(typeof_expr_key, klen)) {
 		datatype_free(datatype_get(dtype));
 		set->key = typeof_expr_key;
 		set->key_typeof_valid = true;
@@ -1105,17 +1109,25 @@ static struct expr *netlink_parse_interval_elem(const struct set *set,
 	return range_expr_to_prefix(range);
 }
 
-static struct expr *concat_elem_expr(struct expr *expr,
+static struct expr *concat_elem_expr(struct expr *key,
 				     const struct datatype *dtype,
 				     struct expr *data, int *off)
 {
 	const struct datatype *subtype;
+	struct expr *expr;
 
-	subtype = concat_subtype_lookup(dtype->type, --(*off));
-
-	expr = constant_expr_splice(data, subtype->size);
-	expr->dtype = subtype;
-	expr->byteorder = subtype->byteorder;
+	if (key) {
+		(*off)--;
+		expr = constant_expr_splice(data, key->len);
+		expr->dtype = datatype_get(key->dtype);
+		expr->byteorder = key->byteorder;
+		expr->len = key->len;
+	} else {
+		subtype = concat_subtype_lookup(dtype->type, --(*off));
+		expr = constant_expr_splice(data, subtype->size);
+		expr->dtype = subtype;
+		expr->byteorder = subtype->byteorder;
+	}
 
 	if (expr->byteorder == BYTEORDER_HOST_ENDIAN)
 		mpz_switch_byteorder(expr->value, expr->len / BITS_PER_BYTE);
@@ -1133,13 +1145,18 @@ static struct expr *netlink_parse_concat_elem_key(const struct set *set,
 						  struct expr *data)
 {
 	const struct datatype *dtype = set->key->dtype;
-	struct expr *concat, *expr;
+	struct expr *concat, *expr, *n = NULL;
 	int off = dtype->subtypes;
+
+	if (set->key->etype == EXPR_CONCAT)
+		n = list_first_entry(&set->key->expressions, struct expr, list);
 
 	concat = concat_expr_alloc(&data->location);
 	while (off > 0) {
-		expr = concat_elem_expr(expr, dtype, data, &off);
+		expr = concat_elem_expr(n, dtype, data, &off);
 		compound_expr_add(concat, expr);
+		if (set->key->etype == EXPR_CONCAT)
+			n = list_next_entry(n, list);
 	}
 
 	expr_free(data);
@@ -1159,7 +1176,7 @@ static struct expr *netlink_parse_concat_elem(const struct set *set,
 
 	concat = concat_expr_alloc(&data->location);
 	while (off > 0) {
-		expr = concat_elem_expr(expr, dtype, data, &off);
+		expr = concat_elem_expr(NULL, dtype, data, &off);
 		list_add_tail(&expr->list, &expressions);
 	}
 
@@ -1171,7 +1188,7 @@ static struct expr *netlink_parse_concat_elem(const struct set *set,
 		while (off > 0) {
 			left = list_first_entry(&expressions, struct expr, list);
 
-			expr = concat_elem_expr(expr, dtype, data, &off);
+			expr = concat_elem_expr(NULL, dtype, data, &off);
 			list_del(&left->list);
 
 			range = range_expr_alloc(&data->location, left, expr);
@@ -1273,6 +1290,7 @@ key_end:
 	}
 
 	expr = set_elem_expr_alloc(&netlink_location, key);
+	expr->flags |= EXPR_F_KERNEL;
 
 	if (nftnl_set_elem_is_set(nlse, NFTNL_SET_ELEM_TIMEOUT))
 		expr->timeout	 = nftnl_set_elem_get_u64(nlse, NFTNL_SET_ELEM_TIMEOUT);

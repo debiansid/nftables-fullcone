@@ -74,7 +74,7 @@ monitor_run_test() {
 		echo "command file:"
 		cat $command_file
 	}
-	$nft -f $command_file || {
+	$nft -f - <$command_file || {
 		err "nft command failed!"
 		rc=1
 	}
@@ -103,7 +103,7 @@ echo_run_test() {
 		echo "command file:"
 		cat $command_file
 	}
-	$nft -nn -e -f $command_file >$echo_output || {
+	$nft -nn -e -f - <$command_file >$echo_output || {
 		err "nft command failed!"
 		rc=1
 	}

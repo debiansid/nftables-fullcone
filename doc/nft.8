@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 02/21/2022
+.\"      Date: 06/07/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "02/21/2022" "\ \&" "\ \&"
+.TH "NFT" "8" "06/07/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -7581,7 +7581,7 @@ ip forward ip dscp set 42
 .RE
 .\}
 .sp
-The extension header statement alters packet content in variable\-sized headers\&. This can currently be used to alter the TCP Maximum segment size of packets, similar to TCPMSS\&.
+The extension header statement alters packet content in variable\-sized headers\&. This can currently be used to alter the TCP Maximum segment size of packets, similar to the TCPMSS target in iptables\&.
 .PP
 \fBchange tcp mss\fR. 
 .sp
@@ -7592,6 +7592,20 @@ The extension header statement alters packet content in variable\-sized headers\
 tcp flags syn tcp option maxseg size set 1360
 # set a size based on route information:
 tcp flags syn tcp option maxseg size set rt mtu
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+You can also remove tcp options via reset keyword\&.
+.PP
+\fBremove tcp option\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+tcp flags syn reset tcp option sack\-perm
 .fi
 .if n \{\
 .RE

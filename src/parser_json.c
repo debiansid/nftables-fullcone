@@ -2652,6 +2652,14 @@ static struct stmt *json_parse_connlimit_stmt(struct json_ctx *ctx,
 	return stmt;
 }
 
+static struct stmt *json_parse_optstrip_stmt(struct json_ctx *ctx,
+					     const char *key, json_t *value)
+{
+	struct expr *expr = json_parse_expr(ctx, value);
+
+	return expr ? optstrip_stmt_alloc(int_loc, expr) : NULL;
+}
+
 static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 {
 	struct {
@@ -2688,6 +2696,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "ct count", json_parse_connlimit_stmt },
 		{ "tproxy", json_parse_tproxy_stmt },
 		{ "synproxy", json_parse_synproxy_stmt },
+		{ "reset", json_parse_optstrip_stmt },
 	};
 	const char *type;
 	unsigned int i;

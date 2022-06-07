@@ -324,6 +324,7 @@ void rule_stmt_insert_at(struct rule *rule, struct stmt *nstmt,
  * @key:	key expression (data type, length))
  * @data:	mapping data expression
  * @objtype:	mapping object type
+ * @existing_set: reference to existing set in the kernel
  * @init:	initializer
  * @rg_cache:	cached range element (left)
  * @policy:	set mechanism policy
@@ -345,6 +346,7 @@ struct set {
 	struct expr		*key;
 	struct expr		*data;
 	uint32_t		objtype;
+	struct set		*existing_set;
 	struct expr		*init;
 	struct expr		*rg_cache;
 	uint32_t		policy;

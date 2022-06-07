@@ -19,6 +19,8 @@
 
 static unsigned int evaluate_cache_add(struct cmd *cmd, unsigned int flags)
 {
+	struct set *set;
+
 	switch (cmd->obj) {
 	case CMD_OBJ_TABLE:
 		if (!cmd->table)
@@ -29,6 +31,10 @@ static unsigned int evaluate_cache_add(struct cmd *cmd, unsigned int flags)
 			 NFT_CACHE_SET |
 			 NFT_CACHE_OBJECT |
 			 NFT_CACHE_FLOWTABLE;
+		list_for_each_entry(set, &cmd->table->sets, list) {
+			if (set->automerge)
+				 flags |= NFT_CACHE_SETELEM_MAYBE;
+		}
 		break;
 	case CMD_OBJ_CHAIN:
 	case CMD_OBJ_SET:

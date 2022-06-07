@@ -585,3 +585,38 @@
         }
    }
 ]
+
+# reset tcp option mptcp
+[
+    {
+        "reset": {
+            "tcp option": {
+                "name": "mptcp"
+            }
+        }
+    }
+]
+
+# reset tcp option 2
+[
+    {
+        "reset": {
+            "tcp option": {
+                "name": "maxseg"
+            }
+        }
+    }
+]
+
+# reset tcp option 123
+[
+    {
+        "reset": {
+            "tcp option": {
+                "base": 123,
+                "len": 0,
+                "offset": 0
+            }
+        }
+    }
+]

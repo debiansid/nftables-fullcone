@@ -36,6 +36,7 @@ static void expr_msort_value(const struct expr *expr, mpz_t value)
 		break;
 	case EXPR_BINOP:
 	case EXPR_MAPPING:
+	case EXPR_RANGE:
 		expr_msort_value(expr->left, value);
 		break;
 	case EXPR_VALUE:

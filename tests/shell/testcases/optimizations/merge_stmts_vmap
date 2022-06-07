@@ -7,6 +7,11 @@ RULESET="table ip x {
 		ct state invalid drop
 		ct state established,related accept
 	}
+	chain z {
+		tcp dport { 1 } accept
+		tcp dport 2-3 drop
+		tcp dport 4 accept
+	}
 }"
 
 $NFT -o -f - <<< $RULESET

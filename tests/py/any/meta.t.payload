@@ -1003,6 +1003,20 @@ ip meta-test input
   [ cmp eq reg 1 0x22eb8a00 0x15ad18e1 ]
   [ immediate reg 0 drop ]
 
+# meta time < "2022-07-01 11:00:00" accept
+ip test-ip4 input
+  [ meta load time => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 8, 8) ]
+  [ cmp lt reg 1 0xf3a8fd16 0x00a07719 ]
+  [ immediate reg 0 accept ]
+
+# meta time > "2022-07-01 11:00:00" accept
+ip test-ip4 input
+  [ meta load time => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 8, 8) ]
+  [ cmp gt reg 1 0xf3a8fd16 0x00a07719 ]
+  [ immediate reg 0 accept ]
+
 # meta day "Saturday" drop
 ip test-ip4 input
   [ meta load day => reg 1 ]
@@ -1044,3 +1058,17 @@ ip meta-test input
   [ meta load hour => reg 1 ]
   [ cmp eq reg 1 0x0001359c ]
   [ immediate reg 0 drop ]
+
+# time < "2022-07-01 11:00:00" accept
+ip test-ip4 input
+  [ meta load time => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 8, 8) ]
+  [ cmp lt reg 1 0xf3a8fd16 0x00a07719 ]
+  [ immediate reg 0 accept ]
+
+# time > "2022-07-01 11:00:00" accept
+ip test-ip4 input
+  [ meta load time => reg 1 ]
+  [ byteorder reg 1 = hton(reg 1, 8, 8) ]
+  [ cmp gt reg 1 0xf3a8fd16 0x00a07719 ]
+  [ immediate reg 0 accept ]

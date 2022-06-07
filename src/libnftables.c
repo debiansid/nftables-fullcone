@@ -500,8 +500,8 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 			struct list_head *cmds)
 {
 	struct nft_cache_filter *filter;
+	struct cmd *cmd, *next;
 	unsigned int flags;
-	struct cmd *cmd;
 
 	filter = nft_cache_filter_init();
 	flags = nft_cache_evaluate(nft, cmds, filter);
@@ -512,7 +512,7 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 
 	nft_cache_filter_fini(filter);
 
-	list_for_each_entry(cmd, cmds, list) {
+	list_for_each_entry_safe(cmd, next, cmds, list) {
 		struct eval_ctx ectx = {
 			.nft	= nft,
 			.msgs	= msgs,

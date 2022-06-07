@@ -8,6 +8,7 @@ noinst_HEADERS = 	cli.h		\
 			expression.h	\
 			fib.h		\
 			hash.h		\
+			intervals.h	\
 			ipopt.h		\
 			json.h		\
 			mini-gmp.h	\
@@ -16,7 +17,6 @@ noinst_HEADERS = 	cli.h		\
 			mnl.h		\
 			nftables.h	\
 			payload.h	\
-			rbtree.h	\
 			tcpopt.h	\
 			statement.h	\
 			ct.h		\

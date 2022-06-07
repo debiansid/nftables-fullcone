@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# no table x, caused segfault in earlier nft releases
+$NFT insert rule inet x y handle 107 'goto { log prefix "MOO! "; }'
+if [ $? -ne 1 ]; then
+	exit 1
+fi
+
 set -e
 
 EXPECTED="table inet x {

@@ -120,6 +120,7 @@ struct expr_ctx {
 	enum byteorder		byteorder;
 	unsigned int		len;
 	unsigned int		maxval;
+	const struct expr	*key;
 };
 
 static inline void __expr_set_context(struct expr_ctx *ctx,
@@ -131,6 +132,7 @@ static inline void __expr_set_context(struct expr_ctx *ctx,
 	ctx->byteorder	= byteorder;
 	ctx->len	= len;
 	ctx->maxval	= maxval;
+	ctx->key	= NULL;
 }
 
 static inline void expr_set_context(struct expr_ctx *ctx,
@@ -190,6 +192,7 @@ const struct expr_ops *expr_ops_by_type(enum expr_types etype);
  * @EXPR_F_INTERVAL_END:	set member ends an open interval
  * @EXPR_F_BOOLEAN:		expression is boolean (set by relational expr on LHS)
  * @EXPR_F_INTERVAL:		expression describes a interval
+ * @EXPR_F_KERNEL:		expression resides in the kernel
  */
 enum expr_flags {
 	EXPR_F_CONSTANT		= 0x1,
@@ -198,6 +201,8 @@ enum expr_flags {
 	EXPR_F_INTERVAL_END	= 0x8,
 	EXPR_F_BOOLEAN		= 0x10,
 	EXPR_F_INTERVAL		= 0x20,
+	EXPR_F_KERNEL		= 0x40,
+	EXPR_F_REMOVE		= 0x80,
 };
 
 #include <payload.h>
@@ -482,10 +487,6 @@ extern struct expr *list_expr_alloc(const struct location *loc);
 
 extern struct expr *set_expr_alloc(const struct location *loc,
 				   const struct set *set);
-extern int set_to_intervals(struct list_head *msgs, struct set *set,
-			    struct expr *init, bool add,
-			    unsigned int debug_mask, bool merge,
-			    struct output_ctx *octx);
 extern void concat_range_aggregate(struct expr *set);
 extern void interval_map_decompose(struct expr *set);
 

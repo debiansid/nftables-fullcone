@@ -87,6 +87,7 @@ kernel_cleanup() {
 	nft_fib nft_fib_ipv4 nft_fib_ipv6 nft_fib_inet \
 	nft_hash nft_ct nft_compat nft_rt nft_objref \
 	nft_set_hash nft_set_rbtree nft_set_bitmap \
+	nft_synproxy nft_connlimit \
 	nft_chain_nat \
 	nft_chain_route_ipv4 nft_chain_route_ipv6 \
 	nft_dup_netdev nft_fwd_netdev \

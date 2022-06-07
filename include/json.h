@@ -91,6 +91,7 @@ json_t *verdict_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *connlimit_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *tproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 json_t *synproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
+json_t *optstrip_stmt_json(const struct stmt *stmt, struct output_ctx *octx);
 
 int do_command_list_json(struct netlink_ctx *ctx, struct cmd *cmd);
 
@@ -192,6 +193,7 @@ STMT_PRINT_STUB(verdict)
 STMT_PRINT_STUB(connlimit)
 STMT_PRINT_STUB(tproxy)
 STMT_PRINT_STUB(synproxy)
+STMT_PRINT_STUB(optstrip)
 
 #undef STMT_PRINT_STUB
 #undef EXPR_PRINT_STUB

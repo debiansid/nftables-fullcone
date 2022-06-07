@@ -18,6 +18,7 @@
 #include <expression.h>
 #include <statement.h>
 #include <datatype.h>
+#include <netlink.h>
 #include <rule.h>
 #include <gmputil.h>
 #include <utils.h>
@@ -268,6 +269,7 @@ static struct expr *verdict_expr_parse_udata(const struct nftnl_udata *attr)
 	struct expr *e;
 
 	e = symbol_expr_alloc(&internal_location, SYMBOL_VALUE, NULL, "verdict");
+	e->dtype = &verdict_type;
 	e->len = NFT_REG_SIZE * BITS_PER_BYTE;
 	return e;
 }
@@ -949,7 +951,7 @@ static struct expr *concat_expr_parse_udata(const struct nftnl_udata *attr)
 	const struct nftnl_udata *ud[NFTNL_UDATA_SET_KEY_CONCAT_NEST_MAX] = {};
 	const struct datatype *dtype;
 	struct expr *concat_expr;
-	uint32_t dt = 0;
+	uint32_t dt = 0, len = 0;
 	unsigned int i;
 	int err;
 
@@ -990,6 +992,7 @@ static struct expr *concat_expr_parse_udata(const struct nftnl_udata *attr)
 
 		dt = concat_subtype_add(dt, expr->dtype->type);
 		compound_expr_add(concat_expr, expr);
+		len += netlink_padded_len(expr->len);
 	}
 
 	dtype = concat_type_alloc(dt);
@@ -997,7 +1000,7 @@ static struct expr *concat_expr_parse_udata(const struct nftnl_udata *attr)
 		goto err_free;
 
 	concat_expr->dtype = datatype_get(dtype);
-	concat_expr->len = dtype->size;
+	concat_expr->len = len;
 
 	return concat_expr;
 
@@ -1462,6 +1465,7 @@ void range_expr_value_high(mpz_t rop, const struct expr *expr)
 		return mpz_set(rop, expr->value);
 	case EXPR_PREFIX:
 		range_expr_value_low(rop, expr->prefix);
+		assert(expr->len >= expr->prefix_len);
 		mpz_init_bitmask(tmp, expr->len - expr->prefix_len);
 		mpz_add(rop, rop, tmp);
 		mpz_clear(tmp);

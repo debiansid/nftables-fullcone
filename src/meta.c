@@ -405,7 +405,7 @@ static void date_type_print(const struct expr *expr, struct output_ctx *octx)
 		nft_print(octx, "Error converting timestamp to printed time");
 }
 
-static time_t parse_iso_date(const char *sym)
+static bool parse_iso_date(uint64_t *tstamp, const char *sym)
 {
 	struct tm tm, *cur_tm;
 	time_t ts;
@@ -419,7 +419,7 @@ static time_t parse_iso_date(const char *sym)
 	if (strptime(sym, "%F", &tm))
 		goto success;
 
-	return -1;
+	return false;
 
 success:
 	/*
@@ -436,7 +436,9 @@ success:
 		return ts;
 
 	/* Substract tm_gmtoff to get the current time */
-	return ts - cur_tm->tm_gmtoff;
+	*tstamp = ts - cur_tm->tm_gmtoff;
+
+	return true;
 }
 
 static struct error_record *date_type_parse(struct parse_ctx *ctx,
@@ -444,9 +446,9 @@ static struct error_record *date_type_parse(struct parse_ctx *ctx,
 					    struct expr **res)
 {
 	const char *endptr = sym->identifier;
-	time_t tstamp;
+	uint64_t tstamp;
 
-	if ((tstamp = parse_iso_date(sym->identifier)) != -1)
+	if (parse_iso_date(&tstamp, sym->identifier))
 		goto success;
 
 	tstamp = strtoul(sym->identifier, (char **) &endptr, 10);

@@ -30,6 +30,6 @@ LIBNFTABLES_2 {
 } LIBNFTABLES_1;
 
 LIBNFTABLES_3 {
-  nft_set_optimize;
-  nft_get_optimize;
+  nft_ctx_set_optimize;
+  nft_ctx_get_optimize;
 } LIBNFTABLES_2;

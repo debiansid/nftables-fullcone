@@ -124,11 +124,17 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 
 #define NFTNL_UDATA_SET_KEY_PAYLOAD_DESC 0
 #define NFTNL_UDATA_SET_KEY_PAYLOAD_TYPE 1
-#define NFTNL_UDATA_SET_KEY_PAYLOAD_MAX 2
+#define NFTNL_UDATA_SET_KEY_PAYLOAD_BASE 2
+#define NFTNL_UDATA_SET_KEY_PAYLOAD_OFFSET 3
+#define NFTNL_UDATA_SET_KEY_PAYLOAD_LEN 4
+#define NFTNL_UDATA_SET_KEY_PAYLOAD_MAX 5
 
 static unsigned int expr_payload_type(const struct proto_desc *desc,
 				      const struct proto_hdr_template *tmpl)
 {
+	if (desc->id == PROTO_DESC_UNKNOWN)
+		return 0;
+
 	return (unsigned int)(tmpl - &desc->templates[0]);
 }
 
@@ -141,6 +147,15 @@ static int payload_expr_build_udata(struct nftnl_udata_buf *udbuf,
 
 	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_KEY_PAYLOAD_DESC, desc->id);
 	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_KEY_PAYLOAD_TYPE, type);
+
+	if (desc->id == 0) {
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_KEY_PAYLOAD_BASE,
+				    expr->payload.base);
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_KEY_PAYLOAD_OFFSET,
+				    expr->payload.offset);
+	}
+	if (expr->dtype->type == TYPE_INTEGER)
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_SET_KEY_PAYLOAD_LEN, expr->len);
 
 	return 0;
 }
@@ -159,6 +174,9 @@ static int payload_parse_udata(const struct nftnl_udata *attr, void *data)
 	switch (type) {
 	case NFTNL_UDATA_SET_KEY_PAYLOAD_DESC:
 	case NFTNL_UDATA_SET_KEY_PAYLOAD_TYPE:
+	case NFTNL_UDATA_SET_KEY_PAYLOAD_BASE:
+	case NFTNL_UDATA_SET_KEY_PAYLOAD_OFFSET:
+	case NFTNL_UDATA_SET_KEY_PAYLOAD_LEN:
 		if (len != sizeof(uint32_t))
 			return -1;
 		break;
@@ -173,8 +191,10 @@ static int payload_parse_udata(const struct nftnl_udata *attr, void *data)
 static struct expr *payload_expr_parse_udata(const struct nftnl_udata *attr)
 {
 	const struct nftnl_udata *ud[NFTNL_UDATA_SET_KEY_PAYLOAD_MAX + 1] = {};
+	unsigned int type, base, offset, len = 0;
 	const struct proto_desc *desc;
-	unsigned int type;
+	bool is_raw = false;
+	struct expr *expr;
 	int err;
 
 	err = nftnl_udata_parse(nftnl_udata_get(attr), nftnl_udata_len(attr),
@@ -187,12 +207,40 @@ static struct expr *payload_expr_parse_udata(const struct nftnl_udata *attr)
 		return NULL;
 
 	desc = find_proto_desc(ud[NFTNL_UDATA_SET_KEY_PAYLOAD_DESC]);
-	if (!desc)
-		return NULL;
+	if (!desc) {
+		if (!ud[NFTNL_UDATA_SET_KEY_PAYLOAD_BASE] ||
+		    !ud[NFTNL_UDATA_SET_KEY_PAYLOAD_OFFSET])
+			return NULL;
+
+		base = nftnl_udata_get_u32(ud[NFTNL_UDATA_SET_KEY_PAYLOAD_BASE]);
+		offset = nftnl_udata_get_u32(ud[NFTNL_UDATA_SET_KEY_PAYLOAD_OFFSET]);
+		is_raw = true;
+	}
 
 	type = nftnl_udata_get_u32(ud[NFTNL_UDATA_SET_KEY_PAYLOAD_TYPE]);
+	if (ud[NFTNL_UDATA_SET_KEY_PAYLOAD_LEN])
+		len = nftnl_udata_get_u32(ud[NFTNL_UDATA_SET_KEY_PAYLOAD_LEN]);
 
-	return payload_expr_alloc(&internal_location, desc, type);
+	expr = payload_expr_alloc(&internal_location, desc, type);
+
+	if (len)
+		expr->len = len;
+
+	if (is_raw) {
+		struct datatype *dtype;
+
+		expr->payload.base = base;
+		expr->payload.offset = offset;
+		expr->payload.is_raw = true;
+		expr->len = len;
+		dtype = dtype_clone(&xinteger_type);
+		dtype->size = len;
+		dtype->byteorder = BYTEORDER_BIG_ENDIAN;
+		dtype->refcnt = 1;
+		expr->dtype = dtype;
+	}
+
+	return expr;
 }
 
 const struct expr_ops payload_expr_ops = {

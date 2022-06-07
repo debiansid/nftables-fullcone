@@ -45,6 +45,11 @@ table inet t {
 			     15 }
 	}
 
+	set s10 {
+		typeof iifname . ip saddr . ipsec in reqid
+		elements = { "eth0" . 10.1.1.2 . 42 }
+	}
+
 	chain c1 {
 		osf name @s1 accept
 	}
@@ -75,5 +80,9 @@ table inet t {
 
 	chain c9 {
 		ip hdrlength @s9 accept
+	}
+
+	chain c10 {
+		iifname . ip saddr . ipsec in reqid @s10 accept
 	}
 }

@@ -1578,10 +1578,16 @@ json_t *synproxy_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 	return json_pack("{s:o}", "synproxy", root);
 }
 
+json_t *optstrip_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	return json_pack("{s:o}", "reset",
+			 expr_print_json(stmt->optstrip.expr, octx));
+}
+
 static json_t *table_print_json_full(struct netlink_ctx *ctx,
 				     struct table *table)
 {
-	json_t *root = json_array(), *tmp;
+	json_t *root = json_array(), *rules = json_array(), *tmp;
 	struct flowtable *flowtable;
 	struct chain *chain;
 	struct rule *rule;
@@ -1611,9 +1617,12 @@ static json_t *table_print_json_full(struct netlink_ctx *ctx,
 
 		list_for_each_entry(rule, &chain->rules, list) {
 			tmp = rule_print_json(&ctx->nft->output, rule);
-			json_array_append_new(root, tmp);
+			json_array_append_new(rules, tmp);
 		}
 	}
+
+	json_array_extend(root, rules);
+	json_decref(rules);
 
 	return root;
 }

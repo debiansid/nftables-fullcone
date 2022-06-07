@@ -54,3 +54,9 @@ tcp option mptcp exists;ok
 tcp option mptcp subtype 0;ok
 tcp option mptcp subtype 1;ok
 tcp option mptcp subtype { 0, 2};ok
+
+reset tcp option mptcp;ok
+reset tcp option 2;ok;reset tcp option maxseg
+reset tcp option 123;ok
+reset tcp option meh;fail
+reset tcp option 256;fail

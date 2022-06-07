@@ -1,3 +1,15 @@
+nftables (1.0.4-1) unstable; urgency=medium
+
+  [ Christian Ehrhardt ]
+  * [8b15f04] Fix version map usage and add symbols file (Closes: #1007888 LP: #1965464)
+
+  [ Arturo Borrero Gonzalez ]
+  * [527715a] New upstream version 1.0.4
+  * [929b673] d/patches: drop all patches
+  * [1a1a7e5] d/control: bump build-dep on libnftnl
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 08 Jun 2022 00:59:59 +0200
+
 nftables (1.0.2-1) unstable; urgency=medium
 
   [ Arturo Borrero Gonzalez ]

@@ -1,3 +1,25 @@
+nftables (1.0.4-2) unstable; urgency=medium
+
+  * [9e654e0] d/nftables.conf: use named priorities
+  * [0e9757f] d/u/signing-key.asc: minimize signing key
+  * [49d2aee] d/libnftables1.symbols: add `Build-Depends-Package` field
+  * [1a50850] d/control: set R³: no.
+  * [1699c66] d/control: add myself to uploaders.
+  * [cd9f31f] d/watch: use HTTPS URL
+  * [a6a05b6] d/watch: use `pgpmode=auto`
+  * [072624b] d/gbp.conf: buildpackage, import-orig: enable `pristine-tar`
+  * [92a12a3] d/gbp.conf: dch: set `id-length`
+  * [6ad5a0b] d/not-installed: remove static archive
+  * [c53e37d] d/rules: remove obsolete dh_installinit override
+  * [fb41a26] d/rules: move dh_auto_configure override
+  * [59c9317] d/rules: include architecture.mk
+  * [8f18fcd] d/rules: pass `--restart-after-upgrade` to dh_installsystemd
+    (closes: #1012613)
+  * [f9d8a42] d/copyright: remove obsolete files
+  * [75426a2] d/changelog: wrap long line
+
+ -- Jeremy Sowden <jeremy@azazel.net>  Sun, 19 Jun 2022 18:04:19 +0100
+
 nftables (1.0.4-1) unstable; urgency=medium
 
   [ Christian Ehrhardt ]

@@ -2,7 +2,8 @@ Source: nftables
 Section: net
 Priority: important
 Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
-Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>
+Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>,
+           Jeremy Sowden <jeremy@azazel.net>
 Build-Depends: asciidoc-base,
                automake,
                bison,

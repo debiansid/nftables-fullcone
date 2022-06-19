@@ -1,7 +1,8 @@
 nftables (1.0.4-1) unstable; urgency=medium
 
   [ Christian Ehrhardt ]
-  * [8b15f04] Fix version map usage and add symbols file (Closes: #1007888 LP: #1965464)
+  * [8b15f04] Fix version map usage and add symbols file
+    (Closes: #1007888 LP: #1965464)
 
   [ Arturo Borrero Gonzalez ]
   * [527715a] New upstream version 1.0.4

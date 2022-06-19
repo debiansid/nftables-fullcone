@@ -8,11 +8,11 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 configure_opts := --with-xtables --with-json --with-python-bin=/usr/bin/python3 --with-cli=editline
 
-override_dh_auto_configure:
-	dh_auto_configure -- $(configure_opts) --
-
 %:
 	dh $@ --with python3
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(configure_opts) --
 
 override_dh_fixperms:
 	dh_fixperms

@@ -1,2 +1,1 @@
-usr/lib/${DEB_TARGET_MULTIARCH}/libnftables.a
 usr/lib/${DEB_TARGET_MULTIARCH}/libnftables.la

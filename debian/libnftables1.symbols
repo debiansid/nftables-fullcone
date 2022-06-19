@@ -1,4 +1,5 @@
 libnftables.so.1 libnftables1 #MINVER#
+* Build-Depends-Package: libnftables-dev
  LIBNFTABLES_1@LIBNFTABLES_1 1.0.2
  LIBNFTABLES_2@LIBNFTABLES_2 1.0.2
  LIBNFTABLES_3@LIBNFTABLES_3 1.0.2

@@ -21,7 +21,7 @@ override_dh_fixperms:
 	chmod a+x debian/nftables/etc/nftables.conf
 
 override_dh_installsystemd:
-	dh_installsystemd --no-enable --no-start
+	dh_installsystemd --no-enable --no-start --restart-after-upgrade
 
 override_dh_installexamples:
 	dh_installexamples -XMakefile

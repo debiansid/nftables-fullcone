@@ -1,0 +1,32 @@
+From 2d0a7a9adeb30708d6fbbee57476c0d4b9214dbd Mon Sep 17 00:00:00 2001
+From: Phil Sutter <phil@nwl.cc>
+Date: Fri, 11 Jun 2021 17:08:34 +0200
+Subject: rule: Fix for potential off-by-one in cmd_add_loc()
+
+Using num_attrs as index means it must be at max one less than the
+array's size at function start.
+
+Fixes: 27362a5bfa433 ("rule: larger number of error locations")
+Signed-off-by: Phil Sutter <phil@nwl.cc>
+---
+ src/rule.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+(limited to 'src/rule.c')
+
+diff --git a/src/rule.c b/src/rule.c
+index dbbe744e..92daf2f3 100644
+--- a/src/rule.c
++++ b/src/rule.c
+@@ -1275,7 +1275,7 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
+ 
+ void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc)
+ {
+-	if (cmd->num_attrs > NFT_NLATTR_LOC_MAX)
++	if (cmd->num_attrs >= NFT_NLATTR_LOC_MAX)
+ 		return;
+ 
+ 	cmd->attr[cmd->num_attrs].offset = offset;
+-- 
+cgit v1.2.3
+

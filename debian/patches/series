@@ -1,1 +1,2 @@
 payload-check-icmp-dependency-before-removing-previo.patch
+rule_fix_for_potential_off-by-one_in_cmd_add_loc.patch

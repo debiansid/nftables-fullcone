@@ -42,10 +42,18 @@ struct netlink_parse_ctx {
 	struct netlink_ctx	*nlctx;
 };
 
+
+#define RULE_PP_IN_CONCATENATION	(1 << 0)
+#define RULE_PP_IN_SET_ELEM		(1 << 1)
+
+#define RULE_PP_REMOVE_OP_AND		(RULE_PP_IN_CONCATENATION | \
+					 RULE_PP_IN_SET_ELEM)
+
 struct rule_pp_ctx {
 	struct proto_ctx	pctx;
 	struct payload_dep_ctx	pdctx;
 	struct stmt		*stmt;
+	unsigned int		flags;
 };
 
 extern const struct input_descriptor indesc_netlink;

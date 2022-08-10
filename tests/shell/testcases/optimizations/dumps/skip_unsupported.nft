@@ -1,0 +1,7 @@
+table inet x {
+	chain y {
+		ip saddr 1.2.3.4 tcp dport 80 meta mark set 0x0000000a accept
+		ip saddr 1.2.3.4 tcp dport 81 meta mark set 0x0000000b accept
+		ip saddr . tcp dport { 1.2.3.5 . 81, 1.2.3.5 . 82 } accept
+	}
+}

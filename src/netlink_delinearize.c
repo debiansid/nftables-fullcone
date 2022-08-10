@@ -200,6 +200,7 @@ static struct expr *netlink_parse_concat_data(struct netlink_parse_ctx *ctx,
 
 		len -= netlink_padded_len(expr->len);
 		reg += netlink_register_space(expr->len);
+		expr_free(expr);
 	}
 	return concat;
 
@@ -1976,11 +1977,6 @@ static void payload_match_postprocess(struct rule_pp_ctx *ctx,
 				      struct expr *expr,
 				      struct expr *payload)
 {
-	enum proto_bases base = payload->payload.base;
-
-	assert(payload->payload.offset >= ctx->pctx.protocol[base].offset);
-	payload->payload.offset -= ctx->pctx.protocol[base].offset;
-
 	switch (expr->op) {
 	case OP_EQ:
 	case OP_NEQ:
@@ -2259,12 +2255,13 @@ static void binop_adjust(const struct expr *binop, struct expr *right,
 	}
 }
 
-static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr,
-			      struct expr **expr_binop)
+static void __binop_postprocess(struct rule_pp_ctx *ctx,
+				struct expr *expr,
+				struct expr *left,
+				struct expr *mask,
+				struct expr **expr_binop)
 {
 	struct expr *binop = *expr_binop;
-	struct expr *left = binop->left;
-	struct expr *mask = binop->right;
 	unsigned int shift;
 
 	assert(binop->etype == EXPR_BINOP);
@@ -2300,13 +2297,24 @@ static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr,
 
 		assert(binop->left == left);
 		*expr_binop = expr_get(left);
-		expr_free(binop);
 
 		if (left->etype == EXPR_PAYLOAD)
 			payload_match_postprocess(ctx, expr, left);
 		else if (left->etype == EXPR_EXTHDR && right)
 			expr_set_type(right, left->dtype, left->byteorder);
+
+		expr_free(binop);
 	}
+}
+
+static void binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr,
+			      struct expr **expr_binop)
+{
+	struct expr *binop = *expr_binop;
+	struct expr *left = binop->left;
+	struct expr *mask = binop->right;
+
+	__binop_postprocess(ctx, expr, left, mask, expr_binop);
 }
 
 static void map_binop_postprocess(struct rule_pp_ctx *ctx, struct expr *expr)
@@ -2538,16 +2546,23 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		unsigned int type = expr->dtype->type, ntype = 0;
 		int off = expr->dtype->subtypes;
 		const struct datatype *dtype;
+		LIST_HEAD(tmp);
+		struct expr *n;
 
-		list_for_each_entry(i, &expr->expressions, list) {
+		ctx->flags |= RULE_PP_IN_CONCATENATION;
+		list_for_each_entry_safe(i, n, &expr->expressions, list) {
 			if (type) {
 				dtype = concat_subtype_lookup(type, --off);
 				expr_set_type(i, dtype, dtype->byteorder);
 			}
+			list_del(&i->list);
 			expr_postprocess(ctx, &i);
+			list_add_tail(&i->list, &tmp);
 
 			ntype = concat_subtype_add(ntype, i->dtype->type);
 		}
+		ctx->flags &= ~RULE_PP_IN_CONCATENATION;
+		list_splice(&tmp, &expr->expressions);
 		datatype_set(expr, concat_type_alloc(ntype));
 		break;
 	}
@@ -2562,6 +2577,27 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		case OP_RSHIFT:
 			expr_set_type(expr->right, &integer_type,
 				      BYTEORDER_HOST_ENDIAN);
+			break;
+		case OP_AND:
+			expr_set_type(expr->right, expr->left->dtype,
+				      expr->left->byteorder);
+
+			/* Do not process OP_AND in ordinary rule context.
+			 *
+			 * Removal needs to be performed as part of the relational
+			 * operation because the RHS constant might need to be adjusted
+			 * (shifted).
+			 *
+			 * This is different in set element context or concatenations:
+			 * There is no relational operation (eq, neq and so on), thus
+			 * it needs to be processed right away.
+			 */
+			if ((ctx->flags & RULE_PP_REMOVE_OP_AND) &&
+			    expr->left->etype == EXPR_PAYLOAD &&
+			    expr->right->etype == EXPR_VALUE) {
+				__binop_postprocess(ctx, expr, expr->left, expr->right, exprp);
+				return;
+			}
 			break;
 		default:
 			expr_set_type(expr->right, expr->left->dtype,
@@ -2625,7 +2661,9 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		expr_postprocess(ctx, &expr->prefix);
 		break;
 	case EXPR_SET_ELEM:
+		ctx->flags |= RULE_PP_IN_SET_ELEM;
 		expr_postprocess(ctx, &expr->key);
+		ctx->flags &= ~RULE_PP_IN_SET_ELEM;
 		break;
 	case EXPR_EXTHDR:
 		exthdr_dependency_kill(&ctx->pdctx, expr, ctx->pctx.family);

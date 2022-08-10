@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 06/07/2022
+.\"      Date: 08/09/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "06/07/2022" "\ \&" "\ \&"
+.TH "NFT" "8" "08/09/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -4837,6 +4837,8 @@ ipv4_addr/ipv6_addr
 T}
 .TE
 .sp 1
+.sp
+\fBNote:\fR When using xfrm_interface, this expression is not useable in output hook as the plain packet does not traverse it with IPsec info attached \- use a chain in postrouting hook instead\&.
 .SS "NUMGEN EXPRESSION"
 .sp
 .if n \{\

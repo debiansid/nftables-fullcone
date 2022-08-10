@@ -19,3 +19,5 @@ ipsec in ip6 daddr dead::beef;ok
 ipsec out ip6 saddr dead::feed;ok
 
 ipsec in spnum 256 reqid 1;fail
+
+counter ipsec out ip daddr 192.168.1.2;ok

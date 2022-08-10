@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+RULESET="define addrv4_vpnnet = 10.1.0.0/16
+
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 0; policy accept;
+
+        ip saddr \$addrv4_vpnnet counter masquerade fully-random comment \"masquerade ipv4\"
+    }
+}"
+
+$NFT -c -o -f - <<< $RULESET

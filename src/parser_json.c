@@ -2780,8 +2780,7 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 	struct handle h = {
 		.table.location = *int_loc,
 	};
-	const char *family = "", *policy = "", *type, *hookstr;
-	const char name[IFNAMSIZ];
+	const char *family = "", *policy = "", *type, *hookstr, *name;
 	struct chain *chain;
 	int prio;
 

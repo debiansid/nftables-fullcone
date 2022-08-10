@@ -1114,17 +1114,21 @@ static struct expr *concat_elem_expr(struct expr *key,
 				     struct expr *data, int *off)
 {
 	const struct datatype *subtype;
+	unsigned int sub_length;
 	struct expr *expr;
 
 	if (key) {
 		(*off)--;
-		expr = constant_expr_splice(data, key->len);
+		sub_length = round_up(key->len, BITS_PER_BYTE);
+
+		expr = constant_expr_splice(data, sub_length);
 		expr->dtype = datatype_get(key->dtype);
 		expr->byteorder = key->byteorder;
 		expr->len = key->len;
 	} else {
 		subtype = concat_subtype_lookup(dtype->type, --(*off));
-		expr = constant_expr_splice(data, subtype->size);
+		sub_length = round_up(subtype->size, BITS_PER_BYTE);
+		expr = constant_expr_splice(data, sub_length);
 		expr->dtype = subtype;
 		expr->byteorder = subtype->byteorder;
 	}
@@ -1136,7 +1140,7 @@ static struct expr *concat_elem_expr(struct expr *key,
 	    expr->dtype->basetype->type == TYPE_BITMASK)
 		expr = bitmask_expr_to_binops(expr);
 
-	data->len -= netlink_padding_len(expr->len);
+	data->len -= netlink_padding_len(sub_length);
 
 	return expr;
 }

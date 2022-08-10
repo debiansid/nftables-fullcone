@@ -81,6 +81,46 @@ static bool __expr_cmp(const struct expr *expr_a, const struct expr *expr_b)
 		if (expr_a->socket.level != expr_b->socket.level)
 			return false;
 		break;
+	case EXPR_OSF:
+		if (expr_a->osf.ttl != expr_b->osf.ttl)
+			return false;
+		if (expr_a->osf.flags != expr_b->osf.flags)
+			return false;
+		break;
+	case EXPR_XFRM:
+		if (expr_a->xfrm.key != expr_b->xfrm.key)
+			return false;
+		if (expr_a->xfrm.direction != expr_b->xfrm.direction)
+			return false;
+		break;
+	case EXPR_FIB:
+		if (expr_a->fib.flags != expr_b->fib.flags)
+			return false;
+		if (expr_a->fib.result != expr_b->fib.result)
+			return false;
+		break;
+	case EXPR_NUMGEN:
+		if (expr_a->numgen.type != expr_b->numgen.type)
+			return false;
+		if (expr_a->numgen.mod != expr_b->numgen.mod)
+			return false;
+		if (expr_a->numgen.offset != expr_b->numgen.offset)
+			return false;
+		break;
+	case EXPR_HASH:
+		if (expr_a->hash.mod != expr_b->hash.mod)
+			return false;
+		if (expr_a->hash.seed_set != expr_b->hash.seed_set)
+			return false;
+		if (expr_a->hash.seed != expr_b->hash.seed)
+			return false;
+		if (expr_a->hash.offset != expr_b->hash.offset)
+			return false;
+		if (expr_a->hash.type != expr_b->hash.type)
+			return false;
+		break;
+	case EXPR_BINOP:
+		return __expr_cmp(expr_a->left, expr_b->left);
 	default:
 		return false;
 	}
@@ -105,7 +145,14 @@ static bool stmt_expr_supported(const struct expr *expr)
 	return false;
 }
 
-static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
+static bool expr_symbol_set(const struct expr *expr)
+{
+	return expr->right->etype == EXPR_SYMBOL &&
+	       expr->right->symtype == SYMBOL_SET;
+}
+
+static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b,
+			   bool fully_compare)
 {
 	struct expr *expr_a, *expr_b;
 
@@ -117,15 +164,29 @@ static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
 		expr_a = stmt_a->expr;
 		expr_b = stmt_b->expr;
 
-		if (!stmt_expr_supported(expr_a) ||
-		    !stmt_expr_supported(expr_b))
+		if (expr_a->op != expr_b->op)
 			return false;
+		if (expr_a->op != OP_IMPLICIT && expr_a->op != OP_EQ)
+			return false;
+
+		if (fully_compare) {
+			if (!stmt_expr_supported(expr_a) ||
+			    !stmt_expr_supported(expr_b))
+				return false;
+
+			if (expr_symbol_set(expr_a) ||
+			    expr_symbol_set(expr_b))
+				return false;
+		}
 
 		return __expr_cmp(expr_a->left, expr_b->left);
 	case STMT_COUNTER:
 	case STMT_NOTRACK:
 		break;
 	case STMT_VERDICT:
+		if (!fully_compare)
+			break;
+
 		expr_a = stmt_a->expr;
 		expr_b = stmt_b->expr;
 
@@ -135,14 +196,6 @@ static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
 		if (expr_a->etype == EXPR_MAP &&
 		    expr_b->etype == EXPR_MAP)
 			return __expr_cmp(expr_a->map, expr_b->map);
-		break;
-	case STMT_LIMIT:
-		if (stmt_a->limit.rate != stmt_b->limit.rate ||
-		    stmt_a->limit.unit != stmt_b->limit.unit ||
-		    stmt_a->limit.burst != stmt_b->limit.burst ||
-		    stmt_a->limit.type != stmt_b->limit.type ||
-		    stmt_a->limit.flags != stmt_b->limit.flags)
-			return false;
 		break;
 	case STMT_LOG:
 		if (stmt_a->log.snaplen != stmt_b->log.snaplen ||
@@ -165,12 +218,18 @@ static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
 			return false;
 		break;
 	case STMT_REJECT:
-		if (stmt_a->reject.expr || stmt_b->reject.expr)
-			return false;
-
 		if (stmt_a->reject.family != stmt_b->reject.family ||
 		    stmt_a->reject.type != stmt_b->reject.type ||
 		    stmt_a->reject.icmp_code != stmt_b->reject.icmp_code)
+			return false;
+
+		if (!!stmt_a->reject.expr ^ !!stmt_b->reject.expr)
+			return false;
+
+		if (!stmt_a->reject.expr)
+			return true;
+
+		if (__expr_cmp(stmt_a->reject.expr, stmt_b->reject.expr))
 			return false;
 		break;
 	case STMT_NAT:
@@ -237,29 +296,42 @@ static bool stmt_verdict_eq(const struct stmt *stmt_a, const struct stmt *stmt_b
 	return false;
 }
 
-static bool stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
-{
-	if (!stmt_a && !stmt_b)
-		return true;
-	else if (!stmt_a)
-		return false;
-	else if (!stmt_b)
-		return false;
-
-	return __stmt_type_eq(stmt_a, stmt_b);
-}
-
 static bool stmt_type_find(struct optimize_ctx *ctx, const struct stmt *stmt)
 {
+	bool unsupported_exists = false;
 	uint32_t i;
 
 	for (i = 0; i < ctx->num_stmts; i++) {
-		if (__stmt_type_eq(stmt, ctx->stmt[i]))
+		if (ctx->stmt[i]->ops->type == STMT_INVALID)
+			unsupported_exists = true;
+
+		if (__stmt_type_eq(stmt, ctx->stmt[i], false))
 			return true;
+	}
+
+	switch (stmt->ops->type) {
+	case STMT_EXPRESSION:
+	case STMT_VERDICT:
+	case STMT_COUNTER:
+	case STMT_NOTRACK:
+	case STMT_LOG:
+	case STMT_NAT:
+	case STMT_REJECT:
+		break;
+	default:
+		/* add unsupported statement only once to statement matrix. */
+		if (unsupported_exists)
+			return true;
+		break;
 	}
 
 	return false;
 }
+
+static struct stmt_ops unsupported_stmt_ops = {
+	.type	= STMT_INVALID,
+	.name	= "unsupported",
+};
 
 static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 {
@@ -269,24 +341,22 @@ static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 		if (stmt_type_find(ctx, stmt))
 			continue;
 
-		if (stmt->ops->type == STMT_VERDICT &&
-		    stmt->expr->etype == EXPR_MAP)
-			continue;
-
 		/* No refcounter available in statement objects, clone it to
 		 * to store in the array of selectors.
 		 */
 		clone = stmt_alloc(&internal_location, stmt->ops);
 		switch (stmt->ops->type) {
 		case STMT_EXPRESSION:
+			if (stmt->expr->op != OP_IMPLICIT &&
+			    stmt->expr->op != OP_EQ) {
+				clone->ops = &unsupported_stmt_ops;
+				break;
+			}
 		case STMT_VERDICT:
 			clone->expr = expr_get(stmt->expr);
 			break;
 		case STMT_COUNTER:
 		case STMT_NOTRACK:
-			break;
-		case STMT_LIMIT:
-			memcpy(&clone->limit, &stmt->limit, sizeof(clone->limit));
 			break;
 		case STMT_LOG:
 			memcpy(&clone->log, &stmt->log, sizeof(clone->log));
@@ -303,9 +373,16 @@ static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 			clone->nat.flags = stmt->nat.flags;
 			clone->nat.type_flags = stmt->nat.type_flags;
 			break;
+		case STMT_REJECT:
+			if (stmt->reject.expr)
+				clone->reject.expr = expr_get(stmt->reject.expr);
+			clone->reject.type = stmt->reject.type;
+			clone->reject.icmp_code = stmt->reject.icmp_code;
+			clone->reject.family = stmt->reject.family;
+			break;
 		default:
-			xfree(clone);
-			continue;
+			clone->ops = &unsupported_stmt_ops;
+			break;
 		}
 
 		ctx->stmt[ctx->num_stmts++] = clone;
@@ -316,17 +393,33 @@ static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 	return 0;
 }
 
+static int unsupported_in_stmt_matrix(const struct optimize_ctx *ctx)
+{
+	uint32_t i;
+
+	for (i = 0; i < ctx->num_stmts; i++) {
+		if (ctx->stmt[i]->ops->type == STMT_INVALID)
+			return i;
+	}
+	/* this should not happen. */
+	return -1;
+}
+
 static int cmd_stmt_find_in_stmt_matrix(struct optimize_ctx *ctx, struct stmt *stmt)
 {
 	uint32_t i;
 
 	for (i = 0; i < ctx->num_stmts; i++) {
-		if (__stmt_type_eq(stmt, ctx->stmt[i]))
+		if (__stmt_type_eq(stmt, ctx->stmt[i], false))
 			return i;
 	}
-	/* should not ever happen. */
-	return 0;
+
+	return -1;
 }
+
+static struct stmt unsupported_stmt = {
+	.ops	= &unsupported_stmt_ops,
+};
 
 static void rule_build_stmt_matrix_stmts(struct optimize_ctx *ctx,
 					 struct rule *rule, uint32_t *i)
@@ -336,6 +429,12 @@ static void rule_build_stmt_matrix_stmts(struct optimize_ctx *ctx,
 
 	list_for_each_entry(stmt, &rule->stmts, list) {
 		k = cmd_stmt_find_in_stmt_matrix(ctx, stmt);
+		if (k < 0) {
+			k = unsupported_in_stmt_matrix(ctx);
+			assert(k >= 0);
+			ctx->stmt_matrix[*i][k] = &unsupported_stmt;
+			continue;
+		}
 		ctx->stmt_matrix[*i][k] = stmt;
 	}
 	ctx->rule[(*i)++] = rule;
@@ -833,7 +932,8 @@ static enum stmt_types merge_stmt_type(const struct optimize_ctx *ctx)
 		}
 	}
 
-	return STMT_INVALID;
+	/* actually no verdict, this assumes rules have the same verdict. */
+	return STMT_VERDICT;
 }
 
 static void merge_rules(const struct optimize_ctx *ctx,
@@ -872,6 +972,13 @@ static void merge_rules(const struct optimize_ctx *ctx,
 		assert(0);
 	}
 
+	if (ctx->rule[from]->comment) {
+		xfree(ctx->rule[from]->comment);
+		ctx->rule[from]->comment = NULL;
+	}
+
+        octx->flags |= NFT_CTX_OUTPUT_STATELESS;
+
 	fprintf(octx->error_fp, "Merging:\n");
 	rule_optimize_print(octx, ctx->rule[from]);
 
@@ -884,6 +991,20 @@ static void merge_rules(const struct optimize_ctx *ctx,
 	fprintf(octx->error_fp, "into:\n\t");
 	rule_print(ctx->rule[from], octx);
 	fprintf(octx->error_fp, "\n");
+
+        octx->flags &= ~NFT_CTX_OUTPUT_STATELESS;
+}
+
+static bool stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
+{
+	if (!stmt_a && !stmt_b)
+		return true;
+	else if (!stmt_a)
+		return false;
+	else if (!stmt_b)
+		return false;
+
+	return __stmt_type_eq(stmt_a, stmt_b, true);
 }
 
 static bool rules_eq(const struct optimize_ctx *ctx, int i, int j)
@@ -963,6 +1084,10 @@ static int chain_optimize(struct nft_ctx *nft, struct list_head *rules)
 			switch (ctx->stmt_matrix[i][m]->ops->type) {
 			case STMT_EXPRESSION:
 				merge[k].stmt[merge[k].num_stmts++] = m;
+				break;
+			case STMT_VERDICT:
+				if (ctx->stmt_matrix[i][m]->expr->etype == EXPR_MAP)
+					merge[k].stmt[merge[k].num_stmts++] = m;
 				break;
 			default:
 				break;

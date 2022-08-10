@@ -3,7 +3,6 @@
 *ip;test-ip4;output
 *ip6;test-ip6;output
 *inet;test-inet;output
-*arp;test-arp;output
 *bridge;test-bridge;output
 
 queue;ok;queue to 0

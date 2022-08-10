@@ -118,6 +118,26 @@ static bool merge_ranges(struct set_automerge_ctx *ctx,
 	return false;
 }
 
+static void set_sort_splice(struct expr *init, struct set *set)
+{
+	struct set *existing_set = set->existing_set;
+
+	set_to_range(init);
+	list_expr_sort(&init->expressions);
+
+	if (!existing_set)
+		return;
+
+	if (existing_set->init) {
+		set_to_range(existing_set->init);
+		list_splice_sorted(&existing_set->init->expressions,
+				   &init->expressions);
+		init_list_head(&existing_set->init->expressions);
+	} else {
+		existing_set->init = set_expr_alloc(&internal_location, set);
+	}
+}
+
 static void setelem_automerge(struct set_automerge_ctx *ctx)
 {
 	struct expr *i, *next, *prev = NULL;
@@ -216,21 +236,13 @@ int set_automerge(struct list_head *msgs, struct cmd *cmd, struct set *set,
 	struct cmd *purge_cmd;
 	struct handle h = {};
 
-	if (existing_set) {
-		if (existing_set->init) {
-			list_splice_init(&existing_set->init->expressions,
-					 &init->expressions);
-		} else {
-			existing_set->init = set_expr_alloc(&internal_location,
-							    set);
-		}
+	if (set->flags & NFT_SET_MAP) {
+		set_to_range(init);
+		list_expr_sort(&init->expressions);
+		return 0;
 	}
 
-	set_to_range(init);
-	list_expr_sort(&init->expressions);
-
-	if (set->flags & NFT_SET_MAP)
-		return 0;
+	set_sort_splice(init, set);
 
 	ctx.purge = set_expr_alloc(&internal_location, set);
 
@@ -409,6 +421,10 @@ static int setelem_delete(struct list_head *msgs, struct set *set,
 			expr_error(msgs, i, "element does not exist");
 			err = -1;
 			goto err;
+		} else if (i->flags & EXPR_F_REMOVE) {
+			expr_error(msgs, i, "element does not exist");
+			err = -1;
+			goto err;
 		}
 		prev = NULL;
 	}
@@ -463,7 +479,11 @@ int set_delete(struct list_head *msgs, struct cmd *cmd, struct set *set,
 	if (set->automerge)
 		automerge_delete(msgs, set, init, debug_mask);
 
-	set_to_range(existing_set->init);
+	if (existing_set->init) {
+		set_to_range(existing_set->init);
+	} else {
+		existing_set->init = set_expr_alloc(&internal_location, set);
+	}
 
 	list_splice_init(&init->expressions, &del_list);
 
@@ -540,8 +560,7 @@ static int setelem_overlap(struct list_head *msgs, struct set *set,
 		}
 
 		if (mpz_cmp(prev_range.low, range.low) == 0 &&
-		    mpz_cmp(prev_range.high, range.high) == 0 &&
-		    (elem->flags & EXPR_F_KERNEL || prev->flags & EXPR_F_KERNEL))
+		    mpz_cmp(prev_range.high, range.high) == 0)
 			goto next;
 
 		if (mpz_cmp(prev_range.low, range.low) <= 0 &&
@@ -589,18 +608,7 @@ int set_overlap(struct list_head *msgs, struct set *set, struct expr *init)
 	struct expr *i, *n, *clone;
 	int err;
 
-	if (existing_set) {
-		if (existing_set->init) {
-			list_splice_init(&existing_set->init->expressions,
-					 &init->expressions);
-		} else {
-			existing_set->init = set_expr_alloc(&internal_location,
-							    set);
-		}
-	}
-
-	set_to_range(init);
-	list_expr_sort(&init->expressions);
+	set_sort_splice(init, set);
 
 	err = setelem_overlap(msgs, set, init);
 

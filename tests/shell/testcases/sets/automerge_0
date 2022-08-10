@@ -1,0 +1,64 @@
+#!/bin/bash
+
+set -e
+
+RULESET="table inet x {
+	set y {
+		type inet_service
+		flags interval
+		auto-merge
+	}
+}"
+
+$NFT -f - <<< $RULESET
+
+tmpfile=$(mktemp)
+echo -n "add element inet x y { " > $tmpfile
+for ((i=0;i<65535;i+=2))
+do
+	echo -n "$i, " >> $tmpfile
+	if [ $i -eq 65534 ]
+	then
+		echo -n "$i" >> $tmpfile
+	fi
+done
+echo "}" >> $tmpfile
+
+$NFT -f $tmpfile
+
+tmpfile2=$(mktemp)
+for ((i=1;i<65535;i+=2))
+do
+	echo "$i" >> $tmpfile2
+done
+
+tmpfile3=$(mktemp)
+shuf $tmpfile2 > $tmpfile3
+i=0
+cat $tmpfile3 | while read line && [ $i -lt 10 ]
+do
+	$NFT add element inet x y { $line }
+	i=$((i+1))
+done
+
+for ((i=0;i<10;i++))
+do
+	from=$(($RANDOM%65535))
+	to=$(($from+100))
+	$NFT add element inet x y { $from-$to }
+	if [ $? -ne 0 ]
+	then
+		echo "failed to add $from-$to"
+		exit 1
+	fi
+	$NFT get element inet x y { $from-$to }
+	if [ $? -ne 0 ]
+	then
+		echo "failed to get $from-$to"
+		exit 1
+	fi
+done
+
+rm -f $tmpfile
+rm -f $tmpfile2
+rm -f $tmpfile3

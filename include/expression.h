@@ -243,6 +243,7 @@ struct expr {
 	enum expr_types		etype:8;
 	enum ops		op:8;
 	unsigned int		len;
+	struct cmd		*cmd;
 
 	union {
 		struct {
@@ -480,6 +481,7 @@ extern struct expr *compound_expr_alloc(const struct location *loc,
 extern void compound_expr_add(struct expr *compound, struct expr *expr);
 extern void compound_expr_remove(struct expr *compound, struct expr *expr);
 extern void list_expr_sort(struct list_head *head);
+extern void list_splice_sorted(struct list_head *list, struct list_head *head);
 
 extern struct expr *concat_expr_alloc(const struct location *loc);
 

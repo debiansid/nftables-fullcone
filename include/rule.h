@@ -681,6 +681,11 @@ void monitor_free(struct monitor *m);
 
 #define NFT_NLATTR_LOC_MAX 32
 
+struct nlerr_loc {
+	uint16_t		offset;
+	const struct location	*location;
+};
+
 /**
  * struct cmd - command statement
  *
@@ -700,6 +705,7 @@ struct cmd {
 	enum cmd_obj		obj;
 	struct handle		handle;
 	uint32_t		seqnum;
+	struct list_head	collapse_list;
 	union {
 		void		*data;
 		struct expr	*expr;
@@ -716,11 +722,9 @@ struct cmd {
 		struct markup	*markup;
 		struct obj	*object;
 	};
-	struct {
-		uint16_t		offset;
-		const struct location	*location;
-	} attr[NFT_NLATTR_LOC_MAX];
-	int			num_attrs;
+	struct nlerr_loc	*attr;
+	uint32_t		attr_array_len;
+	uint32_t		num_attrs;
 	const void		*arg;
 };
 
@@ -728,6 +732,8 @@ extern struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 			     const struct handle *h, const struct location *loc,
 			     void *data);
 extern void nft_cmd_expand(struct cmd *cmd);
+extern bool nft_cmd_collapse(struct list_head *cmds);
+extern void nft_cmd_uncollapse(struct list_head *cmds);
 extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
 				    const struct handle *h,
 				    const struct location *loc, struct obj *obj);

@@ -8,6 +8,12 @@ EXPECTED="table ip x {
 						     10.141.13.0/24 : 192.168.4.0/24 }
             }
      }
+     table ip6 x {
+            chain y {
+                    type nat hook postrouting priority srcnat; policy accept;
+                    snat ip6 prefix to ip6 saddr map { 2001:db8:1111::/64 : 2001:db8:2222::/64 }
+            }
+     }
 "
 
 set -e

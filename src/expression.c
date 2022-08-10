@@ -879,17 +879,30 @@ static void concat_expr_print(const struct expr *expr, struct output_ctx *octx)
 #define NFTNL_UDATA_SET_KEY_CONCAT_SUB_DATA 1
 #define NFTNL_UDATA_SET_KEY_CONCAT_SUB_MAX  2
 
+static struct expr *expr_build_udata_recurse(struct expr *e)
+{
+	switch (e->etype) {
+	case EXPR_BINOP:
+		return e->left;
+	default:
+		break;
+	}
+
+	return e;
+}
+
 static int concat_expr_build_udata(struct nftnl_udata_buf *udbuf,
 				    const struct expr *concat_expr)
 {
 	struct nftnl_udata *nest;
+	struct expr *expr, *tmp;
 	unsigned int i = 0;
-	struct expr *expr;
 
-	list_for_each_entry(expr, &concat_expr->expressions, list) {
+	list_for_each_entry_safe(expr, tmp, &concat_expr->expressions, list) {
 		struct nftnl_udata *nest_expr;
 		int err;
 
+		expr = expr_build_udata_recurse(expr);
 		if (!expr_ops(expr)->build_udata || i >= NFT_REG32_SIZE)
 			return -1;
 

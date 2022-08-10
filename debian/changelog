@@ -1,3 +1,10 @@
+nftables (1.0.5-1) unstable; urgency=medium
+
+  * [882aebc] New upstream version 1.0.5
+  * [d1e9d3f] src:nftables: bump build-dep on libnftnl-dev
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Wed, 10 Aug 2022 13:29:18 +0200
+
 nftables (1.0.4-2) unstable; urgency=medium
 
   * [9e654e0] d/nftables.conf: use named priorities

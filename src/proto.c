@@ -154,14 +154,18 @@ static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base,
 	if (!(debug_mask & NFT_DEBUG_PROTO_CTX))
 		return;
 
+	if (base == PROTO_BASE_LL_HDR && ctx->stacked_ll_count) {
+		pr_debug(" saved ll headers:");
+		for (i = 0; i < ctx->stacked_ll_count; i++)
+			pr_debug(" %s", ctx->stacked_ll[i]->name);
+	}
+
 	pr_debug("update %s protocol context:\n", proto_base_names[base]);
 	for (i = PROTO_BASE_LL_HDR; i <= PROTO_BASE_MAX; i++) {
 		pr_debug(" %-20s: %s",
 			 proto_base_names[i],
 			 ctx->protocol[i].desc ? ctx->protocol[i].desc->name :
 						 "none");
-		if (ctx->protocol[i].offset)
-			pr_debug(" (offset: %u)", ctx->protocol[i].offset);
 		if (i == base)
 			pr_debug(" <-");
 		pr_debug("\n");
@@ -684,7 +688,9 @@ static const struct symbol_table dscp_type_tbl = {
 		SYMBOL("cs5",	0x28),
 		SYMBOL("cs6",	0x30),
 		SYMBOL("cs7",	0x38),
+		SYMBOL("df",	0x00),
 		SYMBOL("be",	0x00),
+		SYMBOL("lephb",	0x01),
 		SYMBOL("af11",	0x0a),
 		SYMBOL("af12",	0x0c),
 		SYMBOL("af13",	0x0e),
@@ -697,6 +703,7 @@ static const struct symbol_table dscp_type_tbl = {
 		SYMBOL("af41",	0x22),
 		SYMBOL("af42",	0x24),
 		SYMBOL("af43",	0x26),
+		SYMBOL("va",	0x2c),
 		SYMBOL("ef",	0x2e),
 		SYMBOL_LIST_END
 	},

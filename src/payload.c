@@ -116,8 +116,13 @@ static void payload_expr_pctx_update(struct proto_ctx *ctx,
 	if (desc->base == base->base) {
 		assert(base->length > 0);
 
-		if (!left->payload.is_raw)
-			ctx->protocol[base->base].offset += base->length;
+		if (!left->payload.is_raw) {
+			if (desc->base == PROTO_BASE_LL_HDR &&
+			    ctx->stacked_ll_count < PROTO_CTX_NUM_PROTOS) {
+				ctx->stacked_ll[ctx->stacked_ll_count] = base;
+				ctx->stacked_ll_count++;
+			}
+		}
 	}
 	proto_ctx_update(ctx, desc->base, loc, desc);
 }
@@ -869,6 +874,38 @@ void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 	}
 }
 
+static const struct proto_desc *get_stacked_desc(const struct proto_ctx *ctx,
+						 const struct proto_desc *top,
+						 const struct expr *e,
+						 unsigned int *skip)
+{
+	unsigned int i, total, payload_offset = e->payload.offset;
+
+	assert(e->etype == EXPR_PAYLOAD);
+
+	if (e->payload.base != PROTO_BASE_LL_HDR ||
+	    payload_offset < top->length) {
+		*skip = 0;
+		return top;
+	}
+
+	for (i = 0, total = 0; i < ctx->stacked_ll_count; i++) {
+		const struct proto_desc *stacked;
+
+		stacked = ctx->stacked_ll[i];
+		if (payload_offset < stacked->length) {
+			*skip = total;
+			return stacked;
+		}
+
+		payload_offset -= stacked->length;
+		total += stacked->length;
+	}
+
+	*skip = total;
+	return top;
+}
+
 /**
  * payload_expr_complete - fill in type information of a raw payload expr
  *
@@ -880,9 +917,10 @@ void exthdr_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
  */
 void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 {
+	unsigned int payload_offset = expr->payload.offset;
 	const struct proto_desc *desc;
 	const struct proto_hdr_template *tmpl;
-	unsigned int i;
+	unsigned int i, total;
 
 	assert(expr->etype == EXPR_PAYLOAD);
 
@@ -891,9 +929,12 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 		return;
 	assert(desc->base == expr->payload.base);
 
+	desc = get_stacked_desc(ctx, desc, expr, &total);
+	payload_offset -= total;
+
 	for (i = 0; i < array_size(desc->templates); i++) {
 		tmpl = &desc->templates[i];
-		if (tmpl->offset != expr->payload.offset ||
+		if (tmpl->offset != payload_offset ||
 		    tmpl->len    != expr->len)
 			continue;
 
@@ -950,6 +991,7 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 	unsigned int payload_len = expr->len;
 	const struct proto_desc *desc;
 	unsigned int off, i, len = 0;
+	unsigned int total;
 
 	assert(expr->etype == EXPR_PAYLOAD);
 
@@ -959,10 +1001,8 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 
 	assert(desc->base == expr->payload.base);
 
-	if (ctx->protocol[expr->payload.base].offset) {
-		assert(payload_offset >= ctx->protocol[expr->payload.base].offset);
-		payload_offset -= ctx->protocol[expr->payload.base].offset;
-	}
+	desc = get_stacked_desc(ctx, desc, expr, &total);
+	payload_offset -= total;
 
 	off = round_up(mask->len, BITS_PER_BYTE) - mask_len;
 	payload_offset += off;
@@ -1009,10 +1049,11 @@ bool payload_expr_trim(struct expr *expr, struct expr *mask,
 void payload_expr_expand(struct list_head *list, struct expr *expr,
 			 const struct proto_ctx *ctx)
 {
+	unsigned int payload_offset = expr->payload.offset;
 	const struct proto_hdr_template *tmpl;
 	const struct proto_desc *desc;
+	unsigned int i, total;
 	struct expr *new;
-	unsigned int i;
 
 	assert(expr->etype == EXPR_PAYLOAD);
 
@@ -1021,13 +1062,16 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 		goto raw;
 	assert(desc->base == expr->payload.base);
 
+	desc = get_stacked_desc(ctx, desc, expr, &total);
+	payload_offset -= total;
+
 	for (i = 1; i < array_size(desc->templates); i++) {
 		tmpl = &desc->templates[i];
 
 		if (tmpl->len == 0)
 			break;
 
-		if (tmpl->offset != expr->payload.offset)
+		if (tmpl->offset != payload_offset)
 			continue;
 
 		if (tmpl->icmp_dep && ctx->th_dep.icmp.type &&
@@ -1039,6 +1083,7 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 			list_add_tail(&new->list, list);
 			expr->len	     -= tmpl->len;
 			expr->payload.offset += tmpl->len;
+			payload_offset       += tmpl->len;
 			if (expr->len == 0)
 				return;
 		} else if (expr->len > 0) {
@@ -1051,7 +1096,7 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 	}
 raw:
 	new = payload_expr_alloc(&expr->location, NULL, 0);
-	payload_init_raw(new, expr->payload.base, expr->payload.offset,
+	payload_init_raw(new, expr->payload.base, payload_offset,
 			 expr->len);
 	list_add_tail(&new->list, list);
 }

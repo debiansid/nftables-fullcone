@@ -47,3 +47,8 @@ ether type ip vlan id 1 ip saddr 10.0.0.1;fail
 
 # mangling
 vlan id 1 vlan id set 2;ok
+
+ether saddr 00:01:02:03:04:05 vlan id 1;ok
+vlan id 2 ether saddr 0:1:2:3:4:6;ok;ether saddr 00:01:02:03:04:06 vlan id 2
+
+ether saddr . vlan id { 0a:0b:0c:0d:0e:0f . 42, 0a:0b:0c:0d:0e:0f . 4095 };ok

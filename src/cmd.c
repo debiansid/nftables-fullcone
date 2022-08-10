@@ -237,7 +237,7 @@ void nft_cmd_error(struct netlink_ctx *ctx, struct cmd *cmd,
 		   struct mnl_err *err)
 {
 	const struct location *loc = NULL;
-	int i;
+	uint32_t i;
 
 	for (i = 0; i < cmd->num_attrs; i++) {
 		if (!cmd->attr[i].offset)

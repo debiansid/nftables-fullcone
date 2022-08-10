@@ -65,8 +65,9 @@ struct nft_cache_filter {
 struct nft_cache;
 enum cmd_ops;
 
-unsigned int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds,
-				struct nft_cache_filter *filter);
+int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds,
+		       struct list_head *msgs, struct nft_cache_filter *filter,
+		       unsigned int *flags);
 int nft_cache_update(struct nft_ctx *ctx, enum cmd_ops cmd,
 		     struct list_head *msgs,
 		     const struct nft_cache_filter *filter);

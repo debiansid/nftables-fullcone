@@ -399,7 +399,7 @@ static void date_type_print(const struct expr *expr, struct output_ctx *octx)
 		tstamp += cur_tm->tm_gmtoff;
 
 	if ((tm = gmtime((time_t *) &tstamp)) != NULL &&
-	     strftime(timestr, sizeof(timestr) - 1, "%F %T", tm))
+	     strftime(timestr, sizeof(timestr) - 1, "%Y-%m-%d %T", tm))
 		nft_print(octx, "\"%s\"", timestr);
 	else
 		nft_print(octx, "Error converting timestamp to printed time");
@@ -412,11 +412,11 @@ static bool parse_iso_date(uint64_t *tstamp, const char *sym)
 
 	memset(&tm, 0, sizeof(struct tm));
 
-	if (strptime(sym, "%F %T", &tm))
+	if (strptime(sym, "%Y-%m-%d %T", &tm))
 		goto success;
-	if (strptime(sym, "%F %R", &tm))
+	if (strptime(sym, "%Y-%m-%d %R", &tm))
 		goto success;
-	if (strptime(sym, "%F", &tm))
+	if (strptime(sym, "%Y-%m-%d", &tm))
 		goto success;
 
 	return false;

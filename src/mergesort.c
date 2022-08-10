@@ -70,7 +70,7 @@ static int expr_msort_cmp(const struct expr *e1, const struct expr *e2)
 	return ret;
 }
 
-static void list_splice_sorted(struct list_head *list, struct list_head *head)
+void list_splice_sorted(struct list_head *list, struct list_head *head)
 {
 	struct list_head *h = head->next;
 	struct list_head *l = list->next;

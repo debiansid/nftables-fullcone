@@ -575,7 +575,7 @@ void interval_map_decompose(struct expr *set)
 
 		if (!mpz_cmp_ui(range, 0)) {
 			if (expr_basetype(low)->type == TYPE_STRING)
-				mpz_switch_byteorder(expr_value(low)->value, low->len / BITS_PER_BYTE);
+				mpz_switch_byteorder(expr_value(low)->value, expr_value(low)->len / BITS_PER_BYTE);
 			low->flags |= EXPR_F_KERNEL;
 			compound_expr_add(set, expr_get(low));
 		} else if (range_is_prefix(range) && !mpz_cmp_ui(p, 0)) {

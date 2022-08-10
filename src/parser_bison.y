@@ -942,7 +942,6 @@ close_scope_esp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_ESP); }
 close_scope_eth		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_ETH); };
 close_scope_export	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_EXPORT); };
 close_scope_fib		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FIB); };
-close_scope_flags	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_FLAGS); };
 close_scope_frag	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FRAG); };
 close_scope_fwd		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_FWD); };
 close_scope_hash	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_HASH); };
@@ -1679,7 +1678,7 @@ table_block_alloc	:	/* empty */
 			}
 			;
 
-table_options		:	FLAGS		STRING	close_scope_flags
+table_options		:	FLAGS		STRING
 			{
 				if (strcmp($2, "dormant") == 0) {
 					$<table>0->flags |= TABLE_F_DORMANT;
@@ -1946,7 +1945,7 @@ set_block		:	/* empty */	{ $$ = $<set>-1; }
 				datatype_set($1->key, $3->dtype);
 				$$ = $1;
 			}
-			|	set_block	FLAGS		set_flag_list	stmt_separator	close_scope_flags
+			|	set_block	FLAGS		set_flag_list	stmt_separator
 			{
 				$1->flags = $3;
 				$$ = $1;
@@ -2016,7 +2015,7 @@ map_block_obj_type	:	COUNTER	close_scope_counter { $$ = NFT_OBJECT_COUNTER; }
 			|	QUOTA	close_scope_quota { $$ = NFT_OBJECT_QUOTA; }
 			|	LIMIT	close_scope_limit { $$ = NFT_OBJECT_LIMIT; }
 			|	SECMARK close_scope_secmark { $$ = NFT_OBJECT_SECMARK; }
-			|	SYNPROXY { $$ = NFT_OBJECT_SYNPROXY; }
+			|	SYNPROXY close_scope_synproxy { $$ = NFT_OBJECT_SYNPROXY; }
 			;
 
 map_block		:	/* empty */	{ $$ = $<set>-1; }
@@ -2080,7 +2079,7 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->flags  |= NFT_SET_OBJECT;
 				$$ = $1;
 			}
-			|	map_block	FLAGS		set_flag_list	stmt_separator	close_scope_flags
+			|	map_block	FLAGS		set_flag_list	stmt_separator
 			{
 				$1->flags |= $3;
 				$$ = $1;
@@ -2153,7 +2152,7 @@ flowtable_block		:	/* empty */	{ $$ = $<flowtable>-1; }
 			{
 				$$->flags |= NFT_FLOWTABLE_COUNTER;
 			}
-			|	flowtable_block	FLAGS	OFFLOAD	stmt_separator	close_scope_flags
+			|	flowtable_block	FLAGS	OFFLOAD	stmt_separator
 			{
 				$$->flags |= FLOWTABLE_F_HW_OFFLOAD;
 			}
@@ -2520,7 +2519,7 @@ dev_spec		:	DEVICE	string
 			|	/* empty */		{ $$ = NULL; }
 			;
 
-flags_spec		:	FLAGS		OFFLOAD	close_scope_flags
+flags_spec		:	FLAGS		OFFLOAD
 			{
 				$<chain>0->flags |= CHAIN_F_HW_OFFLOAD;
 			}
@@ -2915,7 +2914,7 @@ verdict_map_list_expr	:	verdict_map_list_member_expr
 
 verdict_map_list_member_expr:	opt_newline	set_elem_expr	COLON	verdict_expr	opt_newline
 			{
-				$$ = mapping_expr_alloc(&@$, $2, $4);
+				$$ = mapping_expr_alloc(&@2, $2, $4);
 			}
 			;
 
@@ -3126,7 +3125,7 @@ log_arg			:	PREFIX			string
 				$<stmt>0->log.level	= $2;
 				$<stmt>0->log.flags 	|= STMT_LOG_LEVEL;
 			}
-			|	FLAGS			log_flags	close_scope_flags
+			|	FLAGS			log_flags
 			{
 				$<stmt>0->log.logflags	|= $2;
 			}
@@ -3828,13 +3827,13 @@ queue_stmt		:	queue_stmt_compat	close_scope_queue
 			{
 				$$ = queue_stmt_alloc(&@$, $3, 0);
 			}
-			|	QUEUE FLAGS	queue_stmt_flags close_scope_flags TO queue_stmt_expr close_scope_queue
+			|	QUEUE FLAGS	queue_stmt_flags TO queue_stmt_expr close_scope_queue
 			{
-				$$ = queue_stmt_alloc(&@$, $6, $3);
+				$$ = queue_stmt_alloc(&@$, $5, $3);
 			}
-			|	QUEUE	FLAGS	queue_stmt_flags close_scope_flags QUEUENUM queue_stmt_expr_simple close_scope_queue
+			|	QUEUE	FLAGS	queue_stmt_flags QUEUENUM queue_stmt_expr_simple close_scope_queue
 			{
-				$$ = queue_stmt_alloc(&@$, $6, $3);
+				$$ = queue_stmt_alloc(&@$, $5, $3);
 			}
 			;
 
@@ -4263,7 +4262,7 @@ set_list_member_expr	:	opt_newline	set_expr	opt_newline
 			}
 			|	opt_newline	set_elem_expr	COLON	set_rhs_expr	opt_newline
 			{
-				$$ = mapping_expr_alloc(&@$, $2, $4);
+				$$ = mapping_expr_alloc(&@2, $2, $4);
 			}
 			;
 
@@ -5501,7 +5500,7 @@ comp_hdr_expr		:	COMP	comp_hdr_field	close_scope_comp
 			;
 
 comp_hdr_field		:	NEXTHDR		{ $$ = COMPHDR_NEXTHDR; }
-			|	FLAGS	close_scope_flags	{ $$ = COMPHDR_FLAGS; }
+			|	FLAGS		{ $$ = COMPHDR_FLAGS; }
 			|	CPI		{ $$ = COMPHDR_CPI; }
 			;
 
@@ -5562,7 +5561,7 @@ tcp_hdr_field		:	SPORT		{ $$ = TCPHDR_SPORT; }
 			|	ACKSEQ		{ $$ = TCPHDR_ACKSEQ; }
 			|	DOFF		{ $$ = TCPHDR_DOFF; }
 			|	RESERVED	{ $$ = TCPHDR_RESERVED; }
-			|	FLAGS	close_scope_flags	{ $$ = TCPHDR_FLAGS; }
+			|	FLAGS		{ $$ = TCPHDR_FLAGS; }
 			|	WINDOW		{ $$ = TCPHDR_WINDOW; }
 			|	CHECKSUM	{ $$ = TCPHDR_CHECKSUM; }
 			|	URGPTR		{ $$ = TCPHDR_URGPTR; }
@@ -5676,7 +5675,7 @@ sctp_chunk_type		:	DATA		{ $$ = SCTP_CHUNK_TYPE_DATA; }
 			;
 
 sctp_chunk_common_field	:	TYPE	close_scope_type	{ $$ = SCTP_CHUNK_COMMON_TYPE; }
-			|	FLAGS	close_scope_flags	{ $$ = SCTP_CHUNK_COMMON_FLAGS; }
+			|	FLAGS	{ $$ = SCTP_CHUNK_COMMON_FLAGS; }
 			|	LENGTH	{ $$ = SCTP_CHUNK_COMMON_LENGTH; }
 			;
 
@@ -5844,7 +5843,7 @@ rt4_hdr_expr		:	RT4	rt4_hdr_field	close_scope_rt
 			;
 
 rt4_hdr_field		:	LAST_ENT	{ $$ = RT4HDR_LASTENT; }
-			|	FLAGS	close_scope_flags	{ $$ = RT4HDR_FLAGS; }
+			|	FLAGS		{ $$ = RT4HDR_FLAGS; }
 			|	TAG		{ $$ = RT4HDR_TAG; }
 			|	SID		'['	NUM	']'
 			{

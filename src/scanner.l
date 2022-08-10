@@ -201,7 +201,6 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_CT
 %s SCANSTATE_COUNTER
 %s SCANSTATE_ETH
-%s SCANSTATE_FLAGS
 %s SCANSTATE_ICMP
 %s SCANSTATE_IGMP
 %s SCANSTATE_IP
@@ -339,7 +338,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "jump"			{ return JUMP; }
 "goto"			{ return GOTO; }
 "return"		{ return RETURN; }
-<SCANSTATE_EXPR_QUEUE,SCANSTATE_STMT_DUP,SCANSTATE_STMT_FWD,SCANSTATE_STMT_NAT,SCANSTATE_STMT_TPROXY,SCANSTATE_FLAGS,SCANSTATE_IP,SCANSTATE_IP6>"to"			{ return TO; } /* XXX: SCANSTATE_FLAGS and SCANSTATE_IP here are workarounds */
+<SCANSTATE_EXPR_QUEUE,SCANSTATE_STMT_DUP,SCANSTATE_STMT_FWD,SCANSTATE_STMT_NAT,SCANSTATE_STMT_TPROXY,SCANSTATE_IP,SCANSTATE_IP6>"to"			{ return TO; } /* XXX: SCANSTATE_IP is a workaround */
 
 "inet"			{ return INET; }
 "netdev"		{ return NETDEV; }
@@ -363,14 +362,9 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "index"			{ return INDEX; }
 "comment"		{ return COMMENT; }
 
-<SCANSTATE_FLAGS>{
-	"constant"		{ return CONSTANT; }
-	"dynamic"		{ return DYNAMIC; }
-
-	/* log flags */
-	"all"			{ return ALL; }
-}
+"constant"		{ return CONSTANT; }
 "interval"		{ return INTERVAL; }
+"dynamic"		{ return DYNAMIC; }
 "auto-merge"		{ return AUTOMERGE; }
 "timeout"		{ return TIMEOUT; }
 "gc-interval"		{ return GC_INTERVAL; }
@@ -409,7 +403,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 }
 
 "log"			{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_LOG); return LOG; }
-<SCANSTATE_STMT_LOG,SCANSTATE_STMT_NAT,SCANSTATE_IP>"prefix"		{ return PREFIX; }
+<SCANSTATE_STMT_LOG,SCANSTATE_STMT_NAT,SCANSTATE_IP,SCANSTATE_IP6>"prefix"		{ return PREFIX; }
 <SCANSTATE_STMT_LOG>{
 	"snaplen"		{ return SNAPLEN; }
 	"queue-threshold"	{ return QUEUE_THRESHOLD; }
@@ -418,7 +412,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 }
 
 "queue"			{ scanner_push_start_cond(yyscanner, SCANSTATE_EXPR_QUEUE); return QUEUE;}
-<SCANSTATE_FLAGS,SCANSTATE_EXPR_QUEUE>{
+<SCANSTATE_EXPR_QUEUE>{
 	"num"		{ return QUEUENUM;}
 	"bypass"	{ return BYPASS;}
 	"fanout"	{ return FANOUT;}
@@ -612,7 +606,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_EXPR_COMP>{
 	"cpi"			{ return CPI; }
 }
-"flags"			{ scanner_push_start_cond(yyscanner, SCANSTATE_FLAGS); return FLAGS; }
+"flags"			{ return FLAGS; }
 
 "udp"			{ scanner_push_start_cond(yyscanner, SCANSTATE_EXPR_UDP); return UDP; }
 "udplite"		{ scanner_push_start_cond(yyscanner, SCANSTATE_EXPR_UDPLITE); return UDPLITE; }
@@ -780,6 +774,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 }
 
 "notrack"		{ return NOTRACK; }
+
+"all"			{ return ALL; }
 
 <SCANSTATE_CMD_EXPORT,SCANSTATE_CMD_IMPORT,SCANSTATE_CMD_MONITOR>{
 	"xml"			{ return XML; }
@@ -1148,6 +1144,8 @@ void *scanner_init(struct parser_state *state)
 	yylex_init_extra(state, &scanner);
 	yyset_out(NULL, scanner);
 
+	state->startcond_active = xzalloc_array(__SC_MAX,
+						sizeof(*state->startcond_active));
 	return scanner;
 }
 
@@ -1177,6 +1175,8 @@ void scanner_destroy(struct nft_ctx *nft)
 	struct parser_state *state = yyget_extra(nft->scanner);
 
 	input_descriptor_list_destroy(state);
+	xfree(state->startcond_active);
+
 	yylex_destroy(nft->scanner);
 }
 
@@ -1185,6 +1185,7 @@ static void scanner_push_start_cond(void *scanner, enum startcond_type type)
 	struct parser_state *state = yyget_extra(scanner);
 
 	state->startcond_type = type;
+	state->startcond_active[type]++;
 
 	yy_push_state((int)type, scanner);
 }
@@ -1192,6 +1193,8 @@ static void scanner_push_start_cond(void *scanner, enum startcond_type type)
 void scanner_pop_start_cond(void *scanner, enum startcond_type t)
 {
 	struct parser_state *state = yyget_extra(scanner);
+
+	state->startcond_active[t]--;
 
 	if (state->startcond_type != t) {
 		state->flex_state_pop++;
@@ -1202,6 +1205,10 @@ void scanner_pop_start_cond(void *scanner, enum startcond_type t)
 		state->flex_state_pop--;
 		state->startcond_type = yy_top_state(scanner);
 		yy_pop_state(scanner);
+
+		t = state->startcond_type;
+		if (state->startcond_active[t])
+			return;
 	}
 
 	state->startcond_type = yy_top_state(scanner);

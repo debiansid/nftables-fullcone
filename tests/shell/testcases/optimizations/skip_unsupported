@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+
+RULESET="table inet x {
+	chain y {
+		ip saddr 1.2.3.4 tcp dport 80 meta mark set 10 accept
+		ip saddr 1.2.3.4 tcp dport 81 meta mark set 11 accept
+		ip saddr 1.2.3.5 tcp dport 81 accept comment \"test\"
+		ip saddr 1.2.3.5 tcp dport 82 accept
+	}
+}"
+
+$NFT -o -f - <<< $RULESET

@@ -659,13 +659,22 @@ static int resolve_protocol_conflict(struct eval_ctx *ctx,
 	struct stmt *nstmt = NULL;
 	int link, err;
 
-	if (payload->payload.base == PROTO_BASE_LL_HDR &&
-	    proto_is_dummy(desc)) {
-		err = meta_iiftype_gen_dependency(ctx, payload, &nstmt);
-		if (err < 0)
-			return err;
+	if (payload->payload.base == PROTO_BASE_LL_HDR) {
+		if (proto_is_dummy(desc)) {
+			err = meta_iiftype_gen_dependency(ctx, payload, &nstmt);
+			if (err < 0)
+				return err;
 
-		rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
+			rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
+		} else {
+			unsigned int i;
+
+			/* payload desc stored in the L2 header stack? No conflict. */
+			for (i = 0; i < ctx->pctx.stacked_ll_count; i++) {
+				if (ctx->pctx.stacked_ll[i] == payload->payload.desc)
+					return 0;
+			}
+		}
 	}
 
 	assert(base <= PROTO_BASE_MAX);
@@ -678,7 +687,13 @@ static int resolve_protocol_conflict(struct eval_ctx *ctx,
 	    conflict_resolution_gen_dependency(ctx, link, payload, &nstmt) < 0)
 		return 1;
 
-	payload->payload.offset += ctx->pctx.protocol[base].offset;
+	if (base == PROTO_BASE_LL_HDR) {
+		unsigned int i;
+
+		for (i = 0; i < ctx->pctx.stacked_ll_count; i++)
+			payload->payload.offset += ctx->pctx.stacked_ll[i]->length;
+	}
+
 	rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
 
 	return 0;
@@ -727,7 +742,12 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 	if (desc == payload->payload.desc) {
 		const struct proto_hdr_template *tmpl;
 
-		payload->payload.offset += ctx->pctx.protocol[base].offset;
+		if (desc->base == PROTO_BASE_LL_HDR) {
+			unsigned int i;
+
+			for (i = 0; i < ctx->pctx.stacked_ll_count; i++)
+				payload->payload.offset += ctx->pctx.stacked_ll[i]->length;
+		}
 check_icmp:
 		if (desc != &proto_icmp && desc != &proto_icmp6)
 			return 0;
@@ -1431,10 +1451,9 @@ static int __expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr *elem)
 static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *elem = *expr;
+	const struct expr *key;
 
 	if (ctx->set) {
-		const struct expr *key;
-
 		if (__expr_evaluate_set_elem(ctx, elem) < 0)
 			return -1;
 
@@ -1451,9 +1470,19 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 		switch (elem->key->etype) {
 		case EXPR_PREFIX:
 		case EXPR_RANGE:
-			return expr_error(ctx->msgs, elem,
-					  "You must add 'flags interval' to your %s declaration if you want to add %s elements",
-					  set_is_map(ctx->set->flags) ? "map" : "set", expr_name(elem->key));
+			key = elem->key;
+			goto err_missing_flag;
+		case EXPR_CONCAT:
+			list_for_each_entry(key, &elem->key->expressions, list) {
+				switch (key->etype) {
+				case EXPR_PREFIX:
+				case EXPR_RANGE:
+					goto err_missing_flag;
+				default:
+					break;
+				}
+			}
+			break;
 		default:
 			break;
 		}
@@ -1462,7 +1491,13 @@ static int expr_evaluate_set_elem(struct eval_ctx *ctx, struct expr **expr)
 	datatype_set(elem, elem->key->dtype);
 	elem->len   = elem->key->len;
 	elem->flags = elem->key->flags;
+
 	return 0;
+
+err_missing_flag:
+	return expr_error(ctx->msgs, key,
+			  "You must add 'flags interval' to your %s declaration if you want to add %s elements",
+			  set_is_map(ctx->set->flags) ? "map" : "set", expr_name(key));
 }
 
 static const struct expr *expr_set_elem(const struct expr *expr)
@@ -3995,6 +4030,9 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 	if (set == NULL)
 		return set_not_found(ctx, &ctx->cmd->handle.set.location,
 				     ctx->cmd->handle.set.name);
+
+	if (set->key == NULL)
+		return -1;
 
 	set->existing_set = set;
 	ctx->set = set;

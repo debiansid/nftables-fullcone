@@ -193,13 +193,14 @@ struct proto_ctx {
 	struct {
 		struct location			location;
 		const struct proto_desc		*desc;
-		unsigned int			offset;
 		struct {
 			struct location		location;
 			const struct proto_desc	*desc;
 		} protos[PROTO_CTX_NUM_PROTOS];
 		unsigned int			num_protos;
 	} protocol[PROTO_BASE_MAX + 1];
+	const struct proto_desc *stacked_ll[PROTO_CTX_NUM_PROTOS];
+	uint8_t stacked_ll_count;
 };
 
 extern void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,

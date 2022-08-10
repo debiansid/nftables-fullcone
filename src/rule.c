@@ -1279,13 +1279,20 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 	cmd->handle   = *h;
 	cmd->location = *loc;
 	cmd->data     = data;
+	cmd->attr     = xzalloc_array(NFT_NLATTR_LOC_MAX,
+				      sizeof(struct nlerr_loc));
+	cmd->attr_array_len = NFT_NLATTR_LOC_MAX;
+	init_list_head(&cmd->collapse_list);
+
 	return cmd;
 }
 
 void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc)
 {
-	if (cmd->num_attrs >= NFT_NLATTR_LOC_MAX)
-		return;
+	if (cmd->num_attrs >= cmd->attr_array_len) {
+		cmd->attr_array_len *= 2;
+		cmd->attr = xrealloc(cmd->attr, sizeof(struct nlerr_loc) * cmd->attr_array_len);
+	}
 
 	cmd->attr[cmd->num_attrs].offset = offset;
 	cmd->attr[cmd->num_attrs].location = loc;
@@ -1379,6 +1386,81 @@ void nft_cmd_expand(struct cmd *cmd)
 	}
 }
 
+bool nft_cmd_collapse(struct list_head *cmds)
+{
+	struct cmd *cmd, *next, *elems = NULL;
+	struct expr *expr, *enext;
+	bool collapse = false;
+
+	list_for_each_entry_safe(cmd, next, cmds, list) {
+		if (cmd->op != CMD_ADD &&
+		    cmd->op != CMD_CREATE) {
+			elems = NULL;
+			continue;
+		}
+
+		if (cmd->obj != CMD_OBJ_ELEMENTS) {
+			elems = NULL;
+			continue;
+		}
+
+		if (!elems) {
+			elems = cmd;
+			continue;
+		}
+
+		if (cmd->op != elems->op) {
+			elems = cmd;
+			continue;
+		}
+
+		if (strcmp(elems->handle.table.name, cmd->handle.table.name) ||
+		    strcmp(elems->handle.set.name, cmd->handle.set.name)) {
+			elems = cmd;
+			continue;
+		}
+
+		collapse = true;
+		list_for_each_entry_safe(expr, enext, &cmd->expr->expressions, list) {
+			expr->cmd = cmd;
+			list_move_tail(&expr->list, &elems->expr->expressions);
+		}
+		elems->expr->size += cmd->expr->size;
+		list_move_tail(&cmd->list, &elems->collapse_list);
+	}
+
+	return collapse;
+}
+
+void nft_cmd_uncollapse(struct list_head *cmds)
+{
+	struct cmd *cmd, *cmd_next, *collapse_cmd, *collapse_cmd_next;
+	struct expr *expr, *next;
+
+	list_for_each_entry_safe(cmd, cmd_next, cmds, list) {
+		if (list_empty(&cmd->collapse_list))
+			continue;
+
+		assert(cmd->obj == CMD_OBJ_ELEMENTS);
+
+		list_for_each_entry_safe(expr, next, &cmd->expr->expressions, list) {
+			if (!expr->cmd)
+				continue;
+
+			list_move_tail(&expr->list, &expr->cmd->expr->expressions);
+			cmd->expr->size--;
+			expr->cmd = NULL;
+		}
+
+		list_for_each_entry_safe(collapse_cmd, collapse_cmd_next, &cmd->collapse_list, list) {
+			if (cmd->elem.set)
+				collapse_cmd->elem.set = set_get(cmd->elem.set);
+
+			list_add(&collapse_cmd->list, &cmd->list);
+		}
+	}
+}
+
 struct markup *markup_alloc(uint32_t format)
 {
 	struct markup *markup;
@@ -1462,6 +1544,7 @@ void cmd_free(struct cmd *cmd)
 			BUG("invalid command object type %u\n", cmd->obj);
 		}
 	}
+	xfree(cmd->attr);
 	xfree(cmd->arg);
 	xfree(cmd);
 }
@@ -1469,11 +1552,11 @@ void cmd_free(struct cmd *cmd)
 #include <netlink.h>
 #include <mnl.h>
 
-static int __do_add_elements(struct netlink_ctx *ctx, struct set *set,
-			     struct expr *expr, uint32_t flags)
+static int __do_add_elements(struct netlink_ctx *ctx, struct cmd *cmd,
+			     struct set *set, struct expr *expr, uint32_t flags)
 {
 	expr->set_flags |= set->flags;
-	if (mnl_nft_setelem_add(ctx, set, expr, flags) < 0)
+	if (mnl_nft_setelem_add(ctx, cmd, set, expr, flags) < 0)
 		return -1;
 
 	return 0;
@@ -1489,7 +1572,7 @@ static int do_add_elements(struct netlink_ctx *ctx, struct cmd *cmd,
 	    set_to_intervals(set, init, true) < 0)
 		return -1;
 
-	return __do_add_elements(ctx, set, init, flags);
+	return __do_add_elements(ctx, cmd, set, init, flags);
 }
 
 static int do_add_setelems(struct netlink_ctx *ctx, struct cmd *cmd,
@@ -1497,7 +1580,7 @@ static int do_add_setelems(struct netlink_ctx *ctx, struct cmd *cmd,
 {
 	struct set *set = cmd->set;
 
-	return __do_add_elements(ctx, set, set->init, flags);
+	return __do_add_elements(ctx, cmd, set, set->init, flags);
 }
 
 static int do_add_set(struct netlink_ctx *ctx, struct cmd *cmd,
@@ -1591,7 +1674,7 @@ static int do_delete_setelems(struct netlink_ctx *ctx, struct cmd *cmd)
 	    set_to_intervals(set, expr, false) < 0)
 		return -1;
 
-	if (mnl_nft_setelem_del(ctx, &cmd->handle, cmd->elem.expr) < 0)
+	if (mnl_nft_setelem_del(ctx, cmd, &cmd->handle, cmd->elem.expr) < 0)
 		return -1;
 
 	return 0;

@@ -428,6 +428,10 @@ Destination address of the tunnel|
 ipv4_addr/ipv6_addr
 |=================================
 
+*Note:* When using xfrm_interface, this expression is not useable in output
+hook as the plain packet does not traverse it with IPsec info attached - use a
+chain in postrouting hook instead.
+
 NUMGEN EXPRESSION
 ~~~~~~~~~~~~~~~~~
 

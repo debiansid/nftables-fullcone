@@ -1,0 +1,19 @@
+#!/bin/bash
+
+ip link add d0 type dummy || {
+        echo "Skipping, no dummy interface available"
+        exit 0
+}
+trap "ip link del d0" EXIT
+
+set -e
+
+$NFT flush ruleset
+$NFT add table inet test
+$NFT add chain inet test c
+
+$NFT flush ruleset
+
+RULESET='{"nftables":[{"flush":{"ruleset":null}},{"add":{"table":{"family":"netdev","name":"test_table"}}},{"add":{"chain":{"family":"netdev","table":"test_table","name":"test_chain","type":"filter","hook":"ingress","prio":0,"dev":"d0","policy":"accept"}}}]}'
+
+$NFT -j -f - <<< $RULESET

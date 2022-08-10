@@ -322,3 +322,37 @@ netdev
   [ payload load 2b @ link header + 14 => reg 1 ]
   [ bitwise reg 1 = ( reg 1 & 0x000000f0 ) ^ 0x00000200 ]
   [ payload write reg 1 => 2b @ link header + 14 csum_type 0 csum_off 0 csum_flags 0x0 ]
+
+# vlan id 2 ether saddr 0:1:2:3:4:6
+netdev test-netdev ingress
+  [ meta load iiftype => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ payload load 8b @ link header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x03020100 0x00810604 ]
+  [ payload load 2b @ link header + 14 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000ff0f ) ^ 0x00000000 ]
+  [ cmp eq reg 1 0x00000200 ]
+
+# ether saddr 00:01:02:03:04:05 vlan id 1
+netdev test-netdev ingress
+  [ meta load iiftype => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ payload load 8b @ link header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x03020100 0x00810504 ]
+  [ payload load 2b @ link header + 14 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000ff0f ) ^ 0x00000000 ]
+  [ cmp eq reg 1 0x00000100 ]
+
+# ether saddr . vlan id { 0a:0b:0c:0d:0e:0f . 42, 0a:0b:0c:0d:0e:0f . 4095 }
+__set%d test-netdev 3 size 2
+__set%d test-netdev 0
+	element 0d0c0b0a 00000f0e 00002a00  : 0 [end]	element 0d0c0b0a 00000f0e 0000ff0f  : 0 [end]
+netdev test-netdev ingress
+  [ meta load iiftype => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ payload load 2b @ link header + 12 => reg 1 ]
+  [ cmp eq reg 1 0x00000081 ]
+  [ payload load 6b @ link header + 6 => reg 1 ]
+  [ payload load 2b @ link header + 14 => reg 10 ]
+  [ bitwise reg 10 = ( reg 10 & 0x0000ff0f ) ^ 0x00000000 ]
+  [ lookup reg 1 set __set%d ]

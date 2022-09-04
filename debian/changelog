@@ -1,12 +1,13 @@
 nftables (0.9.8-3.1+deb11u1) bullseye; urgency=medium
 
   * d/p/rule_fix_for_potential_off-by-one_in_cmd_add_loc.patch
-    It fixes a one off for the check for NFT_NLATTR_LOC_MAX
+    It fixes an off-by-one error in the check for NFT_NLATTR_LOC_MAX
     which leads to double free or corruption (out) error.
     Thanks to Sven Auhagen <sven.auhagen@voleatech.de> for
     suggesting the fix (closes: #1017359).
+  * d/control: add myself to uploaders.
 
- -- Jeremy Sowden <jeremy@azazel.net>  Sun, 04 Sep 2022 09:29:03 +0100
+ -- Jeremy Sowden <jeremy@azazel.net>  Sun, 04 Sep 2022 09:34:11 +0100
 
 nftables (0.9.8-3.1) unstable; urgency=medium
 

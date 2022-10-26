@@ -69,7 +69,6 @@ Package: libnftables1
 Section: libs
 Priority: optional
 Architecture: linux-any
-Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Netfilter nftables high level userspace API library
  This library provides high level semantics to interact with the nftables

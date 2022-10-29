@@ -4,8 +4,10 @@ nftables (1.0.5-2) unstable; urgency=medium
   * [accc8cd] d/patches: add patch to fix listing of sets containing
     unclosed prefix intervals (closes: #1018156)
   * [f42c641] d/patches: add patch to fix typo's
+  * [46b0bd9] d/rules: `override_dh_fixperms` -> `execute_after_dh_fixperms`
+  * [b639b39] d/rules: fix non-reproducible dates in man-pages
 
- -- Jeremy Sowden <jeremy@azazel.net>  Thu, 22 Sep 2022 21:58:07 +0100
+ -- Jeremy Sowden <jeremy@azazel.net>  Sat, 29 Oct 2022 18:09:03 +0100
 
 nftables (1.0.5-1) unstable; urgency=medium
 

@@ -1,5 +1,6 @@
 nftables (1.0.5-2) unstable; urgency=medium
 
+  [ Jeremy Sowden ]
   * [14670b7] d/control: bump Standards-Version to 4.6.1
   * [accc8cd] d/patches: add patch to fix listing of sets containing
     unclosed prefix intervals (closes: #1018156)
@@ -7,7 +8,10 @@ nftables (1.0.5-2) unstable; urgency=medium
   * [46b0bd9] d/rules: `override_dh_fixperms` -> `execute_after_dh_fixperms`
   * [b639b39] d/rules: fix non-reproducible dates in man-pages
 
- -- Jeremy Sowden <jeremy@azazel.net>  Sat, 29 Oct 2022 18:09:03 +0100
+  [ Helmut Grohne ]
+  * [9b4c211] nftables: fix FTCBFS: B-D on a native python (Closes: #1022965)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 03 Nov 2022 10:34:20 +0100
 
 nftables (1.0.5-1) unstable; urgency=medium
 

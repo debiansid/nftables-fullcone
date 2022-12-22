@@ -1058,13 +1058,19 @@ static void chain_print_declaration(const struct chain *chain,
 void chain_rules_print(const struct chain *chain, struct output_ctx *octx,
 		       const char *indent)
 {
+	unsigned int flags = octx->flags;
 	struct rule *rule;
+
+	if (chain->flags & CHAIN_F_BINDING)
+		octx->flags &= ~NFT_CTX_OUTPUT_HANDLE;
 
 	list_for_each_entry(rule, &chain->rules, list) {
 		nft_print(octx, "\t\t%s", indent ? : "");
 		rule_print(rule, octx);
 		nft_print(octx, "\n");
 	}
+
+	octx->flags = flags;
 }
 
 static void chain_print(const struct chain *chain, struct output_ctx *octx)
@@ -1226,6 +1232,11 @@ static void table_print(const struct table *table, struct output_ctx *octx)
 	struct set *set;
 	const char *delim = "";
 	const char *family = family2str(table->handle.family);
+
+	if (table->has_xt_stmts)
+		fprintf(octx->error_fp,
+			"# Warning: table %s %s is managed by iptables-nft, do not touch!\n",
+			family, table->handle.table.name);
 
 	nft_print(octx, "table %s %s {", family, table->handle.table.name);
 	if (nft_output_handle(octx) || table->flags & TABLE_F_OWNER)
@@ -1414,7 +1425,8 @@ bool nft_cmd_collapse(struct list_head *cmds)
 			continue;
 		}
 
-		if (strcmp(elems->handle.table.name, cmd->handle.table.name) ||
+		if (elems->handle.family != cmd->handle.family ||
+		    strcmp(elems->handle.table.name, cmd->handle.table.name) ||
 		    strcmp(elems->handle.set.name, cmd->handle.set.name)) {
 			elems = cmd;
 			continue;
@@ -2380,9 +2392,14 @@ static int do_list_tables(struct netlink_ctx *ctx, struct cmd *cmd)
 static void table_print_declaration(struct table *table,
 				    struct output_ctx *octx)
 {
-	nft_print(octx, "table %s %s {\n",
-		  family2str(table->handle.family),
-		  table->handle.table.name);
+	const char *family = family2str(table->handle.family);
+
+	if (table->has_xt_stmts)
+		fprintf(octx->error_fp,
+			"# Warning: table %s %s is managed by iptables-nft, do not touch!\n",
+			family, table->handle.table.name);
+
+	nft_print(octx, "table %s %s {\n", family, table->handle.table.name);
 }
 
 static int do_list_chain(struct netlink_ctx *ctx, struct cmd *cmd,

@@ -158,6 +158,8 @@ static struct expr *expr_value(struct expr *expr)
 		return expr->left->key;
 	case EXPR_SET_ELEM:
 		return expr->key;
+	case EXPR_VALUE:
+		return expr;
 	default:
 		BUG("invalid expression type %s\n", expr_name(expr));
 	}
@@ -493,12 +495,49 @@ static struct expr *interval_to_range(struct expr *low, struct expr *i, mpz_t ra
 	return __expr_to_set_elem(low, tmp);
 }
 
+static void
+add_interval(struct expr *set, struct expr *low, struct expr *i)
+{
+	struct expr *expr;
+	mpz_t range, p;
+
+	mpz_init(range);
+	mpz_init(p);
+
+	mpz_sub(range, expr_value(i)->value, expr_value(low)->value);
+	if (i->etype != EXPR_VALUE)
+		mpz_sub_ui(range, range, 1);
+
+	mpz_and(p, expr_value(low)->value, range);
+
+	if (!mpz_cmp_ui(range, 0)) {
+		if (expr_basetype(low)->type == TYPE_STRING)
+			mpz_switch_byteorder(expr_value(low)->value,
+					     expr_value(low)->len / BITS_PER_BYTE);
+		low->flags |= EXPR_F_KERNEL;
+		expr = expr_get(low);
+	} else if (range_is_prefix(range) && !mpz_cmp_ui(p, 0)) {
+
+		if (i->dtype->flags & DTYPE_F_PREFIX)
+			expr = interval_to_prefix(low, i, range);
+		else if (expr_basetype(i)->type == TYPE_STRING)
+			expr = interval_to_string(low, i, range);
+		else
+			expr = interval_to_range(low, i, range);
+	} else
+		expr = interval_to_range(low, i, range);
+
+	compound_expr_add(set, expr);
+
+	mpz_clear(range);
+	mpz_clear(p);
+}
+
 void interval_map_decompose(struct expr *set)
 {
 	struct expr *i, *next, *low = NULL, *end, *catchall = NULL, *key;
 	struct expr **elements, **ranges;
 	unsigned int n, m, size;
-	mpz_t range, p;
 	bool interval;
 
 	if (set->size == 0)
@@ -506,9 +545,6 @@ void interval_map_decompose(struct expr *set)
 
 	elements = xmalloc_array(set->size, sizeof(struct expr *));
 	ranges = xmalloc_array(set->size * 2, sizeof(struct expr *));
-
-	mpz_init(range);
-	mpz_init(p);
 
 	/* Sort elements */
 	n = 0;
@@ -568,32 +604,7 @@ void interval_map_decompose(struct expr *set)
 			}
 		}
 
-		mpz_sub(range, expr_value(i)->value, expr_value(low)->value);
-		mpz_sub_ui(range, range, 1);
-
-		mpz_and(p, expr_value(low)->value, range);
-
-		if (!mpz_cmp_ui(range, 0)) {
-			if (expr_basetype(low)->type == TYPE_STRING)
-				mpz_switch_byteorder(expr_value(low)->value, expr_value(low)->len / BITS_PER_BYTE);
-			low->flags |= EXPR_F_KERNEL;
-			compound_expr_add(set, expr_get(low));
-		} else if (range_is_prefix(range) && !mpz_cmp_ui(p, 0)) {
-			struct expr *expr;
-
-			if (i->dtype->flags & DTYPE_F_PREFIX)
-				expr = interval_to_prefix(low, i, range);
-			else if (expr_basetype(i)->type == TYPE_STRING)
-				expr = interval_to_string(low, i, range);
-			else
-				expr = interval_to_range(low, i, range);
-
-			compound_expr_add(set, expr);
-		} else {
-			struct expr *expr = interval_to_range(low, i, range);
-
-			compound_expr_add(set, expr);
-		}
+		add_interval(set, low, i);
 
 		if (i->flags & EXPR_F_INTERVAL_END) {
 			expr_free(low);
@@ -610,31 +621,17 @@ void interval_map_decompose(struct expr *set)
 	mpz_bitmask(i->value, i->len);
 
 	if (!mpz_cmp(i->value, expr_value(low)->value)) {
-		expr_free(i);
-		i = low;
+		compound_expr_add(set, low);
 	} else {
-		i = range_expr_alloc(&low->location,
-				     expr_clone(expr_value(low)), i);
-		i = set_elem_expr_alloc(&low->location, i);
-		if (low->etype == EXPR_MAPPING) {
-			i = mapping_expr_alloc(&i->location, i,
-					       expr_clone(low->right));
-			interval_expr_copy(i->left, low->left);
-		} else {
-			interval_expr_copy(i, low);
-		}
-		i->flags |= EXPR_F_KERNEL;
-
+		add_interval(set, low, i);
 		expr_free(low);
 	}
 
-	compound_expr_add(set, i);
+	expr_free(i);
+
 out:
 	if (catchall)
 		compound_expr_add(set, catchall);
-
-	mpz_clear(range);
-	mpz_clear(p);
 
 	xfree(ranges);
 	xfree(elements);

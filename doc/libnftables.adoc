@@ -37,6 +37,9 @@ const char *nft_ctx_get_error_buffer(struct nft_ctx* '\*ctx'*);
 int nft_ctx_add_include_path(struct nft_ctx* '\*ctx'*, const char* '\*path'*);
 void nft_ctx_clear_include_paths(struct nft_ctx* '\*ctx'*);
 
+int nft_ctx_add_var(struct nft_ctx* '\*ctx'*, const char* '\*var'*);
+void nft_ctx_clear_vars(struct nft_ctx '\*ctx'*);
+
 int nft_run_cmd_from_buffer(struct nft_ctx* '\*nft'*, const char* '\*buf'*);
 int nft_run_cmd_from_filename(struct nft_ctx* '\*nft'*,
 			      const char* '\*filename'*);*
@@ -68,7 +71,7 @@ The *nft_ctx_free*() function frees the context object pointed to by 'ctx', incl
 
 === nft_ctx_get_dry_run() and nft_ctx_set_dry_run()
 Dry-run setting controls whether ruleset changes are actually committed on kernel side or not.
-It allows to check whether a given operation would succeed without making actual changes to the ruleset.
+It allows one to check whether a given operation would succeed without making actual changes to the ruleset.
 The default setting is *false*.
 
 The *nft_ctx_get_dry_run*() function returns the dry-run setting's value contained in 'ctx'.
@@ -118,7 +121,7 @@ NFT_CTX_OUTPUT_JSON::
 	This flag controls JSON output format, input is auto-detected.
 NFT_CTX_OUTPUT_ECHO::
 	The echo setting makes libnftables print the changes once they are committed to the kernel, just like a running instance of *nft monitor* would.
-	Amongst other things, this allows to retrieve an added rule's handle atomically.
+	Amongst other things, this allows one to retrieve an added rule's handle atomically.
 NFT_CTX_OUTPUT_GUID::
 	Display UID and GID as described in the /etc/passwd and /etc/group files.
 NFT_CTX_OUTPUT_NUMERIC_PROTO::
@@ -196,15 +199,23 @@ On failure, the functions return non-zero which may only happen if buffering was
 The *nft_ctx_get_output_buffer*() and *nft_ctx_get_error_buffer*() functions return a pointer to the buffered output (which may be empty).
 
 === nft_ctx_add_include_path() and nft_ctx_clear_include_path()
-The *include* command in nftables rulesets allows to outsource parts of the ruleset into a different file.
+The *include* command in nftables rulesets allows one to outsource parts of the ruleset into a different file.
 The include path defines where these files are searched for.
-Libnftables allows to have a list of those paths which are searched in order.
+Libnftables allows one to have a list of those paths which are searched in order.
 The default include path list contains a single compile-time defined entry (typically '/etc/').
 
 The *nft_ctx_add_include_path*() function extends the list of include paths in 'ctx' by the one given in 'path'.
 The function returns zero on success or non-zero if memory allocation failed.
 
 The *nft_ctx_clear_include_paths*() function removes all include paths, even the built-in default one.
+
+=== nft_ctx_add_var() and nft_ctx_clear_vars()
+The *define* command in nftables ruleset allows one to define variables.
+
+The *nft_ctx_add_var*() function extends the list of variables in 'ctx'. The variable must be given in the format 'key=value'.
+The function returns zero on success or non-zero if the variable is malformed.
+
+The *nft_ctx_clear_vars*() function removes all variables.
 
 === nft_run_cmd_from_buffer() and nft_run_cmd_from_filename()
 These functions perform the actual work of parsing user input into nftables commands and executing them.

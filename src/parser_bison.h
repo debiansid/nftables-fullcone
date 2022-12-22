@@ -403,7 +403,8 @@ extern int nft_debug;
     REQID = 604,                   /* "reqid"  */
     SPNUM = 605,                   /* "spnum"  */
     IN = 606,                      /* "in"  */
-    OUT = 607                      /* "out"  */
+    OUT = 607,                     /* "out"  */
+    XT = 608                       /* "xt"  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -762,12 +763,13 @@ extern int nft_debug;
 #define SPNUM 605
 #define IN 606
 #define OUT 607
+#define XT 608
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 167 "parser_bison.y"
+#line 178 "parser_bison.y"
 
 	uint64_t		val;
 	uint32_t		val32;
@@ -796,7 +798,7 @@ union YYSTYPE
 		uint8_t field;
 	} tcp_kind_field;
 
-#line 800 "parser_bison.h"
+#line 802 "parser_bison.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

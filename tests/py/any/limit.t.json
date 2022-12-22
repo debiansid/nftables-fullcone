@@ -129,7 +129,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1,
@@ -142,7 +142,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1,
@@ -155,7 +155,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1,

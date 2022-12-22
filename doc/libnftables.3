@@ -2,12 +2,12 @@
 .\"     Title: libnftables
 .\"    Author: Phil Sutter <phil@nwl.cc>
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/09/2022
+.\"      Date: 12/21/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES" "3" "08/09/2022" "\ \&" "\ \&"
+.TH "LIBNFTABLES" "3" "12/21/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -59,7 +59,10 @@ const char *nft_ctx_get_error_buffer(struct nft_ctx\fR \fI*ctx\fR\fB);
 int nft_ctx_add_include_path(struct nft_ctx\fR \fI*ctx\fR\fB, const char\fR \fI*path\fR\fB);
 void nft_ctx_clear_include_paths(struct nft_ctx\fR \fI*ctx\fR\fB);
 
-int nft_run_cmd_from_buffer(struct nft_ctx\fR \fI*nft\fR\fB, const char\fR \fI*buf\fR\fB);
+int nft_ctx_add_var(struct nft_ctx\fR \fI*ctx\fR\fB, const char\fR \fI*var\fR\fB);
+void nft_ctx_clear_vars(struct nft_ctx \fR\fB\fI\e*ctx\fR\fR);
+
+int nft_run_cmd_from_buffer(struct nft_ctx* \fI*nft\fR\fB, const char\fR \fI*buf\fR\fB);
 int nft_run_cmd_from_filename(struct nft_ctx\fR \fI*nft\fR\fB,
                               const char\fR \fI*filename\fR\fB);\fR
 
@@ -79,7 +82,7 @@ The \fBnft_ctx_new\fR() function allocates and returns a new context object\&. T
 The \fBnft_ctx_free\fR() function frees the context object pointed to by \fIctx\fR, including any caches or buffers it may hold\&.
 .SS "nft_ctx_get_dry_run() and nft_ctx_set_dry_run()"
 .sp
-Dry\-run setting controls whether ruleset changes are actually committed on kernel side or not\&. It allows to check whether a given operation would succeed without making actual changes to the ruleset\&. The default setting is \fBfalse\fR\&.
+Dry\-run setting controls whether ruleset changes are actually committed on kernel side or not\&. It allows one to check whether a given operation would succeed without making actual changes to the ruleset\&. The default setting is \fBfalse\fR\&.
 .sp
 The \fBnft_ctx_get_dry_run\fR() function returns the dry\-run setting\(cqs value contained in \fIctx\fR\&.
 .sp
@@ -149,7 +152,7 @@ NFT_CTX_OUTPUT_ECHO
 .RS 4
 The echo setting makes libnftables print the changes once they are committed to the kernel, just like a running instance of
 \fBnft monitor\fR
-would\&. Amongst other things, this allows to retrieve an added rule\(cqs handle atomically\&.
+would\&. Amongst other things, this allows one to retrieve an added rule\(cqs handle atomically\&.
 .RE
 .PP
 NFT_CTX_OUTPUT_GUID
@@ -263,11 +266,18 @@ The \fBnft_ctx_unbuffer_output\fR() and \fBnft_ctx_unbuffer_error\fR() functions
 The \fBnft_ctx_get_output_buffer\fR() and \fBnft_ctx_get_error_buffer\fR() functions return a pointer to the buffered output (which may be empty)\&.
 .SS "nft_ctx_add_include_path() and nft_ctx_clear_include_path()"
 .sp
-The \fBinclude\fR command in nftables rulesets allows to outsource parts of the ruleset into a different file\&. The include path defines where these files are searched for\&. Libnftables allows to have a list of those paths which are searched in order\&. The default include path list contains a single compile\-time defined entry (typically \fI/etc/\fR)\&.
+The \fBinclude\fR command in nftables rulesets allows one to outsource parts of the ruleset into a different file\&. The include path defines where these files are searched for\&. Libnftables allows one to have a list of those paths which are searched in order\&. The default include path list contains a single compile\-time defined entry (typically \fI/etc/\fR)\&.
 .sp
 The \fBnft_ctx_add_include_path\fR() function extends the list of include paths in \fIctx\fR by the one given in \fIpath\fR\&. The function returns zero on success or non\-zero if memory allocation failed\&.
 .sp
 The \fBnft_ctx_clear_include_paths\fR() function removes all include paths, even the built\-in default one\&.
+.SS "nft_ctx_add_var() and nft_ctx_clear_vars()"
+.sp
+The \fBdefine\fR command in nftables ruleset allows one to define variables\&.
+.sp
+The \fBnft_ctx_add_var\fR() function extends the list of variables in \fIctx\fR\&. The variable must be given in the format \fIkey=value\fR\&. The function returns zero on success or non\-zero if the variable is malformed\&.
+.sp
+The \fBnft_ctx_clear_vars\fR() function removes all variables\&.
 .SS "nft_run_cmd_from_buffer() and nft_run_cmd_from_filename()"
 .sp
 These functions perform the actual work of parsing user input into nftables commands and executing them\&.

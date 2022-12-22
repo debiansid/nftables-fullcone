@@ -116,6 +116,31 @@ class Nftables:
         self.nft_run_cmd_from_buffer.restype = c_int
         self.nft_run_cmd_from_buffer.argtypes = [c_void_p, c_char_p]
 
+        self.nft_run_cmd_from_filename = lib.nft_run_cmd_from_filename
+        self.nft_run_cmd_from_filename.restype = c_int
+        self.nft_run_cmd_from_filename.argtypes = [c_void_p, c_char_p]
+
+        self.nft_ctx_add_include_path = lib.nft_ctx_add_include_path
+        self.nft_ctx_add_include_path.restype = c_int
+        self.nft_ctx_add_include_path.argtypes = [c_void_p, c_char_p]
+
+        self.nft_ctx_clear_include_paths = lib.nft_ctx_clear_include_paths
+        self.nft_ctx_clear_include_paths.argtypes = [c_void_p]
+
+        self.nft_ctx_get_dry_run = lib.nft_ctx_get_dry_run
+        self.nft_ctx_get_dry_run.restype = c_bool
+        self.nft_ctx_get_dry_run.argtypes = [c_void_p]
+
+        self.nft_ctx_set_dry_run = lib.nft_ctx_set_dry_run
+        self.nft_ctx_set_dry_run.argtypes = [c_void_p, c_bool]
+
+        self.nft_ctx_add_var = lib.nft_ctx_add_var
+        self.nft_ctx_add_var.restype = c_int
+        self.nft_ctx_add_var.argtypes = [c_void_p, c_char_p]
+
+        self.nft_ctx_clear_vars = lib.nft_ctx_clear_vars
+        self.nft_ctx_clear_vars.argtypes = [c_void_p]
+
         self.nft_ctx_free = lib.nft_ctx_free
         lib.nft_ctx_free.argtypes = [c_void_p]
 
@@ -446,3 +471,77 @@ class Nftables:
 
         self.validator.validate(json_root)
         return True
+
+    def cmd_from_file(self, filename):
+        """Run a nftables command set from a file
+
+        filename can be a str or a Path
+
+        Returns a tuple (rc, output, error):
+        rc     -- return code as returned by nft_run_cmd_from_filename() function
+        output -- a string containing output written to stdout
+        error  -- a string containing output written to stderr
+        """
+        filename_is_unicode = False
+        if not isinstance(filename, bytes):
+            filename_is_unicode = True
+            filename = str(filename)
+            filename= filename.encode("utf-8")
+        rc = self.nft_run_cmd_from_filename(self.__ctx, filename)
+        output = self.nft_ctx_get_output_buffer(self.__ctx)
+        error = self.nft_ctx_get_error_buffer(self.__ctx)
+        if filename_is_unicode:
+            output = output.decode("utf-8")
+            error = error.decode("utf-8")
+        return (rc, output, error)
+
+    def add_include_path(self, filename):
+        """Add a path to the include file list
+        The default list includes the built-in default one
+
+        Returns True on success, False if memory allocation fails
+        """
+        if not isinstance(filename, bytes):
+            filename = str(filename)
+            filename= filename.encode("utf-8")
+        rc = self.nft_ctx_add_include_path(self.__ctx, filename)
+        return rc == 0
+
+    def clear_include_paths(self):
+        """Clear include path list
+
+        Will also remove the built-in default one
+        """
+        self.nft_ctx_clear_include_paths(self.__ctx)
+
+    def get_dry_run(self):
+        """Get dry run state
+
+        Returns True if set, False otherwise
+        """
+        return self.nft_ctx_get_dry_run(self.__ctx)
+
+    def set_dry_run(self, onoff):
+        """ Set dry run state
+
+        Returns the previous dry run state
+        """
+        old = self.get_dry_run()
+        self.nft_ctx_set_dry_run(self.__ctx, onoff)
+
+        return old
+
+    def add_var(self, var):
+        """Add a variable to the variable list
+
+        Returns True if added, False otherwise
+        """
+        if not isinstance(var, bytes):
+            var = var.encode("utf-8")
+        rc = self.nft_ctx_add_var(self.__ctx, var)
+        return rc == 0
+
+    def clear_vars(self):
+        """Clear variable list
+        """
+        self.nft_ctx_clear_vars(self.__ctx)

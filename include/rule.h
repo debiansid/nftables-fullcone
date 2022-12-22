@@ -169,6 +169,7 @@ struct table {
 	unsigned int		refcnt;
 	uint32_t		owner;
 	const char		*comment;
+	bool			has_xt_stmts;
 };
 
 extern struct table *table_alloc(void);

@@ -1520,6 +1520,10 @@ static void netlink_gen_map_stmt(struct netlink_linearize_ctx *ctx,
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_DYNSET_SET_ID, set->handle.set_id);
 	nft_rule_add_expr(ctx, nle, &stmt->location);
 
+	if (stmt->map.key->timeout > 0)
+		nftnl_expr_set_u64(nle, NFTNL_EXPR_DYNSET_TIMEOUT,
+				   stmt->map.key->timeout);
+
 	list_for_each_entry(this, &stmt->map.stmt_list, list)
 		num_stmts++;
 

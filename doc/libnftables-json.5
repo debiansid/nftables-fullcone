@@ -2,12 +2,12 @@
 .\"     Title: libnftables-json
 .\"    Author: Phil Sutter <phil@nwl.cc>
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/09/2022
+.\"      Date: 12/21/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES\-JSON" "5" "08/09/2022" "\ \&" "\ \&"
+.TH "LIBNFTABLES\-JSON" "5" "12/21/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1919,13 +1919,22 @@ CT expectation reference\&.
 .RS 4
 .\}
 .nf
-\fB{ "xt": null }\fR
+\fB{ "xt": {
+        "type":\fR \fITYPENAME\fR\fB,
+        "name":\fR \fISTRING\fR
+\fB}}\fR
+
+\fITYPENAME\fR := \fBmatch\fR | \fBtarget\fR | \fBwatcher\fR
 .fi
 .if n \{\
 .RE
 .\}
 .sp
-This represents an xt statement from xtables compat interface\&. Sadly, at this point, it is not possible to provide any further information about its content\&.
+This represents an xt statement from xtables compat interface\&. It is a fallback if translation is not available or not complete\&.
+.sp
+Seeing this means the ruleset (or parts of it) were created by \fBiptables\-nft\fR and one should use that to manage it\&.
+.sp
+\fBBEWARE:\fR nftables won\(cqt restore these statements\&.
 .SH "EXPRESSIONS"
 .sp
 Expressions are the building blocks of (most) statements\&. In their most basic form, they are just immediate values represented as a JSON string, integer or boolean type\&.
@@ -2093,7 +2102,7 @@ The offset is relative to Network Layer header start offset\&.
 The offset is relative to Transport Layer header start offset\&.
 .RE
 .sp
-The second form allows to reference a field by name (\fBfield\fR) in a named packet header (\fBprotocol\fR)\&.
+The second form allows one to reference a field by name (\fBfield\fR) in a named packet header (\fBprotocol\fR)\&.
 .SS "EXTHDR"
 .sp
 .if n \{\

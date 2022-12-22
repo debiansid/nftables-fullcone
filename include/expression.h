@@ -41,6 +41,10 @@
  * @EXPR_NUMGEN:	number generation expression
  * @EXPR_HASH:		hash expression
  * @EXPR_RT:		routing expression
+ * @EXPR_FIB		forward information base expression
+ * @EXPR_XFRM		XFRM (ipsec) expression
+ * @EXPR_SET_ELEM_CATCHALL catchall element expression
+ * @EXPR_FLAGCMP	flagcmp expression
  */
 enum expr_types {
 	EXPR_INVALID,
@@ -73,8 +77,9 @@ enum expr_types {
 	EXPR_XFRM,
 	EXPR_SET_ELEM_CATCHALL,
 	EXPR_FLAGCMP,
+
+	EXPR_MAX = EXPR_FLAGCMP
 };
-#define EXPR_MAX EXPR_XFRM
 
 enum ops {
 	OP_INVALID,

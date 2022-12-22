@@ -15,3 +15,22 @@ table ip x {
 }"
 
 $NFT -f - <<< "$EXPECTED"
+
+EXPECTED="table ip x {
+	map w {
+		typeof ip saddr . meta mark : verdict
+		flags interval
+		counter
+		elements = {
+			127.0.0.1-127.0.0.4 . 0x123434-0xb00122 : accept,
+		}
+	}
+
+	chain k {
+		type filter hook input priority filter + 1; policy accept;
+		meta mark set 0x123434
+		ip saddr . meta mark vmap @w
+	}
+}"
+
+$NFT -f - <<< "$EXPECTED"

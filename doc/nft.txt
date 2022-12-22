@@ -9,7 +9,7 @@ nft - Administration tool of the nftables framework for packet filtering and cla
 SYNOPSIS
 --------
 [verse]
-*nft* [ *-nNscaeSupyjt* ] [ *-I* 'directory' ] [ *-f* 'filename' | *-i* | 'cmd' ...]
+*nft* [ *-nNscaeSupyjtT* ] [ *-I* 'directory' ] [ *-f* 'filename' | *-i* | 'cmd' ...]
 *nft* *-h*
 *nft* *-v*
 
@@ -411,7 +411,7 @@ statements for instance).
 |route | ip, ip6 | output |
 If a packet has traversed a chain of this type and is about to be accepted, a
 new route lookup is performed if relevant parts of the IP header have changed.
-This allows to e.g. implement policy routing selectors in nftables.
+This allows one to e.g. implement policy routing selectors in nftables.
 |=================
 
 Apart from the special cases illustrated above (e.g. *nat* type not supporting
@@ -472,7 +472,7 @@ with these standard names to ease relative prioritizing, e.g. *mangle - 5* stand
 for *-155*.  Values will also be printed like this until the value is not
 further than 10 from the standard value.
 
-Base chains also allow to set the chain's *policy*, i.e.  what happens to
+Base chains also allow one to set the chain's *policy*, i.e.  what happens to
 packets not explicitly accepted or refused in contained rules. Supported policy
 values are *accept* (which is the default) or *drop*.
 
@@ -660,7 +660,7 @@ ____
 'OPTIONS' := [*timeout* 'TIMESPEC'] [*expires* 'TIMESPEC'] [*comment* 'string']
 'TIMESPEC' := ['num'*d*]['num'*h*]['num'*m*]['num'[*s*]]
 ____
-Element-related commands allow to change contents of named sets and maps.
+Element-related commands allow one to change contents of named sets and maps.
 'key_expression' is typically a value matching the set type.
 'value_expression' is not allowed in sets but mandatory when adding to maps, where it
 matches the data part in its type definition. When deleting from maps, it may
@@ -732,11 +732,19 @@ kernel modules, such as nf_conntrack.
 STATEFUL OBJECTS
 ----------------
 [verse]
-{*add* | *delete* | *list* | *reset*} 'type' ['family'] 'table' 'object'
-*delete* 'type' ['family'] 'table' *handle* 'handle'
+{*add* | *delete* | *list* | *reset*} *counter* ['family'] 'table' 'object'
+{*add* | *delete* | *list* | *reset*} *quota* ['family'] 'table' 'object'
+{*add* | *delete* | *list*} *limit* ['family'] 'table' 'object'
+*delete* 'counter' ['family'] 'table' *handle* 'handle'
+*delete* 'quota' ['family'] 'table' *handle* 'handle'
+*delete* 'limit' ['family'] 'table' *handle* 'handle'
 *list counters* ['family']
 *list quotas* ['family']
 *list limits* ['family']
+*reset counters* ['family']
+*reset quotas* ['family']
+*reset counters* ['family'] *table* 'table'
+*reset quotas* ['family'] *table* 'table'
 
 Stateful objects are attached to tables and are identified by a unique name.
 They group stateful information from rules, to reference them in rules the

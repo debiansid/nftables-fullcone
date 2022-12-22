@@ -442,7 +442,7 @@ Create a number generator. The *inc* or *random* keywords control its
 operation mode: In *inc* mode, the last returned value is simply incremented.
 In *random* mode, a new random number is returned. The value after *mod*
 keyword specifies an upper boundary (read: modulus) which is not reached by
-returned numbers. The optional *offset* allows to increment the returned value
+returned numbers. The optional *offset* allows one to increment the returned value
 by a fixed offset.
 
 A typical use-case for *numgen* is load-balancing:
@@ -472,7 +472,7 @@ header to apply the hashing, concatenations are possible as well. The value
 after *mod* keyword specifies an upper boundary (read: modulus) which is
 not reached by returned numbers. The optional *seed* is used to specify an
 init value used as seed in the hashing function. The optional *offset*
-allows to increment the returned value by a fixed offset.
+allows one to increment the returned value by a fixed offset.
 
 A typical use-case for *jhash* and *symhash* is load-balancing:
 

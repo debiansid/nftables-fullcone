@@ -57,7 +57,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1,
@@ -70,7 +70,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 2,
@@ -83,7 +83,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1025,
@@ -96,7 +96,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1023,
@@ -109,7 +109,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 10230,
@@ -122,7 +122,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "per": "second",
             "rate": 1023000,
@@ -195,7 +195,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",
@@ -209,7 +209,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",
@@ -223,7 +223,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",
@@ -237,7 +237,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",
@@ -251,7 +251,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",
@@ -265,7 +265,7 @@
 [
     {
         "limit": {
-            "burst": 5,
+            "burst": 0,
             "burst_unit": "bytes",
             "inv": true,
             "per": "second",

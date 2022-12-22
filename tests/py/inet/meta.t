@@ -21,3 +21,7 @@ meta secpath missing;ok;meta ipsec missing
 meta ibrname "br0";fail
 meta obrname "br0";fail
 meta mark set ct mark >> 8;ok
+
+meta mark . tcp dport { 0x0000000a-0x00000014 . 80-90, 0x00100000-0x00100123 . 100-120 };ok
+ip saddr . meta mark { 1.2.3.4 . 0x00000100 , 1.2.3.6-1.2.3.8 . 0x00000200-0x00000300 };ok
+ip saddr . meta mark { 1.2.3.4 . 0x00000100 , 5.6.7.8 . 0x00000200 };ok

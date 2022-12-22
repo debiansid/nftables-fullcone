@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/09/2022
+.\"      Date: 12/21/2022
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "08/09/2022" "\ \&" "\ \&"
+.TH "NFT" "8" "12/21/2022" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -32,7 +32,7 @@ nft \- Administration tool of the nftables framework for packet filtering and cl
 .SH "SYNOPSIS"
 .sp
 .nf
-\fBnft\fR [ \fB\-nNscaeSupyjt\fR ] [ \fB\-I\fR \fIdirectory\fR ] [ \fB\-f\fR \fIfilename\fR | \fB\-i\fR | \fIcmd\fR \&...]
+\fBnft\fR [ \fB\-nNscaeSupyjtT\fR ] [ \fB\-I\fR \fIdirectory\fR ] [ \fB\-f\fR \fIfilename\fR | \fB\-i\fR | \fIcmd\fR \&...]
 \fBnft\fR \fB\-h\fR
 \fBnft\fR \fB\-v\fR
 .fi
@@ -726,7 +726,7 @@ T}:T{
 output
 T}:T{
 .sp
-If a packet has traversed a chain of this type and is about to be accepted, a new route lookup is performed if relevant parts of the IP header have changed\&. This allows to e\&.g\&. implement policy routing selectors in nftables\&.
+If a packet has traversed a chain of this type and is about to be accepted, a new route lookup is performed if relevant parts of the IP header have changed\&. This allows one to e\&.g\&. implement policy routing selectors in nftables\&.
 T}
 .TE
 .sp 1
@@ -973,7 +973,7 @@ T}
 .sp
 Basic arithmetic expressions (addition and subtraction) can also be achieved with these standard names to ease relative prioritizing, e\&.g\&. \fBmangle \- 5\fR stands for \fB\-155\fR\&. Values will also be printed like this until the value is not further than 10 from the standard value\&.
 .sp
-Base chains also allow to set the chain\(cqs \fBpolicy\fR, i\&.e\&. what happens to packets not explicitly accepted or refused in contained rules\&. Supported policy values are \fBaccept\fR (which is the default) or \fBdrop\fR\&.
+Base chains also allow one to set the chain\(cqs \fBpolicy\fR, i\&.e\&. what happens to packets not explicitly accepted or refused in contained rules\&. Supported policy values are \fBaccept\fR (which is the default) or \fBdrop\fR\&.
 .SH "RULES"
 .sp
 .if n \{\
@@ -1432,7 +1432,7 @@ T}
 .RE
 .\}
 .sp
-Element\-related commands allow to change contents of named sets and maps\&. \fIkey_expression\fR is typically a value matching the set type\&. \fIvalue_expression\fR is not allowed in sets but mandatory when adding to maps, where it matches the data part in its type definition\&. When deleting from maps, it may be specified but is optional as \fIkey_expression\fR uniquely identifies the element\&.
+Element\-related commands allow one to change contents of named sets and maps\&. \fIkey_expression\fR is typically a value matching the set type\&. \fIvalue_expression\fR is not allowed in sets but mandatory when adding to maps, where it matches the data part in its type definition\&. When deleting from maps, it may be specified but is optional as \fIkey_expression\fR uniquely identifies the element\&.
 .sp
 \fBcreate\fR command is similar to \fBadd\fR with the exception that none of the listed elements may already exist\&.
 .sp
@@ -1545,11 +1545,19 @@ Inspect configured objects\&. \fBlist hooks\fR shows the full hook pipeline, inc
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBdelete\fR | \fBlist\fR | \fBreset\fR} \fItype\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
-\fBdelete\fR \fItype\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+{\fBadd\fR | \fBdelete\fR | \fBlist\fR | \fBreset\fR} \fBcounter\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+{\fBadd\fR | \fBdelete\fR | \fBlist\fR | \fBreset\fR} \fBquota\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+{\fBadd\fR | \fBdelete\fR | \fBlist\fR} \fBlimit\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+\fBdelete\fR \fIcounter\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdelete\fR \fIquota\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdelete\fR \fIlimit\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBlist counters\fR [\fIfamily\fR]
 \fBlist quotas\fR [\fIfamily\fR]
 \fBlist limits\fR [\fIfamily\fR]
+\fBreset counters\fR [\fIfamily\fR]
+\fBreset quotas\fR [\fIfamily\fR]
+\fBreset counters\fR [\fIfamily\fR] \fBtable\fR \fItable\fR
+\fBreset quotas\fR [\fIfamily\fR] \fBtable\fR \fItable\fR
 .fi
 .if n \{\
 .RE
@@ -4851,7 +4859,7 @@ T}
 .RE
 .\}
 .sp
-Create a number generator\&. The \fBinc\fR or \fBrandom\fR keywords control its operation mode: In \fBinc\fR mode, the last returned value is simply incremented\&. In \fBrandom\fR mode, a new random number is returned\&. The value after \fBmod\fR keyword specifies an upper boundary (read: modulus) which is not reached by returned numbers\&. The optional \fBoffset\fR allows to increment the returned value by a fixed offset\&.
+Create a number generator\&. The \fBinc\fR or \fBrandom\fR keywords control its operation mode: In \fBinc\fR mode, the last returned value is simply incremented\&. In \fBrandom\fR mode, a new random number is returned\&. The value after \fBmod\fR keyword specifies an upper boundary (read: modulus) which is not reached by returned numbers\&. The optional \fBoffset\fR allows one to increment the returned value by a fixed offset\&.
 .sp
 A typical use\-case for \fBnumgen\fR is load\-balancing:
 .PP
@@ -4886,7 +4894,7 @@ add rule nat prerouting dnat to numgen random mod 10 map \e
 .RE
 .\}
 .sp
-Use a hashing function to generate a number\&. The functions available are \fBjhash\fR, known as Jenkins Hash, and \fBsymhash\fR, for Symmetric Hash\&. The \fBjhash\fR requires an expression to determine the parameters of the packet header to apply the hashing, concatenations are possible as well\&. The value after \fBmod\fR keyword specifies an upper boundary (read: modulus) which is not reached by returned numbers\&. The optional \fBseed\fR is used to specify an init value used as seed in the hashing function\&. The optional \fBoffset\fR allows to increment the returned value by a fixed offset\&.
+Use a hashing function to generate a number\&. The functions available are \fBjhash\fR, known as Jenkins Hash, and \fBsymhash\fR, for Symmetric Hash\&. The \fBjhash\fR requires an expression to determine the parameters of the packet header to apply the hashing, concatenations are possible as well\&. The value after \fBmod\fR keyword specifies an upper boundary (read: modulus) which is not reached by returned numbers\&. The optional \fBseed\fR is used to specify an init value used as seed in the hashing function\&. The optional \fBoffset\fR allows one to increment the returned value by a fixed offset\&.
 .sp
 A typical use\-case for \fBjhash\fR and \fBsymhash\fR is load\-balancing:
 .PP
@@ -4985,6 +4993,8 @@ T}
 .if n \{\
 .RE
 .\}
+.sp
+The vlan expression is used to match on the vlan header fields\&. This expression will not work in the \fBip\fR, \fBip6\fR and \fBinet\fR families, unless the vlan interface is configured with the \fBreorder_hdr off\fR setting\&. The default is \fBreorder_hdr on\fR which will automatically remove the vlan tag from the packet\&. See ip\-link(8) for more information\&. For these families its easier to match the vlan interface name instead, using the \fBmeta iif\fR or \fBmeta iifname\fR expression\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -6733,6 +6743,7 @@ T}
 .T&
 lt lt
 lt lt
+lt lt
 lt lt.
 T{
 .sp
@@ -6754,6 +6765,13 @@ th
 T}:T{
 .sp
 Transport Header, for example TCP
+T}
+T{
+.sp
+ih
+T}:T{
+.sp
+Inner Header / Payload, i\&.e\&. after the L4 transport level header
 T}
 .TE
 .sp 1
@@ -7468,7 +7486,7 @@ T{
 \fBaccept\fR
 T}:T{
 .sp
-Terminate ruleset evaluation and accept the packet\&. The packet can still be dropped later by another hook, for instance accept in the forward hook still allows to drop the packet later in the postrouting hook, or another forward base chain that has a higher priority number and is evaluated afterwards in the processing pipeline\&.
+Terminate ruleset evaluation and accept the packet\&. The packet can still be dropped later by another hook, for instance accept in the forward hook still allows one to drop the packet later in the postrouting hook, or another forward base chain that has a higher priority number and is evaluated afterwards in the processing pipeline\&.
 T}
 T{
 .sp
@@ -8020,7 +8038,7 @@ ct event set new,related,destroy
 .sp
 .SS "NOTRACK STATEMENT"
 .sp
-The notrack statement allows to disable connection tracking for certain packets\&.
+The notrack statement allows one to disable connection tracking for certain packets\&.
 .sp
 .if n \{\
 .RS 4
@@ -8129,7 +8147,9 @@ T}
 .RE
 .\}
 .sp
-A limit statement matches at a limited rate using a token bucket filter\&. A rule using this statement will match until this limit is reached\&. It can be used in combination with the log statement to give limited logging\&. The optional \fBover\fR keyword makes it match over the specified rate\&. Default \fBburst\fR is 5\&. if you specify \fBburst\fR, it must be non\-zero value\&.
+A limit statement matches at a limited rate using a token bucket filter\&. A rule using this statement will match until this limit is reached\&. It can be used in combination with the log statement to give limited logging\&. The optional \fBover\fR keyword makes it match over the specified rate\&.
+.sp
+The \fBburst\fR value influences the bucket size, i\&.e\&. jitter tolerance\&. With packet\-based \fBlimit\fR, the bucket holds exactly \fBburst\fR packets, by default five\&. If you specify packet \fBburst\fR, it must be a non\-zero value\&. With byte\-based \fBlimit\fR, the bucket\(cqs minimum size is the given rate\(cqs byte value and the \fBburst\fR value adds to that, by default zero bytes\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -8573,7 +8593,7 @@ This statement passes the packet to userspace using the nfnetlink_queue handler\
 .RE
 .\}
 .sp
-QUEUE_EXPRESSION can be used to compute a queue number at run\-time with the hash or numgen expressions\&. It also allows to use the map statement to assign fixed queue numbers based on external inputs such as the source ip address or interface names\&.
+QUEUE_EXPRESSION can be used to compute a queue number at run\-time with the hash or numgen expressions\&. It also allows one to use the map statement to assign fixed queue numbers based on external inputs such as the source ip address or interface names\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -8739,10 +8759,40 @@ dup to ip daddr map { 192\&.168\&.7\&.1 : "eth0", 192\&.168\&.7\&.2 : "eth1" }
 .sp
 The fwd statement is used to redirect a raw packet to another interface\&. It is only available in the netdev family ingress and egress hooks\&. It is similar to the dup statement except that no copy is made\&.
 .sp
+You can also specify the address of the next hop and the device to forward the packet to\&. This updates the source and destination MAC address of the packet by transmitting it through the neighboring layer\&. This also decrements the ttl field of the IP packet\&. This provides a way to effectively bypass the classical forwarding path, thus skipping the fib (forwarding information base) lookup\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBfwd to\fR \fIdevice\fR
+\fBfwd\fR [\fBip\fR | \fBip6\fR] \fBto\fR \fIaddress\fR \fBdevice\fR \fIdevice\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBUsing the fwd statement\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# redirect raw packet to device
+netdev ingress fwd to "eth0"
+
+# forward packet to next hop 192\&.168\&.200\&.1 via eth0 device
+netdev ingress ether saddr set fwd ip to 192\&.168\&.200\&.1 device "eth0"
+.fi
+.if n \{\
+.RE
+.\}
+.sp
 .SS "SET STATEMENT"
 .sp
 The set statement is used to dynamically add or update elements in a set from the packet path\&. The set setname must already exist in the given table and must have been created with one or both of the dynamic and the timeout flags\&. The dynamic flag is required if the set statement expression includes a stateful object\&. The timeout flag is implied if the set is created with a timeout, and is required if the set statement updates elements, rather than adding them\&. Furthermore, these sets should specify both a maximum set size (to prevent memory exhaustion), and their elements should have a timeout (so their number will not grow indefinitely) either from the set definition or from the statement that adds or updates them\&. The set statement can be used to e\&.g\&. create dynamic blacklists\&.
+.sp
+Dynamic updates are also supported with maps\&. In this case, the \fBadd\fR or \fBupdate\fR rule needs to provide both the key and the data element (value), separated via \fI:\fR\&.
 .sp
 .if n \{\
 .RS 4
@@ -8865,6 +8915,25 @@ nft add rule ip filter input ip protocol vmap { tcp : jump tcp\-chain, udp : jum
 .RE
 .\}
 .sp
+.SS "XT STATEMENT"
+.sp
+This represents an xt statement from xtables compat interface\&. It is a fallback if translation is not available or not complete\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBxt\fR \fITYPE\fR \fINAME\fR
+
+\fITYPE\fR := \fBmatch\fR | \fBtarget\fR | \fBwatcher\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Seeing this means the ruleset (or parts of it) were created by \fBiptables\-nft\fR and one should use that to manage it\&.
+.sp
+\fBBEWARE:\fR nftables won\(cqt restore these statements\&.
 .SH "ADDITIONAL COMMANDS"
 .sp
 These are some additional commands included in nft\&.

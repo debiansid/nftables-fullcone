@@ -848,7 +848,8 @@ static bool payload_may_dependency_kill(struct payload_dep_ctx *ctx,
 void payload_dependency_kill(struct payload_dep_ctx *ctx, struct expr *expr,
 			     unsigned int family)
 {
-	if (payload_dependency_exists(ctx, expr->payload.base) &&
+	if (expr->payload.desc != &proto_unknown &&
+	    payload_dependency_exists(ctx, expr->payload.base) &&
 	    payload_may_dependency_kill(ctx, family, expr))
 		payload_dependency_release(ctx, expr->payload.base);
 }
@@ -1058,8 +1059,9 @@ void payload_expr_expand(struct list_head *list, struct expr *expr,
 	assert(expr->etype == EXPR_PAYLOAD);
 
 	desc = ctx->protocol[expr->payload.base].desc;
-	if (desc == NULL)
+	if (desc == NULL || desc == &proto_unknown)
 		goto raw;
+
 	assert(desc->base == expr->payload.base);
 
 	desc = get_stacked_desc(ctx, desc, expr, &total);

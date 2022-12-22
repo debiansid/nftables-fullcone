@@ -1,10 +1,10 @@
-AC_INIT([nftables], [1.0.5], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Lester Gooch #4"], [Release name])
+AC_INIT([nftables], [1.0.6], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Lester Gooch #5"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects
-        tar-pax no-dist-gzip dist-bzip2 1.6])
+        tar-pax no-dist-gzip dist-xz 1.6])
 
 dnl kernel style compile messages
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -55,7 +55,7 @@ AS_IF([test "x$enable_man_doc" = "xyes"], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.4])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.3])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.4])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],

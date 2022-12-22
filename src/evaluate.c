@@ -148,8 +148,29 @@ static int byteorder_conversion(struct eval_ctx *ctx, struct expr **expr,
 		return 0;
 
 	/* Conversion for EXPR_CONCAT is handled for single composing ranges */
-	if ((*expr)->etype == EXPR_CONCAT)
+	if ((*expr)->etype == EXPR_CONCAT) {
+		struct expr *i, *next, *unary;
+
+		list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
+			if (i->byteorder == BYTEORDER_BIG_ENDIAN)
+				continue;
+
+			basetype = expr_basetype(i)->type;
+			if (basetype == TYPE_STRING)
+				continue;
+
+			assert(basetype == TYPE_INTEGER);
+
+			op = byteorder_conversion_op(i, byteorder);
+			unary = unary_expr_alloc(&i->location, op, i);
+			if (expr_evaluate(ctx, &unary) < 0)
+				return -1;
+
+			list_replace(&i->list, &unary->list);
+		}
+
 		return 0;
+	}
 
 	basetype = expr_basetype(*expr)->type;
 	switch (basetype) {
@@ -665,6 +686,7 @@ static int resolve_protocol_conflict(struct eval_ctx *ctx,
 			if (err < 0)
 				return err;
 
+			desc = payload->payload.desc;
 			rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
 		} else {
 			unsigned int i;
@@ -722,7 +744,25 @@ static int __expr_evaluate_payload(struct eval_ctx *ctx, struct expr *expr)
 
 		rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
 		desc = ctx->pctx.protocol[base].desc;
-		goto check_icmp;
+
+		if (desc == expr->payload.desc)
+			goto check_icmp;
+
+		if (base == PROTO_BASE_LL_HDR) {
+			int link;
+
+			link = proto_find_num(desc, payload->payload.desc);
+			if (link < 0 ||
+			    conflict_resolution_gen_dependency(ctx, link, payload, &nstmt) < 0)
+				return expr_error(ctx->msgs, payload,
+						  "conflicting protocols specified: %s vs. %s",
+						  desc->name,
+						  payload->payload.desc->name);
+
+			payload->payload.offset += ctx->pctx.stacked_ll[0]->length;
+			rule_stmt_insert_at(ctx->rule, nstmt, ctx->stmt);
+			return 1;
+		}
 	}
 
 	if (payload->payload.base == desc->base &&
@@ -1170,7 +1210,6 @@ static int expr_evaluate_shift(struct eval_ctx *ctx, struct expr **expr)
 	if (byteorder_conversion(ctx, &op->right, BYTEORDER_HOST_ENDIAN) < 0)
 		return -1;
 
-	op->dtype     = &integer_type;
 	op->byteorder = BYTEORDER_HOST_ENDIAN;
 	op->len       = left->len;
 
@@ -1246,7 +1285,7 @@ static int expr_evaluate_binop(struct eval_ctx *ctx, struct expr **expr)
 					 sym, expr_name(right));
 
 	/* The grammar guarantees this */
-	assert(expr_basetype(left) == expr_basetype(right));
+	assert(datatype_equal(expr_basetype(left), expr_basetype(right)));
 
 	switch (op->op) {
 	case OP_LSHIFT:
@@ -1279,19 +1318,27 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 	uint32_t type = dtype ? dtype->type : 0, ntype = 0;
 	int off = dtype ? dtype->subtypes : 0;
 	unsigned int flags = EXPR_F_CONSTANT | EXPR_F_SINGLETON;
+	const struct list_head *expressions = NULL;
 	struct expr *i, *next, *key = NULL;
 	const struct expr *key_ctx = NULL;
+	bool runaway = false;
 	uint32_t size = 0;
 
 	if (ctx->ectx.key && ctx->ectx.key->etype == EXPR_CONCAT) {
 		key_ctx = ctx->ectx.key;
 		assert(!list_empty(&ctx->ectx.key->expressions));
 		key = list_first_entry(&ctx->ectx.key->expressions, struct expr, list);
+		expressions = &ctx->ectx.key->expressions;
 	}
 
 	list_for_each_entry_safe(i, next, &(*expr)->expressions, list) {
 		enum byteorder bo = BYTEORDER_INVALID;
 		unsigned dsize_bytes, dsize = 0;
+
+		if (runaway) {
+			return expr_binary_error(ctx->msgs, *expr, key_ctx,
+						 "too many concatenation components");
+		}
 
 		if (i->etype == EXPR_CT &&
 		    (i->ct.key == NFT_CT_SRC ||
@@ -1348,8 +1395,12 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 		dsize_bytes = div_round_up(dsize, BITS_PER_BYTE);
 		(*expr)->field_len[(*expr)->field_count++] = dsize_bytes;
 		size += netlink_padded_len(dsize);
-		if (key)
+		if (key && expressions) {
+			if (list_is_last(&key->list, expressions))
+				runaway = true;
+
 			key = list_next_entry(key, list);
+		}
 	}
 
 	(*expr)->flags |= flags;
@@ -1520,6 +1571,7 @@ static int interval_set_eval(struct eval_ctx *ctx, struct set *set,
 	switch (ctx->cmd->op) {
 	case CMD_CREATE:
 	case CMD_ADD:
+	case CMD_INSERT:
 		if (set->automerge) {
 			ret = set_automerge(ctx->msgs, ctx->cmd, set, init,
 					    ctx->nft->debug_mask);
@@ -2575,7 +2627,8 @@ static int stmt_evaluate_verdict(struct eval_ctx *ctx, struct stmt *stmt)
 		if (stmt->expr->verdict != NFT_CONTINUE)
 			stmt->flags |= STMT_F_TERMINAL;
 		if (stmt->expr->chain != NULL) {
-			if (expr_evaluate(ctx, &stmt->expr->chain) < 0)
+			if (stmt_evaluate_arg(ctx, stmt, &string_type, 0, 0,
+					      &stmt->expr->chain) < 0)
 				return -1;
 			if (stmt->expr->chain->etype != EXPR_VALUE) {
 				return expr_error(ctx->msgs, stmt->expr->chain,
@@ -3723,7 +3776,7 @@ static int stmt_evaluate_log_prefix(struct eval_ctx *ctx, struct stmt *stmt)
 				       expr->sym->expr->identifier);
 			break;
 		default:
-			BUG("unknown expresion type %s\n", expr_name(expr));
+			BUG("unknown expression type %s\n", expr_name(expr));
 			break;
 		}
 		SNPRINTF_BUFFER_SIZE(ret, size, len, offset);
@@ -3845,6 +3898,9 @@ static int stmt_evaluate_map(struct eval_ctx *ctx, struct stmt *stmt)
 	if (stmt->map.data->comment != NULL)
 		return expr_error(ctx->msgs, stmt->map.data,
 				  "Data expression comments are not supported");
+	if (stmt->map.data->timeout > 0)
+		return expr_error(ctx->msgs, stmt->map.data,
+				  "Data expression timeouts are not supported");
 
 	list_for_each_entry(this, &stmt->map.stmt_list, list) {
 		if (stmt_evaluate(ctx, this) < 0)
@@ -4333,7 +4389,7 @@ static bool evaluate_device_expr(struct eval_ctx *ctx, struct expr **dev_expr)
 		case EXPR_VALUE:
 			break;
 		default:
-			BUG("invalid expresion type %s\n", expr_name(expr));
+			BUG("invalid expression type %s\n", expr_name(expr));
 			break;
 		}
 

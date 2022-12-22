@@ -11,7 +11,7 @@ The verdict statement alters control flow in the ruleset and issues policy decis
 [horizontal]
 *accept*:: Terminate ruleset evaluation and accept the packet.
 The packet can still be dropped later by another hook, for instance accept
-in the forward hook still allows to drop the packet later in the postrouting hook,
+in the forward hook still allows one to drop the packet later in the postrouting hook,
 or another forward base chain that has a higher priority number and is evaluated
 afterwards in the processing pipeline.
 *drop*:: Terminate ruleset evaluation and drop the packet.
@@ -278,7 +278,7 @@ ct event set new,related,destroy
 
 NOTRACK STATEMENT
 ~~~~~~~~~~~~~~~~~
-The notrack statement allows to disable connection tracking for certain
+The notrack statement allows one to disable connection tracking for certain
 packets.
 
 [verse]
@@ -332,8 +332,13 @@ ____
 A limit statement matches at a limited rate using a token bucket filter. A rule
 using this statement will match until this limit is reached. It can be used in
 combination with the log statement to give limited logging. The optional
-*over* keyword makes it match over the specified rate. Default *burst* is 5.
-if you specify *burst*, it must be non-zero value.
+*over* keyword makes it match over the specified rate.
+
+The *burst* value influences the bucket size, i.e. jitter tolerance. With
+packet-based *limit*, the bucket holds exactly *burst* packets, by default
+five. If you specify packet *burst*, it must be a non-zero value. With
+byte-based *limit*, the bucket's minimum size is the given rate's byte value
+and the *burst* value adds to that, by default zero bytes.
 
 .limit statement values
 [options="header"]
@@ -608,7 +613,7 @@ ____
 
 QUEUE_EXPRESSION can be used to compute a queue number
 at run-time with the hash or numgen expressions. It also
-allows to use the map statement to assign fixed queue numbers
+allows one to use the map statement to assign fixed queue numbers
 based on external inputs such as the source ip address or interface names.
 
 .queue statement values
@@ -678,7 +683,24 @@ The fwd statement is used to redirect a raw packet to another interface. It is
 only available in the netdev family ingress and egress hooks. It is similar to
 the dup statement except that no copy is made.
 
+You can also specify the address of the next hop and the device to forward the
+packet to. This updates the source and destination MAC address of the packet by
+transmitting it through the neighboring layer. This also decrements the ttl
+field of the IP packet. This provides a way to effectively bypass the classical
+forwarding path, thus skipping the fib (forwarding information base) lookup.
+
+[verse]
 *fwd to* 'device'
+*fwd* [*ip* | *ip6*] *to* 'address' *device* 'device'
+
+.Using the fwd statement
+------------------------
+# redirect raw packet to device
+netdev ingress fwd to "eth0"
+
+# forward packet to next hop 192.168.200.1 via eth0 device
+netdev ingress ether saddr set fwd ip to 192.168.200.1 device "eth0"
+-----------------------------------
 
 SET STATEMENT
 ~~~~~~~~~~~~~
@@ -693,6 +715,10 @@ memory exhaustion), and their elements should have a timeout (so their number
 will not grow indefinitely) either from the set definition or from the statement
 that adds or updates them. The set statement can be used to e.g. create dynamic
 blacklists.
+
+Dynamic updates are also supported with maps. In this case, the *add* or
+*update* rule needs to provide both the key and the data element (value),
+separated via ':'.
 
 [verse]
 {*add* | *update*} *@*'setname' *{* 'expression' [*timeout* 'timeout'] [*comment* 'string'] *}*
@@ -778,3 +804,20 @@ ____
 # jump to different chains depending on layer 4 protocol type:
 nft add rule ip filter input ip protocol vmap { tcp : jump tcp-chain, udp : jump udp-chain , icmp : jump icmp-chain }
 ------------------------
+
+XT STATEMENT
+~~~~~~~~~~~~
+This represents an xt statement from xtables compat interface. It is a
+fallback if translation is not available or not complete.
+
+[verse]
+____
+*xt* 'TYPE' 'NAME'
+
+'TYPE' := *match* | *target* | *watcher*
+____
+
+Seeing this means the ruleset (or parts of it) were created by *iptables-nft*
+and one should use that to manage it.
+
+*BEWARE:* nftables won't restore these statements.

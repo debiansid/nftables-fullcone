@@ -1,3 +1,13 @@
+nftables (1.0.6-1) unstable; urgency=medium
+
+  * [41c144c] d/gbp.conf: make pristine-tar config the default
+  * [69ab9ff] d/watch: refresh tarball extension, use tar.xz
+  * [d6a12b6] New upstream version 1.0.6 (Closes: #932877)
+  * [5bff90c] src:nftables: bump build-dep version libnftnl to 1.2.4
+  * [19569e2] d/patches: drop all patches
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 22 Dec 2022 12:14:49 +0100
+
 nftables (1.0.5-2) unstable; urgency=medium
 
   [ Jeremy Sowden ]

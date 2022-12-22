@@ -24,39 +24,39 @@ ip test-ip4 output
 
 # limit rate 1 kbytes/second
 ip test-ip4 output
-  [ limit rate 1024/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1024/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 2 kbytes/second
 ip test-ip4 output
-  [ limit rate 2048/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 2048/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1025 kbytes/second
 ip test-ip4 output
-  [ limit rate 1049600/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1049600/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1023 mbytes/second
 ip test-ip4 output
-  [ limit rate 1072693248/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1072693248/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 10230 mbytes/second
 ip test-ip4 output
-  [ limit rate 10726932480/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 10726932480/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1023000 mbytes/second
 ip test-ip4 output
-  [ limit rate 1072693248000/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1072693248000/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1 bytes / second
 ip
-  [ limit rate 1/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1 kbytes / second
 ip
-  [ limit rate 1024/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1024/second burst 0 type bytes flags 0x0 ]
 
 # limit rate 1 mbytes / second
 ip
-  [ limit rate 1048576/second burst 5 type bytes flags 0x0 ]
+  [ limit rate 1048576/second burst 0 type bytes flags 0x0 ]
 
 
 # limit rate 1025 bytes/second burst 512 bytes
@@ -101,27 +101,27 @@ ip test-ip4 output
 
 # limit rate over 1 kbytes/second
 ip test-ip4 output
-  [ limit rate 1024/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 1024/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 2 kbytes/second
 ip test-ip4 output
-  [ limit rate 2048/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 2048/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 1025 kbytes/second
 ip test-ip4 output
-  [ limit rate 1049600/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 1049600/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 1023 mbytes/second
 ip test-ip4 output
-  [ limit rate 1072693248/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 1072693248/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 10230 mbytes/second
 ip test-ip4 output
-  [ limit rate 10726932480/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 10726932480/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 1023000 mbytes/second
 ip test-ip4 output
-  [ limit rate 1072693248000/second burst 5 type bytes flags 0x1 ]
+  [ limit rate 1072693248000/second burst 0 type bytes flags 0x1 ]
 
 # limit rate over 1025 bytes/second burst 512 bytes
 ip test-ip4 output

@@ -170,6 +170,8 @@ void erec_print(struct output_ctx *octx, const struct error_record *erec,
 		fprintf(f, "%s\n", erec->msg);
 		for (l = 0; l < (int)erec->num_locations; l++) {
 			loc = &erec->locations[l];
+			if (!loc->nle)
+				continue;
 			netlink_dump_expr(loc->nle, f, debug_mask);
 		}
 		return;

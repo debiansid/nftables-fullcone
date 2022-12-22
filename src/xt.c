@@ -28,85 +28,106 @@
 
 #ifdef HAVE_LIBXTABLES
 #include <xtables.h>
+
+static void *xt_entry_alloc(const struct xt_stmt *xt, uint32_t af);
 #endif
 
 void xt_stmt_xlate(const struct stmt *stmt, struct output_ctx *octx)
 {
+	static const char *typename[NFT_XT_MAX] = {
+		[NFT_XT_MATCH]		= "match",
+		[NFT_XT_TARGET]		= "target",
+		[NFT_XT_WATCHER]	= "watcher",
+	};
+	int rc = 0;
 #ifdef HAVE_LIBXTABLES
 	struct xt_xlate *xl = xt_xlate_alloc(10240);
+	struct xtables_target *tg;
+	struct xt_entry_target *t;
+	struct xtables_match *mt;
+	struct xt_entry_match *m;
+	size_t size;
+	void *entry;
+
+	xtables_set_nfproto(stmt->xt.family);
+	entry = xt_entry_alloc(&stmt->xt, stmt->xt.family);
 
 	switch (stmt->xt.type) {
 	case NFT_XT_MATCH:
-		if (stmt->xt.match->xlate) {
+		mt = xtables_find_match(stmt->xt.name, XTF_TRY_LOAD, NULL);
+		if (!mt) {
+			fprintf(stderr, "XT match %s not found\n",
+				stmt->xt.name);
+			return;
+		}
+		size = XT_ALIGN(sizeof(*m)) + stmt->xt.infolen;
+
+		m = xzalloc(size);
+		memcpy(&m->data, stmt->xt.info, stmt->xt.infolen);
+
+		m->u.match_size = size;
+		m->u.user.revision = stmt->xt.rev;
+
+		if (mt->xlate) {
 			struct xt_xlate_mt_params params = {
-				.ip		= stmt->xt.entry,
-				.match		= stmt->xt.match->m,
-				.numeric        = 0,
+				.ip		= entry,
+				.match		= m,
+				.numeric        = 1,
 			};
 
-			stmt->xt.match->xlate(xl, &params);
-			nft_print(octx, "%s", xt_xlate_get(xl));
-		} else if (stmt->xt.match->print) {
-			printf("#");
-			stmt->xt.match->print(&stmt->xt.entry,
-					      stmt->xt.match->m, 0);
+			rc = mt->xlate(xl, &params);
 		}
+		xfree(m);
 		break;
 	case NFT_XT_WATCHER:
 	case NFT_XT_TARGET:
-		if (stmt->xt.target->xlate) {
+		tg = xtables_find_target(stmt->xt.name, XTF_TRY_LOAD);
+		if (!tg) {
+			fprintf(stderr, "XT target %s not found\n",
+				stmt->xt.name);
+			return;
+		}
+		size = XT_ALIGN(sizeof(*t)) + stmt->xt.infolen;
+
+		t = xzalloc(size);
+		memcpy(&t->data, stmt->xt.info, stmt->xt.infolen);
+
+		t->u.target_size = size;
+		t->u.user.revision = stmt->xt.rev;
+
+		strcpy(t->u.user.name, tg->name);
+
+		if (tg->xlate) {
 			struct xt_xlate_tg_params params = {
-				.ip		= stmt->xt.entry,
-				.target		= stmt->xt.target->t,
-				.numeric        = 0,
+				.ip		= entry,
+				.target		= t,
+				.numeric        = 1,
 			};
 
-			stmt->xt.target->xlate(xl, &params);
-			nft_print(octx, "%s", xt_xlate_get(xl));
-		} else if (stmt->xt.target->print) {
-			printf("#");
-			stmt->xt.target->print(NULL, stmt->xt.target->t, 0);
+			rc = tg->xlate(xl, &params);
 		}
-		break;
-	default:
+		xfree(t);
 		break;
 	}
 
+	if (rc == 1)
+		nft_print(octx, "%s", xt_xlate_get(xl));
 	xt_xlate_free(xl);
-#else
-	nft_print(octx, "# xt_%s", stmt->xt.name);
+	xfree(entry);
 #endif
+	if (!rc)
+		nft_print(octx, "xt %s %s",
+			  typename[stmt->xt.type], stmt->xt.name);
 }
 
 void xt_stmt_destroy(struct stmt *stmt)
 {
-#ifdef HAVE_LIBXTABLES
-	switch (stmt->xt.type) {
-	case NFT_XT_MATCH:
-		if (!stmt->xt.match)
-			break;
-		if (stmt->xt.match->m)
-			xfree(stmt->xt.match->m);
-		xfree(stmt->xt.match);
-		break;
-	case NFT_XT_WATCHER:
-	case NFT_XT_TARGET:
-		if (!stmt->xt.target)
-			break;
-		if (stmt->xt.target->t)
-			xfree(stmt->xt.target->t);
-		xfree(stmt->xt.target);
-		break;
-	default:
-		break;
-	}
-#endif
-	xfree(stmt->xt.entry);
 	xfree(stmt->xt.name);
+	xfree(stmt->xt.info);
 }
 
 #ifdef HAVE_LIBXTABLES
-static void *xt_entry_alloc(struct xt_stmt *xt, uint32_t af)
+static void *xt_entry_alloc(const struct xt_stmt *xt, uint32_t af)
 {
 	union nft_entry {
 		struct ipt_entry ipt;
@@ -173,24 +194,6 @@ static uint32_t xt_proto(const struct proto_ctx *pctx)
 
 	return 0;
 }
-
-static struct xtables_target *xt_target_clone(struct xtables_target *t)
-{
-	struct xtables_target *clone;
-
-	clone = xzalloc(sizeof(struct xtables_target));
-	memcpy(clone, t, sizeof(struct xtables_target));
-	return clone;
-}
-
-static struct xtables_match *xt_match_clone(struct xtables_match *m)
-{
-	struct xtables_match *clone;
-
-	clone = xzalloc(sizeof(struct xtables_match));
-	memcpy(clone, m, sizeof(struct xtables_match));
-	return clone;
-}
 #endif
 
 /*
@@ -201,43 +204,23 @@ void netlink_parse_match(struct netlink_parse_ctx *ctx,
 			 const struct location *loc,
 			 const struct nftnl_expr *nle)
 {
-	struct stmt *stmt;
-	const char *name;
-#ifdef HAVE_LIBXTABLES
-	struct xtables_match *mt;
 	const char *mtinfo;
-	struct xt_entry_match *m;
+	struct stmt *stmt;
 	uint32_t mt_len;
 
-	xtables_set_nfproto(ctx->table->handle.family);
-
-	name = nftnl_expr_get_str(nle, NFTNL_EXPR_MT_NAME);
-
-	mt = xtables_find_match(name, XTF_TRY_LOAD, NULL);
-	if (!mt) {
-		fprintf(stderr, "XT match %s not found\n", name);
-		return;
-	}
 	mtinfo = nftnl_expr_get(nle, NFTNL_EXPR_MT_INFO, &mt_len);
 
-	m = xzalloc(sizeof(struct xt_entry_match) + mt_len);
-	memcpy(&m->data, mtinfo, mt_len);
-
-	m->u.match_size = mt_len + XT_ALIGN(sizeof(struct xt_entry_match));
-	m->u.user.revision = nftnl_expr_get_u32(nle, NFTNL_EXPR_MT_REV);
-
 	stmt = xt_stmt_alloc(loc);
-	stmt->xt.name = strdup(name);
+	stmt->xt.name = strdup(nftnl_expr_get_str(nle, NFTNL_EXPR_MT_NAME));
 	stmt->xt.type = NFT_XT_MATCH;
-	stmt->xt.match = xt_match_clone(mt);
-	stmt->xt.match->m = m;
-#else
-	name = nftnl_expr_get_str(nle, NFTNL_EXPR_MT_NAME);
+	stmt->xt.rev = nftnl_expr_get_u32(nle, NFTNL_EXPR_MT_REV);
+	stmt->xt.family = ctx->table->handle.family;
 
-	stmt = xt_stmt_alloc(loc);
-	stmt->xt.name = strdup(name);
-	stmt->xt.type = NFT_XT_MATCH;
-#endif
+	stmt->xt.infolen = mt_len;
+	stmt->xt.info = xmalloc(mt_len);
+	memcpy(stmt->xt.info, mtinfo, mt_len);
+
+	ctx->table->has_xt_stmts = true;
 	rule_stmt_append(ctx->rule, stmt);
 }
 
@@ -245,44 +228,23 @@ void netlink_parse_target(struct netlink_parse_ctx *ctx,
 			  const struct location *loc,
 			  const struct nftnl_expr *nle)
 {
-	struct stmt *stmt;
-	const char *name;
-#ifdef HAVE_LIBXTABLES
-	struct xtables_target *tg;
 	const void *tginfo;
-	struct xt_entry_target *t;
-	size_t size;
+	struct stmt *stmt;
 	uint32_t tg_len;
 
-	xtables_set_nfproto(ctx->table->handle.family);
-
-	name = nftnl_expr_get_str(nle, NFTNL_EXPR_TG_NAME);
-	tg = xtables_find_target(name, XTF_TRY_LOAD);
-	if (!tg) {
-		fprintf(stderr, "XT target %s not found\n", name);
-		return;
-	}
 	tginfo = nftnl_expr_get(nle, NFTNL_EXPR_TG_INFO, &tg_len);
 
-	size = XT_ALIGN(sizeof(struct xt_entry_target)) + tg_len;
-	t = xzalloc(size);
-	memcpy(&t->data, tginfo, tg_len);
-	t->u.target_size = size;
-	t->u.user.revision = nftnl_expr_get_u32(nle, NFTNL_EXPR_TG_REV);
-	strcpy(t->u.user.name, tg->name);
-
 	stmt = xt_stmt_alloc(loc);
-	stmt->xt.name = strdup(name);
+	stmt->xt.name = strdup(nftnl_expr_get_str(nle, NFTNL_EXPR_TG_NAME));
 	stmt->xt.type = NFT_XT_TARGET;
-	stmt->xt.target = xt_target_clone(tg);
-	stmt->xt.target->t = t;
-#else
-	name = nftnl_expr_get_str(nle, NFTNL_EXPR_TG_NAME);
+	stmt->xt.rev = nftnl_expr_get_u32(nle, NFTNL_EXPR_TG_REV);
+	stmt->xt.family = ctx->table->handle.family;
 
-	stmt = xt_stmt_alloc(loc);
-	stmt->xt.name = strdup(name);
-	stmt->xt.type = NFT_XT_TARGET;
-#endif
+	stmt->xt.infolen = tg_len;
+	stmt->xt.info = xmalloc(tg_len);
+	memcpy(stmt->xt.info, tginfo, tg_len);
+
+	ctx->table->has_xt_stmts = true;
 	rule_stmt_append(ctx->rule, stmt);
 }
 
@@ -309,7 +271,6 @@ void stmt_xt_postprocess(struct rule_pp_ctx *rctx, struct stmt *stmt,
 		stmt->xt.type = NFT_XT_WATCHER;
 
 	stmt->xt.proto = xt_proto(&rctx->pctx);
-	stmt->xt.entry = xt_entry_alloc(&stmt->xt, rctx->pctx.family);
 }
 
 static int nft_xt_compatible_revision(const char *name, uint8_t rev, int opt)

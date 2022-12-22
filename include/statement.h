@@ -255,8 +255,8 @@ enum nft_xt_type {
 	NFT_XT_MATCH = 0,
 	NFT_XT_TARGET,
 	NFT_XT_WATCHER,
-	NFT_XT_MAX
 };
+#define NFT_XT_MAX	(NFT_XT_WATCHER + 1)
 
 struct xtables_match;
 struct xtables_target;
@@ -264,12 +264,11 @@ struct xtables_target;
 struct xt_stmt {
 	const char			*name;
 	enum nft_xt_type		type;
+	uint32_t			rev;
+	uint32_t			family;
+	size_t				infolen;
+	void				*info;
 	uint32_t			proto;
-	union {
-		struct xtables_match	*match;
-		struct xtables_target	*target;
-	};
-	void				*entry;
 };
 
 extern struct stmt *xt_stmt_alloc(const struct location *loc);

@@ -1059,10 +1059,22 @@ Assign connection tracking expectation.
 
 === XT
 [verse]
-*{ "xt": null }*
+____
+*{ "xt": {
+	"type":* 'TYPENAME'*,
+	"name":* 'STRING'
+*}}*
 
-This represents an xt statement from xtables compat interface. Sadly, at this
-point, it is not possible to provide any further information about its content.
+'TYPENAME' := *match* | *target* | *watcher*
+____
+
+This represents an xt statement from xtables compat interface. It is a
+fallback if translation is not available or not complete.
+
+Seeing this means the ruleset (or parts of it) were created by *iptables-nft*
+and one should use that to manage it.
+
+*BEWARE:* nftables won't restore these statements.
 
 == EXPRESSIONS
 Expressions are the building blocks of (most) statements. In their most basic
@@ -1172,7 +1184,7 @@ point (*base*). The following *base* values are accepted:
 *"th"*::
 	The offset is relative to Transport Layer header start offset.
 
-The second form allows to reference a field by name (*field*) in a named packet
+The second form allows one to reference a field by name (*field*) in a named packet
 header (*protocol*).
 
 === EXTHDR

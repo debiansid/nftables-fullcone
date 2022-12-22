@@ -428,6 +428,7 @@ static int netlink_events_setelem_cb(const struct nlmsghdr *nlh, int type,
 	 * used by named sets, so use a dummy set.
 	 */
 	dummyset = set_alloc(monh->loc);
+	handle_merge(&dummyset->handle, &set->handle);
 	dummyset->key = expr_clone(set->key);
 	if (set->data)
 		dummyset->data = expr_clone(set->data);
@@ -551,6 +552,10 @@ static int netlink_events_rule_cb(const struct nlmsghdr *nlh, int type,
 
 	nlr = netlink_rule_alloc(nlh);
 	r = netlink_delinearize_rule(monh->ctx, nlr);
+	if (!r) {
+		fprintf(stderr, "W: Received event for an unknown table.\n");
+		goto out_free_nlr;
+	}
 	nlr_for_each_set(nlr, rule_map_decompose_cb, NULL,
 			 &monh->ctx->nft->cache);
 	cmd = netlink_msg2cmd(type, nlh->nlmsg_flags);
@@ -587,6 +592,7 @@ static int netlink_events_rule_cb(const struct nlmsghdr *nlh, int type,
 		break;
 	}
 	rule_free(r);
+out_free_nlr:
 	nftnl_rule_free(nlr);
 	return MNL_CB_OK;
 }
@@ -638,6 +644,7 @@ static void netlink_events_cache_addset(struct netlink_mon_handler *monh,
 	memset(&set_tmpctx, 0, sizeof(set_tmpctx));
 	init_list_head(&set_tmpctx.list);
 	init_list_head(&msgs);
+	set_tmpctx.nft = monh->ctx->nft;
 	set_tmpctx.msgs = &msgs;
 
 	nls = netlink_set_alloc(nlh);

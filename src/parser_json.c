@@ -1826,7 +1826,7 @@ static struct stmt *json_parse_limit_stmt(struct json_ctx *ctx,
 					  const char *key, json_t *value)
 {
 	struct stmt *stmt;
-	uint64_t rate, burst = 5;
+	uint64_t rate, burst = 0;
 	const char *rate_unit = "packets", *time, *burst_unit = "bytes";
 	int inv = 0;
 
@@ -1840,6 +1840,9 @@ static struct stmt *json_parse_limit_stmt(struct json_ctx *ctx,
 		stmt = limit_stmt_alloc(int_loc);
 
 		if (!strcmp(rate_unit, "packets")) {
+			if (burst == 0)
+				burst = 5;
+
 			stmt->limit.type = NFT_LIMIT_PKTS;
 			stmt->limit.rate = rate;
 			stmt->limit.burst = burst;
@@ -1960,6 +1963,23 @@ static struct stmt *json_parse_dup_stmt(struct json_ctx *ctx,
 		return NULL;
 	}
 	stmt->dup.dev = expr;
+	return stmt;
+}
+
+static struct stmt *json_parse_secmark_stmt(struct json_ctx *ctx,
+					     const char *key, json_t *value)
+{
+	struct stmt *stmt;
+
+	stmt = objref_stmt_alloc(int_loc);
+	stmt->objref.type = NFT_OBJECT_SECMARK;
+	stmt->objref.expr = json_parse_stmt_expr(ctx, value);
+	if (!stmt->objref.expr) {
+		json_error(ctx, "Invalid secmark reference.");
+		stmt_free(stmt);
+		return NULL;
+	}
+
 	return stmt;
 }
 
@@ -2227,13 +2247,36 @@ static struct stmt *json_parse_reject_stmt(struct json_ctx *ctx,
 	return stmt;
 }
 
+static void json_parse_set_stmt_list(struct json_ctx *ctx,
+				      struct list_head *stmt_list,
+				      json_t *stmt_json)
+{
+	struct list_head *head;
+	struct stmt *tmp;
+	json_t *value;
+	size_t index;
+
+	if (!stmt_json)
+		return;
+
+	if (!json_is_array(stmt_json))
+		json_error(ctx, "Unexpected object type in stmt");
+
+	head = stmt_list;
+	json_array_foreach(stmt_json, index, value) {
+		tmp = json_parse_stmt(ctx, value);
+		list_add(&tmp->list, head);
+		head = &tmp->list;
+	}
+}
+
 static struct stmt *json_parse_set_stmt(struct json_ctx *ctx,
 					  const char *key, json_t *value)
 {
 	const char *opstr, *set;
 	struct expr *expr, *expr2;
+	json_t *elem, *stmt_json;
 	struct stmt *stmt;
-	json_t *elem;
 	int op;
 
 	if (json_unpack_err(ctx, value, "{s:s, s:o, s:s}",
@@ -2268,6 +2311,10 @@ static struct stmt *json_parse_set_stmt(struct json_ctx *ctx,
 	stmt->set.op = op;
 	stmt->set.key = expr;
 	stmt->set.set = expr2;
+
+	if (!json_unpack(value, "{s:o}", "stmt", &stmt_json))
+		json_parse_set_stmt_list(ctx, &stmt->set.stmt_list, stmt_json);
+
 	return stmt;
 }
 
@@ -2697,6 +2744,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "tproxy", json_parse_tproxy_stmt },
 		{ "synproxy", json_parse_synproxy_stmt },
 		{ "reset", json_parse_optstrip_stmt },
+		{ "secmark", json_parse_secmark_stmt },
 	};
 	const char *type;
 	unsigned int i;
@@ -2714,6 +2762,11 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 			return NULL;
 		}
 		return verdict_stmt_alloc(int_loc, expr);
+	}
+
+	if (!strcmp(type, "xt")) {
+		json_error(ctx, "unsupported xtables compat expression, use iptables-nft with this ruleset");
+		return NULL;
 	}
 
 	for (i = 0; i < array_size(stmt_parser_tbl); i++) {
@@ -2972,8 +3025,8 @@ static struct cmd *json_parse_cmd_add_set(struct json_ctx *ctx, json_t *root,
 {
 	struct handle h = { 0 };
 	const char *family = "", *policy, *dtype_ext = NULL;
+	json_t *tmp, *stmt_json;
 	struct set *set;
-	json_t *tmp;
 
 	if (json_unpack_err(ctx, root, "{s:s, s:s}",
 			    "family", &family,
@@ -3083,6 +3136,9 @@ static struct cmd *json_parse_cmd_add_set(struct json_ctx *ctx, json_t *root,
 	if (!json_unpack(root, "{s:i}", "gc-interval", &set->gc_int))
 		set->gc_int *= 1000;
 	json_unpack(root, "{s:i}", "size", &set->desc.size);
+
+	if (!json_unpack(root, "{s:o}", "stmt", &stmt_json))
+		json_parse_set_stmt_list(ctx, &set->stmt_list, stmt_json);
 
 	handle_merge(&set->handle, &h);
 
@@ -3202,7 +3258,7 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 		return NULL;
 	}
 
-	json_unpack(root, "{s:o}", &devs);
+	json_unpack(root, "{s:o}", "dev", &devs);
 
 	hookstr = chain_hookname_lookup(hook);
 	if (!hookstr) {
@@ -3305,6 +3361,9 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 	}
 
 	obj = obj_alloc(int_loc);
+
+	if (!json_unpack(root, "{s:s}", "comment", &obj->comment))
+		obj->comment = xstrdup(obj->comment);
 
 	switch (cmd_obj) {
 	case CMD_OBJ_COUNTER:
@@ -3829,13 +3888,14 @@ static int json_verify_metainfo(struct json_ctx *ctx, json_t *root)
 {
 	int schema_version;
 
-	if (!json_unpack(root, "{s:i}", "json_schema_version", &schema_version))
-			return 0;
-
-	if (schema_version > JSON_SCHEMA_VERSION) {
-		json_error(ctx, "Schema version %d not supported, maximum supported version is %d\n",
-			   schema_version, JSON_SCHEMA_VERSION);
-		return 1;
+	if (!json_unpack(root, "{s:i}", "json_schema_version", &schema_version)) {
+		if (schema_version > JSON_SCHEMA_VERSION) {
+			json_error(ctx,
+				   "Schema version %d not supported, maximum"
+			           " supported version is %d\n",
+				   schema_version, JSON_SCHEMA_VERSION);
+			return 1;
+		}
 	}
 
 	return 0;

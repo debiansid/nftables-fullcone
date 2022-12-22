@@ -22,6 +22,7 @@ struct parser_state {
 
 	struct scope			*scopes[SCOPE_NEST_MAX];
 	unsigned int			scope;
+	bool				scope_err;
 
 	unsigned int			flex_state_pop;
 	unsigned int			startcond_type;
@@ -49,6 +50,7 @@ enum startcond_type {
 	PARSER_SC_TCP,
 	PARSER_SC_TYPE,
 	PARSER_SC_VLAN,
+	PARSER_SC_XT,
 	PARSER_SC_CMD_EXPORT,
 	PARSER_SC_CMD_IMPORT,
 	PARSER_SC_CMD_LIST,

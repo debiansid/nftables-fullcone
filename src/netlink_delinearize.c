@@ -1660,6 +1660,14 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 	if (nftnl_expr_is_set(nle, NFTNL_EXPR_DYNSET_SREG_DATA)) {
 		sreg_data = netlink_parse_register(nle, NFTNL_EXPR_DYNSET_SREG_DATA);
 		expr_data = netlink_get_register(ctx, loc, sreg_data);
+
+		if (expr_data->len < set->data->len) {
+			expr_free(expr_data);
+			expr_data = netlink_parse_concat_expr(ctx, loc, sreg_data, set->data->len);
+			if (expr_data == NULL)
+				netlink_error(ctx, loc,
+					      "Could not parse dynset map data expressions");
+		}
 	}
 
 	if (expr_data != NULL) {
@@ -2228,6 +2236,9 @@ static void binop_adjust(const struct expr *binop, struct expr *right,
 		binop_adjust_one(binop, right, shift);
 		break;
 	case EXPR_SET_REF:
+		if (!set_is_anonymous(right->set->flags))
+			break;
+
 		list_for_each_entry(i, &right->set->init->expressions, list) {
 			switch (i->key->etype) {
 			case EXPR_VALUE:
@@ -2992,14 +3003,15 @@ static void stmt_payload_postprocess(struct rule_pp_ctx *ctx)
 {
 	struct stmt *stmt = ctx->stmt;
 
+	payload_expr_complete(stmt->payload.expr, &ctx->pctx);
+	if (!payload_is_known(stmt->payload.expr))
+		stmt_payload_binop_postprocess(ctx);
+
 	expr_postprocess(ctx, &stmt->payload.expr);
 
 	expr_set_type(stmt->payload.val,
 		      stmt->payload.expr->dtype,
 		      stmt->payload.expr->byteorder);
-
-	if (!payload_is_known(stmt->payload.expr))
-		stmt_payload_binop_postprocess(ctx);
 
 	expr_postprocess(ctx, &stmt->payload.val);
 }
@@ -3195,7 +3207,10 @@ struct rule *netlink_delinearize_rule(struct netlink_ctx *ctx,
 	pctx->rule = rule_alloc(&netlink_location, &h);
 	pctx->table = table_cache_find(&ctx->nft->cache.table_cache,
 				       h.table.name, h.family);
-	assert(pctx->table != NULL);
+	if (!pctx->table) {
+		errno = ENOENT;
+		return NULL;
+	}
 
 	pctx->rule->comment = nftnl_rule_get_comment(nlr);
 

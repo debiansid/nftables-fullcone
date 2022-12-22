@@ -109,8 +109,22 @@ find_tests() {
 echo ""
 ok=0
 failed=0
+taint=0
+
+check_taint()
+{
+	read taint_now < /proc/sys/kernel/tainted
+	if [ $taint -ne $taint_now ] ; then
+		msg_warn "[FAILED]	kernel is tainted: $taint  -> $taint_now"
+		((failed++))
+	fi
+}
+
+check_taint
+
 for testfile in $(find_tests)
 do
+	read taint < /proc/sys/kernel/tainted
 	kernel_cleanup
 
 	msg_info "[EXECUTING]	$testfile"
@@ -155,6 +169,8 @@ do
 			msg_warn "[FAILED]	$testfile"
 		fi
 	fi
+
+	check_taint
 done
 
 echo ""

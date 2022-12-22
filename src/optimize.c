@@ -352,6 +352,10 @@ static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 				clone->ops = &unsupported_stmt_ops;
 				break;
 			}
+			if (stmt->expr->left->etype == EXPR_CONCAT) {
+				clone->ops = &unsupported_stmt_ops;
+				break;
+			}
 		case STMT_VERDICT:
 			clone->expr = expr_get(stmt->expr);
 			break;
@@ -546,12 +550,60 @@ static void merge_stmts(const struct optimize_ctx *ctx,
 	}
 }
 
+static void __merge_concat_stmts(const struct optimize_ctx *ctx, uint32_t i,
+				 const struct merge *merge, struct expr *set)
+{
+	struct expr *concat, *next, *expr, *concat_clone, *clone, *elem;
+	LIST_HEAD(pending_list);
+	LIST_HEAD(concat_list);
+	struct stmt *stmt_a;
+	uint32_t k;
+
+	concat = concat_expr_alloc(&internal_location);
+	list_add(&concat->list, &concat_list);
+
+	for (k = 0; k < merge->num_stmts; k++) {
+		list_for_each_entry_safe(concat, next, &concat_list, list) {
+			stmt_a = ctx->stmt_matrix[i][merge->stmt[k]];
+			switch (stmt_a->expr->right->etype) {
+			case EXPR_SET:
+				list_for_each_entry(expr, &stmt_a->expr->right->expressions, list) {
+					concat_clone = expr_clone(concat);
+					clone = expr_clone(expr->key);
+					compound_expr_add(concat_clone, clone);
+					list_add_tail(&concat_clone->list, &pending_list);
+				}
+				list_del(&concat->list);
+				expr_free(concat);
+				break;
+			case EXPR_SYMBOL:
+			case EXPR_VALUE:
+			case EXPR_PREFIX:
+			case EXPR_RANGE:
+				clone = expr_clone(stmt_a->expr->right);
+				compound_expr_add(concat, clone);
+				break;
+			default:
+				assert(0);
+				break;
+			}
+		}
+		list_splice_init(&pending_list, &concat_list);
+	}
+
+	list_for_each_entry_safe(concat, next, &concat_list, list) {
+		list_del(&concat->list);
+		elem = set_elem_expr_alloc(&internal_location, concat);
+		compound_expr_add(set, elem);
+	}
+}
+
 static void merge_concat_stmts(const struct optimize_ctx *ctx,
 			       uint32_t from, uint32_t to,
 			       const struct merge *merge)
 {
-	struct expr *concat, *elem, *set;
 	struct stmt *stmt, *stmt_a;
+	struct expr *concat, *set;
 	uint32_t i, k;
 
 	stmt = ctx->stmt_matrix[from][merge->stmt[0]];
@@ -569,15 +621,9 @@ static void merge_concat_stmts(const struct optimize_ctx *ctx,
 	set = set_expr_alloc(&internal_location, NULL);
 	set->set_flags |= NFT_SET_ANONYMOUS;
 
-	for (i = from; i <= to; i++) {
-		concat = concat_expr_alloc(&internal_location);
-		for (k = 0; k < merge->num_stmts; k++) {
-			stmt_a = ctx->stmt_matrix[i][merge->stmt[k]];
-			compound_expr_add(concat, expr_get(stmt_a->expr->right));
-		}
-		elem = set_elem_expr_alloc(&internal_location, concat);
-		compound_expr_add(set, elem);
-	}
+	for (i = from; i <= to; i++)
+		__merge_concat_stmts(ctx, i, merge, set);
+
 	expr_free(stmt->expr->right);
 	stmt->expr->right = set;
 
@@ -1007,14 +1053,40 @@ static bool stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b)
 	return __stmt_type_eq(stmt_a, stmt_b, true);
 }
 
+static bool stmt_is_mergeable(const struct stmt *stmt)
+{
+	if (!stmt)
+		return false;
+
+	switch (stmt->ops->type) {
+	case STMT_VERDICT:
+		if (stmt->expr->etype == EXPR_MAP)
+			return true;
+		break;
+	case STMT_EXPRESSION:
+	case STMT_NAT:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
 static bool rules_eq(const struct optimize_ctx *ctx, int i, int j)
 {
-	uint32_t k;
+	uint32_t k, mergeable = 0;
 
 	for (k = 0; k < ctx->num_stmts; k++) {
+		if (stmt_is_mergeable(ctx->stmt_matrix[i][k]))
+			mergeable++;
+
 		if (!stmt_type_eq(ctx->stmt_matrix[i][k], ctx->stmt_matrix[j][k]))
 			return false;
 	}
+
+	if (mergeable == 0)
+		return false;
 
 	return true;
 }

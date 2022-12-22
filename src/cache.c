@@ -598,6 +598,7 @@ static int list_rule_cb(struct nftnl_rule *nlr, void *data)
 
 	netlink_dump_rule(nlr, ctx);
 	rule = netlink_delinearize_rule(ctx, nlr);
+	assert(rule);
 	list_add_tail(&rule->list, &ctx->list);
 
 	return 0;

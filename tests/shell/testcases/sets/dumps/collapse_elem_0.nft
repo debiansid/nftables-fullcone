@@ -1,0 +1,12 @@
+table ip a {
+	set x {
+		type inet_service
+		elements = { 1, 2 }
+	}
+}
+table ip6 a {
+	set x {
+		type inet_service
+		elements = { 2 }
+	}
+}

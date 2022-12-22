@@ -65,15 +65,26 @@ static struct scope *current_scope(const struct parser_state *state)
 	return state->scopes[state->scope];
 }
 
-static void open_scope(struct parser_state *state, struct scope *scope)
+static int open_scope(struct parser_state *state, struct scope *scope)
 {
-	assert(state->scope < array_size(state->scopes) - 1);
+	if (state->scope >= array_size(state->scopes) - 1) {
+		state->scope_err = true;
+		return -1;
+	}
+
 	scope_init(scope, current_scope(state));
 	state->scopes[++state->scope] = scope;
+
+	return 0;
 }
 
 static void close_scope(struct parser_state *state)
 {
+	if (state->scope_err) {
+		state->scope_err = false;
+		return;
+	}
+
 	assert(state->scope > 0);
 	state->scope--;
 }
@@ -615,6 +626,8 @@ int nft_lex(void *, void *, void *);
 %token IN			"in"
 %token OUT			"out"
 
+%token XT		"xt"
+
 %type <limit_rate>		limit_rate_pkts
 %type <limit_rate>		limit_rate_bytes
 
@@ -889,6 +902,9 @@ int nft_lex(void *, void *, void *);
 %type <stmt>			optstrip_stmt
 %destructor { stmt_free($$); }	optstrip_stmt
 
+%type <stmt>			xt_stmt
+%destructor { stmt_free($$); }	xt_stmt
+
 %type <expr>			boolean_expr
 %destructor { expr_free($$); }	boolean_expr
 %type <val8>			boolean_keys
@@ -980,6 +996,7 @@ close_scope_udplite	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_UDPL
 
 close_scope_log		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_LOG); }
 close_scope_synproxy	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_SYNPROXY); }
+close_scope_xt		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_XT); }
 
 common_block		:	INCLUDE		QUOTED_STRING	stmt_separator
 			{
@@ -1674,7 +1691,11 @@ describe_cmd		:	primary_expr
 table_block_alloc	:	/* empty */
 			{
 				$$ = table_alloc();
-				open_scope(state, &$$->scope);
+				if (open_scope(state, &$$->scope) < 0) {
+					erec_queue(error(&@$, "too many levels of nesting"),
+						   state->msgs);
+					state->nerrs++;
+				}
 			}
 			;
 
@@ -1836,7 +1857,11 @@ table_block		:	/* empty */	{ $$ = $<table>-1; }
 chain_block_alloc	:	/* empty */
 			{
 				$$ = chain_alloc(NULL);
-				open_scope(state, &$$->scope);
+				if (open_scope(state, &$$->scope) < 0) {
+					erec_queue(error(&@$, "too many levels of nesting"),
+						   state->msgs);
+					state->nerrs++;
+				}
 			}
 			;
 
@@ -2860,6 +2885,18 @@ stmt			:	verdict_stmt
 			|	synproxy_stmt	close_scope_synproxy
 			|	chain_stmt
 			|	optstrip_stmt
+			|	xt_stmt		close_scope_xt
+			;
+
+xt_stmt			:	XT	STRING	STRING
+			{
+				$$ = NULL;
+				xfree($2);
+				xfree($3);
+				erec_queue(error(&@$, "unsupported xtables compat expression, use iptables-nft with this ruleset"),
+					   state->msgs);
+				YYERROR;
+			}
 			;
 
 chain_stmt_type		:	JUMP	{ $$ = NFT_JUMP; }
@@ -3203,7 +3240,7 @@ log_flag_tcp		:	SEQUENCE
 limit_stmt		:	LIMIT	RATE	limit_mode	limit_rate_pkts	limit_burst_pkts	close_scope_limit
 	    		{
 				if ($5 == 0) {
-					erec_queue(error(&@5, "limit burst must be > 0"),
+					erec_queue(error(&@5, "packet limit burst must be > 0"),
 						   state->msgs);
 					YYERROR;
 				}
@@ -3216,11 +3253,6 @@ limit_stmt		:	LIMIT	RATE	limit_mode	limit_rate_pkts	limit_burst_pkts	close_scope
 			}
 			|	LIMIT	RATE	limit_mode	limit_rate_bytes	limit_burst_bytes	close_scope_limit
 			{
-				if ($5 == 0) {
-					erec_queue(error(&@5, "limit burst must be > 0"),
-						   state->msgs);
-					YYERROR;
-				}
 				$$ = limit_stmt_alloc(&@$);
 				$$->limit.rate	= $4.rate;
 				$$->limit.unit	= $4.unit;
@@ -3301,7 +3333,7 @@ limit_rate_pkts		:	NUM     SLASH	time_unit
 			}
 			;
 
-limit_burst_bytes	:	/* empty */			{ $$ = 5; }
+limit_burst_bytes	:	/* empty */			{ $$ = 0; }
 			|	BURST	limit_bytes		{ $$ = $2; }
 			;
 

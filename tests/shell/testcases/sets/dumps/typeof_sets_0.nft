@@ -50,6 +50,11 @@ table inet t {
 		elements = { "eth0" . 10.1.1.2 . 42 }
 	}
 
+	set s11 {
+		typeof vlan id . ip saddr
+		elements = { 3567 . 1.2.3.4 }
+	}
+
 	chain c1 {
 		osf name @s1 accept
 	}
@@ -84,5 +89,9 @@ table inet t {
 
 	chain c10 {
 		iifname . ip saddr . ipsec in reqid @s10 accept
+	}
+
+	chain c11 {
+		vlan id . ip saddr @s11 accept
 	}
 }

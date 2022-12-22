@@ -124,6 +124,7 @@ string		({letter}|[_.])({letter}|{digit}|[/\-_\.])*
 quotedstring	\"[^"]*\"
 asteriskstring	({string}\*|{string}\\\*|\\\*|{string}\\\*{string})
 comment		#.*$
+comment_line	^[ \t]*#.*\n
 slash		\/
 
 timestring	([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?
@@ -214,6 +215,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_TCP
 %s SCANSTATE_TYPE
 %s SCANSTATE_VLAN
+%s SCANSTATE_XT
 %s SCANSTATE_CMD_EXPORT
 %s SCANSTATE_CMD_IMPORT
 %s SCANSTATE_CMD_LIST
@@ -799,6 +801,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "secmark"		{ scanner_push_start_cond(yyscanner, SCANSTATE_SECMARK); return SECMARK; }
 
+"xt"			{ scanner_push_start_cond(yyscanner, SCANSTATE_XT); return XT; }
+
 {addrstring}		{
 				yylval->string = xstrdup(yytext);
 				return STRING;
@@ -857,6 +861,9 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 {tab}+
 {space}+
+{comment_line}		{
+				reset_pos(yyget_extra(yyscanner), yylloc);
+			}
 {comment}
 
 <<EOF>> 		{

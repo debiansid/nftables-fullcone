@@ -77,6 +77,47 @@ static json_t *set_dtype_json(const struct expr *key)
 	return root;
 }
 
+static json_t *stmt_print_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	char buf[1024];
+	FILE *fp;
+
+	if (stmt->ops->json)
+		return stmt->ops->json(stmt, octx);
+
+	fprintf(stderr, "warning: stmt ops %s have no json callback\n",
+		stmt->ops->name);
+
+	fp = octx->output_fp;
+	octx->output_fp = fmemopen(buf, 1024, "w");
+
+	stmt->ops->print(stmt, octx);
+
+	fclose(octx->output_fp);
+	octx->output_fp = fp;
+
+	return json_pack("s", buf);
+}
+
+static json_t *set_stmt_list_json(const struct list_head *stmt_list,
+				   struct output_ctx *octx)
+{
+	unsigned int flags = octx->flags;
+	json_t *root, *tmp;
+	struct stmt *i;
+
+	root = json_array();
+	octx->flags |= NFT_CTX_OUTPUT_STATELESS;
+
+	list_for_each_entry(i, stmt_list, list) {
+		tmp = stmt_print_json(i, octx);
+		json_array_append_new(root, tmp);
+	}
+	octx->flags = flags;
+
+	return root;
+}
+
 static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 {
 	json_t *root, *tmp;
@@ -152,6 +193,11 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 		json_object_set_new(root, "elem", array);
 	}
 
+	if (!list_empty(&set->stmt_list)) {
+		json_object_set_new(root, "stmt",
+				    set_stmt_list_json(&set->stmt_list, octx));
+	}
+
 	return json_pack("{s:o}", type, root);
 }
 
@@ -166,34 +212,6 @@ static json_t *element_print_json(struct output_ctx *octx,
 			 "table", set->handle.table.name,
 			 "name", set->handle.set.name,
 			 "elem", root);
-}
-
-static json_t *stmt_print_json(const struct stmt *stmt, struct output_ctx *octx)
-{
-	char buf[1024];
-	FILE *fp;
-
-	/* XXX: Can't be supported at this point:
-	 * xt_stmt_xlate() ignores output_fp.
-	 */
-	if (stmt->ops->type == STMT_XT)
-		return json_pack("{s:n}", "xt");
-
-	if (stmt->ops->json)
-		return stmt->ops->json(stmt, octx);
-
-	fprintf(stderr, "warning: stmt ops %s have no json callback\n",
-		stmt->ops->name);
-
-	fp = octx->output_fp;
-	octx->output_fp = fmemopen(buf, 1024, "w");
-
-	stmt->ops->print(stmt, octx);
-
-	fclose(octx->output_fp);
-	octx->output_fp = fp;
-
-	return json_pack("s", buf);
 }
 
 static json_t *rule_print_json(struct output_ctx *octx,
@@ -304,6 +322,12 @@ static json_t *obj_print_json(const struct obj *obj)
 			"name", obj->handle.obj.name,
 			"table", obj->handle.table.name,
 			"handle", obj->handle.handle.id);
+
+	if (obj->comment) {
+		tmp = json_pack("{s:s}", "comment", obj->comment);
+		json_object_update(root, tmp);
+		json_decref(tmp);
+	}
 
 	switch (obj->type) {
 	case NFT_OBJECT_COUNTER:
@@ -1441,10 +1465,20 @@ json_t *counter_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 
 json_t *set_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 {
-	return json_pack("{s:{s:s, s:o, s:s+}}", "set",
+	json_t *root;
+
+	root = json_pack("{s:s, s:o, s:s+}",
 			 "op", set_stmt_op_names[stmt->set.op],
 			 "elem", expr_print_json(stmt->set.key, octx),
 			 "set", "@", stmt->set.set->set->handle.set.name);
+
+	if (!list_empty(&stmt->set.stmt_list)) {
+		json_object_set_new(root, "stmt",
+				    set_stmt_list_json(&stmt->set.stmt_list,
+						       octx));
+	}
+
+	return json_pack("{s:o}", "set", root);
 }
 
 json_t *objref_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
@@ -1582,6 +1616,19 @@ json_t *optstrip_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 {
 	return json_pack("{s:o}", "reset",
 			 expr_print_json(stmt->optstrip.expr, octx));
+}
+
+json_t *xt_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	static const char *xt_typename[NFT_XT_MAX] = {
+		[NFT_XT_MATCH]          = "match",
+		[NFT_XT_TARGET]         = "target",
+		[NFT_XT_WATCHER]        = "watcher",
+	};
+
+	return json_pack("{s:{s:s, s:s}}", "xt",
+			 "type", xt_typename[stmt->xt.type],
+			 "name", stmt->xt.name);
 }
 
 static json_t *table_print_json_full(struct netlink_ctx *ctx,

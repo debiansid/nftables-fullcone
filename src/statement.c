@@ -465,7 +465,7 @@ static void limit_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 		nft_print(octx,	"limit rate %s%" PRIu64 " %s/%s",
 			  inv ? "over " : "", rate, data_unit,
 			  get_unit(stmt->limit.unit));
-		if (stmt->limit.burst != 5) {
+		if (stmt->limit.burst != 0) {
 			uint64_t burst;
 
 			data_unit = get_rate(stmt->limit.burst, &burst);
@@ -997,6 +997,7 @@ static const struct stmt_ops xt_stmt_ops = {
 	.name		= "xt",
 	.print		= xt_stmt_print,
 	.destroy	= xt_stmt_destroy,
+	.json		= xt_stmt_json,
 };
 
 struct stmt *xt_stmt_alloc(const struct location *loc)

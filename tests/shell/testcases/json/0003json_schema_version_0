@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+$NFT flush ruleset
+
+RULESET='{"nftables": [{"metainfo": {"json_schema_version": 1}}]}'
+
+$NFT -j -f - <<< $RULESET

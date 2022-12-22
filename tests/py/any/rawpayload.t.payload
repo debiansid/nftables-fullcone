@@ -48,6 +48,14 @@ inet test-inet input
   [ payload load 16b @ link header + 0 => reg 1 ]
   [ cmp eq reg 1 0x98badcfe 0x10325476 0x67452301 0xdebc0a89 ]
 
+# meta l4proto 91 @th,400,16 0x0 accept
+inet test-inet input
+  [ meta load l4proto => reg 1 ]
+  [ cmp eq reg 1 0x0000005b ]
+  [ payload load 2b @ transport header + 50 => reg 1 ]
+  [ cmp eq reg 1 0x00000000 ]
+  [ immediate reg 0 accept ]
+
 # @ih,32,32 0x14000000
 inet test-inet input
   [ payload load 4b @ inner header + 4 => reg 1 ]

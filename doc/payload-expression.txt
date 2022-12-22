@@ -23,6 +23,14 @@ VLAN HEADER EXPRESSION
 [verse]
 *vlan* {*id* | *dei* | *pcp* | *type*}
 
+The vlan expression is used to match on the vlan header fields.
+This expression will not work in the *ip*, *ip6* and *inet* families,
+unless the vlan interface is configured with the *reorder_hdr off* setting.
+The default is *reorder_hdr on* which will automatically remove the vlan tag
+from the packet. See ip-link(8) for more information.
+For these families its easier to match the vlan interface name
+instead, using the *meta iif* or *meta iifname* expression.
+
 .VLAN header expression
 [options="header"]
 |==================
@@ -548,6 +556,8 @@ Link layer, for example the Ethernet header
 Network header, for example IPv4 or IPv6
 |th|
 Transport Header, for example TCP
+|ih|
+Inner Header / Payload, i.e. after the L4 transport level header
 |==============================
 
 .Matching destination port of both UDP and TCP

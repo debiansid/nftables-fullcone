@@ -1,3 +1,11 @@
+nftables (1.0.6-2) UNRELEASED; urgency=medium
+
+  * [5e89bdc] d/patches: add patch to fix handling of invalid octal strings
+    (Closes: #932880)
+  * [df007f6] d/control: bump Standards-Version to 4.6.2
+
+ -- Jeremy Sowden <jeremy@azazel.net>  Thu, 26 Jan 2023 22:05:01 +0000
+
 nftables (1.0.6-1) unstable; urgency=medium
 
   * [41c144c] d/gbp.conf: make pristine-tar config the default

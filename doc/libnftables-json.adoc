@@ -175,7 +175,7 @@ kind, optionally filtered by *family* and for some, also *table*.
 ____
 *{ "reset":* 'RESET_OBJECT' *}*
 
-'RESET_OBJECT' := 'COUNTER' | 'COUNTERS' | 'QUOTA' | 'QUOTAS'
+'RESET_OBJECT' := 'COUNTER' | 'COUNTERS' | 'QUOTA' | 'QUOTAS' | 'RULE' | 'RULES'
 ____
 
 Reset state in suitable objects, i.e. zero their internal counter.

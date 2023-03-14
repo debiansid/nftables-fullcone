@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 12/21/2022
+.\"      Date: 03/13/2023
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "12/21/2022" "\ \&" "\ \&"
+.TH "NFT" "8" "03/13/2023" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -497,9 +497,10 @@ By design, \fBlist ruleset\fR command output may be used as input to \fBnft \-f\
 .\}
 .nf
 {\fBadd\fR | \fBcreate\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR [ {\fBcomment\fR \fIcomment\fR \fB;\fR\fI} \fR\fI\fB{ flags\fR\fR\fI \*(Aqflags\fR \fB; }\fR]
-{\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR} \fBtable\fR [\fIfamily\fR] \fItable\fR
 \fBlist tables\fR [\fIfamily\fR]
 \fBdelete table\fR [\fIfamily\fR] \fBhandle\fR \fIhandle\fR
+\fBdestroy table\fR [\fIfamily\fR] \fBhandle\fR \fIhandle\fR
 .fi
 .if n \{\
 .RE
@@ -565,6 +566,7 @@ tab(:);
 lt lt
 lt lt
 lt lt
+lt lt
 lt lt.
 T{
 .sp
@@ -579,6 +581,13 @@ T{
 T}:T{
 .sp
 Delete the specified table\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified table, it does not fail if it does not exist\&.
 T}
 T{
 .sp
@@ -603,9 +612,10 @@ T}
 .\}
 .nf
 {\fBadd\fR | \fBcreate\fR} \fBchain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR [\fB{ type\fR \fItype\fR \fBhook\fR \fIhook\fR [\fBdevice\fR \fIdevice\fR] \fBpriority\fR \fIpriority\fR \fB;\fR [\fBpolicy\fR \fIpolicy\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] \fR\fI\fB}\fR\fR\fI]
-{\fR\fI\fBdelete\fR\fR\fI | \fR\fI\fBlist\fR\fR\fI | \fR\fI\fBflush\fR\fR\fI} \fR\fI\fBchain\fR\fR\fI [\*(Aqfamily\fR] \fItable\fR \fIchain\fR
+{\fR\fI\fBdelete\fR\fR\fI | \fR\fI\fBdestroy\fR\fR\fI | \fR\fI\fBlist\fR\fR\fI | \fR\fI\fBflush\fR\fR\fI} \fR\fI\fBchain\fR\fR\fI [\*(Aqfamily\fR] \fItable\fR \fIchain\fR
 \fBlist chains\fR [\fIfamily\fR]
 \fBdelete chain\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdestroy chain\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBrename chain\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fInewname\fR
 .fi
 .if n \{\
@@ -615,6 +625,7 @@ T}
 Chains are containers for rules\&. They exist in two kinds, base chains and regular chains\&. A base chain is an entry point for packets from the networking stack, a regular chain may be used as jump target and is used for better rule organization\&.
 .TS
 tab(:);
+lt lt
 lt lt
 lt lt
 lt lt
@@ -641,6 +652,13 @@ T{
 T}:T{
 .sp
 Delete the specified chain\&. The chain must not contain any rules or be used as jump target\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified chain, it does not fail if it does not exist\&. The chain must not contain any rules or be used as jump target\&.
 T}
 T{
 .sp
@@ -794,6 +812,8 @@ hook\&.
 .RE
 .sp
 The \fBpriority\fR parameter accepts a signed integer value or a standard priority name which specifies the order in which chains with the same \fBhook\fR value are traversed\&. The ordering is ascending, i\&.e\&. lower priority values have precedence over higher ones\&.
+.sp
+With \fBnat\fR type chains, there\(cqs a lower excluding limit of \-200 for \fBpriority\fR values, because conntrack hooks at this priority and NAT requires it\&.
 .sp
 Standard priority values can be replaced with easily memorizable names\&. Not all names make sense in every family with every hook (see the compatibility matrices below) but their numerical value can still be used for prioritizing chains\&.
 .sp
@@ -982,7 +1002,11 @@ Base chains also allow one to set the chain\(cqs \fBpolicy\fR, i\&.e\&. what hap
 .nf
 {\fBadd\fR | \fBinsert\fR} \fBrule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR [\fBhandle\fR \fIhandle\fR | \fBindex\fR \fIindex\fR] \fIstatement\fR \&... [\fBcomment\fR \fIcomment\fR]
 \fBreplace rule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR \fIstatement\fR \&... [\fBcomment\fR \fIcomment\fR]
-\fBdelete rule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR
+{\fBdelete\fR | \fBreset\fR} \fBrule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR
+\fBdestroy rule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR
+\fBreset rules\fR [\fIfamily\fR]
+\fBreset rules\fR \fBtable\fR [\fIfamily\fR] \fItable\fR
+\fBreset rules\fR \fBchain\fR [\fIfamily\fR] \fItable\fR [\fIchain\fR]
 .fi
 .if n \{\
 .RE
@@ -995,6 +1019,8 @@ The add and insert commands support an optional location specifier, which is eit
 A \fIcomment\fR is a single word or a double\-quoted (") multi\-word string which can be used to make notes regarding the actual rule\&. \fBNote:\fR If you use bash for adding rules, you have to escape the quotation marks, e\&.g\&. \e"enable ssh for servers\e"\&.
 .TS
 tab(:);
+lt lt
+lt lt
 lt lt
 lt lt
 lt lt
@@ -1026,6 +1052,20 @@ T{
 T}:T{
 .sp
 Delete the specified rule\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified rule, it does not fail if it does not exist\&.
+T}
+T{
+.sp
+\fBreset\fR
+T}:T{
+.sp
+Reset rule\-contained state, i\&.e\&. counter and quota statement values\&.
 T}
 .TE
 .sp 1
@@ -1101,10 +1141,10 @@ The sets allowed_hosts and allowed_ports need to be created first\&. The next se
 .\}
 .nf
 \fBadd set\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR \fB;\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBtimeout\fR \fItimeout\fR \fB;\fR] [\fBgc\-interval\fR \fIgc\-interval\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] [\fBauto\-merge ;\fR] \fB}\fR
-{\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBset\fR [\fIfamily\fR] \fItable\fR \fIset\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR} \fBset\fR [\fIfamily\fR] \fItable\fR \fIset\fR
 \fBlist sets\fR [\fIfamily\fR]
 \fBdelete set\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
-{\fBadd\fR | \fBdelete\fR} \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIelement\fR[\fB,\fR \&...] \fB}\fR
+{\fBadd\fR | \fBdelete\fR | \fBdestroy\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIelement\fR[\fB,\fR \&...] \fB}\fR
 .fi
 .if n \{\
 .RE
@@ -1113,6 +1153,7 @@ The sets allowed_hosts and allowed_ports need to be created first\&. The next se
 Sets are element containers of a user\-defined data type, they are uniquely identified by a user\-defined name and attached to tables\&. Their behaviour can be tuned with the flags that can be specified at set creation time\&.
 .TS
 tab(:);
+lt lt
 lt lt
 lt lt
 lt lt
@@ -1130,6 +1171,13 @@ T{
 T}:T{
 .sp
 Delete the specified set\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified set, it does not fail if it does not exist\&.
 T}
 T{
 .sp
@@ -1271,7 +1319,7 @@ T}
 .\}
 .nf
 \fBadd map\fR [\fIfamily\fR] \fItable\fR \fImap\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] \fB}\fR
-{\fBdelete\fR | \fBlist\fR | \fBflush\fR} \fBmap\fR [\fIfamily\fR] \fItable\fR \fImap\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR} \fBmap\fR [\fIfamily\fR] \fItable\fR \fImap\fR
 \fBlist maps\fR [\fIfamily\fR]
 .fi
 .if n \{\
@@ -1281,6 +1329,7 @@ T}
 Maps store data based on some specific key used as input\&. They are uniquely identified by a user\-defined name and attached to tables\&.
 .TS
 tab(:);
+lt lt
 lt lt
 lt lt
 lt lt
@@ -1300,6 +1349,13 @@ T{
 T}:T{
 .sp
 Delete the specified map\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified map, it does not fail if it does not exist\&.
 T}
 T{
 .sp
@@ -1422,7 +1478,7 @@ T}
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBcreate\fR | \fBdelete\fR | \fBget\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIELEMENT\fR[\fB,\fR \&...] \fB}\fR
+{\fBadd\fR | \fBcreate\fR | \fBdelete\fR | \fBdestroy\fR | \fBget\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIELEMENT\fR[\fB,\fR \&...] \fB}\fR
 
 \fIELEMENT\fR := \fIkey_expression\fR \fIOPTIONS\fR [\fB:\fR \fIvalue_expression\fR]
 \fIOPTIONS\fR := [\fBtimeout\fR \fITIMESPEC\fR] [\fBexpires\fR \fITIMESPEC\fR] [\fBcomment\fR \fIstring\fR]
@@ -1486,7 +1542,7 @@ T}
 .nf
 {\fBadd\fR | \fBcreate\fR} \fBflowtable\fR [\fIfamily\fR] \fItable\fR \fIflowtable\fR \fB{ hook\fR \fIhook\fR \fBpriority\fR \fIpriority\fR \fB; devices = {\fR \fIdevice\fR[\fB,\fR \&...] \fB} ; }\fR
 \fBlist flowtables\fR [\fIfamily\fR]
-{\fBdelete\fR | \fBlist\fR} \fBflowtable\fR [\fIfamily\fR] \fItable\fR \fIflowtable\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR} \fBflowtable\fR [\fIfamily\fR] \fItable\fR \fIflowtable\fR
 \fBdelete\fR \fBflowtable\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 .fi
 .if n \{\
@@ -1498,6 +1554,7 @@ Flowtables allow you to accelerate packet forwarding in software\&. Flowtables e
 The \fBpriority\fR can be a signed integer or \fBfilter\fR which stands for 0\&. Addition and subtraction can be used to set relative priority, e\&.g\&. filter + 5 equals to 5\&.
 .TS
 tab(:);
+lt lt
 lt lt
 lt lt
 lt lt.
@@ -1514,6 +1571,13 @@ T{
 T}:T{
 .sp
 Delete the specified flowtable\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified flowtable, it does not fail if it does not exist\&.
 T}
 T{
 .sp
@@ -1545,12 +1609,15 @@ Inspect configured objects\&. \fBlist hooks\fR shows the full hook pipeline, inc
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBdelete\fR | \fBlist\fR | \fBreset\fR} \fBcounter\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
-{\fBadd\fR | \fBdelete\fR | \fBlist\fR | \fBreset\fR} \fBquota\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
-{\fBadd\fR | \fBdelete\fR | \fBlist\fR} \fBlimit\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+{\fBadd\fR | \fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBreset\fR} \fBcounter\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+{\fBadd\fR | \fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBreset\fR} \fBquota\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
+{\fBadd\fR | \fBdelete\fR | \fBdestroy\fR | \fBlist\fR} \fBlimit\fR [\fIfamily\fR] \fItable\fR \fIobject\fR
 \fBdelete\fR \fIcounter\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBdelete\fR \fIquota\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBdelete\fR \fIlimit\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdestroy\fR \fIcounter\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdestroy\fR \fIquota\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
+\fBdestroy\fR \fIlimit\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 \fBlist counters\fR [\fIfamily\fR]
 \fBlist quotas\fR [\fIfamily\fR]
 \fBlist limits\fR [\fIfamily\fR]
@@ -1569,6 +1636,7 @@ tab(:);
 lt lt
 lt lt
 lt lt
+lt lt
 lt lt.
 T{
 .sp
@@ -1583,6 +1651,13 @@ T{
 T}:T{
 .sp
 Delete the specified object\&.
+T}
+T{
+.sp
+\fBdestroy\fR
+T}:T{
+.sp
+Delete the specified object, it does not fail if it does not exist\&.
 T}
 T{
 .sp
@@ -6713,6 +6788,393 @@ integer (16 bit)
 T}
 .TE
 .sp 1
+.SS "GRE HEADER EXPRESSION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBgre\fR {\fBflags\fR | \fBversion\fR | \fBprotocol\fR}
+\fBgre\fR \fBip\fR {\fBversion\fR | \fBhdrlength\fR | \fBdscp\fR | \fBecn\fR | \fBlength\fR | \fBid\fR | \fBfrag\-off\fR | \fBttl\fR | \fBprotocol\fR | \fBchecksum\fR | \fBsaddr\fR | \fBdaddr\fR }
+\fBgre\fR \fBip6\fR {\fBversion\fR | \fBdscp\fR | \fBecn\fR | \fBflowlabel\fR | \fBlength\fR | \fBnexthdr\fR | \fBhoplimit\fR | \fBsaddr\fR | \fBdaddr\fR}
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The gre expression is used to match on the gre header fields\&. This expression also allows to match on the IPv4 or IPv6 packet within the gre header\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&54.\ \&GRE header expression
+.TS
+allbox tab(:);
+ltB ltB ltB.
+T{
+Keyword
+T}:T{
+Description
+T}:T{
+Type
+T}
+.T&
+lt lt lt
+lt lt lt
+lt lt lt.
+T{
+.sp
+flags
+T}:T{
+.sp
+checksum, routing, key, sequence and strict source route flags
+T}:T{
+.sp
+integer (5 bit)
+T}
+T{
+.sp
+version
+T}:T{
+.sp
+gre version field, 0 for GRE and 1 for PPTP
+T}:T{
+.sp
+integer (3 bit)
+T}
+T{
+.sp
+protocol
+T}:T{
+.sp
+EtherType of encapsulated packet
+T}:T{
+.sp
+integer (16 bit)
+T}
+.TE
+.sp 1
+.PP
+\fBMatching inner IPv4 destination address encapsulated in gre\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+netdev filter ingress gre ip daddr 9\&.9\&.9\&.9 counter
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.SS "GENEVE HEADER EXPRESSION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBgeneve\fR {\fBvni\fR | \fBflags\fR}
+\fBgeneve\fR \fBether\fR {\fBdaddr\fR | \fBsaddr\fR | \fBtype\fR}
+\fBgeneve\fR \fBvlan\fR {\fBid\fR | \fBdei\fR | \fBpcp\fR | \fBtype\fR}
+\fBgeneve\fR \fBip\fR {\fBversion\fR | \fBhdrlength\fR | \fBdscp\fR | \fBecn\fR | \fBlength\fR | \fBid\fR | \fBfrag\-off\fR | \fBttl\fR | \fBprotocol\fR | \fBchecksum\fR | \fBsaddr\fR | \fBdaddr\fR }
+\fBgeneve\fR \fBip6\fR {\fBversion\fR | \fBdscp\fR | \fBecn\fR | \fBflowlabel\fR | \fBlength\fR | \fBnexthdr\fR | \fBhoplimit\fR | \fBsaddr\fR | \fBdaddr\fR}
+\fBgeneve\fR \fBtcp\fR {\fBsport\fR | \fBdport\fR | \fBsequence\fR | \fBackseq\fR | \fBdoff\fR | \fBreserved\fR | \fBflags\fR | \fBwindow\fR | \fBchecksum\fR | \fBurgptr\fR}
+\fBgeneve\fR \fBudp\fR {\fBsport\fR | \fBdport\fR | \fBlength\fR | \fBchecksum\fR}
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The geneve expression is used to match on the geneve header fields\&. The geneve header encapsulates a ethernet frame within a \fBudp\fR packet\&. This expression requires that you restrict the matching to \fBudp\fR packets (usually at port 6081 according to IANA\-assigned ports)\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&55.\ \&GENEVE header expression
+.TS
+allbox tab(:);
+ltB ltB ltB.
+T{
+Keyword
+T}:T{
+Description
+T}:T{
+Type
+T}
+.T&
+lt lt lt
+lt lt lt.
+T{
+.sp
+protocol
+T}:T{
+.sp
+EtherType of encapsulated packet
+T}:T{
+.sp
+integer (16 bit)
+T}
+T{
+.sp
+vni
+T}:T{
+.sp
+Virtual Network ID (VNI)
+T}:T{
+.sp
+integer (24 bit)
+T}
+.TE
+.sp 1
+.PP
+\fBMatching inner TCP destination port encapsulated in geneve\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+netdev filter ingress udp dport 4789 geneve tcp dport 80 counter
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.SS "GRETAP HEADER EXPRESSION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBgretap\fR {\fBvni\fR | \fBflags\fR}
+\fBgretap\fR \fBether\fR {\fBdaddr\fR | \fBsaddr\fR | \fBtype\fR}
+\fBgretap\fR \fBvlan\fR {\fBid\fR | \fBdei\fR | \fBpcp\fR | \fBtype\fR}
+\fBgretap\fR \fBip\fR {\fBversion\fR | \fBhdrlength\fR | \fBdscp\fR | \fBecn\fR | \fBlength\fR | \fBid\fR | \fBfrag\-off\fR | \fBttl\fR | \fBprotocol\fR | \fBchecksum\fR | \fBsaddr\fR | \fBdaddr\fR }
+\fBgretap\fR \fBip6\fR {\fBversion\fR | \fBdscp\fR | \fBecn\fR | \fBflowlabel\fR | \fBlength\fR | \fBnexthdr\fR | \fBhoplimit\fR | \fBsaddr\fR | \fBdaddr\fR}
+\fBgretap\fR \fBtcp\fR {\fBsport\fR | \fBdport\fR | \fBsequence\fR | \fBackseq\fR | \fBdoff\fR | \fBreserved\fR | \fBflags\fR | \fBwindow\fR | \fBchecksum\fR | \fBurgptr\fR}
+\fBgretap\fR \fBudp\fR {\fBsport\fR | \fBdport\fR | \fBlength\fR | \fBchecksum\fR}
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The gretap expression is used to match on the encapsulated ethernet frame within the gre header\&. Use the \fBgre\fR expression to match on the \fBgre\fR header fields\&.
+.PP
+\fBMatching inner TCP destination port encapsulated in gretap\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+netdev filter ingress gretap tcp dport 80 counter
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.SS "VXLAN HEADER EXPRESSION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvxlan\fR {\fBvni\fR | \fBflags\fR}
+\fBvxlan\fR \fBether\fR {\fBdaddr\fR | \fBsaddr\fR | \fBtype\fR}
+\fBvxlan\fR \fBvlan\fR {\fBid\fR | \fBdei\fR | \fBpcp\fR | \fBtype\fR}
+\fBvxlan\fR \fBip\fR {\fBversion\fR | \fBhdrlength\fR | \fBdscp\fR | \fBecn\fR | \fBlength\fR | \fBid\fR | \fBfrag\-off\fR | \fBttl\fR | \fBprotocol\fR | \fBchecksum\fR | \fBsaddr\fR | \fBdaddr\fR }
+\fBvxlan\fR \fBip6\fR {\fBversion\fR | \fBdscp\fR | \fBecn\fR | \fBflowlabel\fR | \fBlength\fR | \fBnexthdr\fR | \fBhoplimit\fR | \fBsaddr\fR | \fBdaddr\fR}
+\fBvxlan\fR \fBtcp\fR {\fBsport\fR | \fBdport\fR | \fBsequence\fR | \fBackseq\fR | \fBdoff\fR | \fBreserved\fR | \fBflags\fR | \fBwindow\fR | \fBchecksum\fR | \fBurgptr\fR}
+\fBvxlan\fR \fBudp\fR {\fBsport\fR | \fBdport\fR | \fBlength\fR | \fBchecksum\fR}
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The vxlan expression is used to match on the vxlan header fields\&. The vxlan header encapsulates a ethernet frame within a \fBudp\fR packet\&. This expression requires that you restrict the matching to \fBudp\fR packets (usually at port 4789 according to IANA\-assigned ports)\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&56.\ \&VXLAN header expression
+.TS
+allbox tab(:);
+ltB ltB ltB.
+T{
+Keyword
+T}:T{
+Description
+T}:T{
+Type
+T}
+.T&
+lt lt lt
+lt lt lt.
+T{
+.sp
+flags
+T}:T{
+.sp
+vxlan flags
+T}:T{
+.sp
+integer (8 bit)
+T}
+T{
+.sp
+vni
+T}:T{
+.sp
+Virtual Network ID (VNI)
+T}:T{
+.sp
+integer (24 bit)
+T}
+.TE
+.sp 1
+.PP
+\fBMatching inner TCP destination port encapsulated in vxlan\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+netdev filter ingress udp dport 4789 vxlan tcp dport 80 counter
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.SS "ARP HEADER EXPRESSION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBarp\fR {\fBhtype\fR | \fBptype\fR | \fBhlen\fR | \fBplen\fR | \fBoperation\fR | \fBsaddr\fR { \fBip\fR | \fBether\fR } | \fBdaddr\fR { \fBip\fR | \fBether\fR }
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&57.\ \&ARP header expression
+.TS
+allbox tab(:);
+ltB ltB ltB.
+T{
+Keyword
+T}:T{
+Description
+T}:T{
+Type
+T}
+.T&
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt
+lt lt lt.
+T{
+.sp
+htype
+T}:T{
+.sp
+ARP hardware type
+T}:T{
+.sp
+integer (16 bit)
+T}
+T{
+.sp
+ptype
+T}:T{
+.sp
+EtherType
+T}:T{
+.sp
+ether_type
+T}
+T{
+.sp
+hlen
+T}:T{
+.sp
+Hardware address len
+T}:T{
+.sp
+integer (8 bit)
+T}
+T{
+.sp
+plen
+T}:T{
+.sp
+Protocol address len
+T}:T{
+.sp
+integer (8 bit)
+T}
+T{
+.sp
+operation
+T}:T{
+.sp
+Operation
+T}:T{
+.sp
+arp_op
+T}
+T{
+.sp
+saddr ether
+T}:T{
+.sp
+Ethernet sender address
+T}:T{
+.sp
+ether_addr
+T}
+T{
+.sp
+daddr ether
+T}:T{
+.sp
+Ethernet target address
+T}:T{
+.sp
+ether_addr
+T}
+T{
+.sp
+saddr ip
+T}:T{
+.sp
+IPv4 sender address
+T}:T{
+.sp
+ipv4_addr
+T}
+T{
+.sp
+daddr ip
+T}:T{
+.sp
+IPv4 target address
+T}:T{
+.sp
+ipv4_addr
+T}
+.TE
+.sp 1
 .SS "RAW PAYLOAD EXPRESSION"
 .sp
 .if n \{\
@@ -6731,7 +7193,7 @@ The raw payload expression instructs to load \fIlength\fR bits starting at \fIof
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&54.\ \&Supported payload protocol bases
+.B Table\ \&58.\ \&Supported payload protocol bases
 .TS
 allbox tab(:);
 ltB ltB.
@@ -6855,7 +7317,7 @@ The following syntaxes are valid only in a relational expression with boolean ty
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&55.\ \&IPv6 extension headers
+.B Table\ \&59.\ \&IPv6 extension headers
 .TS
 allbox tab(:);
 ltB ltB.
@@ -6920,7 +7382,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&56.\ \&TCP Options
+.B Table\ \&60.\ \&TCP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7082,7 +7544,7 @@ TCP option matching also supports raw expression syntax to access arbitrary opti
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&57.\ \&IP Options
+.B Table\ \&61.\ \&IP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7214,7 +7676,7 @@ The conntrack\-specific types in this table are described in the sub\-section CO
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&58.\ \&Conntrack expressions
+.B Table\ \&62.\ \&Conntrack expressions
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7657,7 +8119,7 @@ This is a non\-terminating statement, so the rule evaluation continues after the
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&59.\ \&log statement options
+.B Table\ \&63.\ \&log statement options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7731,7 +8193,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&60.\ \&log\-flags
+.B Table\ \&64.\ \&log\-flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7834,7 +8296,7 @@ A reject statement is used to send back an error packet in response to the match
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&61.\ \&different ICMP reject variants are meant for use in different table families
+.B Table\ \&65.\ \&different ICMP reject variants are meant for use in different table families
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7921,7 +8383,7 @@ Unlike iptables, where the helper assignment happens in the raw table, the helpe
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&62.\ \&Conntrack statement types
+.B Table\ \&66.\ \&Conntrack statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8073,7 +8535,7 @@ A meta statement sets meta data associated with a packet\&.
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&63.\ \&Meta statement types
+.B Table\ \&67.\ \&Meta statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8155,7 +8617,7 @@ The \fBburst\fR value influences the bucket size, i\&.e\&. jitter tolerance\&. W
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&64.\ \&limit statement values
+.B Table\ \&68.\ \&limit statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8228,7 +8690,7 @@ Before kernel 4\&.18 nat statements require both prerouting and postrouting base
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&65.\ \&NAT statement values
+.B Table\ \&69.\ \&NAT statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8269,7 +8731,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&66.\ \&NAT statement flags
+.B Table\ \&70.\ \&NAT statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8376,7 +8838,7 @@ This syntax can be used in \fBinet\fR tables\&. The \fBip/ip6\fR parameter defin
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&67.\ \&tproxy attributes
+.B Table\ \&71.\ \&tproxy attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8456,7 +8918,7 @@ This statement will process TCP three\-way\-handshake parallel in netfilter cont
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&68.\ \&synproxy statement attributes
+.B Table\ \&72.\ \&synproxy statement attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8489,7 +8951,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&69.\ \&synproxy statement flags
+.B Table\ \&73.\ \&synproxy statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8599,7 +9061,7 @@ QUEUE_EXPRESSION can be used to compute a queue number at run\-time with the has
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&70.\ \&queue statement values
+.B Table\ \&74.\ \&queue statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8651,7 +9113,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&71.\ \&queue statement flags
+.B Table\ \&75.\ \&queue statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8698,7 +9160,7 @@ The dup statement is used to duplicate a packet and send the copy to a different
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&72.\ \&Dup statement values
+.B Table\ \&76.\ \&Dup statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.

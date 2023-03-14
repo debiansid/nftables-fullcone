@@ -88,6 +88,30 @@ int proto_find_num(const struct proto_desc *base,
 	return -1;
 }
 
+static const struct proto_desc *inner_protocols[] = {
+	&proto_vxlan,
+	&proto_geneve,
+	&proto_gre,
+	&proto_gretap,
+};
+
+const struct proto_desc *proto_find_inner(uint32_t type, uint32_t hdrsize,
+					  uint32_t flags)
+{
+	const struct proto_desc *desc;
+	unsigned int i;
+
+	for (i = 0; i < array_size(inner_protocols); i++) {
+		desc = inner_protocols[i];
+		if (desc->inner.type == type &&
+		    desc->inner.hdrsize == hdrsize &&
+		    desc->inner.flags == flags)
+			return inner_protocols[i];
+	}
+
+	return &proto_unknown;
+}
+
 static const struct dev_proto_desc dev_proto_desc[] = {
 	DEV_PROTO_DESC(ARPHRD_ETHER, &proto_eth),
 };
@@ -160,7 +184,9 @@ static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base,
 			pr_debug(" %s", ctx->stacked_ll[i]->name);
 	}
 
-	pr_debug("update %s protocol context:\n", proto_base_names[base]);
+	pr_debug("update %s protocol context%s:\n",
+		 proto_base_names[base], ctx->inner ? " (inner)" : "");
+
 	for (i = PROTO_BASE_LL_HDR; i <= PROTO_BASE_MAX; i++) {
 		pr_debug(" %-20s: %s",
 			 proto_base_names[i],
@@ -181,7 +207,7 @@ static void proto_ctx_debug(const struct proto_ctx *ctx, enum proto_bases base,
  * @debug_mask:	display debugging information
  */
 void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,
-		    unsigned int debug_mask)
+		    unsigned int debug_mask, bool inner)
 {
 	const struct hook_proto_desc *h = &hook_proto_desc[family];
 
@@ -189,6 +215,7 @@ void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,
 	ctx->family = family;
 	ctx->protocol[h->base].desc = h->desc;
 	ctx->debug_mask = debug_mask;
+	ctx->inner = inner;
 
 	proto_ctx_debug(ctx, h->base, debug_mask);
 }
@@ -227,6 +254,8 @@ void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 			ctx->protocol[base].protos[i].desc = desc;
 			ctx->protocol[base].protos[i].location = *loc;
 		}
+		break;
+	case PROTO_BASE_INNER_HDR:
 		break;
 	default:
 		BUG("unknown protocol base %d", base);
@@ -513,6 +542,10 @@ const struct proto_desc proto_udp = {
 		[UDPHDR_LENGTH]		= UDPHDR_FIELD("length", len),
 		[UDPHDR_CHECKSUM]	= UDPHDR_FIELD("checksum", check),
 	},
+	.protocols	= {
+		PROTO_LINK(0,	&proto_vxlan),
+		PROTO_LINK(0,	&proto_geneve),
+	},
 };
 
 const struct proto_desc proto_udplite = {
@@ -742,6 +775,42 @@ const struct datatype ecn_type = {
 	.sym_tbl	= &ecn_type_tbl,
 };
 
+#define GREHDR_TEMPLATE(__name, __dtype, __member) \
+	HDR_TEMPLATE(__name, __dtype, struct grehdr, __member)
+#define GREHDR_TYPE(__name, __member) \
+	GREHDR_TEMPLATE(__name, &ethertype_type, __member)
+
+const struct proto_desc proto_gre = {
+	.name		= "gre",
+	.id		= PROTO_DESC_GRE,
+	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.templates	= {
+		[0] = PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
+		[GREHDR_FLAGS]		= HDR_BITFIELD("flags", &integer_type, 0, 5),
+		[GREHDR_VERSION]	= HDR_BITFIELD("version", &integer_type, 13, 3),
+		[GREHDR_PROTOCOL]	= HDR_BITFIELD("protocol", &ethertype_type, 16, 16),
+	},
+	.inner		= {
+		.hdrsize	= sizeof(struct grehdr),
+		.flags		= NFT_INNER_NH | NFT_INNER_TH,
+		.type		= NFT_INNER_GENEVE + 1,
+	},
+};
+
+const struct proto_desc proto_gretap = {
+	.name		= "gretap",
+	.id		= PROTO_DESC_GRETAP,
+	.base		= PROTO_BASE_TRANSPORT_HDR,
+	.templates	= {
+		[0] = PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
+	},
+	.inner		= {
+		.hdrsize	= sizeof(struct grehdr),
+		.flags		= NFT_INNER_LL | NFT_INNER_NH | NFT_INNER_TH,
+		.type		= NFT_INNER_GENEVE + 2,
+	},
+};
+
 #define IPHDR_FIELD(__name, __member) \
 	HDR_FIELD(__name, struct iphdr, __member)
 #define IPHDR_ADDR(__name, __member) \
@@ -765,6 +834,8 @@ const struct proto_desc proto_ip = {
 		PROTO_LINK(IPPROTO_TCP,		&proto_tcp),
 		PROTO_LINK(IPPROTO_DCCP,	&proto_dccp),
 		PROTO_LINK(IPPROTO_SCTP,	&proto_sctp),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gre),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gretap),
 	},
 	.templates	= {
 		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
@@ -891,6 +962,8 @@ const struct proto_desc proto_ip6 = {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
 		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gre),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gretap),
 	},
 	.templates	= {
 		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
@@ -956,6 +1029,8 @@ const struct proto_desc proto_inet_service = {
 		PROTO_LINK(IPPROTO_ICMP,	&proto_icmp),
 		PROTO_LINK(IPPROTO_IGMP,	&proto_igmp),
 		PROTO_LINK(IPPROTO_ICMPV6,	&proto_icmp6),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gre),
+		PROTO_LINK(IPPROTO_GRE,		&proto_gretap),
 	},
 	.templates	= {
 		[0]	= PROTO_META_TEMPLATE("l4proto", &inet_protocol_type, NFT_META_L4PROTO, 8),
@@ -1136,6 +1211,57 @@ const struct proto_desc proto_eth = {
 };
 
 /*
+ * VXLAN
+ */
+
+const struct proto_desc proto_vxlan = {
+	.name		= "vxlan",
+	.id		= PROTO_DESC_VXLAN,
+	.base		= PROTO_BASE_INNER_HDR,
+	.templates	= {
+		[VXLANHDR_FLAGS] = HDR_BITFIELD("flags", &bitmask_type, 0, 8),
+		[VXLANHDR_VNI]	 = HDR_BITFIELD("vni", &integer_type, (4 * BITS_PER_BYTE), 24),
+	},
+	.protocols	= {
+		PROTO_LINK(__constant_htons(ETH_P_IP),		&proto_ip),
+		PROTO_LINK(__constant_htons(ETH_P_ARP),		&proto_arp),
+		PROTO_LINK(__constant_htons(ETH_P_IPV6),	&proto_ip6),
+		PROTO_LINK(__constant_htons(ETH_P_8021Q),	&proto_vlan),
+	},
+	.inner		= {
+		.hdrsize	= sizeof(struct vxlanhdr),
+		.flags		= NFT_INNER_HDRSIZE | NFT_INNER_LL | NFT_INNER_NH | NFT_INNER_TH,
+		.type		= NFT_INNER_VXLAN,
+	},
+};
+
+/*
+ * GENEVE
+ */
+
+const struct proto_desc proto_geneve = {
+	.name		= "geneve",
+	.id		= PROTO_DESC_GENEVE,
+	.base		= PROTO_BASE_INNER_HDR,
+	.templates	= {
+		[GNVHDR_TYPE]	= HDR_TYPE("type", &ethertype_type, struct gnvhdr, type),
+		[GNVHDR_VNI]	= HDR_BITFIELD("vni", &integer_type, (4 * BITS_PER_BYTE), 24),
+	},
+	.protocols	= {
+		PROTO_LINK(__constant_htons(ETH_P_IP),		&proto_ip),
+		PROTO_LINK(__constant_htons(ETH_P_ARP),		&proto_arp),
+		PROTO_LINK(__constant_htons(ETH_P_IPV6),	&proto_ip6),
+		PROTO_LINK(__constant_htons(ETH_P_8021Q),	&proto_vlan),
+	},
+	.inner		= {
+		.hdrsize	= sizeof(struct gnvhdr),
+		.flags		= NFT_INNER_HDRSIZE | NFT_INNER_LL | NFT_INNER_NH | NFT_INNER_TH,
+		.type		= NFT_INNER_GENEVE,
+	},
+};
+
+
+/*
  * Dummy protocol for netdev tables.
  */
 const struct proto_desc proto_netdev = {
@@ -1171,6 +1297,9 @@ static const struct proto_desc *proto_definitions[PROTO_DESC_MAX + 1] = {
 	[PROTO_DESC_ARP]	= &proto_arp,
 	[PROTO_DESC_VLAN]	= &proto_vlan,
 	[PROTO_DESC_ETHER]	= &proto_eth,
+	[PROTO_DESC_VXLAN]	= &proto_vxlan,
+	[PROTO_DESC_GRE]	= &proto_gre,
+	[PROTO_DESC_GRETAP]	= &proto_gretap,
 };
 
 const struct proto_desc *proto_find_desc(enum proto_desc_id desc_id)

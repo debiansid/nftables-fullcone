@@ -532,6 +532,160 @@ compression Parameter Index |
 integer (16 bit)
 |============================
 
+GRE HEADER EXPRESSION
+~~~~~~~~~~~~~~~~~~~~~~~
+[verse]
+*gre* {*flags* | *version* | *protocol*}
+*gre* *ip* {*version* | *hdrlength* | *dscp* | *ecn* | *length* | *id* | *frag-off* | *ttl* | *protocol* | *checksum* | *saddr* | *daddr* }
+*gre* *ip6* {*version* | *dscp* | *ecn* | *flowlabel* | *length* | *nexthdr* | *hoplimit* | *saddr* | *daddr*}
+
+The gre expression is used to match on the gre header fields. This expression
+also allows to match on the IPv4 or IPv6 packet within the gre header.
+
+.GRE header expression
+[options="header"]
+|==================
+|Keyword| Description| Type
+|flags|
+checksum, routing, key, sequence and strict source route flags|
+integer (5 bit)
+|version|
+gre version field, 0 for GRE and 1 for PPTP|
+integer (3 bit)
+|protocol|
+EtherType of encapsulated packet|
+integer (16 bit)
+|==================
+
+.Matching inner IPv4 destination address encapsulated in gre
+------------------------------------------------------------
+netdev filter ingress gre ip daddr 9.9.9.9 counter
+------------------------------------------------------------
+
+GENEVE HEADER EXPRESSION
+~~~~~~~~~~~~~~~~~~~~~~~~
+[verse]
+*geneve* {*vni* | *flags*}
+*geneve* *ether* {*daddr* | *saddr* | *type*}
+*geneve* *vlan* {*id* | *dei* | *pcp* | *type*}
+*geneve* *ip* {*version* | *hdrlength* | *dscp* | *ecn* | *length* | *id* | *frag-off* | *ttl* | *protocol* | *checksum* | *saddr* | *daddr* }
+*geneve* *ip6* {*version* | *dscp* | *ecn* | *flowlabel* | *length* | *nexthdr* | *hoplimit* | *saddr* | *daddr*}
+*geneve* *tcp* {*sport* | *dport* | *sequence* | *ackseq* | *doff* | *reserved* | *flags* | *window* | *checksum* | *urgptr*}
+*geneve* *udp* {*sport* | *dport* | *length* | *checksum*}
+
+The geneve expression is used to match on the geneve header fields. The geneve
+header encapsulates a ethernet frame within a *udp* packet. This expression
+requires that you restrict the matching to *udp* packets (usually at
+port 6081 according to IANA-assigned ports).
+
+.GENEVE header expression
+[options="header"]
+|==================
+|Keyword| Description| Type
+|protocol|
+EtherType of encapsulated packet|
+integer (16 bit)
+|vni|
+Virtual Network ID (VNI)|
+integer (24 bit)
+|==================
+
+.Matching inner TCP destination port encapsulated in geneve
+----------------------------------------------------------
+netdev filter ingress udp dport 4789 geneve tcp dport 80 counter
+----------------------------------------------------------
+
+GRETAP HEADER EXPRESSION
+~~~~~~~~~~~~~~~~~~~~~~~~
+[verse]
+*gretap* {*vni* | *flags*}
+*gretap* *ether* {*daddr* | *saddr* | *type*}
+*gretap* *vlan* {*id* | *dei* | *pcp* | *type*}
+*gretap* *ip* {*version* | *hdrlength* | *dscp* | *ecn* | *length* | *id* | *frag-off* | *ttl* | *protocol* | *checksum* | *saddr* | *daddr* }
+*gretap* *ip6* {*version* | *dscp* | *ecn* | *flowlabel* | *length* | *nexthdr* | *hoplimit* | *saddr* | *daddr*}
+*gretap* *tcp* {*sport* | *dport* | *sequence* | *ackseq* | *doff* | *reserved* | *flags* | *window* | *checksum* | *urgptr*}
+*gretap* *udp* {*sport* | *dport* | *length* | *checksum*}
+
+The gretap expression is used to match on the encapsulated ethernet frame
+within the gre header. Use the *gre* expression to match on the *gre* header
+fields.
+
+.Matching inner TCP destination port encapsulated in gretap
+----------------------------------------------------------
+netdev filter ingress gretap tcp dport 80 counter
+----------------------------------------------------------
+
+VXLAN HEADER EXPRESSION
+~~~~~~~~~~~~~~~~~~~~~~~
+[verse]
+*vxlan* {*vni* | *flags*}
+*vxlan* *ether* {*daddr* | *saddr* | *type*}
+*vxlan* *vlan* {*id* | *dei* | *pcp* | *type*}
+*vxlan* *ip* {*version* | *hdrlength* | *dscp* | *ecn* | *length* | *id* | *frag-off* | *ttl* | *protocol* | *checksum* | *saddr* | *daddr* }
+*vxlan* *ip6* {*version* | *dscp* | *ecn* | *flowlabel* | *length* | *nexthdr* | *hoplimit* | *saddr* | *daddr*}
+*vxlan* *tcp* {*sport* | *dport* | *sequence* | *ackseq* | *doff* | *reserved* | *flags* | *window* | *checksum* | *urgptr*}
+*vxlan* *udp* {*sport* | *dport* | *length* | *checksum*}
+
+The vxlan expression is used to match on the vxlan header fields. The vxlan
+header encapsulates a ethernet frame within a *udp* packet. This expression
+requires that you restrict the matching to *udp* packets (usually at
+port 4789 according to IANA-assigned ports).
+
+.VXLAN header expression
+[options="header"]
+|==================
+|Keyword| Description| Type
+|flags|
+vxlan flags|
+integer (8 bit)
+|vni|
+Virtual Network ID (VNI)|
+integer (24 bit)
+|==================
+
+.Matching inner TCP destination port encapsulated in vxlan
+----------------------------------------------------------
+netdev filter ingress udp dport 4789 vxlan tcp dport 80 counter
+----------------------------------------------------------
+
+ARP HEADER EXPRESSION
+~~~~~~~~~~~~~~~~~~~~~
+[verse]
+*arp* {*htype* | *ptype* | *hlen* | *plen* | *operation* | *saddr* { *ip* | *ether* } | *daddr* { *ip* | *ether* }
+
+.ARP header expression
+[options="header"]
+|==================
+|Keyword| Description| Type
+|htype|
+ARP hardware type|
+integer (16 bit)
+|ptype|
+EtherType|
+ether_type
+|hlen|
+Hardware address len|
+integer (8 bit)
+|plen|
+Protocol address len |
+integer (8 bit)
+|operation|
+Operation |
+arp_op
+|saddr ether|
+Ethernet sender address|
+ether_addr
+|daddr ether|
+Ethernet target address|
+ether_addr
+|saddr ip|
+IPv4 sender address|
+ipv4_addr
+|daddr ip|
+IPv4 target address|
+ipv4_addr
+|======================
+
 RAW PAYLOAD EXPRESSION
 ~~~~~~~~~~~~~~~~~~~~~~
 [verse]

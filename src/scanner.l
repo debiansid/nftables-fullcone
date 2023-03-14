@@ -118,7 +118,6 @@ digit		[0-9]
 hexdigit	[0-9a-fA-F]
 decstring	{digit}+
 hexstring	0[xX]{hexdigit}+
-numberstring	({decstring}|{hexstring})
 letter		[a-zA-Z]
 string		({letter}|[_.])({letter}|{digit}|[/\-_\.])*
 quotedstring	\"[^"]*\"
@@ -202,10 +201,12 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_CT
 %s SCANSTATE_COUNTER
 %s SCANSTATE_ETH
+%s SCANSTATE_GRE
 %s SCANSTATE_ICMP
 %s SCANSTATE_IGMP
 %s SCANSTATE_IP
 %s SCANSTATE_IP6
+%s SCANSTATE_LAST
 %s SCANSTATE_LIMIT
 %s SCANSTATE_META
 %s SCANSTATE_POLICY
@@ -216,6 +217,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 %s SCANSTATE_TYPE
 %s SCANSTATE_VLAN
 %s SCANSTATE_XT
+%s SCANSTATE_CMD_DESTROY
 %s SCANSTATE_CMD_EXPORT
 %s SCANSTATE_CMD_IMPORT
 %s SCANSTATE_CMD_LIST
@@ -359,6 +361,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 "import"                { scanner_push_start_cond(yyscanner, SCANSTATE_CMD_IMPORT); return IMPORT; }
 "export"		{ scanner_push_start_cond(yyscanner, SCANSTATE_CMD_EXPORT); return EXPORT; }
 "monitor"		{ scanner_push_start_cond(yyscanner, SCANSTATE_CMD_MONITOR); return MONITOR; }
+"destroy"		{ scanner_push_start_cond(yyscanner, SCANSTATE_CMD_DESTROY); return DESTROY; }
+
 
 "position"		{ return POSITION; }
 "index"			{ return INDEX; }
@@ -399,9 +403,15 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_COUNTER,SCANSTATE_CT,SCANSTATE_LIMIT>"packets"		{ return PACKETS; }
 <SCANSTATE_COUNTER,SCANSTATE_CT,SCANSTATE_LIMIT,SCANSTATE_QUOTA>"bytes"	{ return BYTES; }
 
+"last"				{ scanner_push_start_cond(yyscanner, SCANSTATE_LAST); return LAST; }
+<SCANSTATE_LAST>{
+	"never"			{ return NEVER; }
+}
+
 <SCANSTATE_CMD_LIST,SCANSTATE_CMD_RESET>{
 	"counters"		{ return COUNTERS; }
 	"quotas"		{ return QUOTAS; }
+	"rules"			{ return RULES; }
 }
 
 "log"			{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_LOG); return LOG; }
@@ -433,9 +443,10 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 
 "quota"			{ scanner_push_start_cond(yyscanner, SCANSTATE_QUOTA); return QUOTA; }
 <SCANSTATE_QUOTA>{
-	"used"		{ return USED; }
 	"until"		{ return UNTIL; }
 }
+
+<SCANSTATE_QUOTA,SCANSTATE_LAST>"used"		{ return USED; }
 
 "hour"			{ return HOUR; }
 "day"			{ return DAY; }
@@ -493,7 +504,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 }
 
 "ip"			{ scanner_push_start_cond(yyscanner, SCANSTATE_IP); return IP; }
-<SCANSTATE_IP,SCANSTATE_IP6,SCANSTATE_EXPR_OSF>{
+<SCANSTATE_IP,SCANSTATE_IP6,SCANSTATE_EXPR_OSF,SCANSTATE_GRE>{
 	"version"		{ return HDRVERSION; }
 }
 <SCANSTATE_EXPR_AH,SCANSTATE_EXPR_DST,SCANSTATE_EXPR_HBH,SCANSTATE_EXPR_MH,SCANSTATE_EXPR_RT,SCANSTATE_IP>{
@@ -510,7 +521,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_EXPR_OSF,SCANSTATE_IP>{
 	"ttl"			{ return TTL; }
 }
-<SCANSTATE_CT,SCANSTATE_IP,SCANSTATE_META,SCANSTATE_TYPE>"protocol"		{ return PROTOCOL; }
+<SCANSTATE_CT,SCANSTATE_IP,SCANSTATE_META,SCANSTATE_TYPE,SCANSTATE_GRE>"protocol"		{ return PROTOCOL; }
 <SCANSTATE_EXPR_MH,SCANSTATE_EXPR_UDP,SCANSTATE_EXPR_UDPLITE,SCANSTATE_ICMP,SCANSTATE_IGMP,SCANSTATE_IP,SCANSTATE_SCTP,SCANSTATE_TCP>{
 	"checksum"		{ return CHECKSUM; }
 }
@@ -621,6 +632,14 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_CT,SCANSTATE_EXPR_DCCP,SCANSTATE_SCTP,SCANSTATE_TCP,SCANSTATE_EXPR_TH,SCANSTATE_EXPR_UDP,SCANSTATE_EXPR_UDPLITE>{
 	"dport"			{ return DPORT; }
 }
+
+"vxlan"			{ return VXLAN; }
+"vni"			{ return VNI; }
+
+"geneve"		{ return GENEVE; }
+
+"gre"			{ scanner_push_start_cond(yyscanner, SCANSTATE_GRE); return GRE; }
+"gretap"		{ scanner_push_start_cond(yyscanner, SCANSTATE_GRE); return GRETAP; }
 
 "tcp"			{ scanner_push_start_cond(yyscanner, SCANSTATE_TCP); return TCP; }
 
@@ -819,10 +838,23 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 				return STRING;
 			}
 
-{numberstring}		{
+{hexstring}		{
 				errno = 0;
-				yylval->val = strtoull(yytext, NULL, 0);
+				yylval->val = strtoull(yytext, NULL, 16);
 				if (errno != 0) {
+					yylval->string = xstrdup(yytext);
+					return STRING;
+				}
+				return NUM;
+			}
+
+{decstring}		{
+				int base = yytext[0] == '0' ? 8 : 10;
+				char *end;
+
+				errno = 0;
+				yylval->val = strtoull(yytext, &end, base);
+				if (errno != 0 || *end) {
 					yylval->string = xstrdup(yytext);
 					return STRING;
 				}

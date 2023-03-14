@@ -2,9 +2,8 @@
  * Copyright (c) 2017 Eric Leblond <eric@regit.org>
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
+ * it under the terms of the GNU General Public License version 2 (or any
+ * later) as published by the Free Software Foundation.
  */
 #include <nftables/libnftables.h>
 #include <erec.h>
@@ -520,6 +519,13 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 	if (nft_cmd_collapse(cmds))
 		collapsed = true;
 
+	list_for_each_entry(cmd, cmds, list) {
+		if (cmd->op != CMD_ADD)
+			continue;
+
+		nft_cmd_expand(cmd);
+	}
+
 	list_for_each_entry_safe(cmd, next, cmds, list) {
 		struct eval_ctx ectx = {
 			.nft	= nft,
@@ -543,7 +549,7 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 		if (cmd->op != CMD_ADD)
 			continue;
 
-		nft_cmd_expand(cmd);
+		nft_cmd_post_expand(cmd);
 	}
 
 	return 0;

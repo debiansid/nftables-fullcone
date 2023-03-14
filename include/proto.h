@@ -96,6 +96,10 @@ enum proto_desc_id {
 	PROTO_DESC_ARP,
 	PROTO_DESC_VLAN,
 	PROTO_DESC_ETHER,
+	PROTO_DESC_VXLAN,
+	PROTO_DESC_GENEVE,
+	PROTO_DESC_GRE,
+	PROTO_DESC_GRETAP,
 	__PROTO_DESC_MAX
 };
 #define PROTO_DESC_MAX	(__PROTO_DESC_MAX - 1)
@@ -131,7 +135,11 @@ struct proto_desc {
 		uint32_t			filter;
 	}				format;
 	unsigned int			pseudohdr[PROTO_HDRS_MAX];
-
+	struct {
+		uint32_t		hdrsize;
+		uint32_t		flags;
+		enum nft_inner_type	type;
+	} inner;
 };
 
 #define PROTO_LINK(__num, __desc)	{ .num = (__num), .desc = (__desc), }
@@ -185,6 +193,7 @@ extern const struct proto_desc *proto_dev_desc(uint16_t type);
 struct proto_ctx {
 	unsigned int			debug_mask;
 	uint8_t				family;
+	bool				inner;
 	union {
 		struct {
 			uint8_t			type;
@@ -204,7 +213,7 @@ struct proto_ctx {
 };
 
 extern void proto_ctx_init(struct proto_ctx *ctx, unsigned int family,
-			   unsigned int debug_mask);
+			   unsigned int debug_mask, bool inner);
 extern void proto_ctx_update(struct proto_ctx *ctx, enum proto_bases base,
 			     const struct location *loc,
 			     const struct proto_desc *desc);
@@ -216,6 +225,8 @@ extern const struct proto_desc *proto_find_upper(const struct proto_desc *base,
 						 unsigned int num);
 extern int proto_find_num(const struct proto_desc *base,
 			  const struct proto_desc *desc);
+const struct proto_desc *proto_find_inner(uint32_t type, uint32_t hdrsize,
+					  uint32_t flags);
 
 extern const struct proto_desc *proto_find_desc(enum proto_desc_id desc_id);
 
@@ -263,6 +274,7 @@ enum ip_hdr_fields {
 	IPHDR_SADDR,
 	IPHDR_DADDR,
 };
+#define IPHDR_MAX	IPHDR_DADDR
 
 enum icmp_hdr_fields {
 	ICMPHDR_INVALID,
@@ -376,6 +388,45 @@ enum th_hdr_fields {
 	THDR_DPORT,
 };
 
+struct vxlanhdr {
+	uint32_t vx_flags;
+	uint32_t vx_vni;
+};
+
+enum vxlan_hdr_fields {
+	VXLANHDR_INVALID,
+	VXLANHDR_VNI,
+	VXLANHDR_FLAGS,
+};
+
+struct gnvhdr {
+	uint16_t flags;
+	uint16_t type;
+	uint32_t vni;
+};
+enum geneve_hdr_fields {
+	GNVHDR_INVALID,
+	GNVHDR_VNI,
+	GNVHDR_TYPE,
+};
+
+struct grehdr {
+	uint16_t flags;
+	uint16_t protocol;
+};
+
+enum gre_hdr_fields {
+	GREHDR_INVALID,
+	GREHDR_VERSION,
+	GREHDR_FLAGS,
+	GREHDR_PROTOCOL,
+};
+
+extern const struct proto_desc proto_vxlan;
+extern const struct proto_desc proto_geneve;
+extern const struct proto_desc proto_gre;
+extern const struct proto_desc proto_gretap;
+
 extern const struct proto_desc proto_icmp;
 extern const struct proto_desc proto_igmp;
 extern const struct proto_desc proto_ah;
@@ -412,5 +463,8 @@ extern const struct datatype arpop_type;
 extern const struct datatype icmp6_type_type;
 extern const struct datatype dscp_type;
 extern const struct datatype ecn_type;
+
+struct eval_ctx;
+struct proto_ctx *eval_proto_ctx(struct eval_ctx *ctx);
 
 #endif /* NFTABLES_PROTO_H */

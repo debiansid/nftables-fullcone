@@ -23,7 +23,7 @@
  * @TYPE_INET_SERVICE:	internet service (integer subtype)
  * @TYPE_ICMP_TYPE:	ICMP type codes (integer subtype)
  * @TYPE_TCP_FLAG:	TCP flag (bitmask subtype)
- * @TCPE_DCCP_PKTTYPE:	DCCP packet type (integer subtype)
+ * @TYPE_DCCP_PKTTYPE:	DCCP packet type (integer subtype)
  * @TYPE_MH_TYPE:	Mobility Header type (integer subtype)
  * @TYPE_TIME:		relative time
  * @TYPE_MARK:		packet mark (integer subtype)

@@ -249,6 +249,36 @@ struct stmt *counter_stmt_alloc(const struct location *loc)
 	return stmt;
 }
 
+static void last_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+{
+	nft_print(octx, "last");
+
+	if (nft_output_stateless(octx))
+		return;
+
+	nft_print(octx, " used ");
+
+	if (stmt->last.set)
+		time_print(stmt->last.used, octx);
+	else
+		nft_print(octx, "never");
+}
+
+static const struct stmt_ops last_stmt_ops = {
+	.type		= STMT_LAST,
+	.name		= "last",
+	.print		= last_stmt_print,
+};
+
+struct stmt *last_stmt_alloc(const struct location *loc)
+{
+	struct stmt *stmt;
+
+	stmt = stmt_alloc(loc, &last_stmt_ops);
+	stmt->flags |= STMT_F_STATEFUL;
+	return stmt;
+}
+
 static const char *objref_type[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_COUNTER]	= "counter",
 	[NFT_OBJECT_QUOTA]	= "quota",

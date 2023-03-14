@@ -316,6 +316,7 @@ struct expr {
 			/* EXPR_PAYLOAD */
 			const struct proto_desc		*desc;
 			const struct proto_hdr_template	*tmpl;
+			const struct proto_desc		*inner_desc;
 			enum proto_bases		base;
 			unsigned int			offset;
 			bool				is_raw;
@@ -334,6 +335,7 @@ struct expr {
 			/* EXPR_META */
 			enum nft_meta_keys	key;
 			enum proto_bases	base;
+			const struct proto_desc	*inner_desc;
 		} meta;
 		struct {
 			/* SOCKET */

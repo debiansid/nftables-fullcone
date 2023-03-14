@@ -4,6 +4,7 @@ set -e
 
 RULESET="table ip test1 {
         chain y {
+                oif lo accept
                 ip saddr 4.4.4.4 dnat to 1.1.1.1
                 ip saddr 5.5.5.5 dnat to 2.2.2.2
         }
@@ -13,6 +14,7 @@ $NFT -o -f - <<< $RULESET
 
 RULESET="table ip test2 {
         chain y {
+                oif lo accept
                 tcp dport 80 dnat to 1.1.1.1:8001
                 tcp dport 81 dnat to 2.2.2.2:9001
         }
@@ -22,8 +24,10 @@ $NFT -o -f - <<< $RULESET
 
 RULESET="table ip test3 {
         chain y {
+                oif lo accept
                 ip saddr 1.1.1.1 tcp sport 1024-65535 snat to 3.3.3.3
                 ip saddr 2.2.2.2 tcp sport 1024-65535 snat to 4.4.4.4
+                oifname enp2s0 snat ip to ip saddr map { 10.1.1.0/24 : 72.2.3.66-72.2.3.78 }
         }
 }"
 
@@ -31,9 +35,26 @@ $NFT -o -f - <<< $RULESET
 
 RULESET="table ip test4 {
         chain y {
+                oif lo accept
                 ip daddr 1.1.1.1 tcp dport 80 dnat to 4.4.4.4:8000
                 ip daddr 2.2.2.2 tcp dport 81 dnat to 3.3.3.3:9000
         }
+}"
+
+$NFT -o -f - <<< $RULESET
+
+RULESET="table inet nat {
+	chain prerouting {
+		oif lo accept
+		iifname enp2s0 ip daddr 72.2.3.66 tcp dport 53122 dnat to 10.1.1.10:22
+		iifname enp2s0 ip daddr 72.2.3.66 tcp dport 443 dnat to 10.1.1.52:443
+		iifname enp2s0 ip daddr 72.2.3.70 tcp dport 80 dnat to 10.1.1.52:80
+	}
+	chain postrouting {
+		oif lo accept
+		ip daddr 72.2.3.66 snat to 10.2.2.2
+		ip daddr 72.2.3.67 snat to 10.2.3.3
+	}
 }"
 
 $NFT -o -f - <<< $RULESET

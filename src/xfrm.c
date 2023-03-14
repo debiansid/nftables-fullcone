@@ -1,9 +1,11 @@
 /*
  * XFRM (ipsec) expression
  *
+ * Copyright (c) Red Hat GmbH.  Author: Florian Westphal <fw@strlen.de>
+ *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * it under the terms of the GNU General Public License version 2 (or any
+ * later) as published by the Free Software Foundation.
  */
 
 #include <nftables.h>

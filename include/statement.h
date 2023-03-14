@@ -47,6 +47,13 @@ struct counter_stmt {
 
 extern struct stmt *counter_stmt_alloc(const struct location *loc);
 
+struct last_stmt {
+	uint64_t		used;
+	uint32_t		set;
+};
+
+extern struct stmt *last_stmt_alloc(const struct location *loc);
+
 struct exthdr_stmt {
 	struct expr			*expr;
 	struct expr			*val;
@@ -303,6 +310,7 @@ extern struct stmt *xt_stmt_alloc(const struct location *loc);
  * @STMT_SYNPROXY:	synproxy statement
  * @STMT_CHAIN:		chain statement
  * @STMT_OPTSTRIP:	optstrip statement
+ * @STMT_LAST:		last statement
  */
 enum stmt_types {
 	STMT_INVALID,
@@ -333,6 +341,7 @@ enum stmt_types {
 	STMT_SYNPROXY,
 	STMT_CHAIN,
 	STMT_OPTSTRIP,
+	STMT_LAST,
 };
 
 /**
@@ -382,6 +391,7 @@ struct stmt {
 		struct counter_stmt	counter;
 		struct payload_stmt	payload;
 		struct meta_stmt	meta;
+		struct last_stmt	last;
 		struct log_stmt		log;
 		struct limit_stmt	limit;
 		struct reject_stmt	reject;

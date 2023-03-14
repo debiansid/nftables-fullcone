@@ -29,6 +29,7 @@
 extern const struct expr_ops ct_expr_ops;
 extern const struct expr_ops fib_expr_ops;
 extern const struct expr_ops hash_expr_ops;
+extern const struct expr_ops inner_expr_ops;
 extern const struct expr_ops meta_expr_ops;
 extern const struct expr_ops numgen_expr_ops;
 extern const struct expr_ops osf_expr_ops;

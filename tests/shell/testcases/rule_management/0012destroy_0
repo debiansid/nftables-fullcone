@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+$NFT add table t
+$NFT add chain t c
+
+$NFT destroy rule t c handle 3333

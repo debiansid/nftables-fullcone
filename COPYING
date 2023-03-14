@@ -1,8 +1,8 @@
+Original author of nftables distributed the code under the terms of the
+GPL version 2 *only*. New code though is moving to GPL version 2 or any
+later which is the preferred license for this project these days.
 
-nftables is distributed under the terms of the GPL version 2. Note that
-*only* version 2 of the GPL applies, not "any later version".
-
-Patrick McHardy <kaber@trash.net>
+Pablo Neira Ayuso <pablo@netfilter.org>
 
 -------------------------------------------------------------------------------
 

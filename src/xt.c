@@ -2,9 +2,9 @@
  * Copyright (c) 2013-2015 Pablo Neira Ayuso <pablo@netfilter.org>
  * Copyright (c) 2015 Arturo Borrero Gonzalez <arturo@debian.org>
  *
- * This program is free software; you can redistribute it and/or modifyi
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 (or any
+ * later) as published by the Free Software Foundation.
  */
 
 #include <stdlib.h>
@@ -116,7 +116,7 @@ void xt_stmt_xlate(const struct stmt *stmt, struct output_ctx *octx)
 	xfree(entry);
 #endif
 	if (!rc)
-		nft_print(octx, "xt %s %s",
+		nft_print(octx, "xt %s \"%s\"",
 			  typename[stmt->xt.type], stmt->xt.name);
 }
 
@@ -267,10 +267,12 @@ static bool is_watcher(uint32_t family, struct stmt *stmt)
 void stmt_xt_postprocess(struct rule_pp_ctx *rctx, struct stmt *stmt,
 			 struct rule *rule)
 {
-	if (is_watcher(rctx->pctx.family, stmt))
+	struct dl_proto_ctx *dl = dl_proto_ctx(rctx);
+
+	if (is_watcher(dl->pctx.family, stmt))
 		stmt->xt.type = NFT_XT_WATCHER;
 
-	stmt->xt.proto = xt_proto(&rctx->pctx);
+	stmt->xt.proto = xt_proto(&dl->pctx);
 }
 
 static int nft_xt_compatible_revision(const char *name, uint8_t rev, int opt)

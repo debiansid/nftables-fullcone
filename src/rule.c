@@ -1298,181 +1298,6 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 	return cmd;
 }
 
-void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc)
-{
-	if (cmd->num_attrs >= cmd->attr_array_len) {
-		cmd->attr_array_len *= 2;
-		cmd->attr = xrealloc(cmd->attr, sizeof(struct nlerr_loc) * cmd->attr_array_len);
-	}
-
-	cmd->attr[cmd->num_attrs].offset = offset;
-	cmd->attr[cmd->num_attrs].location = loc;
-	cmd->num_attrs++;
-}
-
-void nft_cmd_expand(struct cmd *cmd)
-{
-	struct list_head new_cmds;
-	struct flowtable *ft;
-	struct table *table;
-	struct chain *chain;
-	struct rule *rule;
-	struct set *set;
-	struct obj *obj;
-	struct cmd *new;
-	struct handle h;
-
-	init_list_head(&new_cmds);
-
-	switch (cmd->obj) {
-	case CMD_OBJ_TABLE:
-		table = cmd->table;
-		if (!table)
-			return;
-
-		list_for_each_entry(chain, &table->chains, list) {
-			memset(&h, 0, sizeof(h));
-			handle_merge(&h, &chain->handle);
-			h.chain_id = chain->handle.chain_id;
-			new = cmd_alloc(CMD_ADD, CMD_OBJ_CHAIN, &h,
-					&chain->location, chain_get(chain));
-			list_add_tail(&new->list, &new_cmds);
-		}
-		list_for_each_entry(obj, &table->objs, list) {
-			handle_merge(&obj->handle, &table->handle);
-			memset(&h, 0, sizeof(h));
-			handle_merge(&h, &obj->handle);
-			new = cmd_alloc(CMD_ADD, obj_type_to_cmd(obj->type), &h,
-					&obj->location, obj_get(obj));
-			list_add_tail(&new->list, &new_cmds);
-		}
-		list_for_each_entry(set, &table->sets, list) {
-			handle_merge(&set->handle, &table->handle);
-			memset(&h, 0, sizeof(h));
-			handle_merge(&h, &set->handle);
-			new = cmd_alloc(CMD_ADD, CMD_OBJ_SET, &h,
-					&set->location, set_get(set));
-			list_add_tail(&new->list, &new_cmds);
-		}
-		list_for_each_entry(ft, &table->flowtables, list) {
-			handle_merge(&ft->handle, &table->handle);
-			memset(&h, 0, sizeof(h));
-			handle_merge(&h, &ft->handle);
-			new = cmd_alloc(CMD_ADD, CMD_OBJ_FLOWTABLE, &h,
-					&ft->location, flowtable_get(ft));
-			list_add_tail(&new->list, &new_cmds);
-		}
-		list_for_each_entry(chain, &table->chains, list) {
-			list_for_each_entry(rule, &chain->rules, list) {
-				memset(&h, 0, sizeof(h));
-				handle_merge(&h, &rule->handle);
-				if (chain->flags & CHAIN_F_BINDING) {
-					rule->handle.chain_id =
-						chain->handle.chain_id;
-					rule->handle.chain.location =
-						chain->location;
-				}
-				new = cmd_alloc(CMD_ADD, CMD_OBJ_RULE, &h,
-						&rule->location,
-						rule_get(rule));
-				list_add_tail(&new->list, &new_cmds);
-			}
-		}
-		list_splice(&new_cmds, &cmd->list);
-		break;
-	case CMD_OBJ_SET:
-	case CMD_OBJ_MAP:
-		set = cmd->set;
-		if (!set->init)
-			break;
-
-		memset(&h, 0, sizeof(h));
-		handle_merge(&h, &set->handle);
-		new = cmd_alloc(CMD_ADD, CMD_OBJ_SETELEMS, &h,
-				&set->location, set_get(set));
-		list_add(&new->list, &cmd->list);
-		break;
-	default:
-		break;
-	}
-}
-
-bool nft_cmd_collapse(struct list_head *cmds)
-{
-	struct cmd *cmd, *next, *elems = NULL;
-	struct expr *expr, *enext;
-	bool collapse = false;
-
-	list_for_each_entry_safe(cmd, next, cmds, list) {
-		if (cmd->op != CMD_ADD &&
-		    cmd->op != CMD_CREATE) {
-			elems = NULL;
-			continue;
-		}
-
-		if (cmd->obj != CMD_OBJ_ELEMENTS) {
-			elems = NULL;
-			continue;
-		}
-
-		if (!elems) {
-			elems = cmd;
-			continue;
-		}
-
-		if (cmd->op != elems->op) {
-			elems = cmd;
-			continue;
-		}
-
-		if (elems->handle.family != cmd->handle.family ||
-		    strcmp(elems->handle.table.name, cmd->handle.table.name) ||
-		    strcmp(elems->handle.set.name, cmd->handle.set.name)) {
-			elems = cmd;
-			continue;
-		}
-
-		collapse = true;
-		list_for_each_entry_safe(expr, enext, &cmd->expr->expressions, list) {
-			expr->cmd = cmd;
-			list_move_tail(&expr->list, &elems->expr->expressions);
-		}
-		elems->expr->size += cmd->expr->size;
-		list_move_tail(&cmd->list, &elems->collapse_list);
-	}
-
-	return collapse;
-}
-
-void nft_cmd_uncollapse(struct list_head *cmds)
-{
-	struct cmd *cmd, *cmd_next, *collapse_cmd, *collapse_cmd_next;
-	struct expr *expr, *next;
-
-	list_for_each_entry_safe(cmd, cmd_next, cmds, list) {
-		if (list_empty(&cmd->collapse_list))
-			continue;
-
-		assert(cmd->obj == CMD_OBJ_ELEMENTS);
-
-		list_for_each_entry_safe(expr, next, &cmd->expr->expressions, list) {
-			if (!expr->cmd)
-				continue;
-
-			list_move_tail(&expr->list, &expr->cmd->expr->expressions);
-			cmd->expr->size--;
-			expr->cmd = NULL;
-		}
-
-		list_for_each_entry_safe(collapse_cmd, collapse_cmd_next, &cmd->collapse_list, list) {
-			if (cmd->elem.set)
-				collapse_cmd->elem.set = set_get(cmd->elem.set);
-
-			list_add(&collapse_cmd->list, &cmd->list);
-		}
-	}
-}
-
 struct markup *markup_alloc(uint32_t format)
 {
 	struct markup *markup;
@@ -2504,6 +2329,8 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SET:
 		return do_list_set(ctx, cmd, table);
 	case CMD_OBJ_RULESET:
+	case CMD_OBJ_RULES:
+	case CMD_OBJ_RULE:
 		return do_list_ruleset(ctx, cmd);
 	case CMD_OBJ_METERS:
 		return do_list_sets(ctx, cmd);
@@ -2611,6 +2438,14 @@ static int do_command_reset(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_QUOTA:
 		type = NFT_OBJECT_QUOTA;
 		break;
+	case CMD_OBJ_RULES:
+		ret = netlink_reset_rules(ctx, cmd, true);
+		if (ret < 0)
+			return ret;
+
+		return do_command_list(ctx, cmd);
+	case CMD_OBJ_RULE:
+		return netlink_reset_rules(ctx, cmd, false);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
@@ -2728,6 +2563,7 @@ int do_command(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_REPLACE:
 		return do_command_replace(ctx, cmd);
 	case CMD_DELETE:
+	case CMD_DESTROY:
 		return do_command_delete(ctx, cmd);
 	case CMD_GET:
 		return do_command_get(ctx, cmd);
@@ -2902,7 +2738,8 @@ static void stmt_reduce(const struct rule *rule)
 			switch (stmt->expr->op) {
 			case OP_EQ:
 			case OP_IMPLICIT:
-				if (stmt->expr->left->meta.key == NFT_META_PROTOCOL) {
+				if (stmt->expr->left->meta.key == NFT_META_PROTOCOL &&
+				    !stmt->expr->left->meta.inner_desc) {
 					uint16_t protocol;
 
 					protocol = mpz_get_uint16(stmt->expr->right->value);

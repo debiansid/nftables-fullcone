@@ -15,3 +15,5 @@ meta obrname "br0";fail
 
 meta sdif "lo" accept;ok
 meta sdifname != "vrf1" accept;ok
+
+meta mark set ip dscp;ok

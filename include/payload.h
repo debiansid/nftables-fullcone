@@ -15,6 +15,8 @@ struct eval_ctx;
 struct stmt;
 extern int payload_gen_dependency(struct eval_ctx *ctx, const struct expr *expr,
 				  struct stmt **res);
+int payload_gen_inner_dependency(struct eval_ctx *ctx, const struct expr *expr,
+				 struct stmt **res);
 extern int payload_gen_icmp_dependency(struct eval_ctx *ctx,
 				       const struct expr *expr,
 				       struct stmt **res);
@@ -66,5 +68,7 @@ extern void payload_expr_complete(struct expr *expr,
 				  const struct proto_ctx *ctx);
 
 bool payload_expr_cmp(const struct expr *e1, const struct expr *e2);
+
+const struct proto_desc *find_proto_desc(const struct nftnl_udata *ud);
 
 #endif /* NFTABLES_PAYLOAD_H */

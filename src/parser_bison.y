@@ -291,6 +291,8 @@ int nft_lex(void *, void *, void *);
 %token DESCRIBE			"describe"
 %token IMPORT			"import"
 %token EXPORT			"export"
+%token DESTROY			"destroy"
+
 %token MONITOR			"monitor"
 
 %token ALL			"all"
@@ -439,6 +441,14 @@ int nft_lex(void *, void *, void *);
 
 %token DCCP			"dccp"
 
+%token VXLAN			"vxlan"
+%token VNI			"vni"
+
+%token GRE			"gre"
+%token GRETAP			"gretap"
+
+%token GENEVE			"geneve"
+
 %token SCTP			"sctp"
 %token CHUNK			"chunk"
 %token DATA			"data"
@@ -544,6 +554,9 @@ int nft_lex(void *, void *, void *);
 %token BYTES			"bytes"
 %token AVGPKT			"avgpkt"
 
+%token LAST			"last"
+%token NEVER			"never"
+
 %token COUNTERS			"counters"
 %token QUOTAS			"quotas"
 %token LIMITS			"limits"
@@ -642,8 +655,8 @@ int nft_lex(void *, void *, void *);
 %type <cmd>			line
 %destructor { cmd_free($$); }	line
 
-%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
-%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd
+%type <cmd>			base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd destroy_cmd
+%destructor { cmd_free($$); }	base_cmd add_cmd replace_cmd create_cmd insert_cmd delete_cmd get_cmd list_cmd reset_cmd flush_cmd rename_cmd export_cmd monitor_cmd describe_cmd import_cmd destroy_cmd
 
 %type <handle>			table_spec tableid_spec table_or_id_spec
 %destructor { handle_free(&$$); } table_spec tableid_spec table_or_id_spec
@@ -700,8 +713,8 @@ int nft_lex(void *, void *, void *);
 %destructor { stmt_list_free($$); xfree($$); } stmt_list stateful_stmt_list set_elem_stmt_list
 %type <stmt>			stmt match_stmt verdict_stmt set_elem_stmt
 %destructor { stmt_free($$); }	stmt match_stmt verdict_stmt set_elem_stmt
-%type <stmt>			counter_stmt counter_stmt_alloc stateful_stmt
-%destructor { stmt_free($$); }	counter_stmt counter_stmt_alloc stateful_stmt
+%type <stmt>			counter_stmt counter_stmt_alloc stateful_stmt last_stmt
+%destructor { stmt_free($$); }	counter_stmt counter_stmt_alloc stateful_stmt last_stmt
 %type <stmt>			payload_stmt
 %destructor { stmt_free($$); }	payload_stmt
 %type <stmt>			ct_stmt
@@ -899,6 +912,13 @@ int nft_lex(void *, void *, void *);
 %type <val>			tcpopt_field_maxseg	tcpopt_field_mptcp	tcpopt_field_sack	 tcpopt_field_tsopt	tcpopt_field_window
 %type <tcp_kind_field>		tcp_hdr_option_kind_and_field
 
+%type <expr>			inner_eth_expr inner_inet_expr inner_expr
+%destructor { expr_free($$); }	inner_eth_expr inner_inet_expr inner_expr
+
+%type <expr>			vxlan_hdr_expr geneve_hdr_expr gre_hdr_expr gretap_hdr_expr
+%destructor { expr_free($$); }	vxlan_hdr_expr geneve_hdr_expr gre_hdr_expr gretap_hdr_expr
+%type <val>			vxlan_hdr_field geneve_hdr_field gre_hdr_field
+
 %type <stmt>			optstrip_stmt
 %destructor { stmt_free($$); }	optstrip_stmt
 
@@ -951,7 +971,9 @@ close_scope_at		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_AT); };
 close_scope_comp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_COMP); };
 close_scope_ct		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CT); };
 close_scope_counter	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_COUNTER); };
+close_scope_last	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_LAST); };
 close_scope_dccp	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_DCCP); };
+close_scope_destroy	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_DESTROY); };
 close_scope_dst		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_DST); };
 close_scope_dup		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_DUP); };
 close_scope_esp		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_ESP); };
@@ -960,6 +982,7 @@ close_scope_export	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_CMD_EXPORT
 close_scope_fib		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FIB); };
 close_scope_frag	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_FRAG); };
 close_scope_fwd		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_STMT_FWD); };
+close_scope_gre		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_GRE); };
 close_scope_hash	: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_HASH); };
 close_scope_hbh		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_EXPR_HBH); };
 close_scope_ip		: { scanner_pop_start_cond(nft->scanner, PARSER_SC_IP); };
@@ -1086,6 +1109,7 @@ base_cmd		:	/* empty */	add_cmd		{ $$ = $1; }
 			|	EXPORT		export_cmd	close_scope_export	{ $$ = $2; }
 			|	MONITOR		monitor_cmd	close_scope_monitor	{ $$ = $2; }
 			|	DESCRIBE	describe_cmd	{ $$ = $2; }
+			|	DESTROY		destroy_cmd	close_scope_destroy	{ $$ = $2; }
 			;
 
 add_cmd			:	TABLE		table_spec
@@ -1393,6 +1417,74 @@ delete_cmd		:	TABLE		table_or_id_spec
 			}
 			;
 
+destroy_cmd		:	TABLE		table_or_id_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_TABLE, &$2, &@$, NULL);
+			}
+			|	CHAIN		chain_or_id_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_CHAIN, &$2, &@$, NULL);
+			}
+			|	RULE		ruleid_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_RULE, &$2, &@$, NULL);
+			}
+			|	SET		set_or_id_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_SET, &$2, &@$, NULL);
+			}
+			|	MAP		set_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_SET, &$2, &@$, NULL);
+			}
+			|	ELEMENT		set_spec	set_block_expr
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
+			}
+			|	FLOWTABLE	flowtable_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_FLOWTABLE, &$2, &@$, NULL);
+			}
+			|	FLOWTABLE	flowtableid_spec
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_FLOWTABLE, &$2, &@$, NULL);
+			}
+			|	FLOWTABLE	flowtable_spec	flowtable_block_alloc
+						'{'	flowtable_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_FLOWTABLE, &$2, &@$, $5);
+			}
+			|	COUNTER		obj_or_id_spec	close_scope_counter
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_COUNTER, &$2, &@$, NULL);
+			}
+			|	QUOTA		obj_or_id_spec	close_scope_quota
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_QUOTA, &$2, &@$, NULL);
+			}
+			|	CT	ct_obj_type	obj_spec	ct_obj_alloc	close_scope_ct
+			{
+				$$ = cmd_alloc_obj_ct(CMD_DESTROY, $2, &$3, &@$, $4);
+				if ($2 == NFT_OBJECT_CT_TIMEOUT)
+					init_list_head(&$4->ct_timeout.timeout_list);
+			}
+			|	LIMIT		obj_or_id_spec	close_scope_limit
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_LIMIT, &$2, &@$, NULL);
+			}
+			|	SECMARK		obj_or_id_spec	close_scope_secmark
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_SECMARK, &$2, &@$, NULL);
+			}
+			|	SYNPROXY	obj_or_id_spec	close_scope_synproxy
+			{
+				$$ = cmd_alloc(CMD_DESTROY, CMD_OBJ_SYNPROXY, &$2, &@$, NULL);
+			}
+			;
+
+
 get_cmd			:	ELEMENT		set_spec	set_block_expr
 			{
 				$$ = cmd_alloc(CMD_GET, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
@@ -1580,6 +1672,22 @@ reset_cmd		:	COUNTERS	ruleset_spec
 			|       QUOTA           obj_spec	close_scope_quota
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_QUOTA, &$2, &@$, NULL);
+			}
+			|	RULES		ruleset_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$2, &@$, NULL);
+			}
+			|	RULES		TABLE	table_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$3, &@$, NULL);
+			}
+			|	RULES		CHAIN	chain_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$3, &@$, NULL);
+			}
+			|	RULE		ruleid_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULE, &$2, &@$, NULL);
 			}
 			;
 
@@ -2582,6 +2690,7 @@ chain_policy		:	ACCEPT		{ $$ = NF_ACCEPT; }
 			;
 
 identifier		:	STRING
+			|	LAST		{ $$ = xstrdup("last"); }
 			;
 
 string			:	STRING
@@ -2862,6 +2971,7 @@ stateful_stmt		:	counter_stmt	close_scope_counter
 			|	limit_stmt
 			|	quota_stmt
 			|	connlimit_stmt
+			|	last_stmt	close_scope_last
 			;
 
 stmt			:	verdict_stmt
@@ -2888,7 +2998,7 @@ stmt			:	verdict_stmt
 			|	xt_stmt		close_scope_xt
 			;
 
-xt_stmt			:	XT	STRING	STRING
+xt_stmt			:	XT	STRING	string
 			{
 				$$ = NULL;
 				xfree($2);
@@ -2997,6 +3107,22 @@ counter_arg		:	PACKETS			NUM
 			|	BYTES			NUM
 			{
 				$<stmt>0->counter.bytes	 = $2;
+			}
+			;
+
+last_stmt		:	LAST
+			{
+				$$ = last_stmt_alloc(&@$);
+			}
+			|	LAST USED	NEVER
+			{
+				$$ = last_stmt_alloc(&@$);
+			}
+			|	LAST USED	time_spec
+			{
+				$$ = last_stmt_alloc(&@$);
+				$$->last.used = $3;
+				$$->last.set = true;
 			}
 			;
 
@@ -4426,6 +4552,32 @@ set_elem_stmt		:	COUNTER	close_scope_counter
 				$$->connlimit.count = $4;
 				$$->connlimit.flags = NFT_CONNLIMIT_F_INV;
 			}
+			|	QUOTA	quota_mode NUM quota_unit quota_used	close_scope_quota
+			{
+				struct error_record *erec;
+				uint64_t rate;
+
+				erec = data_unit_parse(&@$, $4, &rate);
+				xfree($4);
+				if (erec != NULL) {
+					erec_queue(erec, state->msgs);
+					YYERROR;
+				}
+				$$ = quota_stmt_alloc(&@$);
+				$$->quota.bytes	= $3 * rate;
+				$$->quota.used = $5;
+				$$->quota.flags	= $2;
+			}
+			|	LAST USED	NEVER	close_scope_last
+			{
+				$$ = last_stmt_alloc(&@$);
+			}
+			|	LAST USED	time_spec	close_scope_last
+			{
+				$$ = last_stmt_alloc(&@$);
+				$$->last.used = $3;
+				$$->last.set = true;
+			}
 			;
 
 set_elem_expr_option	:	TIMEOUT			time_spec
@@ -4809,9 +4961,11 @@ keyword_expr		:	ETHER   close_scope_eth { $$ = symbol_value(&@$, "ether"); }
 			|	SNAT	close_scope_nat	{ $$ = symbol_value(&@$, "snat"); }
 			|	ECN			{ $$ = symbol_value(&@$, "ecn"); }
 			|	RESET	close_scope_reset	{ $$ = symbol_value(&@$, "reset"); }
+			|	DESTROY	close_scope_destroy	{ $$ = symbol_value(&@$, "destroy"); }
 			|	ORIGINAL		{ $$ = symbol_value(&@$, "original"); }
 			|	REPLY			{ $$ = symbol_value(&@$, "reply"); }
 			|	LABEL			{ $$ = symbol_value(&@$, "label"); }
+			|	LAST	close_scope_last	{ $$ = symbol_value(&@$, "last"); }
 			;
 
 primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
@@ -4870,6 +5024,13 @@ primary_rhs_expr	:	symbol_expr		{ $$ = $1; }
 			|	ICMP6	close_scope_icmp
 			{
 				uint8_t data = IPPROTO_ICMPV6;
+				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
+							 BYTEORDER_HOST_ENDIAN,
+							 sizeof(data) * BITS_PER_BYTE, &data);
+			}
+			|	GRE close_scope_gre
+			{
+				uint8_t data = IPPROTO_GRE;
 				$$ = constant_expr_alloc(&@$, &inet_protocol_type,
 							 BYTEORDER_HOST_ENDIAN,
 							 sizeof(data) * BITS_PER_BYTE, &data);
@@ -5329,6 +5490,10 @@ payload_expr		:	payload_raw_expr
 			|	dccp_hdr_expr
 			|	sctp_hdr_expr
 			|	th_hdr_expr
+			|	vxlan_hdr_expr
+			|	geneve_hdr_expr
+			|	gre_hdr_expr
+			|	gretap_hdr_expr
 			;
 
 payload_raw_expr	:	AT	payload_base_spec	COMMA	NUM	COMMA	NUM	close_scope_at
@@ -5577,6 +5742,94 @@ tcp_hdr_expr		:	TCP	tcp_hdr_field
 			{
 				$$ = tcpopt_expr_alloc(&@$, $5, 0);
 				tcpopt_init_raw($$, $5, $7, $9, 0);
+			}
+			;
+
+inner_inet_expr		:	ip_hdr_expr
+			|	icmp_hdr_expr
+			|	igmp_hdr_expr
+			|	ip6_hdr_expr
+			|	icmp6_hdr_expr
+			|	auth_hdr_expr
+			|	esp_hdr_expr
+			|	comp_hdr_expr
+			|	udp_hdr_expr
+			|	udplite_hdr_expr
+			|	tcp_hdr_expr	close_scope_tcp
+			|	dccp_hdr_expr
+			|	sctp_hdr_expr
+			|	th_hdr_expr
+			;
+
+inner_eth_expr		:	eth_hdr_expr
+			|	vlan_hdr_expr
+			|	arp_hdr_expr
+			;
+
+inner_expr		:	inner_eth_expr
+			|	inner_inet_expr
+			;
+
+vxlan_hdr_expr		:	VXLAN	vxlan_hdr_field
+			{
+				struct expr *expr;
+
+				expr = payload_expr_alloc(&@$, &proto_vxlan, $2);
+				expr->payload.inner_desc = &proto_vxlan;
+				$$ = expr;
+			}
+			|	VXLAN	inner_expr
+			{
+				$$ = $2;
+				$$->location = @$;
+				$$->payload.inner_desc = &proto_vxlan;
+			}
+			;
+
+vxlan_hdr_field		:	VNI			{ $$ = VXLANHDR_VNI; }
+			|	FLAGS			{ $$ = VXLANHDR_FLAGS; }
+			;
+
+geneve_hdr_expr		:	GENEVE	geneve_hdr_field
+			{
+				struct expr *expr;
+
+				expr = payload_expr_alloc(&@$, &proto_geneve, $2);
+				expr->payload.inner_desc = &proto_geneve;
+				$$ = expr;
+			}
+			|	GENEVE	inner_expr
+			{
+				$$ = $2;
+				$$->location = @$;
+				$$->payload.inner_desc = &proto_geneve;
+			}
+			;
+
+geneve_hdr_field	:	VNI			{ $$ = GNVHDR_VNI; }
+			|	TYPE			{ $$ = GNVHDR_TYPE; }
+			;
+
+gre_hdr_expr		:	GRE	gre_hdr_field	close_scope_gre
+			{
+				$$ = payload_expr_alloc(&@$, &proto_gre, $2);
+			}
+			|	GRE	close_scope_gre inner_inet_expr
+			{
+				$$ = $3;
+				$$->payload.inner_desc = &proto_gre;
+			}
+			;
+
+gre_hdr_field		:	HDRVERSION		{ $$ = GREHDR_VERSION;	}
+			|	FLAGS			{ $$ = GREHDR_FLAGS; }
+			|	PROTOCOL		{ $$ = GREHDR_PROTOCOL; }
+			;
+
+gretap_hdr_expr		:	GRETAP	close_scope_gre inner_expr
+			{
+				$$ = $3;
+				$$->payload.inner_desc = &proto_gretap;
 			}
 			;
 
@@ -5927,7 +6180,7 @@ exthdr_exists_expr	:	EXTHDR	exthdr_key
 				desc = exthdr_find_proto($2);
 
 				/* Assume that NEXTHDR template is always
-				 * the fist one in list of templates.
+				 * the first one in list of templates.
 				 */
 				$$ = exthdr_expr_alloc(&@$, desc, 1);
 				$$->exthdr.flags = NFT_EXTHDR_F_PRESENT;

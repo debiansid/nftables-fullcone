@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+struct handle;
+
 enum cache_level_bits {
 	NFT_CACHE_TABLE_BIT	= (1 << 0),
 	NFT_CACHE_CHAIN_BIT	= (1 << 1),
@@ -55,6 +57,7 @@ struct nft_cache_filter {
 		const char	*chain;
 		const char	*set;
 		const char	*ft;
+		uint64_t	rule_handle;
 	} list;
 
 	struct {
@@ -137,5 +140,9 @@ struct nft_cache {
 
 void nft_chain_cache_update(struct netlink_ctx *ctx, struct table *table,
 			    const char *chain);
+
+int rule_cache_dump(struct netlink_ctx *ctx, const struct handle *h,
+		    const struct nft_cache_filter *filter,
+		    bool dump, bool reset);
 
 #endif /* _NFT_CACHE_H_ */

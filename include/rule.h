@@ -563,6 +563,7 @@ void flowtable_print(const struct flowtable *n, struct output_ctx *octx);
  * @CMD_EXPORT:		export the ruleset in a given format
  * @CMD_MONITOR:	event listener
  * @CMD_DESCRIBE:	describe an expression
+ * @CMD_DESTROY:	destroy object
  */
 enum cmd_ops {
 	CMD_INVALID,
@@ -580,6 +581,7 @@ enum cmd_ops {
 	CMD_EXPORT,
 	CMD_MONITOR,
 	CMD_DESCRIBE,
+	CMD_DESTROY,
 };
 
 /**
@@ -620,6 +622,7 @@ enum cmd_obj {
 	CMD_OBJ_SETELEMS,
 	CMD_OBJ_SETS,
 	CMD_OBJ_RULE,
+	CMD_OBJ_RULES,
 	CMD_OBJ_CHAIN,
 	CMD_OBJ_CHAINS,
 	CMD_OBJ_TABLE,
@@ -732,15 +735,10 @@ struct cmd {
 extern struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 			     const struct handle *h, const struct location *loc,
 			     void *data);
-extern void nft_cmd_expand(struct cmd *cmd);
-extern bool nft_cmd_collapse(struct list_head *cmds);
-extern void nft_cmd_uncollapse(struct list_head *cmds);
 extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
 				    const struct handle *h,
 				    const struct location *loc, struct obj *obj);
 extern void cmd_free(struct cmd *cmd);
-
-void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc);
 
 #include <payload.h>
 #include <expression.h>
@@ -769,7 +767,8 @@ struct eval_ctx {
 	struct set		*set;
 	struct stmt		*stmt;
 	struct expr_ctx		ectx;
-	struct proto_ctx	pctx;
+	struct proto_ctx	_pctx[2];
+	const struct proto_desc	*inner_desc;
 };
 
 extern int cmd_evaluate(struct eval_ctx *ctx, struct cmd *cmd);

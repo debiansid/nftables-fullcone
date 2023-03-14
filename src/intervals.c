@@ -416,11 +416,12 @@ static int setelem_delete(struct list_head *msgs, struct set *set,
 				list_del(&i->list);
 				expr_free(i);
 			}
-		} else if (set->automerge &&
-			   setelem_adjust(set, purge, &prev_range, &range, prev, i) < 0) {
-			expr_error(msgs, i, "element does not exist");
-			err = -1;
-			goto err;
+		} else if (set->automerge) {
+			if (setelem_adjust(set, purge, &prev_range, &range, prev, i) < 0) {
+				expr_error(msgs, i, "element does not exist");
+				err = -1;
+				goto err;
+			}
 		} else if (i->flags & EXPR_F_REMOVE) {
 			expr_error(msgs, i, "element does not exist");
 			err = -1;

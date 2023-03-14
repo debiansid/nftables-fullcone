@@ -1,0 +1,19 @@
+Clonando en '/tmp/tmp.L4eY4ZPZJb'...
+hecho.
+configure.ac:45: installing 'build-aux/ar-lib'
+configure.ac:25: installing 'build-aux/compile'
+configure.ac:46: installing 'build-aux/config.guess'
+configure.ac:46: installing 'build-aux/config.sub'
+configure.ac:6: installing 'build-aux/install-sh'
+configure.ac:6: installing 'build-aux/missing'
+src/Makefile.am: installing 'build-aux/depcomp'
+configure.ac: installing 'build-aux/ylwrap'
+/tmp/tmp.L4eY4ZPZJb/src/parser_bison.y:148.1-19: aviso: directiva no válida: «%name-prefix "nft_"», use «%define api.prefix {nft_}» [-Wdeprecated]
+  148 | %name-prefix "nft_"
+      | ^~~~~~~~~~~~~~~~~~~
+      | %define api.prefix {nft_}
+/tmp/tmp.L4eY4ZPZJb/src/parser_bison.y: aviso: fix-its can be applied.  Rerun with option '--update'. [-Wother]
+libtool: warning: remember to run 'libtool --finish /tmp/tmp.L4eY4ZPZJb/nftables-0.9.8/_inst/lib'
+libtool: warning: 'libnftables.la' has not been installed in '/tmp/tmp.L4eY4ZPZJb/nftables-0.9.8/_inst/lib'
+configure: error: No suitable version of linenoise found
+configure: error: No suitable version of libedit found

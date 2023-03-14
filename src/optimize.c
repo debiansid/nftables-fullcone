@@ -21,6 +21,7 @@
 #include <statement.h>
 #include <utils.h>
 #include <erec.h>
+#include <linux/netfilter.h>
 
 #define MAX_STMTS	32
 
@@ -45,6 +46,8 @@ static bool __expr_cmp(const struct expr *expr_a, const struct expr *expr_b)
 		if (expr_a->payload.offset != expr_b->payload.offset)
 			return false;
 		if (expr_a->payload.desc != expr_b->payload.desc)
+			return false;
+		if (expr_a->payload.inner_desc != expr_b->payload.inner_desc)
 			return false;
 		if (expr_a->payload.tmpl != expr_b->payload.tmpl)
 			return false;
@@ -368,6 +371,13 @@ static int rule_collect_stmts(struct optimize_ctx *ctx, struct rule *rule)
 				clone->log.prefix = expr_get(stmt->log.prefix);
 			break;
 		case STMT_NAT:
+			if ((stmt->nat.addr &&
+			     stmt->nat.addr->etype == EXPR_MAP) ||
+			    (stmt->nat.proto &&
+			     stmt->nat.proto->etype == EXPR_MAP)) {
+				clone->ops = &unsupported_stmt_ops;
+				break;
+			}
 			clone->nat.type = stmt->nat.type;
 			clone->nat.family = stmt->nat.family;
 			if (stmt->nat.addr)
@@ -550,20 +560,19 @@ static void merge_stmts(const struct optimize_ctx *ctx,
 	}
 }
 
-static void __merge_concat_stmts(const struct optimize_ctx *ctx, uint32_t i,
-				 const struct merge *merge, struct expr *set)
+static void __merge_concat(const struct optimize_ctx *ctx, uint32_t i,
+			   const struct merge *merge, struct list_head *concat_list)
 {
-	struct expr *concat, *next, *expr, *concat_clone, *clone, *elem;
+	struct expr *concat, *next, *expr, *concat_clone, *clone;
 	LIST_HEAD(pending_list);
-	LIST_HEAD(concat_list);
 	struct stmt *stmt_a;
 	uint32_t k;
 
 	concat = concat_expr_alloc(&internal_location);
-	list_add(&concat->list, &concat_list);
+	list_add(&concat->list, concat_list);
 
 	for (k = 0; k < merge->num_stmts; k++) {
-		list_for_each_entry_safe(concat, next, &concat_list, list) {
+		list_for_each_entry_safe(concat, next, concat_list, list) {
 			stmt_a = ctx->stmt_matrix[i][merge->stmt[k]];
 			switch (stmt_a->expr->right->etype) {
 			case EXPR_SET:
@@ -588,8 +597,17 @@ static void __merge_concat_stmts(const struct optimize_ctx *ctx, uint32_t i,
 				break;
 			}
 		}
-		list_splice_init(&pending_list, &concat_list);
+		list_splice_init(&pending_list, concat_list);
 	}
+}
+
+static void __merge_concat_stmts(const struct optimize_ctx *ctx, uint32_t i,
+				 const struct merge *merge, struct expr *set)
+{
+	struct expr *concat, *next, *elem;
+	LIST_HEAD(concat_list);
+
+	__merge_concat(ctx, i, merge, &concat_list);
 
 	list_for_each_entry_safe(concat, next, &concat_list, list) {
 		list_del(&concat->list);
@@ -728,14 +746,32 @@ static void merge_stmts_vmap(const struct optimize_ctx *ctx,
 	stmt_free(verdict_a);
 }
 
+static void __merge_concat_stmts_vmap(const struct optimize_ctx *ctx,
+				      uint32_t i, const struct merge *merge,
+				      struct expr *set, struct stmt *verdict)
+{
+	struct expr *concat, *next, *elem, *mapping;
+	LIST_HEAD(concat_list);
+
+	__merge_concat(ctx, i, merge, &concat_list);
+
+	list_for_each_entry_safe(concat, next, &concat_list, list) {
+		list_del(&concat->list);
+		elem = set_elem_expr_alloc(&internal_location, concat);
+		mapping = mapping_expr_alloc(&internal_location, elem,
+					     expr_get(verdict->expr));
+		compound_expr_add(set, mapping);
+	}
+}
+
 static void merge_concat_stmts_vmap(const struct optimize_ctx *ctx,
 				    uint32_t from, uint32_t to,
 				    const struct merge *merge)
 {
 	struct stmt *orig_stmt = ctx->stmt_matrix[from][merge->stmt[0]];
-	struct expr *concat_a, *concat_b, *expr, *set;
-	struct stmt *stmt, *stmt_a, *stmt_b, *verdict;
-	uint32_t i, j;
+	struct stmt *stmt, *stmt_a, *verdict;
+	struct expr *concat_a, *expr, *set;
+	uint32_t i;
 	int k;
 
 	k = stmt_verdict_find(ctx);
@@ -753,15 +789,8 @@ static void merge_concat_stmts_vmap(const struct optimize_ctx *ctx,
 	set->set_flags |= NFT_SET_ANONYMOUS;
 
 	for (i = from; i <= to; i++) {
-		concat_b = concat_expr_alloc(&internal_location);
-		for (j = 0; j < merge->num_stmts; j++) {
-			stmt_b = ctx->stmt_matrix[i][merge->stmt[j]];
-			expr = stmt_b->expr->right;
-			compound_expr_add(concat_b, expr_get(expr));
-		}
 		verdict = ctx->stmt_matrix[i][k];
-		build_verdict_map(concat_b, verdict, set);
-		expr_free(concat_b);
+		__merge_concat_stmts_vmap(ctx, i, merge, set, verdict);
 	}
 
 	expr = map_expr_alloc(&internal_location, concat_a, set);
@@ -844,9 +873,9 @@ static void merge_nat(const struct optimize_ctx *ctx,
 		      const struct merge *merge)
 {
 	struct expr *expr, *set, *elem, *nat_expr, *mapping, *left;
+	int k, family = NFPROTO_UNSPEC;
 	struct stmt *stmt, *nat_stmt;
 	uint32_t i;
-	int k;
 
 	k = stmt_nat_find(ctx);
 	assert(k >= 0);
@@ -868,9 +897,18 @@ static void merge_nat(const struct optimize_ctx *ctx,
 
 	stmt = ctx->stmt_matrix[from][merge->stmt[0]];
 	left = expr_get(stmt->expr->left);
+	if (left->etype == EXPR_PAYLOAD) {
+		if (left->payload.desc == &proto_ip)
+			family = NFPROTO_IPV4;
+		else if (left->payload.desc == &proto_ip6)
+			family = NFPROTO_IPV6;
+	}
 	expr = map_expr_alloc(&internal_location, left, set);
 
 	nat_stmt = ctx->stmt_matrix[from][k];
+	if (nat_stmt->nat.family == NFPROTO_UNSPEC)
+		nat_stmt->nat.family = family;
+
 	expr_free(nat_stmt->nat.addr);
 	nat_stmt->nat.addr = expr;
 
@@ -884,9 +922,9 @@ static void merge_concat_nat(const struct optimize_ctx *ctx,
 			     const struct merge *merge)
 {
 	struct expr *expr, *set, *elem, *nat_expr, *mapping, *left, *concat;
+	int k, family = NFPROTO_UNSPEC;
 	struct stmt *stmt, *nat_stmt;
 	uint32_t i, j;
-	int k;
 
 	k = stmt_nat_find(ctx);
 	assert(k >= 0);
@@ -915,11 +953,20 @@ static void merge_concat_nat(const struct optimize_ctx *ctx,
 	for (j = 0; j < merge->num_stmts; j++) {
 		stmt = ctx->stmt_matrix[from][merge->stmt[j]];
 		left = stmt->expr->left;
+		if (left->etype == EXPR_PAYLOAD) {
+			if (left->payload.desc == &proto_ip)
+				family = NFPROTO_IPV4;
+			else if (left->payload.desc == &proto_ip6)
+				family = NFPROTO_IPV6;
+		}
 		compound_expr_add(concat, expr_get(left));
 	}
 	expr = map_expr_alloc(&internal_location, concat, set);
 
 	nat_stmt = ctx->stmt_matrix[from][k];
+	if (nat_stmt->nat.family == NFPROTO_UNSPEC)
+		nat_stmt->nat.family = family;
+
 	expr_free(nat_stmt->nat.addr);
 	nat_stmt->nat.addr = expr;
 
@@ -964,21 +1011,21 @@ static void rule_optimize_print(struct output_ctx *octx,
 	fprintf(octx->error_fp, "%s\n", line);
 }
 
-static enum stmt_types merge_stmt_type(const struct optimize_ctx *ctx)
+static enum stmt_types merge_stmt_type(const struct optimize_ctx *ctx,
+				       uint32_t from, uint32_t to)
 {
-	uint32_t i;
+	uint32_t i, j;
 
-	for (i = 0; i < ctx->num_stmts; i++) {
-		switch (ctx->stmt[i]->ops->type) {
-		case STMT_VERDICT:
-		case STMT_NAT:
-			return ctx->stmt[i]->ops->type;
-		default:
-			continue;
+	for (i = from; i <= to; i++) {
+		for (j = 0; j < ctx->num_stmts; j++) {
+			if (!ctx->stmt_matrix[i][j])
+				continue;
+			if (ctx->stmt_matrix[i][j]->ops->type == STMT_NAT)
+				return STMT_NAT;
 		}
 	}
 
-	/* actually no verdict, this assumes rules have the same verdict. */
+	/* merge by verdict, even if no verdict is specified. */
 	return STMT_VERDICT;
 }
 
@@ -991,7 +1038,7 @@ static void merge_rules(const struct optimize_ctx *ctx,
 	bool same_verdict;
 	uint32_t i;
 
-	stmt_type = merge_stmt_type(ctx);
+	stmt_type = merge_stmt_type(ctx, from, to);
 
 	switch (stmt_type) {
 	case STMT_VERDICT:
@@ -1111,10 +1158,11 @@ static int chain_optimize(struct nft_ctx *nft, struct list_head *rules)
 		ctx->num_rules++;
 	}
 
-	ctx->rule = xzalloc(sizeof(ctx->rule) * ctx->num_rules);
-	ctx->stmt_matrix = xzalloc(sizeof(struct stmt *) * ctx->num_rules);
+	ctx->rule = xzalloc(sizeof(*ctx->rule) * ctx->num_rules);
+	ctx->stmt_matrix = xzalloc(sizeof(*ctx->stmt_matrix) * ctx->num_rules);
 	for (i = 0; i < ctx->num_rules; i++)
-		ctx->stmt_matrix[i] = xzalloc(sizeof(struct stmt *) * MAX_STMTS);
+		ctx->stmt_matrix[i] = xzalloc_array(MAX_STMTS,
+						    sizeof(**ctx->stmt_matrix));
 
 	merge = xzalloc(sizeof(*merge) * ctx->num_rules);
 
@@ -1214,7 +1262,7 @@ static int cmd_optimize(struct nft_ctx *nft, struct cmd *cmd)
 int nft_optimize(struct nft_ctx *nft, struct list_head *cmds)
 {
 	struct cmd *cmd;
-	int ret;
+	int ret = 0;
 
 	list_for_each_entry(cmd, cmds, list) {
 		switch (cmd->op) {

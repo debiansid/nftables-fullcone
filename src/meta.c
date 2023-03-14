@@ -433,7 +433,7 @@ success:
 	cur_tm = localtime(&ts);
 
 	if (ts == (time_t) -1 || cur_tm == NULL)
-		return ts;
+		return false;
 
 	/* Substract tm_gmtoff to get the current time */
 	*tstamp = ts - cur_tm->tm_gmtoff;
@@ -734,6 +734,7 @@ static void meta_expr_clone(struct expr *new, const struct expr *expr)
 {
 	new->meta.key = expr->meta.key;
 	new->meta.base = expr->meta.base;
+	new->meta.inner_desc = expr->meta.inner_desc;
 }
 
 /**
@@ -807,12 +808,18 @@ static void meta_expr_pctx_update(struct proto_ctx *ctx,
 }
 
 #define NFTNL_UDATA_META_KEY 0
-#define NFTNL_UDATA_META_MAX 1
+#define NFTNL_UDATA_META_INNER_DESC 1
+#define NFTNL_UDATA_META_MAX 2
 
 static int meta_expr_build_udata(struct nftnl_udata_buf *udbuf,
 				 const struct expr *expr)
 {
 	nftnl_udata_put_u32(udbuf, NFTNL_UDATA_META_KEY, expr->meta.key);
+
+	if (expr->meta.inner_desc) {
+		nftnl_udata_put_u32(udbuf, NFTNL_UDATA_META_INNER_DESC,
+				    expr->meta.inner_desc->id);
+	}
 
 	return 0;
 }
@@ -825,6 +832,7 @@ static int meta_parse_udata(const struct nftnl_udata *attr, void *data)
 
 	switch (type) {
 	case NFTNL_UDATA_META_KEY:
+	case NFTNL_UDATA_META_INNER_DESC:
 		if (len != sizeof(uint32_t))
 			return -1;
 		break;
@@ -839,6 +847,8 @@ static int meta_parse_udata(const struct nftnl_udata *attr, void *data)
 static struct expr *meta_expr_parse_udata(const struct nftnl_udata *attr)
 {
 	const struct nftnl_udata *ud[NFTNL_UDATA_META_MAX + 1] = {};
+	const struct proto_desc *desc;
+	struct expr *expr;
 	uint32_t key;
 	int err;
 
@@ -852,7 +862,14 @@ static struct expr *meta_expr_parse_udata(const struct nftnl_udata *attr)
 
 	key = nftnl_udata_get_u32(ud[NFTNL_UDATA_META_KEY]);
 
-	return meta_expr_alloc(&internal_location, key);
+	expr = meta_expr_alloc(&internal_location, key);
+
+	if (ud[NFTNL_UDATA_META_INNER_DESC]) {
+		desc = find_proto_desc(ud[NFTNL_UDATA_META_INNER_DESC]);
+		expr->meta.inner_desc = desc;
+	}
+
+	return expr;
 }
 
 const struct expr_ops meta_expr_ops = {

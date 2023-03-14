@@ -322,9 +322,10 @@ TABLES
 ------
 [verse]
 {*add* | *create*} *table* ['family'] 'table' [ {*comment* 'comment' *;*'} *{ flags* 'flags' *; }*]
-{*delete* | *list* | *flush*} *table* ['family'] 'table'
+{*delete* | *destroy* | *list* | *flush*} *table* ['family'] 'table'
 *list tables* ['family']
 *delete table* ['family'] *handle* 'handle'
+*destroy table* ['family'] *handle* 'handle'
 
 Tables are containers for chains, sets and stateful objects. They are identified
 by their address family and their name. The address family must be one of *ip*,
@@ -368,6 +369,7 @@ add table inet mytable
 [horizontal]
 *add*:: Add a new table for the given family with the given name.
 *delete*:: Delete the specified table.
+*destroy*:: Delete the specified table, it does not fail if it does not exist.
 *list*:: List all chains and rules of the specified table.
 *flush*:: Flush all chains and rules of the specified table.
 
@@ -375,9 +377,10 @@ CHAINS
 ------
 [verse]
 {*add* | *create*} *chain* ['family'] 'table' 'chain' [*{ type* 'type' *hook* 'hook' [*device* 'device'] *priority* 'priority' *;* [*policy* 'policy' *;*] [*comment* 'comment' *;*'] *}*]
-{*delete* | *list* | *flush*} *chain* ['family'] 'table' 'chain'
+{*delete* | *destroy* | *list* | *flush*} *chain* ['family'] 'table' 'chain'
 *list chains* ['family']
 *delete chain* ['family'] 'table' *handle* 'handle'
+*destroy chain* ['family'] 'table' *handle* 'handle'
 *rename chain* ['family'] 'table' 'chain' 'newname'
 
 Chains are containers for rules. They exist in two kinds, base chains and
@@ -390,6 +393,7 @@ organization.
 are specified, the chain is created as a base chain and hooked up to the networking stack.
 *create*:: Similar to the *add* command, but returns an error if the chain already exists.
 *delete*:: Delete the specified chain. The chain must not contain any rules or be used as jump target.
+*destroy*:: Delete the specified chain, it does not fail if it does not exist. The chain must not contain any rules or be used as jump target.
 *rename*:: Rename the specified chain.
 *list*:: List all rules of the specified chain.
 *flush*:: Flush all rules of the specified chain.
@@ -434,6 +438,9 @@ The *priority* parameter accepts a signed integer value or a standard priority
 name which specifies the order in which chains with the same *hook* value are
 traversed. The ordering is ascending, i.e. lower priority values have precedence
 over higher ones.
+
+With *nat* type chains, there's a lower excluding limit of -200 for *priority*
+values, because conntrack hooks at this priority and NAT requires it.
 
 Standard priority values can be replaced with easily memorizable names.  Not all
 names make sense in every family with every hook (see the compatibility matrices
@@ -481,7 +488,11 @@ RULES
 [verse]
 {*add* | *insert*} *rule* ['family'] 'table' 'chain' [*handle* 'handle' | *index* 'index'] 'statement' ... [*comment* 'comment']
 *replace rule* ['family'] 'table' 'chain' *handle* 'handle' 'statement' ... [*comment* 'comment']
-*delete rule* ['family'] 'table' 'chain' *handle* 'handle'
+{*delete* | *reset*} *rule* ['family'] 'table' 'chain' *handle* 'handle'
+*destroy rule* ['family'] 'table' 'chain' *handle* 'handle'
+*reset rules* ['family']
+*reset rules* *table* ['family'] 'table'
+*reset rules* *chain* ['family'] 'table' ['chain']
 
 Rules are added to chains in the given table. If the family is not specified, the
 ip family is used. Rules are constructed from two kinds of components according
@@ -509,6 +520,8 @@ case the rule is inserted after the specified rule.
 beginning of the chain or before the specified rule.
 *replace*:: Similar to *add*, but the rule replaces the specified rule.
 *delete*:: Delete the specified rule.
+*destroy*:: Delete the specified rule, it does not fail if it does not exist.
+*reset*:: Reset rule-contained state, i.e. counter and quota statement values.
 
 .*add a rule to ip table output chain*
 -------------
@@ -559,10 +572,10 @@ section describes nft set syntax in more detail.
 
 [verse]
 *add set* ['family'] 'table' 'set' *{ type* 'type' | *typeof* 'expression' *;* [*flags* 'flags' *;*] [*timeout* 'timeout' *;*] [*gc-interval* 'gc-interval' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*comment* 'comment' *;*'] [*policy* 'policy' *;*] [*auto-merge ;*] *}*
-{*delete* | *list* | *flush*} *set* ['family'] 'table' 'set'
+{*delete* | *destroy* | *list* | *flush*} *set* ['family'] 'table' 'set'
 *list sets* ['family']
 *delete set* ['family'] 'table' *handle* 'handle'
-{*add* | *delete*} *element* ['family'] 'table' 'set' *{* 'element'[*,* ...] *}*
+{*add* | *delete* | *destroy* } *element* ['family'] 'table' 'set' *{* 'element'[*,* ...] *}*
 
 Sets are element containers of a user-defined data type, they are uniquely
 identified by a user-defined name and attached to tables. Their behaviour can
@@ -571,6 +584,7 @@ be tuned with the flags that can be specified at set creation time.
 [horizontal]
 *add*:: Add a new set in the specified table. See the Set specification table below for more information about how to specify properties of a set.
 *delete*:: Delete the specified set.
+*destroy*:: Delete the specified set, it does not fail if it does not exist.
 *list*:: Display the elements in the specified set.
 *flush*:: Remove all elements from the specified set.
 
@@ -612,7 +626,7 @@ MAPS
 -----
 [verse]
 *add map* ['family'] 'table' 'map' *{ type* 'type' | *typeof* 'expression' [*flags* 'flags' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*comment* 'comment' *;*'] [*policy* 'policy' *;*] *}*
-{*delete* | *list* | *flush*} *map* ['family'] 'table' 'map'
+{*delete* | *destroy* | *list* | *flush*} *map* ['family'] 'table' 'map'
 *list maps* ['family']
 
 Maps store data based on some specific key used as input. They are uniquely identified by a user-defined name and attached to tables.
@@ -620,6 +634,7 @@ Maps store data based on some specific key used as input. They are uniquely iden
 [horizontal]
 *add*:: Add a new map in the specified table.
 *delete*:: Delete the specified map.
+*destroy*:: Delete the specified map, it does not fail if it does not exist.
 *list*:: Display the elements in the specified map.
 *flush*:: Remove all elements from the specified map.
 *add element*:: Comma-separated list of elements to add into the specified map.
@@ -654,7 +669,7 @@ ELEMENTS
 --------
 [verse]
 ____
-{*add* | *create* | *delete* | *get* } *element* ['family'] 'table' 'set' *{* 'ELEMENT'[*,* ...] *}*
+{*add* | *create* | *delete* | *destroy* | *get* } *element* ['family'] 'table' 'set' *{* 'ELEMENT'[*,* ...] *}*
 
 'ELEMENT' := 'key_expression' 'OPTIONS' [*:* 'value_expression']
 'OPTIONS' := [*timeout* 'TIMESPEC'] [*expires* 'TIMESPEC'] [*comment* 'string']
@@ -692,7 +707,7 @@ FLOWTABLES
 [verse]
 {*add* | *create*} *flowtable* ['family'] 'table' 'flowtable' *{ hook* 'hook' *priority* 'priority' *; devices = {* 'device'[*,* ...] *} ; }*
 *list flowtables* ['family']
-{*delete* | *list*} *flowtable* ['family'] 'table' 'flowtable'
+{*delete* | *destroy* | *list*} *flowtable* ['family'] 'table' 'flowtable'
 *delete* *flowtable* ['family'] 'table' *handle* 'handle'
 
 Flowtables allow you to accelerate packet forwarding in software. Flowtables
@@ -716,6 +731,7 @@ and subtraction can be used to set relative priority, e.g. filter + 5 equals to
 [horizontal]
 *add*:: Add a new flowtable for the given family with the given name.
 *delete*:: Delete the specified flowtable.
+*destroy*:: Delete the specified flowtable, it does not fail if it does not exist.
 *list*:: List all flowtables.
 
 LISTING
@@ -732,12 +748,15 @@ kernel modules, such as nf_conntrack.
 STATEFUL OBJECTS
 ----------------
 [verse]
-{*add* | *delete* | *list* | *reset*} *counter* ['family'] 'table' 'object'
-{*add* | *delete* | *list* | *reset*} *quota* ['family'] 'table' 'object'
-{*add* | *delete* | *list*} *limit* ['family'] 'table' 'object'
+{*add* | *delete* | *destroy* | *list* | *reset*} *counter* ['family'] 'table' 'object'
+{*add* | *delete* | *destroy* | *list* | *reset*} *quota* ['family'] 'table' 'object'
+{*add* | *delete* | *destroy* | *list*} *limit* ['family'] 'table' 'object'
 *delete* 'counter' ['family'] 'table' *handle* 'handle'
 *delete* 'quota' ['family'] 'table' *handle* 'handle'
 *delete* 'limit' ['family'] 'table' *handle* 'handle'
+*destroy* 'counter' ['family'] 'table' *handle* 'handle'
+*destroy* 'quota' ['family'] 'table' *handle* 'handle'
+*destroy* 'limit' ['family'] 'table' *handle* 'handle'
 *list counters* ['family']
 *list quotas* ['family']
 *list limits* ['family']
@@ -753,6 +772,7 @@ keywords "type name" are used e.g. "counter name".
 [horizontal]
 *add*:: Add a new stateful object in the specified table.
 *delete*:: Delete the specified object.
+*destroy*:: Delete the specified object, it does not fail if it does not exist.
 *list*:: Display stateful information the object holds.
 *reset*:: List-and-reset stateful object.
 

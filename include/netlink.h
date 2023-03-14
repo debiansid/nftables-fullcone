@@ -40,6 +40,8 @@ struct netlink_parse_ctx {
 	struct expr		*registers[MAX_REGS + 1];
 	unsigned int		debug_mask;
 	struct netlink_ctx	*nlctx;
+	bool			inner;
+	uint8_t			inner_reg;
 };
 
 
@@ -49,9 +51,14 @@ struct netlink_parse_ctx {
 #define RULE_PP_REMOVE_OP_AND		(RULE_PP_IN_CONCATENATION | \
 					 RULE_PP_IN_SET_ELEM)
 
-struct rule_pp_ctx {
+struct dl_proto_ctx {
 	struct proto_ctx	pctx;
 	struct payload_dep_ctx	pdctx;
+};
+
+struct rule_pp_ctx {
+	struct dl_proto_ctx	_dl[2];
+	struct dl_proto_ctx	*dl;
 	struct stmt		*stmt;
 	unsigned int		flags;
 };
@@ -176,6 +183,9 @@ extern int netlink_list_flowtables(struct netlink_ctx *ctx,
 extern struct flowtable *netlink_delinearize_flowtable(struct netlink_ctx *ctx,
 						       struct nftnl_flowtable *nlo);
 
+extern int netlink_reset_rules(struct netlink_ctx *ctx, const struct cmd *cmd,
+			       bool dump);
+
 extern void netlink_dump_chain(const struct nftnl_chain *nlc,
 			       struct netlink_ctx *ctx);
 extern void netlink_dump_rule(const struct nftnl_rule *nlr,
@@ -245,5 +255,7 @@ struct nft_expr_loc {
 
 struct nft_expr_loc *nft_expr_loc_find(const struct nftnl_expr *nle,
 				       struct netlink_linearize_ctx *ctx);
+
+struct dl_proto_ctx *dl_proto_ctx(struct rule_pp_ctx *ctx);
 
 #endif /* NFTABLES_NETLINK_H */

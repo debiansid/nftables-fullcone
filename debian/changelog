@@ -1,3 +1,10 @@
+nftables (1.0.7-1) unstable; urgency=medium
+
+  * [5012323] New upstream version 1.0.7
+  * [5965017] d/patches: drop invalid-octal-fix.patch
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 14 Mar 2023 12:36:06 +0100
+
 nftables (1.0.6-2) unstable; urgency=medium
 
   [ Jeremy Sowden ]

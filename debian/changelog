@@ -1,3 +1,9 @@
+nftables (1.0.7-2) unstable; urgency=medium
+
+  * [800ca9f] d/patches: add 0001-debian-bug-1038724.patch (Closes: #1038724)
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 20 Jun 2023 17:09:27 +0200
+
 nftables (1.0.7-1) unstable; urgency=medium
 
   * [5012323] New upstream version 1.0.7

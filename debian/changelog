@@ -1,3 +1,12 @@
+nftables (1.0.6-2+deb12u1) bookworm; urgency=medium
+
+  * [7edf72e] d/patches: add 0001-debian-bug-1038724.patch (Closes: #1038724)
+    This patch fixes a Debian 11 Bullseye -> Debian 12 Bookworm regression in
+    set listing format, and makes the output consistent and predictable,
+    bringing back the Debian Bullseye behavior.
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Tue, 20 Jun 2023 16:55:52 +0200
+
 nftables (1.0.6-2) unstable; urgency=medium
 
   [ Jeremy Sowden ]

@@ -9,3 +9,5 @@ meta ibrpvid 100;ok
 
 meta protocol ip udp dport 67;ok
 meta protocol ip6 udp dport 67;ok
+
+meta broute set 1;fail

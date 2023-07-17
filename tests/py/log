@@ -1,0 +1,1004 @@
+INFO: Log will be available at /tmp/nftables-test.log
+any/last.t: ERROR: line 11: add rule ip test-ip4 input last: This rule should not have failed.
+any/last.t: ERROR: line 12: add rule ip test-ip4 input last used 300s: This rule should not have failed.
+any/meta.t: ERROR: line 3: I cannot create the chain 'egress'
+any/meta.t: ERROR: line 12: add rule netdev test-netdev egress meta length 1000: This rule should not have failed.
+any/meta.t: ERROR: line 13: add rule netdev test-netdev egress meta length 22: This rule should not have failed.
+any/meta.t: ERROR: line 14: add rule netdev test-netdev egress meta length != 233: This rule should not have failed.
+any/meta.t: ERROR: line 15: add rule netdev test-netdev egress meta length 33-45: This rule should not have failed.
+any/meta.t: ERROR: line 16: add rule netdev test-netdev egress meta length != 33-45: This rule should not have failed.
+any/meta.t: ERROR: line 17: add rule netdev test-netdev egress meta length { 33, 55, 67, 88}: This rule should not have failed.
+any/meta.t: ERROR: line 18: add rule netdev test-netdev egress meta length { 33-55, 67-88}: This rule should not have failed.
+any/meta.t: ERROR: line 19: add rule netdev test-netdev egress meta length { 33-55, 56-88, 100-120}: This rule should not have failed.
+any/meta.t: ERROR: line 20: add rule netdev test-netdev egress meta length != { 33, 55, 67, 88}: This rule should not have failed.
+any/meta.t: ERROR: line 21: add rule netdev test-netdev egress meta length { 33-55, 66-88}: This rule should not have failed.
+any/meta.t: ERROR: line 22: add rule netdev test-netdev egress meta length != { 33-55, 66-88}: This rule should not have failed.
+any/meta.t: ERROR: line 24: add rule netdev test-netdev egress meta protocol { ip, arp, ip6, vlan }: This rule should not have failed.
+any/meta.t: ERROR: line 25: add rule netdev test-netdev egress meta protocol != {ip, arp, ip6, 8021q}: This rule should not have failed.
+any/meta.t: ERROR: line 26: add rule netdev test-netdev egress meta protocol ip: This rule should not have failed.
+any/meta.t: ERROR: line 27: add rule netdev test-netdev egress meta protocol != ip: This rule should not have failed.
+any/meta.t: ERROR: line 29: add rule netdev test-netdev egress meta l4proto 22: This rule should not have failed.
+any/meta.t: ERROR: line 30: add rule netdev test-netdev egress meta l4proto != 233: This rule should not have failed.
+any/meta.t: ERROR: line 31: add rule netdev test-netdev egress meta l4proto 33-45: This rule should not have failed.
+any/meta.t: ERROR: line 32: add rule netdev test-netdev egress meta l4proto != 33-45: This rule should not have failed.
+any/meta.t: ERROR: line 33: add rule netdev test-netdev egress meta l4proto { 33, 55, 67, 88}: This rule should not have failed.
+any/meta.t: ERROR: line 34: add rule netdev test-netdev egress meta l4proto != { 33, 55, 67, 88}: This rule should not have failed.
+any/meta.t: ERROR: line 35: add rule netdev test-netdev egress meta l4proto { 33-55, 66-88}: This rule should not have failed.
+any/meta.t: ERROR: line 36: add rule netdev test-netdev egress meta l4proto != { 33-55, 66-88}: This rule should not have failed.
+any/meta.t: ERROR: line 38: add rule netdev test-netdev egress meta priority root: This rule should not have failed.
+any/meta.t: ERROR: line 39: add rule netdev test-netdev egress meta priority none: This rule should not have failed.
+any/meta.t: ERROR: line 40: add rule netdev test-netdev egress meta priority 0x87654321: This rule should not have failed.
+any/meta.t: ERROR: line 41: add rule netdev test-netdev egress meta priority 2271560481: This rule should not have failed.
+any/meta.t: ERROR: line 42: add rule netdev test-netdev egress meta priority 1:1234: This rule should not have failed.
+any/meta.t: ERROR: line 43: add rule netdev test-netdev egress meta priority bcad:dadc: This rule should not have failed.
+any/meta.t: ERROR: line 44: add rule netdev test-netdev egress meta priority aabb:0: This rule should not have failed.
+any/meta.t: ERROR: line 45: add rule netdev test-netdev egress meta priority != bcad:dadc: This rule should not have failed.
+any/meta.t: ERROR: line 46: add rule netdev test-netdev egress meta priority != aabb:0: This rule should not have failed.
+any/meta.t: ERROR: line 47: add rule netdev test-netdev egress meta priority bcad:dada-bcad:dadc: This rule should not have failed.
+any/meta.t: ERROR: line 48: add rule netdev test-netdev egress meta priority != bcad:dada-bcad:dadc: This rule should not have failed.
+any/meta.t: ERROR: line 49: add rule netdev test-netdev egress meta priority {bcad:dada, bcad:dadc, aaaa:bbbb}: This rule should not have failed.
+any/meta.t: ERROR: line 50: add rule netdev test-netdev egress meta priority set cafe:beef: This rule should not have failed.
+any/meta.t: ERROR: line 51: add rule netdev test-netdev egress meta priority != {bcad:dada, bcad:dadc, aaaa:bbbb}: This rule should not have failed.
+any/meta.t: ERROR: line 53: add rule netdev test-netdev egress meta mark 0x4: This rule should not have failed.
+any/meta.t: ERROR: line 54: add rule netdev test-netdev egress meta mark 0x32: This rule should not have failed.
+any/meta.t: ERROR: line 55: add rule netdev test-netdev egress meta mark and 0x03 == 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 56: add rule netdev test-netdev egress meta mark and 0x03 != 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 57: add rule netdev test-netdev egress meta mark 0x10: This rule should not have failed.
+any/meta.t: ERROR: line 58: add rule netdev test-netdev egress meta mark != 0x10: This rule should not have failed.
+any/meta.t: ERROR: line 59: add rule netdev test-netdev egress meta mark 0xffffff00/24: This rule should not have failed.
+any/meta.t: ERROR: line 61: add rule netdev test-netdev egress meta mark or 0x03 == 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 62: add rule netdev test-netdev egress meta mark or 0x03 != 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 63: add rule netdev test-netdev egress meta mark xor 0x03 == 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 64: add rule netdev test-netdev egress meta mark xor 0x03 != 0x01: This rule should not have failed.
+any/meta.t: ERROR: line 66: add rule netdev test-netdev egress meta iif "lo" accept: This rule should not have failed.
+any/meta.t: ERROR: line 67: add rule netdev test-netdev egress meta iif != "lo" accept: This rule should not have failed.
+any/meta.t: ERROR: line 69: add rule netdev test-netdev egress meta iifname "dummy0": This rule should not have failed.
+any/meta.t: ERROR: line 70: add rule netdev test-netdev egress meta iifname != "dummy0": This rule should not have failed.
+any/meta.t: ERROR: line 71: add rule netdev test-netdev egress meta iifname {"dummy0", "lo"}: This rule should not have failed.
+any/meta.t: ERROR: line 72: add rule netdev test-netdev egress meta iifname != {"dummy0", "lo"}: This rule should not have failed.
+any/meta.t: ERROR: line 73: add rule netdev test-netdev egress meta iifname "dummy*": This rule should not have failed.
+any/meta.t: ERROR: line 74: add rule netdev test-netdev egress meta iifname "dummy\*": This rule should not have failed.
+any/meta.t: ERROR: line 77: add rule netdev test-netdev egress meta iiftype {ether, ppp, ipip, ipip6, loopback, sit, ipgre}: This rule should not have failed.
+any/meta.t: ERROR: line 78: add rule netdev test-netdev egress meta iiftype != {ether, ppp, ipip, ipip6, loopback, sit, ipgre}: This rule should not have failed.
+any/meta.t: ERROR: line 79: add rule netdev test-netdev egress meta iiftype != ether: This rule should not have failed.
+any/meta.t: ERROR: line 80: add rule netdev test-netdev egress meta iiftype ether: This rule should not have failed.
+any/meta.t: ERROR: line 81: add rule netdev test-netdev egress meta iiftype != ppp: This rule should not have failed.
+any/meta.t: ERROR: line 82: add rule netdev test-netdev egress meta iiftype ppp: This rule should not have failed.
+any/meta.t: ERROR: line 84: add rule netdev test-netdev egress meta oif "lo" accept: This rule should not have failed.
+any/meta.t: ERROR: line 85: add rule netdev test-netdev egress meta oif != "lo" accept: This rule should not have failed.
+any/meta.t: ERROR: line 87: add rule netdev test-netdev egress meta oifname "dummy0": This rule should not have failed.
+any/meta.t: ERROR: line 88: add rule netdev test-netdev egress meta oifname != "dummy0": This rule should not have failed.
+any/meta.t: ERROR: line 89: add rule netdev test-netdev egress meta oifname { "dummy0", "lo"}: This rule should not have failed.
+any/meta.t: ERROR: line 90: add rule netdev test-netdev egress meta oifname "dummy*": This rule should not have failed.
+any/meta.t: ERROR: line 91: add rule netdev test-netdev egress meta oifname "dummy\*": This rule should not have failed.
+any/meta.t: ERROR: line 94: add rule netdev test-netdev egress meta oiftype {ether, ppp, ipip, ipip6, loopback, sit, ipgre}: This rule should not have failed.
+any/meta.t: ERROR: line 95: add rule netdev test-netdev egress meta oiftype != {ether, ppp, ipip, ipip6, loopback, sit, ipgre}: This rule should not have failed.
+any/meta.t: ERROR: line 96: add rule netdev test-netdev egress meta oiftype != ether: This rule should not have failed.
+any/meta.t: ERROR: line 97: add rule netdev test-netdev egress meta oiftype ether: This rule should not have failed.
+any/meta.t: ERROR: line 99: add rule netdev test-netdev egress meta skuid {"bin", "root", "daemon"} accept: This rule should not have failed.
+any/meta.t: ERROR: line 100: add rule netdev test-netdev egress meta skuid != {"bin", "root", "daemon"} accept: This rule should not have failed.
+any/meta.t: ERROR: line 101: add rule netdev test-netdev egress meta skuid "root": This rule should not have failed.
+any/meta.t: ERROR: line 102: add rule netdev test-netdev egress meta skuid != "root": This rule should not have failed.
+any/meta.t: ERROR: line 103: add rule netdev test-netdev egress meta skuid lt 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 104: add rule netdev test-netdev egress meta skuid gt 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 105: add rule netdev test-netdev egress meta skuid eq 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 106: add rule netdev test-netdev egress meta skuid 3001-3005 accept: This rule should not have failed.
+any/meta.t: ERROR: line 107: add rule netdev test-netdev egress meta skuid != 2001-2005 accept: This rule should not have failed.
+any/meta.t: ERROR: line 108: add rule netdev test-netdev egress meta skuid { 2001-2005, 3001-3005} accept: This rule should not have failed.
+any/meta.t: ERROR: line 109: add rule netdev test-netdev egress meta skuid != { 2001-2005, 3001-3005} accept: This rule should not have failed.
+any/meta.t: ERROR: line 111: add rule netdev test-netdev egress meta skgid {"bin", "root", "daemon"} accept: This rule should not have failed.
+any/meta.t: ERROR: line 112: add rule netdev test-netdev egress meta skgid != {"bin", "root", "daemon"} accept: This rule should not have failed.
+any/meta.t: ERROR: line 113: add rule netdev test-netdev egress meta skgid "root": This rule should not have failed.
+any/meta.t: ERROR: line 114: add rule netdev test-netdev egress meta skgid != "root": This rule should not have failed.
+any/meta.t: ERROR: line 115: add rule netdev test-netdev egress meta skgid lt 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 116: add rule netdev test-netdev egress meta skgid gt 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 117: add rule netdev test-netdev egress meta skgid eq 3000 accept: This rule should not have failed.
+any/meta.t: ERROR: line 118: add rule netdev test-netdev egress meta skgid 2001-2005 accept: This rule should not have failed.
+any/meta.t: ERROR: line 119: add rule netdev test-netdev egress meta skgid != 2001-2005 accept: This rule should not have failed.
+any/meta.t: ERROR: line 131: add rule netdev test-netdev egress meta mark set 0xffffffc8 xor 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 132: add rule netdev test-netdev egress meta mark set 0x16 and 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 133: add rule netdev test-netdev egress meta mark set 0xffffffe9 or 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 134: add rule netdev test-netdev egress meta mark set 0xffffffde and 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 135: add rule netdev test-netdev egress meta mark set 0xf045ffde or 0x10: This rule should not have failed.
+any/meta.t: ERROR: line 136: add rule netdev test-netdev egress meta mark set 0xffffffde or 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 137: add rule netdev test-netdev egress meta mark set 0x32 or 0xfffff: This rule should not have failed.
+any/meta.t: ERROR: line 138: add rule netdev test-netdev egress meta mark set 0xfffe xor 0x16: This rule should not have failed.
+any/meta.t: ERROR: line 143: add rule netdev test-netdev egress meta iif "lo": This rule should not have failed.
+any/meta.t: ERROR: line 144: add rule netdev test-netdev egress meta oif "lo": This rule should not have failed.
+any/meta.t: ERROR: line 145: add rule netdev test-netdev egress meta oifname "dummy2" accept: This rule should not have failed.
+any/meta.t: ERROR: line 146: add rule netdev test-netdev egress meta skuid 3000: This rule should not have failed.
+any/meta.t: ERROR: line 147: add rule netdev test-netdev egress meta skgid 3000: This rule should not have failed.
+any/meta.t: ERROR: line 151: add rule netdev test-netdev egress meta rtclassid "cosmos": This rule should not have failed.
+any/meta.t: ERROR: line 153: add rule netdev test-netdev egress meta pkttype broadcast: This rule should not have failed.
+any/meta.t: ERROR: line 154: add rule netdev test-netdev egress meta pkttype host: This rule should not have failed.
+any/meta.t: ERROR: line 155: add rule netdev test-netdev egress meta pkttype multicast: This rule should not have failed.
+any/meta.t: ERROR: line 156: add rule netdev test-netdev egress meta pkttype != broadcast: This rule should not have failed.
+any/meta.t: ERROR: line 157: add rule netdev test-netdev egress meta pkttype != host: This rule should not have failed.
+any/meta.t: ERROR: line 158: add rule netdev test-netdev egress meta pkttype != multicast: This rule should not have failed.
+any/meta.t: ERROR: line 160: add rule netdev test-netdev egress pkttype { broadcast, multicast} accept: This rule should not have failed.
+any/meta.t: ERROR: line 162: add rule netdev test-netdev egress meta cpu 1: This rule should not have failed.
+any/meta.t: ERROR: line 163: add rule netdev test-netdev egress meta cpu != 1: This rule should not have failed.
+any/meta.t: ERROR: line 164: add rule netdev test-netdev egress meta cpu 1-3: This rule should not have failed.
+any/meta.t: ERROR: line 165: add rule netdev test-netdev egress meta cpu != 1-2: This rule should not have failed.
+any/meta.t: ERROR: line 166: add rule netdev test-netdev egress meta cpu { 2,3}: This rule should not have failed.
+any/meta.t: ERROR: line 167: add rule netdev test-netdev egress meta cpu { 2-3, 5-7}: This rule should not have failed.
+any/meta.t: ERROR: line 168: add rule netdev test-netdev egress meta cpu != { 2,3}: This rule should not have failed.
+any/meta.t: ERROR: line 170: add rule netdev test-netdev egress meta iifgroup 0: This rule should not have failed.
+any/meta.t: ERROR: line 171: add rule netdev test-netdev egress meta iifgroup != 0: This rule should not have failed.
+any/meta.t: ERROR: line 172: add rule netdev test-netdev egress meta iifgroup "default": This rule should not have failed.
+any/meta.t: ERROR: line 173: add rule netdev test-netdev egress meta iifgroup != "default": This rule should not have failed.
+any/meta.t: ERROR: line 174: add rule netdev test-netdev egress meta iifgroup {"default", 11}: This rule should not have failed.
+any/meta.t: ERROR: line 175: add rule netdev test-netdev egress meta iifgroup != {"default", 11}: This rule should not have failed.
+any/meta.t: ERROR: line 176: add rule netdev test-netdev egress meta iifgroup { 11,33}: This rule should not have failed.
+any/meta.t: ERROR: line 177: add rule netdev test-netdev egress meta iifgroup {11-33, 44-55}: This rule should not have failed.
+any/meta.t: ERROR: line 178: add rule netdev test-netdev egress meta iifgroup != { 11,33}: This rule should not have failed.
+any/meta.t: ERROR: line 179: add rule netdev test-netdev egress meta iifgroup != {11-33, 44-55}: This rule should not have failed.
+any/meta.t: ERROR: line 180: add rule netdev test-netdev egress meta oifgroup 0: This rule should not have failed.
+any/meta.t: ERROR: line 181: add rule netdev test-netdev egress meta oifgroup != 0: This rule should not have failed.
+any/meta.t: ERROR: line 182: add rule netdev test-netdev egress meta oifgroup "default": This rule should not have failed.
+any/meta.t: ERROR: line 183: add rule netdev test-netdev egress meta oifgroup != "default": This rule should not have failed.
+any/meta.t: ERROR: line 184: add rule netdev test-netdev egress meta oifgroup {"default", 11}: This rule should not have failed.
+any/meta.t: ERROR: line 185: add rule netdev test-netdev egress meta oifgroup != {"default", 11}: This rule should not have failed.
+any/meta.t: ERROR: line 186: add rule netdev test-netdev egress meta oifgroup { 11,33}: This rule should not have failed.
+any/meta.t: ERROR: line 187: add rule netdev test-netdev egress meta oifgroup {11-33, 44-55}: This rule should not have failed.
+any/meta.t: ERROR: line 188: add rule netdev test-netdev egress meta oifgroup != { 11,33}: This rule should not have failed.
+any/meta.t: ERROR: line 189: add rule netdev test-netdev egress meta oifgroup != {11-33, 44-55}: This rule should not have failed.
+any/meta.t: ERROR: line 191: add rule netdev test-netdev egress meta cgroup 1048577: This rule should not have failed.
+any/meta.t: ERROR: line 192: add rule netdev test-netdev egress meta cgroup != 1048577: This rule should not have failed.
+any/meta.t: ERROR: line 193: add rule netdev test-netdev egress meta cgroup { 1048577, 1048578 }: This rule should not have failed.
+any/meta.t: ERROR: line 194: add rule netdev test-netdev egress meta cgroup != { 1048577, 1048578}: This rule should not have failed.
+any/meta.t: ERROR: line 195: add rule netdev test-netdev egress meta cgroup 1048577-1048578: This rule should not have failed.
+any/meta.t: ERROR: line 196: add rule netdev test-netdev egress meta cgroup != 1048577-1048578: This rule should not have failed.
+any/meta.t: ERROR: line 198: add rule netdev test-netdev egress meta iif . meta oif { "lo" . "lo" }: This rule should not have failed.
+any/meta.t: ERROR: line 199: add rule netdev test-netdev egress meta iif . meta oif . meta mark { "lo" . "lo" . 0x0000000a }: This rule should not have failed.
+any/meta.t: ERROR: line 200: add rule netdev test-netdev egress meta iif . meta oif vmap { "lo" . "lo" : drop }: This rule should not have failed.
+any/meta.t: ERROR: line 202: add rule netdev test-netdev egress meta random eq 1: This rule should not have failed.
+any/meta.t: ERROR: line 203: add rule netdev test-netdev egress meta random gt 1000000: This rule should not have failed.
+any/meta.t: ERROR: line 205: add rule netdev test-netdev egress meta time "1970-05-23 21:07:14" drop: This rule should not have failed.
+any/meta.t: ERROR: line 206: add rule netdev test-netdev egress meta time 12341234 drop: This rule should not have failed.
+any/meta.t: ERROR: line 207: add rule netdev test-netdev egress meta time "2019-06-21 17:00:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 208: add rule netdev test-netdev egress meta time "2019-07-01 00:00:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 209: add rule netdev test-netdev egress meta time "2019-07-01 00:01:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 210: add rule netdev test-netdev egress meta time "2019-07-01 00:00:01" drop: This rule should not have failed.
+any/meta.t: ERROR: line 211: add rule netdev test-netdev egress meta time < "2022-07-01 11:00:00" accept: This rule should not have failed.
+any/meta.t: ERROR: line 212: add rule netdev test-netdev egress meta time > "2022-07-01 11:00:00" accept: This rule should not have failed.
+any/meta.t: ERROR: line 213: add rule netdev test-netdev egress meta day "Saturday" drop: This rule should not have failed.
+any/meta.t: ERROR: line 214: add rule netdev test-netdev egress meta day 6 drop: This rule should not have failed.
+any/meta.t: ERROR: line 216: add rule netdev test-netdev egress meta hour "17:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 217: add rule netdev test-netdev egress meta hour "17:00:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 218: add rule netdev test-netdev egress meta hour "17:00:01" drop: This rule should not have failed.
+any/meta.t: ERROR: line 219: add rule netdev test-netdev egress meta hour "00:00" drop: This rule should not have failed.
+any/meta.t: ERROR: line 220: add rule netdev test-netdev egress meta hour "00:01" drop: This rule should not have failed.
+any/meta.t: ERROR: line 221: add rule netdev test-netdev egress time < "2022-07-01 11:00:00" accept: This rule should not have failed.
+any/meta.t: ERROR: line 222: add rule netdev test-netdev egress time > "2022-07-01 11:00:00" accept: This rule should not have failed.
+any/meta.t: ERROR: line 226: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+any/rawpayload.t: ERROR: line 3: I cannot create the chain 'egress'
+any/rawpayload.t: ERROR: line 8: add rule netdev test-netdev egress meta l4proto { tcp, udp, sctp} @th,16,16 { 22, 23, 80 }: This rule should not have failed.
+any/rawpayload.t: ERROR: line 9: add rule netdev test-netdev egress meta l4proto tcp @th,16,16 { 22, 23, 80}: This rule should not have failed.
+any/rawpayload.t: ERROR: line 10: add rule netdev test-netdev egress @nh,8,8 0xff: This rule should not have failed.
+any/rawpayload.t: ERROR: line 11: add rule netdev test-netdev egress @nh,8,16 0x0: This rule should not have failed.
+any/rawpayload.t: ERROR: line 18: add rule netdev test-netdev egress @ll,0,1 1: This rule should not have failed.
+any/rawpayload.t: ERROR: line 19: add rule netdev test-netdev egress @ll,0,8 & 0x80 == 0x80: This rule should not have failed.
+any/rawpayload.t: ERROR: line 20: add rule netdev test-netdev egress @ll,0,128 0xfedcba987654321001234567890abcde: This rule should not have failed.
+any/rawpayload.t: ERROR: line 22: add rule netdev test-netdev egress meta l4proto 91 @th,400,16 0x0 accept: This rule should not have failed.
+any/rawpayload.t: ERROR: line 24: add rule inet test-inet input @ih,32,32 0x14000000: This rule should not have failed.
+any/rawpayload.t: ERROR: line 24: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+any/rt.t: OK
+any/ct.t: OK
+any/log.t: OK
+any/queue.t: OK
+any/objects.t: ERROR: line 3: I cannot create the chain 'egress'
+any/objects.t: ERROR: line 16: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+any/objects.t: OK
+any/counter.t: OK
+any/quota.t: ERROR: line 3: I cannot create the chain 'egress'
+any/quota.t: ERROR: line 12: add rule netdev test-netdev egress quota 1025 bytes: This rule should not have failed.
+any/quota.t: ERROR: line 13: add rule netdev test-netdev egress quota 1 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 14: add rule netdev test-netdev egress quota 2 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 15: add rule netdev test-netdev egress quota 1025 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 16: add rule netdev test-netdev egress quota 1023 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 17: add rule netdev test-netdev egress quota 10230 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 18: add rule netdev test-netdev egress quota 1023000 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 20: add rule netdev test-netdev egress quota over 1 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 21: add rule netdev test-netdev egress quota over 2 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 22: add rule netdev test-netdev egress quota over 1025 kbytes: This rule should not have failed.
+any/quota.t: ERROR: line 23: add rule netdev test-netdev egress quota over 1023 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 24: add rule netdev test-netdev egress quota over 10230 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 25: add rule netdev test-netdev egress quota over 1023000 mbytes: This rule should not have failed.
+any/quota.t: ERROR: line 25: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+any/limit.t: ERROR: line 3: I cannot create the chain 'egress'
+any/limit.t: ERROR: line 12: add rule netdev test-netdev egress limit rate 400/minute: This rule should not have failed.
+any/limit.t: ERROR: line 13: add rule netdev test-netdev egress limit rate 20/second: This rule should not have failed.
+any/limit.t: ERROR: line 14: add rule netdev test-netdev egress limit rate 400/hour: This rule should not have failed.
+any/limit.t: ERROR: line 15: add rule netdev test-netdev egress limit rate 40/day: This rule should not have failed.
+any/limit.t: ERROR: line 16: add rule netdev test-netdev egress limit rate 400/week: This rule should not have failed.
+any/limit.t: ERROR: line 17: add rule netdev test-netdev egress limit rate 1023/second burst 10 packets: This rule should not have failed.
+any/limit.t: ERROR: line 20: add rule netdev test-netdev egress limit rate 1 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 21: add rule netdev test-netdev egress limit rate 2 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 22: add rule netdev test-netdev egress limit rate 1025 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 23: add rule netdev test-netdev egress limit rate 1023 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 24: add rule netdev test-netdev egress limit rate 10230 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 25: add rule netdev test-netdev egress limit rate 1023000 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 28: add rule netdev test-netdev egress limit rate 1 bytes / second: This rule should not have failed.
+any/limit.t: ERROR: line 29: add rule netdev test-netdev egress limit rate 1 kbytes / second: This rule should not have failed.
+any/limit.t: ERROR: line 30: add rule netdev test-netdev egress limit rate 1 mbytes / second: This rule should not have failed.
+any/limit.t: ERROR: line 33: add rule netdev test-netdev egress limit rate 1025 bytes/second burst 512 bytes: This rule should not have failed.
+any/limit.t: ERROR: line 34: add rule netdev test-netdev egress limit rate 1025 kbytes/second burst 1023 kbytes: This rule should not have failed.
+any/limit.t: ERROR: line 35: add rule netdev test-netdev egress limit rate 1025 mbytes/second burst 1025 kbytes: This rule should not have failed.
+any/limit.t: ERROR: line 36: add rule netdev test-netdev egress limit rate 1025000 mbytes/second burst 1023 mbytes: This rule should not have failed.
+any/limit.t: ERROR: line 38: add rule netdev test-netdev egress limit rate over 400/minute: This rule should not have failed.
+any/limit.t: ERROR: line 39: add rule netdev test-netdev egress limit rate over 20/second: This rule should not have failed.
+any/limit.t: ERROR: line 40: add rule netdev test-netdev egress limit rate over 400/hour: This rule should not have failed.
+any/limit.t: ERROR: line 41: add rule netdev test-netdev egress limit rate over 40/day: This rule should not have failed.
+any/limit.t: ERROR: line 42: add rule netdev test-netdev egress limit rate over 400/week: This rule should not have failed.
+any/limit.t: ERROR: line 43: add rule netdev test-netdev egress limit rate over 1023/second burst 10 packets: This rule should not have failed.
+any/limit.t: ERROR: line 45: add rule netdev test-netdev egress limit rate over 1 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 46: add rule netdev test-netdev egress limit rate over 2 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 47: add rule netdev test-netdev egress limit rate over 1025 kbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 48: add rule netdev test-netdev egress limit rate over 1023 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 49: add rule netdev test-netdev egress limit rate over 10230 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 50: add rule netdev test-netdev egress limit rate over 1023000 mbytes/second: This rule should not have failed.
+any/limit.t: ERROR: line 52: add rule netdev test-netdev egress limit rate over 1025 bytes/second burst 512 bytes: This rule should not have failed.
+any/limit.t: ERROR: line 53: add rule netdev test-netdev egress limit rate over 1025 kbytes/second burst 1023 kbytes: This rule should not have failed.
+any/limit.t: ERROR: line 54: add rule netdev test-netdev egress limit rate over 1025 mbytes/second burst 1025 kbytes: This rule should not have failed.
+any/limit.t: ERROR: line 55: add rule netdev test-netdev egress limit rate over 1025000 mbytes/second burst 1023 mbytes: This rule should not have failed.
+any/limit.t: ERROR: line 55: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+any/tcpopt.t: ERROR: line 58: add rule ip test-ip4 input reset tcp option mptcp: This rule should not have failed.
+any/tcpopt.t: ERROR: line 59: add rule ip test-ip4 input reset tcp option 2: This rule should not have failed.
+any/tcpopt.t: ERROR: line 60: add rule ip test-ip4 input reset tcp option 123: This rule should not have failed.
+arp/arp.t: ERROR: line 4: I cannot create the chain 'egress'
+arp/arp.t: ERROR: line 9: add rule netdev test-netdev egress arp htype 1: This rule should not have failed.
+arp/arp.t: ERROR: line 10: add rule netdev test-netdev egress arp htype != 1: This rule should not have failed.
+arp/arp.t: ERROR: line 11: add rule netdev test-netdev egress arp htype 22: This rule should not have failed.
+arp/arp.t: ERROR: line 12: add rule netdev test-netdev egress arp htype != 233: This rule should not have failed.
+arp/arp.t: ERROR: line 13: add rule netdev test-netdev egress arp htype 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 14: add rule netdev test-netdev egress arp htype != 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 15: add rule netdev test-netdev egress arp htype { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 16: add rule netdev test-netdev egress arp htype != { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 18: add rule netdev test-netdev egress arp ptype 0x0800: This rule should not have failed.
+arp/arp.t: ERROR: line 20: add rule netdev test-netdev egress arp hlen 22: This rule should not have failed.
+arp/arp.t: ERROR: line 21: add rule netdev test-netdev egress arp hlen != 233: This rule should not have failed.
+arp/arp.t: ERROR: line 22: add rule netdev test-netdev egress arp hlen 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 23: add rule netdev test-netdev egress arp hlen != 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 24: add rule netdev test-netdev egress arp hlen { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 25: add rule netdev test-netdev egress arp hlen != { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 27: add rule netdev test-netdev egress arp plen 22: This rule should not have failed.
+arp/arp.t: ERROR: line 28: add rule netdev test-netdev egress arp plen != 233: This rule should not have failed.
+arp/arp.t: ERROR: line 29: add rule netdev test-netdev egress arp plen 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 30: add rule netdev test-netdev egress arp plen != 33-45: This rule should not have failed.
+arp/arp.t: ERROR: line 31: add rule netdev test-netdev egress arp plen { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 32: add rule netdev test-netdev egress arp plen != { 33, 55, 67, 88}: This rule should not have failed.
+arp/arp.t: ERROR: line 34: add rule netdev test-netdev egress arp operation {nak, inreply, inrequest, rreply, rrequest, reply, request}: This rule should not have failed.
+arp/arp.t: ERROR: line 35: add rule netdev test-netdev egress arp operation != {nak, inreply, inrequest, rreply, rrequest, reply, request}: This rule should not have failed.
+arp/arp.t: ERROR: line 36: add rule netdev test-netdev egress arp operation 1-2: This rule should not have failed.
+arp/arp.t: ERROR: line 37: add rule netdev test-netdev egress arp operation request: This rule should not have failed.
+arp/arp.t: ERROR: line 38: add rule netdev test-netdev egress arp operation reply: This rule should not have failed.
+arp/arp.t: ERROR: line 39: add rule netdev test-netdev egress arp operation rrequest: This rule should not have failed.
+arp/arp.t: ERROR: line 40: add rule netdev test-netdev egress arp operation rreply: This rule should not have failed.
+arp/arp.t: ERROR: line 41: add rule netdev test-netdev egress arp operation inrequest: This rule should not have failed.
+arp/arp.t: ERROR: line 42: add rule netdev test-netdev egress arp operation inreply: This rule should not have failed.
+arp/arp.t: ERROR: line 43: add rule netdev test-netdev egress arp operation nak: This rule should not have failed.
+arp/arp.t: ERROR: line 44: add rule netdev test-netdev egress arp operation != request: This rule should not have failed.
+arp/arp.t: ERROR: line 45: add rule netdev test-netdev egress arp operation != reply: This rule should not have failed.
+arp/arp.t: ERROR: line 46: add rule netdev test-netdev egress arp operation != rrequest: This rule should not have failed.
+arp/arp.t: ERROR: line 47: add rule netdev test-netdev egress arp operation != rreply: This rule should not have failed.
+arp/arp.t: ERROR: line 48: add rule netdev test-netdev egress arp operation != inrequest: This rule should not have failed.
+arp/arp.t: ERROR: line 49: add rule netdev test-netdev egress arp operation != inreply: This rule should not have failed.
+arp/arp.t: ERROR: line 50: add rule netdev test-netdev egress arp operation != nak: This rule should not have failed.
+arp/arp.t: ERROR: line 52: add rule netdev test-netdev egress arp saddr ip 1.2.3.4: This rule should not have failed.
+arp/arp.t: ERROR: line 53: add rule netdev test-netdev egress arp daddr ip 4.3.2.1: This rule should not have failed.
+arp/arp.t: ERROR: line 54: add rule netdev test-netdev egress arp saddr ether aa:bb:cc:aa:bb:cc: This rule should not have failed.
+arp/arp.t: ERROR: line 55: add rule netdev test-netdev egress arp daddr ether aa:bb:cc:aa:bb:cc: This rule should not have failed.
+arp/arp.t: ERROR: line 57: add rule netdev test-netdev egress arp saddr ip 192.168.1.1 arp daddr ether fe:ed:00:c0:ff:ee: This rule should not have failed.
+arp/arp.t: ERROR: line 58: add rule netdev test-netdev egress arp daddr ether fe:ed:00:c0:ff:ee arp saddr ip 192.168.1.1: This rule should not have failed.
+arp/arp.t: ERROR: line 60: add rule netdev test-netdev egress meta iifname "invalid" arp ptype 0x0800 arp htype 1 arp hlen 6 arp plen 4 @nh,192,32 0xc0a88f10 @nh,144,48 set 0x112233445566: This rule should not have failed.
+arp/arp.t: ERROR: line 60: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+bridge/meta.t: OK
+bridge/redirect.t: ERROR: line 5: add rule bridge test-bridge prerouting meta broute set 1: This rule should not have failed.
+bridge/icmpX.t: OK
+bridge/vlan.t: ERROR: line 3: I cannot create the chain 'egress'
+bridge/vlan.t: ERROR: line 8: add rule netdev test-netdev egress vlan id 4094: This rule should not have failed.
+bridge/vlan.t: ERROR: line 9: add rule netdev test-netdev egress vlan id 0: This rule should not have failed.
+bridge/vlan.t: ERROR: line 12: add rule netdev test-netdev egress vlan id 4094 vlan dei 0: This rule should not have failed.
+bridge/vlan.t: ERROR: line 13: add rule netdev test-netdev egress vlan id 4094 vlan dei 1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 14: add rule netdev test-netdev egress vlan id 4094 vlan dei != 1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 15: add rule netdev test-netdev egress vlan id 4094 vlan cfi 1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 19: add rule netdev test-netdev egress vlan id 4094 vlan dei 1 vlan pcp 7: This rule should not have failed.
+bridge/vlan.t: ERROR: line 20: add rule netdev test-netdev egress vlan id 4094 vlan dei 1 vlan pcp 3: This rule should not have failed.
+bridge/vlan.t: ERROR: line 22: add rule netdev test-netdev egress ether type vlan vlan id 4094: This rule should not have failed.
+bridge/vlan.t: ERROR: line 23: add rule netdev test-netdev egress ether type vlan vlan id 0: This rule should not have failed.
+bridge/vlan.t: ERROR: line 24: add rule netdev test-netdev egress ether type vlan vlan id 4094 vlan dei 0: This rule should not have failed.
+bridge/vlan.t: ERROR: line 25: add rule netdev test-netdev egress ether type vlan vlan id 4094 vlan dei 1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 28: add rule netdev test-netdev egress vlan id 4094 tcp dport 22: This rule should not have failed.
+bridge/vlan.t: ERROR: line 29: add rule netdev test-netdev egress vlan id 1 ip saddr 10.0.0.1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 30: add rule netdev test-netdev egress vlan id 1 ip saddr 10.0.0.0/23: This rule should not have failed.
+bridge/vlan.t: ERROR: line 31: add rule netdev test-netdev egress vlan id 1 ip saddr 10.0.0.0/23 udp dport 53: This rule should not have failed.
+bridge/vlan.t: ERROR: line 32: add rule netdev test-netdev egress ether type vlan vlan id 1 ip saddr 10.0.0.0/23 udp dport 53: This rule should not have failed.
+bridge/vlan.t: ERROR: line 34: add rule netdev test-netdev egress vlan id { 1, 2, 4, 100, 4095 } vlan pcp 1-3: This rule should not have failed.
+bridge/vlan.t: ERROR: line 37: add rule netdev test-netdev egress ether type vlan ip protocol 1 accept: This rule should not have failed.
+bridge/vlan.t: ERROR: line 40: add rule netdev test-netdev egress ether type 8021ad vlan id 1 ip protocol 6 accept: This rule should not have failed.
+bridge/vlan.t: ERROR: line 41: add rule netdev test-netdev egress ether type 8021ad vlan id 1 vlan type 8021q vlan id 2 vlan type ip counter: This rule should not have failed.
+bridge/vlan.t: ERROR: line 42: add rule netdev test-netdev egress ether type 8021ad vlan id 1 vlan type 8021q vlan id 2 vlan type ip ip protocol 6: This rule should not have failed.
+bridge/vlan.t: ERROR: line 49: add rule netdev test-netdev egress vlan id 1 vlan id set 2: This rule should not have failed.
+bridge/vlan.t: ERROR: line 51: add rule netdev test-netdev egress ether saddr 00:01:02:03:04:05 vlan id 1: This rule should not have failed.
+bridge/vlan.t: ERROR: line 52: add rule netdev test-netdev egress vlan id 2 ether saddr 0:1:2:3:4:6: This rule should not have failed.
+bridge/vlan.t: ERROR: line 54: add rule netdev test-netdev egress ether saddr . vlan id { 0a:0b:0c:0d:0e:0f . 42, 0a:0b:0c:0d:0e:0f . 4095 }: This rule should not have failed.
+bridge/vlan.t: ERROR: line 54: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+bridge/ether.t: OK
+bridge/reject.t: OK
+inet/ipsec.t: OK
+inet/vmap.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/vmap.t: ERROR: line 8: add rule netdev test-netdev egress iifname . ip protocol . th dport vmap { "eth0" . tcp . 22 : accept, "eth1" . udp . 67 : drop }: This rule should not have failed.
+inet/vmap.t: ERROR: line 9: add rule inet test-inet input ip saddr . @ih,32,32 { 1.1.1.1 . 0x14, 2.2.2.2 . 0x1e }: This rule should not have failed.
+inet/vmap.t: ERROR: line 10: add rule netdev test-netdev egress udp length . @th,160,128 vmap { 47-63 . 0xe373135363130333131303735353203 : accept }: This rule should not have failed.
+inet/vmap.t: ERROR: line 10: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/meta.t: OK
+inet/snat.t: OK
+inet/ether-ip.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/ether-ip.t: ERROR: line 8: add rule netdev test-netdev egress tcp dport 22 iiftype ether ip daddr 1.2.3.4 ether saddr 00:0f:54:0c:11:4 accept: This rule should not have failed.
+inet/ether-ip.t: ERROR: line 9: add rule netdev test-netdev egress tcp dport 22 ip daddr 1.2.3.4 ether saddr 00:0f:54:0c:11:04: This rule should not have failed.
+inet/ether-ip.t: ERROR: line 9: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/rt.t: OK
+inet/ct.t: OK
+inet/ip.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/ip.t: ERROR: line 10: add rule netdev test-netdev egress ip saddr . ip daddr . ether saddr { 1.1.1.1 . 2.2.2.2 . ca:fe:ca:fe:ca:fe }: This rule should not have failed.
+inet/ip.t: ERROR: line 12: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/icmpX.t: OK
+inet/tcp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/tcp.t: ERROR: line 12: add rule netdev test-netdev egress tcp dport 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 13: add rule netdev test-netdev egress tcp dport != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 14: add rule netdev test-netdev egress tcp dport 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 15: add rule netdev test-netdev egress tcp dport != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 16: add rule netdev test-netdev egress tcp dport { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 17: add rule netdev test-netdev egress tcp dport != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 18: add rule netdev test-netdev egress tcp dport {telnet, http, https} accept: This rule should not have failed.
+inet/tcp.t: ERROR: line 19: add rule netdev test-netdev egress tcp dport vmap { 22 : accept, 23 : drop }: This rule should not have failed.
+inet/tcp.t: ERROR: line 20: add rule netdev test-netdev egress tcp dport vmap { 25:accept, 28:drop }: This rule should not have failed.
+inet/tcp.t: ERROR: line 21: add rule netdev test-netdev egress tcp dport { 22, 53, 80, 110 }: This rule should not have failed.
+inet/tcp.t: ERROR: line 22: add rule netdev test-netdev egress tcp dport != { 22, 53, 80, 110 }: This rule should not have failed.
+inet/tcp.t: ERROR: line 26: add rule netdev test-netdev egress tcp sport 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 27: add rule netdev test-netdev egress tcp sport != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 28: add rule netdev test-netdev egress tcp sport 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 29: add rule netdev test-netdev egress tcp sport != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 30: add rule netdev test-netdev egress tcp sport { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 31: add rule netdev test-netdev egress tcp sport != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 32: add rule netdev test-netdev egress tcp sport vmap { 25:accept, 28:drop }: This rule should not have failed.
+inet/tcp.t: ERROR: line 34: add rule netdev test-netdev egress tcp sport 8080 drop: This rule should not have failed.
+inet/tcp.t: ERROR: line 35: add rule netdev test-netdev egress tcp sport 1024 tcp dport 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 36: add rule netdev test-netdev egress tcp sport 1024 tcp dport 22 tcp sequence 0: This rule should not have failed.
+inet/tcp.t: ERROR: line 38: add rule netdev test-netdev egress tcp sequence 0 tcp sport 1024 tcp dport 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 39: add rule netdev test-netdev egress tcp sequence 0 tcp sport { 1024, 1022} tcp dport 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 41: add rule netdev test-netdev egress tcp sequence 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 42: add rule netdev test-netdev egress tcp sequence != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 43: add rule netdev test-netdev egress tcp sequence 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 44: add rule netdev test-netdev egress tcp sequence != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 45: add rule netdev test-netdev egress tcp sequence { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 46: add rule netdev test-netdev egress tcp sequence != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 48: add rule netdev test-netdev egress tcp ackseq 42949672 drop: This rule should not have failed.
+inet/tcp.t: ERROR: line 49: add rule netdev test-netdev egress tcp ackseq 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 50: add rule netdev test-netdev egress tcp ackseq != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 51: add rule netdev test-netdev egress tcp ackseq 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 52: add rule netdev test-netdev egress tcp ackseq != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 53: add rule netdev test-netdev egress tcp ackseq { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 54: add rule netdev test-netdev egress tcp ackseq != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 66: add rule netdev test-netdev egress tcp flags { fin, syn, rst, psh, ack, urg, ecn, cwr} drop: This rule should not have failed.
+inet/tcp.t: ERROR: line 67: add rule netdev test-netdev egress tcp flags != { fin, urg, ecn, cwr} drop: This rule should not have failed.
+inet/tcp.t: ERROR: line 68: add rule netdev test-netdev egress tcp flags cwr: This rule should not have failed.
+inet/tcp.t: ERROR: line 69: add rule netdev test-netdev egress tcp flags != cwr: This rule should not have failed.
+inet/tcp.t: ERROR: line 70: add rule netdev test-netdev egress tcp flags == syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 71: add rule netdev test-netdev egress tcp flags fin,syn / fin,syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 72: add rule netdev test-netdev egress tcp flags != syn / fin,syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 73: add rule netdev test-netdev egress tcp flags & syn != 0: This rule should not have failed.
+inet/tcp.t: ERROR: line 74: add rule netdev test-netdev egress tcp flags & syn == 0: This rule should not have failed.
+inet/tcp.t: ERROR: line 75: add rule netdev test-netdev egress tcp flags & (syn | ack) != 0: This rule should not have failed.
+inet/tcp.t: ERROR: line 76: add rule netdev test-netdev egress tcp flags & (syn | ack) == 0: This rule should not have failed.
+inet/tcp.t: ERROR: line 78: add rule netdev test-netdev egress tcp flags & syn == syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 79: add rule netdev test-netdev egress tcp flags & syn != syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 80: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | ack) syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 81: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | ack) == syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 82: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | ack) != syn: This rule should not have failed.
+inet/tcp.t: ERROR: line 83: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | ack) == (syn | ack): This rule should not have failed.
+inet/tcp.t: ERROR: line 84: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | ack) != (syn | ack): This rule should not have failed.
+inet/tcp.t: ERROR: line 85: add rule netdev test-netdev egress tcp flags & (syn | ack) == (syn | ack): This rule should not have failed.
+inet/tcp.t: ERROR: line 86: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | psh | ack | urg | ecn | cwr) == fin | syn | rst | psh | ack | urg | ecn | cwr: This rule should not have failed.
+inet/tcp.t: ERROR: line 87: add rule netdev test-netdev egress tcp flags { syn, syn | ack }: This rule should not have failed.
+inet/tcp.t: ERROR: line 88: add rule netdev test-netdev egress tcp flags & (fin | syn | rst | psh | ack | urg) == { fin, ack, psh | ack, fin | psh | ack }: This rule should not have failed.
+inet/tcp.t: ERROR: line 89: add rule netdev test-netdev egress tcp flags ! fin,rst: This rule should not have failed.
+inet/tcp.t: ERROR: line 92: add rule netdev test-netdev egress tcp window 22222: This rule should not have failed.
+inet/tcp.t: ERROR: line 93: add rule netdev test-netdev egress tcp window 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 94: add rule netdev test-netdev egress tcp window != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 95: add rule netdev test-netdev egress tcp window 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 96: add rule netdev test-netdev egress tcp window != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 97: add rule netdev test-netdev egress tcp window { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 98: add rule netdev test-netdev egress tcp window != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 100: add rule netdev test-netdev egress tcp checksum 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 101: add rule netdev test-netdev egress tcp checksum != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 102: add rule netdev test-netdev egress tcp checksum 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 103: add rule netdev test-netdev egress tcp checksum != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 104: add rule netdev test-netdev egress tcp checksum { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 105: add rule netdev test-netdev egress tcp checksum != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 107: add rule netdev test-netdev egress tcp urgptr 1234 accept: This rule should not have failed.
+inet/tcp.t: ERROR: line 108: add rule netdev test-netdev egress tcp urgptr 22: This rule should not have failed.
+inet/tcp.t: ERROR: line 109: add rule netdev test-netdev egress tcp urgptr != 233: This rule should not have failed.
+inet/tcp.t: ERROR: line 110: add rule netdev test-netdev egress tcp urgptr 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 111: add rule netdev test-netdev egress tcp urgptr != 33-45: This rule should not have failed.
+inet/tcp.t: ERROR: line 112: add rule netdev test-netdev egress tcp urgptr { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 113: add rule netdev test-netdev egress tcp urgptr != { 33, 55, 67, 88}: This rule should not have failed.
+inet/tcp.t: ERROR: line 115: add rule netdev test-netdev egress tcp doff 8: This rule should not have failed.
+inet/tcp.t: ERROR: line 115: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/icmp.t: OK
+inet/socket.t: OK
+inet/udplite.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/udplite.t: ERROR: line 10: add rule netdev test-netdev egress udplite sport 80 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 11: add rule netdev test-netdev egress udplite sport != 60 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 12: add rule netdev test-netdev egress udplite sport 50-70 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 13: add rule netdev test-netdev egress udplite sport != 50-60 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 14: add rule netdev test-netdev egress udplite sport { 49, 50} drop: This rule should not have failed.
+inet/udplite.t: ERROR: line 15: add rule netdev test-netdev egress udplite sport != { 49, 50} accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 17: add rule netdev test-netdev egress udplite dport 80 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 18: add rule netdev test-netdev egress udplite dport != 60 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 19: add rule netdev test-netdev egress udplite dport 70-75 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 20: add rule netdev test-netdev egress udplite dport != 50-60 accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 21: add rule netdev test-netdev egress udplite dport { 49, 50} drop: This rule should not have failed.
+inet/udplite.t: ERROR: line 22: add rule netdev test-netdev egress udplite dport != { 49, 50} accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 31: add rule netdev test-netdev egress udplite checksum 6666 drop: This rule should not have failed.
+inet/udplite.t: ERROR: line 32: add rule netdev test-netdev egress udplite checksum != { 444, 555} accept: This rule should not have failed.
+inet/udplite.t: ERROR: line 33: add rule netdev test-netdev egress udplite checksum 22: This rule should not have failed.
+inet/udplite.t: ERROR: line 34: add rule netdev test-netdev egress udplite checksum != 233: This rule should not have failed.
+inet/udplite.t: ERROR: line 35: add rule netdev test-netdev egress udplite checksum 33-45: This rule should not have failed.
+inet/udplite.t: ERROR: line 36: add rule netdev test-netdev egress udplite checksum != 33-45: This rule should not have failed.
+inet/udplite.t: ERROR: line 37: add rule netdev test-netdev egress udplite checksum { 33, 55, 67, 88}: This rule should not have failed.
+inet/udplite.t: ERROR: line 38: add rule netdev test-netdev egress udplite checksum != { 33, 55, 67, 88}: This rule should not have failed.
+inet/udplite.t: ERROR: line 38: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/dccp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/dccp.t: ERROR: line 10: add rule netdev test-netdev egress dccp sport 21-35: This rule should not have failed.
+inet/dccp.t: ERROR: line 11: add rule netdev test-netdev egress dccp sport != 21-35: This rule should not have failed.
+inet/dccp.t: ERROR: line 12: add rule netdev test-netdev egress dccp sport {23, 24, 25}: This rule should not have failed.
+inet/dccp.t: ERROR: line 13: add rule netdev test-netdev egress dccp sport != {23, 24, 25}: This rule should not have failed.
+inet/dccp.t: ERROR: line 15: add rule netdev test-netdev egress dccp sport 20-50: This rule should not have failed.
+inet/dccp.t: ERROR: line 19: add rule netdev test-netdev egress dccp dport {23, 24, 25}: This rule should not have failed.
+inet/dccp.t: ERROR: line 20: add rule netdev test-netdev egress dccp dport != {23, 24, 25}: This rule should not have failed.
+inet/dccp.t: ERROR: line 22: add rule netdev test-netdev egress dccp type {request, response, data, ack, dataack, closereq, close, reset, sync, syncack}: This rule should not have failed.
+inet/dccp.t: ERROR: line 23: add rule netdev test-netdev egress dccp type != {request, response, data, ack, dataack, closereq, close, reset, sync, syncack}: This rule should not have failed.
+inet/dccp.t: ERROR: line 24: add rule netdev test-netdev egress dccp type request: This rule should not have failed.
+inet/dccp.t: ERROR: line 25: add rule netdev test-netdev egress dccp type != request: This rule should not have failed.
+inet/dccp.t: ERROR: line 27: add rule ip test-ip4 input dccp option 0 exists: This rule should not have failed.
+inet/dccp.t: ERROR: line 28: add rule ip test-ip4 input dccp option 43 missing: This rule should not have failed.
+inet/dccp.t: ERROR: line 29: add rule ip test-ip4 input dccp option 255 exists: This rule should not have failed.
+inet/dccp.t: ERROR: line 30: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/tproxy.t: OK
+inet/ether.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/ether.t: ERROR: line 11: add rule netdev test-netdev egress tcp dport 22 iiftype ether ether saddr 00:0f:54:0c:11:4 accept: This rule should not have failed.
+inet/ether.t: ERROR: line 12: add rule netdev test-netdev egress tcp dport 22 ether saddr 00:0f:54:0c:11:04 accept: This rule should not have failed.
+inet/ether.t: ERROR: line 14: add rule netdev test-netdev egress ether saddr 00:0f:54:0c:11:04 accept: This rule should not have failed.
+inet/ether.t: ERROR: line 16: add rule netdev test-netdev egress vlan id 1: This rule should not have failed.
+inet/ether.t: ERROR: line 17: add rule netdev test-netdev egress ether type vlan vlan id 2: This rule should not have failed.
+inet/ether.t: ERROR: line 20: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/synproxy.t: OK
+inet/sctp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/sctp.t: ERROR: line 10: add rule netdev test-netdev egress sctp sport 23: This rule should not have failed.
+inet/sctp.t: ERROR: line 11: add rule netdev test-netdev egress sctp sport != 23: This rule should not have failed.
+inet/sctp.t: ERROR: line 12: add rule netdev test-netdev egress sctp sport 23-44: This rule should not have failed.
+inet/sctp.t: ERROR: line 13: add rule netdev test-netdev egress sctp sport != 23-44: This rule should not have failed.
+inet/sctp.t: ERROR: line 14: add rule netdev test-netdev egress sctp sport { 23, 24, 25}: This rule should not have failed.
+inet/sctp.t: ERROR: line 15: add rule netdev test-netdev egress sctp sport != { 23, 24, 25}: This rule should not have failed.
+inet/sctp.t: ERROR: line 17: add rule netdev test-netdev egress sctp dport 23: This rule should not have failed.
+inet/sctp.t: ERROR: line 18: add rule netdev test-netdev egress sctp dport != 23: This rule should not have failed.
+inet/sctp.t: ERROR: line 19: add rule netdev test-netdev egress sctp dport 23-44: This rule should not have failed.
+inet/sctp.t: ERROR: line 20: add rule netdev test-netdev egress sctp dport != 23-44: This rule should not have failed.
+inet/sctp.t: ERROR: line 21: add rule netdev test-netdev egress sctp dport { 23, 24, 25}: This rule should not have failed.
+inet/sctp.t: ERROR: line 22: add rule netdev test-netdev egress sctp dport != { 23, 24, 25}: This rule should not have failed.
+inet/sctp.t: ERROR: line 24: add rule netdev test-netdev egress sctp checksum 1111: This rule should not have failed.
+inet/sctp.t: ERROR: line 25: add rule netdev test-netdev egress sctp checksum != 11: This rule should not have failed.
+inet/sctp.t: ERROR: line 26: add rule netdev test-netdev egress sctp checksum 21-333: This rule should not have failed.
+inet/sctp.t: ERROR: line 27: add rule netdev test-netdev egress sctp checksum != 32-111: This rule should not have failed.
+inet/sctp.t: ERROR: line 28: add rule netdev test-netdev egress sctp checksum { 22, 33, 44}: This rule should not have failed.
+inet/sctp.t: ERROR: line 29: add rule netdev test-netdev egress sctp checksum != { 22, 33, 44}: This rule should not have failed.
+inet/sctp.t: ERROR: line 31: add rule netdev test-netdev egress sctp vtag 22: This rule should not have failed.
+inet/sctp.t: ERROR: line 32: add rule netdev test-netdev egress sctp vtag != 233: This rule should not have failed.
+inet/sctp.t: ERROR: line 33: add rule netdev test-netdev egress sctp vtag 33-45: This rule should not have failed.
+inet/sctp.t: ERROR: line 34: add rule netdev test-netdev egress sctp vtag != 33-45: This rule should not have failed.
+inet/sctp.t: ERROR: line 35: add rule netdev test-netdev egress sctp vtag {33, 55, 67, 88}: This rule should not have failed.
+inet/sctp.t: ERROR: line 36: add rule netdev test-netdev egress sctp vtag != {33, 55, 67, 88}: This rule should not have failed.
+inet/sctp.t: ERROR: line 39: add rule ip test-ip4 input sctp chunk data exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 40: add rule ip test-ip4 input sctp chunk init exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 41: add rule ip test-ip4 input sctp chunk init-ack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 42: add rule ip test-ip4 input sctp chunk sack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 43: add rule ip test-ip4 input sctp chunk heartbeat exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 44: add rule ip test-ip4 input sctp chunk heartbeat-ack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 45: add rule ip test-ip4 input sctp chunk abort exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 46: add rule ip test-ip4 input sctp chunk shutdown exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 47: add rule ip test-ip4 input sctp chunk shutdown-ack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 48: add rule ip test-ip4 input sctp chunk error exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 49: add rule ip test-ip4 input sctp chunk cookie-echo exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 50: add rule ip test-ip4 input sctp chunk cookie-ack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 51: add rule ip test-ip4 input sctp chunk ecne exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 52: add rule ip test-ip4 input sctp chunk cwr exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 53: add rule ip test-ip4 input sctp chunk shutdown-complete exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 54: add rule ip test-ip4 input sctp chunk asconf-ack exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 55: add rule ip test-ip4 input sctp chunk forward-tsn exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 56: add rule ip test-ip4 input sctp chunk asconf exists: This rule should not have failed.
+inet/sctp.t: ERROR: line 59: add rule ip test-ip4 input sctp chunk data type 0: This rule should not have failed.
+inet/sctp.t: ERROR: line 60: add rule ip test-ip4 input sctp chunk init flags 23: This rule should not have failed.
+inet/sctp.t: ERROR: line 61: add rule ip test-ip4 input sctp chunk init-ack length 42: This rule should not have failed.
+inet/sctp.t: ERROR: line 64: add rule ip test-ip4 input sctp chunk data stream 1337: This rule should not have failed.
+inet/sctp.t: ERROR: line 65: add rule ip test-ip4 input sctp chunk init initial-tsn 5: This rule should not have failed.
+inet/sctp.t: ERROR: line 66: add rule ip test-ip4 input sctp chunk init-ack num-outbound-streams 3: This rule should not have failed.
+inet/sctp.t: ERROR: line 67: add rule ip test-ip4 input sctp chunk sack a-rwnd 1: This rule should not have failed.
+inet/sctp.t: ERROR: line 68: add rule ip test-ip4 input sctp chunk shutdown cum-tsn-ack 65535: This rule should not have failed.
+inet/sctp.t: ERROR: line 69: add rule ip test-ip4 input sctp chunk ecne lowest-tsn 5: This rule should not have failed.
+inet/sctp.t: ERROR: line 70: add rule ip test-ip4 input sctp chunk cwr lowest-tsn 8: This rule should not have failed.
+inet/sctp.t: ERROR: line 71: add rule ip test-ip4 input sctp chunk asconf-ack seqno 12345: This rule should not have failed.
+inet/sctp.t: ERROR: line 72: add rule ip test-ip4 input sctp chunk forward-tsn new-cum-tsn 31337: This rule should not have failed.
+inet/sctp.t: ERROR: line 73: add rule ip test-ip4 input sctp chunk asconf seqno 12345: This rule should not have failed.
+inet/sctp.t: ERROR: line 73: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/map.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/map.t: ERROR: line 9: add rule netdev test-netdev egress mark set ip saddr map { 10.2.3.2 : 0x0000002a, 10.2.3.1 : 0x00000017}: This rule should not have failed.
+inet/map.t: ERROR: line 10: add rule netdev test-netdev egress mark set ip hdrlength map { 5 : 0x00000017, 4 : 0x00000001}: This rule should not have failed.
+inet/map.t: ERROR: line 10: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/ip_tcp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/ip_tcp.t: ERROR: line 10: add rule netdev test-netdev egress ip protocol tcp tcp dport 22: This rule should not have failed.
+inet/ip_tcp.t: ERROR: line 13: add rule netdev test-netdev egress ip protocol tcp ip saddr 1.2.3.4 tcp dport 22: This rule should not have failed.
+inet/ip_tcp.t: ERROR: line 16: add rule netdev test-netdev egress ip protocol tcp counter ip saddr 1.2.3.4 tcp dport 22: This rule should not have failed.
+inet/ip_tcp.t: ERROR: line 19: add rule netdev test-netdev egress ip protocol tcp counter tcp dport 22: This rule should not have failed.
+inet/ip_tcp.t: ERROR: line 21: add rule netdev test-netdev egress ether type ip tcp dport 22: This rule should not have failed.
+inet/ip_tcp.t: ERROR: line 21: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/fib.t: OK
+inet/vxlan.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/vxlan.t: ERROR: line 11: add rule ip test-ip4 input udp dport 4789 vxlan vni 10: This rule should not have failed.
+inet/vxlan.t: ERROR: line 12: add rule ip test-ip4 input udp dport 4789 vxlan ip saddr 10.141.11.2: This rule should not have failed.
+inet/vxlan.t: ERROR: line 13: add rule ip test-ip4 input udp dport 4789 vxlan ip saddr 10.141.11.0/24: This rule should not have failed.
+inet/vxlan.t: ERROR: line 14: add rule ip test-ip4 input udp dport 4789 vxlan ip protocol 1: This rule should not have failed.
+inet/vxlan.t: ERROR: line 15: add rule ip test-ip4 input udp dport 4789 vxlan udp sport 8888: This rule should not have failed.
+inet/vxlan.t: ERROR: line 16: add rule ip test-ip4 input udp dport 4789 vxlan icmp type echo-reply: This rule should not have failed.
+inet/vxlan.t: ERROR: line 17: add rule ip test-ip4 input udp dport 4789 vxlan ether saddr 62:87:4d:d6:19:05: This rule should not have failed.
+inet/vxlan.t: ERROR: line 18: add rule ip test-ip4 input udp dport 4789 vxlan vlan id 10: This rule should not have failed.
+inet/vxlan.t: ERROR: line 19: add rule ip test-ip4 input udp dport 4789 vxlan ip dscp 0x02: This rule should not have failed.
+inet/vxlan.t: ERROR: line 20: add rule ip test-ip4 input udp dport 4789 vxlan ip dscp 0x02: This rule should not have failed.
+inet/vxlan.t: ERROR: line 21: add rule ip test-ip4 input udp dport 4789 vxlan ip saddr . vxlan ip daddr { 1.2.3.4 . 4.3.2.1 }: This rule should not have failed.
+inet/vxlan.t: ERROR: line 23: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/ah.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/ah.t: ERROR: line 22: add rule netdev test-netdev egress ah hdrlength 11-23: This rule should not have failed.
+inet/ah.t: ERROR: line 23: add rule netdev test-netdev egress ah hdrlength != 11-23: This rule should not have failed.
+inet/ah.t: ERROR: line 24: add rule netdev test-netdev egress ah hdrlength {11, 23, 44 }: This rule should not have failed.
+inet/ah.t: ERROR: line 25: add rule netdev test-netdev egress ah hdrlength != {11, 23, 44 }: This rule should not have failed.
+inet/ah.t: ERROR: line 27: add rule netdev test-netdev egress ah reserved 22: This rule should not have failed.
+inet/ah.t: ERROR: line 28: add rule netdev test-netdev egress ah reserved != 233: This rule should not have failed.
+inet/ah.t: ERROR: line 29: add rule netdev test-netdev egress ah reserved 33-45: This rule should not have failed.
+inet/ah.t: ERROR: line 30: add rule netdev test-netdev egress ah reserved != 33-45: This rule should not have failed.
+inet/ah.t: ERROR: line 31: add rule netdev test-netdev egress ah reserved {23, 100}: This rule should not have failed.
+inet/ah.t: ERROR: line 32: add rule netdev test-netdev egress ah reserved != {23, 100}: This rule should not have failed.
+inet/ah.t: ERROR: line 34: add rule netdev test-netdev egress ah spi 111: This rule should not have failed.
+inet/ah.t: ERROR: line 35: add rule netdev test-netdev egress ah spi != 111: This rule should not have failed.
+inet/ah.t: ERROR: line 36: add rule netdev test-netdev egress ah spi 111-222: This rule should not have failed.
+inet/ah.t: ERROR: line 37: add rule netdev test-netdev egress ah spi != 111-222: This rule should not have failed.
+inet/ah.t: ERROR: line 38: add rule netdev test-netdev egress ah spi {111, 122}: This rule should not have failed.
+inet/ah.t: ERROR: line 39: add rule netdev test-netdev egress ah spi != {111, 122}: This rule should not have failed.
+inet/ah.t: ERROR: line 42: add rule netdev test-netdev egress ah sequence 123: This rule should not have failed.
+inet/ah.t: ERROR: line 43: add rule netdev test-netdev egress ah sequence != 123: This rule should not have failed.
+inet/ah.t: ERROR: line 44: add rule netdev test-netdev egress ah sequence {23, 25, 33}: This rule should not have failed.
+inet/ah.t: ERROR: line 45: add rule netdev test-netdev egress ah sequence != {23, 25, 33}: This rule should not have failed.
+inet/ah.t: ERROR: line 46: add rule netdev test-netdev egress ah sequence 23-33: This rule should not have failed.
+inet/ah.t: ERROR: line 47: add rule netdev test-netdev egress ah sequence != 23-33: This rule should not have failed.
+inet/ah.t: ERROR: line 47: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/dnat.t: OK
+inet/esp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/esp.t: ERROR: line 10: add rule netdev test-netdev egress esp spi 100: This rule should not have failed.
+inet/esp.t: ERROR: line 11: add rule netdev test-netdev egress esp spi != 100: This rule should not have failed.
+inet/esp.t: ERROR: line 12: add rule netdev test-netdev egress esp spi 111-222: This rule should not have failed.
+inet/esp.t: ERROR: line 13: add rule netdev test-netdev egress esp spi != 111-222: This rule should not have failed.
+inet/esp.t: ERROR: line 14: add rule netdev test-netdev egress esp spi { 100, 102}: This rule should not have failed.
+inet/esp.t: ERROR: line 15: add rule netdev test-netdev egress esp spi != { 100, 102}: This rule should not have failed.
+inet/esp.t: ERROR: line 17: add rule netdev test-netdev egress esp sequence 22: This rule should not have failed.
+inet/esp.t: ERROR: line 18: add rule netdev test-netdev egress esp sequence 22-24: This rule should not have failed.
+inet/esp.t: ERROR: line 19: add rule netdev test-netdev egress esp sequence != 22-24: This rule should not have failed.
+inet/esp.t: ERROR: line 20: add rule netdev test-netdev egress esp sequence { 22, 24}: This rule should not have failed.
+inet/esp.t: ERROR: line 21: add rule netdev test-netdev egress esp sequence != { 22, 24}: This rule should not have failed.
+inet/esp.t: ERROR: line 21: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/geneve.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/geneve.t: ERROR: line 11: add rule ip test-ip4 input udp dport 6081 geneve vni 10: This rule should not have failed.
+inet/geneve.t: ERROR: line 12: add rule ip test-ip4 input udp dport 6081 geneve ip saddr 10.141.11.2: This rule should not have failed.
+inet/geneve.t: ERROR: line 13: add rule ip test-ip4 input udp dport 6081 geneve ip saddr 10.141.11.0/24: This rule should not have failed.
+inet/geneve.t: ERROR: line 14: add rule ip test-ip4 input udp dport 6081 geneve ip protocol 1: This rule should not have failed.
+inet/geneve.t: ERROR: line 15: add rule ip test-ip4 input udp dport 6081 geneve udp sport 8888: This rule should not have failed.
+inet/geneve.t: ERROR: line 16: add rule ip test-ip4 input udp dport 6081 geneve icmp type echo-reply: This rule should not have failed.
+inet/geneve.t: ERROR: line 17: add rule ip test-ip4 input udp dport 6081 geneve ether saddr 62:87:4d:d6:19:05: This rule should not have failed.
+inet/geneve.t: ERROR: line 18: add rule ip test-ip4 input udp dport 6081 geneve vlan id 10: This rule should not have failed.
+inet/geneve.t: ERROR: line 19: add rule ip test-ip4 input udp dport 6081 geneve ip dscp 0x02: This rule should not have failed.
+inet/geneve.t: ERROR: line 20: add rule ip test-ip4 input udp dport 6081 geneve ip dscp 0x02: This rule should not have failed.
+inet/geneve.t: ERROR: line 21: add rule ip test-ip4 input udp dport 6081 geneve ip saddr . geneve ip daddr { 1.2.3.4 . 4.3.2.1 }: This rule should not have failed.
+inet/geneve.t: ERROR: line 23: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/udp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/udp.t: ERROR: line 10: add rule netdev test-netdev egress udp sport 80 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 11: add rule netdev test-netdev egress udp sport != 60 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 12: add rule netdev test-netdev egress udp sport 50-70 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 13: add rule netdev test-netdev egress udp sport != 50-60 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 14: add rule netdev test-netdev egress udp sport { 49, 50} drop: This rule should not have failed.
+inet/udp.t: ERROR: line 15: add rule netdev test-netdev egress udp sport != { 50, 60} accept: This rule should not have failed.
+inet/udp.t: ERROR: line 19: add rule netdev test-netdev egress udp dport 80 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 20: add rule netdev test-netdev egress udp dport != 60 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 21: add rule netdev test-netdev egress udp dport 70-75 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 22: add rule netdev test-netdev egress udp dport != 50-60 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 23: add rule netdev test-netdev egress udp dport { 49, 50} drop: This rule should not have failed.
+inet/udp.t: ERROR: line 24: add rule netdev test-netdev egress udp dport != { 50, 60} accept: This rule should not have failed.
+inet/udp.t: ERROR: line 26: add rule netdev test-netdev egress udp length 6666: This rule should not have failed.
+inet/udp.t: ERROR: line 27: add rule netdev test-netdev egress udp length != 6666: This rule should not have failed.
+inet/udp.t: ERROR: line 28: add rule netdev test-netdev egress udp length 50-65 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 29: add rule netdev test-netdev egress udp length != 50-65 accept: This rule should not have failed.
+inet/udp.t: ERROR: line 30: add rule netdev test-netdev egress udp length { 50, 65} accept: This rule should not have failed.
+inet/udp.t: ERROR: line 31: add rule netdev test-netdev egress udp length != { 50, 65} accept: This rule should not have failed.
+inet/udp.t: ERROR: line 33: add rule netdev test-netdev egress udp checksum 6666 drop: This rule should not have failed.
+inet/udp.t: ERROR: line 34: add rule netdev test-netdev egress udp checksum != { 444, 555} accept: This rule should not have failed.
+inet/udp.t: ERROR: line 36: add rule netdev test-netdev egress udp checksum 22: This rule should not have failed.
+inet/udp.t: ERROR: line 37: add rule netdev test-netdev egress udp checksum != 233: This rule should not have failed.
+inet/udp.t: ERROR: line 38: add rule netdev test-netdev egress udp checksum 33-45: This rule should not have failed.
+inet/udp.t: ERROR: line 39: add rule netdev test-netdev egress udp checksum != 33-45: This rule should not have failed.
+inet/udp.t: ERROR: line 40: add rule netdev test-netdev egress udp checksum { 33, 55, 67, 88}: This rule should not have failed.
+inet/udp.t: ERROR: line 41: add rule netdev test-netdev egress udp checksum != { 33, 55, 67, 88}: This rule should not have failed.
+inet/udp.t: ERROR: line 44: add rule netdev test-netdev egress iif "lo" udp checksum set 0: This rule should not have failed.
+inet/udp.t: ERROR: line 45: add rule netdev test-netdev egress iif "lo" udp dport set 65535: This rule should not have failed.
+inet/udp.t: ERROR: line 45: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/sets.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/sets.t: ERROR: line 15: add rule netdev test-netdev egress ip saddr @set1 drop: This rule should not have failed.
+inet/sets.t: ERROR: line 18: add rule netdev test-netdev egress ip6 daddr != @set2 accept: This rule should not have failed.
+inet/sets.t: ERROR: line 24: add rule netdev test-netdev egress ip saddr . ip daddr . tcp dport @set3 accept: This rule should not have failed.
+inet/sets.t: ERROR: line 25: add rule netdev test-netdev egress ip daddr . tcp dport { 10.0.0.0/8 . 10-23, 192.168.1.1-192.168.3.8 . 80-443 } accept: This rule should not have failed.
+inet/sets.t: ERROR: line 25: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/gretap.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/gretap.t: ERROR: line 10: add rule ip test-ip4 input gretap ip saddr 10.141.11.2: This rule should not have failed.
+inet/gretap.t: ERROR: line 11: add rule ip test-ip4 input gretap ip saddr 10.141.11.0/24: This rule should not have failed.
+inet/gretap.t: ERROR: line 12: add rule ip test-ip4 input gretap ip protocol 1: This rule should not have failed.
+inet/gretap.t: ERROR: line 13: add rule ip test-ip4 input gretap udp sport 8888: This rule should not have failed.
+inet/gretap.t: ERROR: line 14: add rule ip test-ip4 input gretap icmp type echo-reply: This rule should not have failed.
+inet/gretap.t: ERROR: line 15: add rule ip test-ip4 input gretap ether saddr 62:87:4d:d6:19:05: This rule should not have failed.
+inet/gretap.t: ERROR: line 16: add rule ip test-ip4 input gretap vlan id 10: This rule should not have failed.
+inet/gretap.t: ERROR: line 17: add rule ip test-ip4 input gretap ip dscp 0x02: This rule should not have failed.
+inet/gretap.t: ERROR: line 18: add rule ip test-ip4 input gretap ip dscp 0x02: This rule should not have failed.
+inet/gretap.t: ERROR: line 19: add rule ip test-ip4 input gretap ip saddr . gretap ip daddr { 1.2.3.4 . 4.3.2.1 }: This rule should not have failed.
+inet/gretap.t: ERROR: line 21: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/osf.t: OK
+inet/gre.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/gre.t: ERROR: line 10: add rule netdev test-netdev egress gre version 0: This rule should not have failed.
+inet/gre.t: ERROR: line 11: add rule ip test-ip4 input gre ip saddr 10.141.11.2: This rule should not have failed.
+inet/gre.t: ERROR: line 12: add rule ip test-ip4 input gre ip saddr 10.141.11.0/24: This rule should not have failed.
+inet/gre.t: ERROR: line 13: add rule ip test-ip4 input gre ip protocol 1: This rule should not have failed.
+inet/gre.t: ERROR: line 14: add rule ip test-ip4 input gre udp sport 8888: This rule should not have failed.
+inet/gre.t: ERROR: line 15: add rule ip test-ip4 input gre icmp type echo-reply: This rule should not have failed.
+inet/gre.t: ERROR: line 18: add rule ip test-ip4 input gre ip dscp 0x02: This rule should not have failed.
+inet/gre.t: ERROR: line 19: add rule ip test-ip4 input gre ip dscp 0x02: This rule should not have failed.
+inet/gre.t: ERROR: line 20: add rule ip test-ip4 input gre ip saddr . gre ip daddr { 1.2.3.4 . 4.3.2.1 }: This rule should not have failed.
+inet/gre.t: ERROR: line 22: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/comp.t: ERROR: line 3: I cannot create the chain 'egress'
+inet/comp.t: ERROR: line 12: add rule netdev test-netdev egress comp nexthdr != esp: This rule should not have failed.
+inet/comp.t: ERROR: line 18: add rule netdev test-netdev egress comp flags 0x0: This rule should not have failed.
+inet/comp.t: ERROR: line 19: add rule netdev test-netdev egress comp flags != 0x23: This rule should not have failed.
+inet/comp.t: ERROR: line 20: add rule netdev test-netdev egress comp flags 0x33-0x45: This rule should not have failed.
+inet/comp.t: ERROR: line 21: add rule netdev test-netdev egress comp flags != 0x33-0x45: This rule should not have failed.
+inet/comp.t: ERROR: line 22: add rule netdev test-netdev egress comp flags {0x33, 0x55, 0x67, 0x88}: This rule should not have failed.
+inet/comp.t: ERROR: line 23: add rule netdev test-netdev egress comp flags != {0x33, 0x55, 0x67, 0x88}: This rule should not have failed.
+inet/comp.t: ERROR: line 25: add rule netdev test-netdev egress comp cpi 22: This rule should not have failed.
+inet/comp.t: ERROR: line 26: add rule netdev test-netdev egress comp cpi != 233: This rule should not have failed.
+inet/comp.t: ERROR: line 27: add rule netdev test-netdev egress comp cpi 33-45: This rule should not have failed.
+inet/comp.t: ERROR: line 28: add rule netdev test-netdev egress comp cpi != 33-45: This rule should not have failed.
+inet/comp.t: ERROR: line 29: add rule netdev test-netdev egress comp cpi {33, 55, 67, 88}: This rule should not have failed.
+inet/comp.t: ERROR: line 30: add rule netdev test-netdev egress comp cpi != {33, 55, 67, 88}: This rule should not have failed.
+inet/comp.t: ERROR: line 30: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+inet/reject.t: OK
+ip/meta.t: OK
+ip/snat.t: OK
+ip/masquerade.t: OK
+ip/redirect.t: OK
+ip/rt.t: OK
+ip/ct.t: OK
+ip/hash.t: OK
+ip/ip.t: ERROR: line 3: I cannot create the chain 'egress'
+ip/ip.t: ERROR: line 28: add rule netdev test-netdev egress ip dscp cs1: This rule should not have failed.
+ip/ip.t: ERROR: line 29: add rule netdev test-netdev egress ip dscp != cs1: This rule should not have failed.
+ip/ip.t: ERROR: line 30: add rule netdev test-netdev egress ip dscp 0x38: This rule should not have failed.
+ip/ip.t: ERROR: line 31: add rule netdev test-netdev egress ip dscp != 0x20: This rule should not have failed.
+ip/ip.t: ERROR: line 32: add rule netdev test-netdev egress ip dscp {cs0, cs1, cs2, cs3, cs4, cs5, cs6, cs7, af11, af12, af13, af21, af22, af23, af31, af32, af33, af41, af42, af43, ef}: This rule should not have failed.
+ip/ip.t: ERROR: line 34: add rule netdev test-netdev egress ip dscp != {cs0, cs3}: This rule should not have failed.
+ip/ip.t: ERROR: line 35: add rule netdev test-netdev egress ip dscp vmap { cs1 : continue , cs4 : accept } counter: This rule should not have failed.
+ip/ip.t: ERROR: line 37: add rule netdev test-netdev egress ip length 232: This rule should not have failed.
+ip/ip.t: ERROR: line 38: add rule netdev test-netdev egress ip length != 233: This rule should not have failed.
+ip/ip.t: ERROR: line 39: add rule netdev test-netdev egress ip length 333-435: This rule should not have failed.
+ip/ip.t: ERROR: line 40: add rule netdev test-netdev egress ip length != 333-453: This rule should not have failed.
+ip/ip.t: ERROR: line 41: add rule netdev test-netdev egress ip length { 333, 553, 673, 838}: This rule should not have failed.
+ip/ip.t: ERROR: line 42: add rule netdev test-netdev egress ip length != { 333, 553, 673, 838}: This rule should not have failed.
+ip/ip.t: ERROR: line 44: add rule netdev test-netdev egress ip id 22: This rule should not have failed.
+ip/ip.t: ERROR: line 45: add rule netdev test-netdev egress ip id != 233: This rule should not have failed.
+ip/ip.t: ERROR: line 46: add rule netdev test-netdev egress ip id 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 47: add rule netdev test-netdev egress ip id != 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 48: add rule netdev test-netdev egress ip id { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 49: add rule netdev test-netdev egress ip id != { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 51: add rule netdev test-netdev egress ip frag-off 222 accept: This rule should not have failed.
+ip/ip.t: ERROR: line 52: add rule netdev test-netdev egress ip frag-off != 233: This rule should not have failed.
+ip/ip.t: ERROR: line 53: add rule netdev test-netdev egress ip frag-off 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 54: add rule netdev test-netdev egress ip frag-off != 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 55: add rule netdev test-netdev egress ip frag-off { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 56: add rule netdev test-netdev egress ip frag-off != { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 58: add rule netdev test-netdev egress ip ttl 0 drop: This rule should not have failed.
+ip/ip.t: ERROR: line 59: add rule netdev test-netdev egress ip ttl 233: This rule should not have failed.
+ip/ip.t: ERROR: line 60: add rule netdev test-netdev egress ip ttl 33-55: This rule should not have failed.
+ip/ip.t: ERROR: line 61: add rule netdev test-netdev egress ip ttl != 45-50: This rule should not have failed.
+ip/ip.t: ERROR: line 62: add rule netdev test-netdev egress ip ttl {43, 53, 45 }: This rule should not have failed.
+ip/ip.t: ERROR: line 63: add rule netdev test-netdev egress ip ttl != {43, 53, 45 }: This rule should not have failed.
+ip/ip.t: ERROR: line 65: add rule netdev test-netdev egress ip protocol tcp: This rule should not have failed.
+ip/ip.t: ERROR: line 66: add rule netdev test-netdev egress ip protocol != tcp: This rule should not have failed.
+ip/ip.t: ERROR: line 67: add rule netdev test-netdev egress ip protocol { icmp, esp, ah, comp, udp, udplite, tcp, dccp, sctp} accept: This rule should not have failed.
+ip/ip.t: ERROR: line 68: add rule netdev test-netdev egress ip protocol != { icmp, esp, ah, comp, udp, udplite, tcp, dccp, sctp} accept: This rule should not have failed.
+ip/ip.t: ERROR: line 70: add rule netdev test-netdev egress ip protocol 255: This rule should not have failed.
+ip/ip.t: ERROR: line 73: add rule netdev test-netdev egress ip checksum 13172 drop: This rule should not have failed.
+ip/ip.t: ERROR: line 74: add rule netdev test-netdev egress ip checksum 22: This rule should not have failed.
+ip/ip.t: ERROR: line 75: add rule netdev test-netdev egress ip checksum != 233: This rule should not have failed.
+ip/ip.t: ERROR: line 76: add rule netdev test-netdev egress ip checksum 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 77: add rule netdev test-netdev egress ip checksum != 33-45: This rule should not have failed.
+ip/ip.t: ERROR: line 78: add rule netdev test-netdev egress ip checksum { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 79: add rule netdev test-netdev egress ip checksum != { 33, 55, 67, 88}: This rule should not have failed.
+ip/ip.t: ERROR: line 83: add rule netdev test-netdev egress ip saddr 192.168.2.0/24: This rule should not have failed.
+ip/ip.t: ERROR: line 84: add rule netdev test-netdev egress ip saddr != 192.168.2.0/24: This rule should not have failed.
+ip/ip.t: ERROR: line 85: add rule netdev test-netdev egress ip saddr 192.168.3.1 ip daddr 192.168.3.100: This rule should not have failed.
+ip/ip.t: ERROR: line 86: add rule netdev test-netdev egress ip saddr != 1.1.1.1: This rule should not have failed.
+ip/ip.t: ERROR: line 87: add rule netdev test-netdev egress ip saddr 1.1.1.1: This rule should not have failed.
+ip/ip.t: ERROR: line 88: add rule netdev test-netdev egress ip daddr 192.168.0.1-192.168.0.250: This rule should not have failed.
+ip/ip.t: ERROR: line 89: add rule netdev test-netdev egress ip daddr 10.0.0.0-10.255.255.255: This rule should not have failed.
+ip/ip.t: ERROR: line 90: add rule netdev test-netdev egress ip daddr 172.16.0.0-172.31.255.255: This rule should not have failed.
+ip/ip.t: ERROR: line 91: add rule netdev test-netdev egress ip daddr 192.168.3.1-192.168.4.250: This rule should not have failed.
+ip/ip.t: ERROR: line 92: add rule netdev test-netdev egress ip daddr != 192.168.0.1-192.168.0.250: This rule should not have failed.
+ip/ip.t: ERROR: line 93: add rule netdev test-netdev egress ip daddr { 192.168.5.1, 192.168.5.2, 192.168.5.3 } accept: This rule should not have failed.
+ip/ip.t: ERROR: line 94: add rule netdev test-netdev egress ip daddr != { 192.168.5.1, 192.168.5.2, 192.168.5.3 } accept: This rule should not have failed.
+ip/ip.t: ERROR: line 96: add rule netdev test-netdev egress ip daddr 192.168.1.2-192.168.1.55: This rule should not have failed.
+ip/ip.t: ERROR: line 97: add rule netdev test-netdev egress ip daddr != 192.168.1.2-192.168.1.55: This rule should not have failed.
+ip/ip.t: ERROR: line 98: add rule netdev test-netdev egress ip saddr 192.168.1.3-192.168.33.55: This rule should not have failed.
+ip/ip.t: ERROR: line 99: add rule netdev test-netdev egress ip saddr != 192.168.1.3-192.168.33.55: This rule should not have failed.
+ip/ip.t: ERROR: line 101: add rule netdev test-netdev egress ip daddr 192.168.0.1: This rule should not have failed.
+ip/ip.t: ERROR: line 102: add rule netdev test-netdev egress ip daddr 192.168.0.1 drop: This rule should not have failed.
+ip/ip.t: ERROR: line 103: add rule netdev test-netdev egress ip daddr 192.168.0.2: This rule should not have failed.
+ip/ip.t: ERROR: line 105: add rule netdev test-netdev egress ip saddr & 0xff == 1: This rule should not have failed.
+ip/ip.t: ERROR: line 106: add rule netdev test-netdev egress ip saddr & 0.0.0.255 < 0.0.0.127: This rule should not have failed.
+ip/ip.t: ERROR: line 108: add rule netdev test-netdev egress ip saddr & 0xffff0000 == 0xffff0000: This rule should not have failed.
+ip/ip.t: ERROR: line 110: add rule netdev test-netdev egress ip version 4 ip hdrlength 5: This rule should not have failed.
+ip/ip.t: ERROR: line 111: add rule netdev test-netdev egress ip hdrlength 0: This rule should not have failed.
+ip/ip.t: ERROR: line 112: add rule netdev test-netdev egress ip hdrlength 15: This rule should not have failed.
+ip/ip.t: ERROR: line 113: add rule netdev test-netdev egress ip hdrlength vmap { 0-4 : drop, 5 : accept, 6 : continue } counter: This rule should not have failed.
+ip/ip.t: ERROR: line 117: add rule netdev test-netdev egress iif "lo" ip daddr set 127.0.0.1: This rule should not have failed.
+ip/ip.t: ERROR: line 118: add rule netdev test-netdev egress iif "lo" ip checksum set 0: This rule should not have failed.
+ip/ip.t: ERROR: line 119: add rule netdev test-netdev egress iif "lo" ip id set 0: This rule should not have failed.
+ip/ip.t: ERROR: line 120: add rule netdev test-netdev egress iif "lo" ip ecn set 1: This rule should not have failed.
+ip/ip.t: ERROR: line 121: add rule netdev test-netdev egress iif "lo" ip ecn set ce: This rule should not have failed.
+ip/ip.t: ERROR: line 122: add rule netdev test-netdev egress iif "lo" ip ttl set 23: This rule should not have failed.
+ip/ip.t: ERROR: line 123: add rule netdev test-netdev egress iif "lo" ip protocol set 1: This rule should not have failed.
+ip/ip.t: ERROR: line 125: add rule netdev test-netdev egress iif "lo" ip dscp set af23: This rule should not have failed.
+ip/ip.t: ERROR: line 126: add rule netdev test-netdev egress iif "lo" ip dscp set cs0: This rule should not have failed.
+ip/ip.t: ERROR: line 128: add rule netdev test-netdev egress ip saddr . ip daddr { 192.0.2.1 . 10.0.0.1-10.0.0.2 }: This rule should not have failed.
+ip/ip.t: ERROR: line 129: add rule netdev test-netdev egress ip saddr . ip daddr vmap { 192.168.5.1-192.168.5.128 . 192.168.6.1-192.168.6.128 : accept }: This rule should not have failed.
+ip/ip.t: ERROR: line 129: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+ip/igmp.t: OK
+ip/tcp.t: OK
+ip/icmp.t: OK
+ip/flowtable.t: OK
+ip/dup.t: OK
+ip/tproxy.t: OK
+ip/ether.t: OK
+ip/objects.t: OK
+ip/ip_tcp.t: OK
+ip/dnat.t: OK
+ip/sets.t: ERROR: line 3: I cannot create the chain 'egress'
+ip/sets.t: ERROR: line 32: add rule netdev test-netdev egress ip saddr @set1 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 33: add rule netdev test-netdev egress ip saddr != @set1 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 34: add rule netdev test-netdev egress ip saddr @set2 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 35: add rule netdev test-netdev egress ip saddr != @set2 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 52: add rule netdev test-netdev egress ip saddr . ip daddr @set5 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 53: add rule netdev test-netdev egress add @set5 { ip saddr . ip daddr }: This rule should not have failed.
+ip/sets.t: ERROR: line 56: add rule netdev test-netdev egress ip saddr { { 1.1.1.0, 3.3.3.0 }, 2.2.2.0 }: This rule should not have failed.
+ip/sets.t: ERROR: line 57: add rule netdev test-netdev egress ip saddr { { 1.1.1.0/24, 3.3.3.0/24 }, 2.2.2.0/24 }: This rule should not have failed.
+ip/sets.t: ERROR: line 60: add element ip test-ip4 set6 {  192.168.3.5,  * }: This rule should not have failed.
+ip/sets.t: ERROR: line 61: add rule netdev test-netdev egress ip saddr @set6 drop: This rule should not have failed.
+ip/sets.t: ERROR: line 63: add rule ip test-ip4 input ip saddr vmap { 1.1.1.1 : drop, * : accept }: This rule should not have failed.
+ip/sets.t: ERROR: line 64: add rule ip test-ip4 input meta mark set ip saddr map { 1.1.1.1 : 0x00000001, * : 0x00000002 }: This rule should not have failed.
+ip/sets.t: ERROR: line 65: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+ip/numgen.t: OK
+ip/reject.t: OK
+ip6/vmap.t: ERROR: line 3: I cannot create the chain 'egress'
+ip6/vmap.t: ERROR: line 9: add rule netdev test-netdev egress ip6 saddr vmap { abcd::3 : accept }: This rule should not have failed.
+ip6/vmap.t: ERROR: line 14: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 15: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234:1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 16: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234:1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 17: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234::1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 18: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234::1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 19: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234::1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 20: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 21: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234:1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 22: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234:1234:1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 23: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 24: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 25: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234::1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 26: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234::1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 27: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 28: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 29: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234:1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 30: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 31: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 32: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234::1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 33: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 34: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 35: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:1234::  : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 36: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 37: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 38: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 39: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 40: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 41: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 42: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 43: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 44: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 45: add rule netdev test-netdev egress ip6 saddr vmap { ::1234:1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 46: add rule netdev test-netdev egress ip6 saddr vmap { 1234::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 47: add rule netdev test-netdev egress ip6 saddr vmap { 1234:1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 48: add rule netdev test-netdev egress ip6 saddr vmap { ::1234 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 49: add rule netdev test-netdev egress ip6 saddr vmap { 1234:: : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 50: add rule netdev test-netdev egress ip6 saddr vmap { ::/64 : accept}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 52: add rule netdev test-netdev egress ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:: : accept, ::aaaa : drop}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 53: add rule netdev test-netdev egress ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept, ::bbbb : drop}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 54: add rule netdev test-netdev egress ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept,::cccc : drop}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 55: add rule netdev test-netdev egress ip6 saddr vmap {1234:1234:1234:1234:1234:1234:aaaa:::accept,::dddd: drop}: This rule should not have failed.
+ip6/vmap.t: ERROR: line 58: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+ip6/rt0.t: OK
+ip6/meta.t: OK
+ip6/snat.t: OK
+ip6/srh.t: OK
+ip6/masquerade.t: OK
+ip6/redirect.t: OK
+ip6/rt.t: OK
+ip6/icmpv6.t: OK
+ip6/ct.t: OK
+ip6/flowtable.t: OK
+ip6/dst.t: OK
+ip6/ip6.t: OK
+ip6/dup.t: OK
+ip6/tproxy.t: OK
+ip6/ether.t: OK
+ip6/hbh.t: OK
+ip6/map.t: OK
+ip6/frag.t: ERROR: line 3: I cannot create the chain 'egress'
+ip6/frag.t: ERROR: line 9: add rule netdev test-netdev egress frag nexthdr tcp: This rule should not have failed.
+ip6/frag.t: ERROR: line 10: add rule netdev test-netdev egress frag nexthdr != icmp: This rule should not have failed.
+ip6/frag.t: ERROR: line 11: add rule netdev test-netdev egress frag nexthdr {esp, ah, comp, udp, udplite, tcp, dccp, sctp}: This rule should not have failed.
+ip6/frag.t: ERROR: line 12: add rule netdev test-netdev egress frag nexthdr != {esp, ah, comp, udp, udplite, tcp, dccp, sctp}: This rule should not have failed.
+ip6/frag.t: ERROR: line 13: add rule netdev test-netdev egress frag nexthdr esp: This rule should not have failed.
+ip6/frag.t: ERROR: line 14: add rule netdev test-netdev egress frag nexthdr ah: This rule should not have failed.
+ip6/frag.t: ERROR: line 16: add rule netdev test-netdev egress frag reserved 22: This rule should not have failed.
+ip6/frag.t: ERROR: line 17: add rule netdev test-netdev egress frag reserved != 233: This rule should not have failed.
+ip6/frag.t: ERROR: line 18: add rule netdev test-netdev egress frag reserved 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 19: add rule netdev test-netdev egress frag reserved != 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 20: add rule netdev test-netdev egress frag reserved { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 21: add rule netdev test-netdev egress frag reserved != { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 23: add rule netdev test-netdev egress frag frag-off 22: This rule should not have failed.
+ip6/frag.t: ERROR: line 24: add rule netdev test-netdev egress frag frag-off != 233: This rule should not have failed.
+ip6/frag.t: ERROR: line 25: add rule netdev test-netdev egress frag frag-off 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 26: add rule netdev test-netdev egress frag frag-off != 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 27: add rule netdev test-netdev egress frag frag-off { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 28: add rule netdev test-netdev egress frag frag-off != { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 30: add rule netdev test-netdev egress frag reserved2 1: This rule should not have failed.
+ip6/frag.t: ERROR: line 31: add rule netdev test-netdev egress frag more-fragments 0: This rule should not have failed.
+ip6/frag.t: ERROR: line 32: add rule netdev test-netdev egress frag more-fragments 1: This rule should not have failed.
+ip6/frag.t: ERROR: line 34: add rule netdev test-netdev egress frag id 1: This rule should not have failed.
+ip6/frag.t: ERROR: line 35: add rule netdev test-netdev egress frag id 22: This rule should not have failed.
+ip6/frag.t: ERROR: line 36: add rule netdev test-netdev egress frag id != 33: This rule should not have failed.
+ip6/frag.t: ERROR: line 37: add rule netdev test-netdev egress frag id 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 38: add rule netdev test-netdev egress frag id != 33-45: This rule should not have failed.
+ip6/frag.t: ERROR: line 39: add rule netdev test-netdev egress frag id { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 40: add rule netdev test-netdev egress frag id != { 33, 55, 67, 88}: This rule should not have failed.
+ip6/frag.t: ERROR: line 40: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+ip6/exthdr.t: OK
+ip6/dnat.t: OK
+ip6/sets.t: ERROR: line 3: I cannot create the chain 'egress'
+ip6/sets.t: ERROR: line 25: add rule netdev test-netdev egress ip6 saddr @set2 drop: This rule should not have failed.
+ip6/sets.t: ERROR: line 26: add rule netdev test-netdev egress ip6 saddr != @set2 drop: This rule should not have failed.
+ip6/sets.t: ERROR: line 42: add rule netdev test-netdev egress ip6 saddr . ip6 daddr @set5 drop: This rule should not have failed.
+ip6/sets.t: ERROR: line 43: add rule netdev test-netdev egress add @set5 { ip6 saddr . ip6 daddr }: This rule should not have failed.
+ip6/sets.t: ERROR: line 44: add rule netdev test-netdev egress delete @set5 { ip6 saddr . ip6 daddr }: This rule should not have failed.
+ip6/sets.t: ERROR: line 44: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+ip6/mh.t: OK
+ip6/reject.t: OK
+netdev/dup.t: ERROR: line 2: I cannot create the chain 'egress'
+netdev/dup.t: ERROR: line 6: add rule netdev test-netdev egress dup to "lo": This rule should not have failed.
+netdev/dup.t: ERROR: line 7: add rule netdev test-netdev egress dup to meta mark map { 0x00000001 : "lo", 0x00000002 : "lo"}: This rule should not have failed.
+netdev/dup.t: ERROR: line 8: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+netdev/fwd.t: ERROR: line 2: I cannot create the chain 'egress'
+netdev/fwd.t: ERROR: line 6: add rule netdev test-netdev egress fwd to "lo": This rule should not have failed.
+netdev/fwd.t: ERROR: line 7: add rule netdev test-netdev egress fwd to meta mark map { 0x00000001 : "lo", 0x00000002 : "lo"}: This rule should not have failed.
+netdev/fwd.t: ERROR: line 9: add rule netdev test-netdev egress fwd ip to 192.168.2.200 device "lo": This rule should not have failed.
+netdev/fwd.t: ERROR: line 9: The chain egress does not exist in netdev test-netdev. I cannot delete it.
+netdev/reject.t: ERROR: line 5: add rule netdev test-netdev ingress reject with icmp host-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 6: add rule netdev test-netdev ingress reject with icmp net-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 7: add rule netdev test-netdev ingress reject with icmp prot-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 8: add rule netdev test-netdev ingress reject with icmp port-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 9: add rule netdev test-netdev ingress reject with icmp net-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 10: add rule netdev test-netdev ingress reject with icmp host-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 11: add rule netdev test-netdev ingress reject with icmp admin-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 13: add rule netdev test-netdev ingress reject with icmpv6 no-route: This rule should not have failed.
+netdev/reject.t: ERROR: line 14: add rule netdev test-netdev ingress reject with icmpv6 admin-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 15: add rule netdev test-netdev ingress reject with icmpv6 addr-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 16: add rule netdev test-netdev ingress reject with icmpv6 port-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 17: add rule netdev test-netdev ingress reject with icmpv6 policy-fail: This rule should not have failed.
+netdev/reject.t: ERROR: line 18: add rule netdev test-netdev ingress reject with icmpv6 reject-route: This rule should not have failed.
+netdev/reject.t: ERROR: line 20: add rule netdev test-netdev ingress mark 12345 reject with tcp reset: This rule should not have failed.
+netdev/reject.t: ERROR: line 22: add rule netdev test-netdev ingress reject: This rule should not have failed.
+netdev/reject.t: ERROR: line 23: add rule netdev test-netdev ingress meta protocol ip reject: This rule should not have failed.
+netdev/reject.t: ERROR: line 24: add rule netdev test-netdev ingress meta protocol ip6 reject: This rule should not have failed.
+netdev/reject.t: ERROR: line 26: add rule netdev test-netdev ingress reject with icmpx host-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 27: add rule netdev test-netdev ingress reject with icmpx no-route: This rule should not have failed.
+netdev/reject.t: ERROR: line 28: add rule netdev test-netdev ingress reject with icmpx admin-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 29: add rule netdev test-netdev ingress reject with icmpx port-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 31: add rule netdev test-netdev ingress meta protocol ip reject with icmp host-unreachable: This rule should not have failed.
+netdev/reject.t: ERROR: line 32: add rule netdev test-netdev ingress meta protocol ip6 reject with icmpv6 no-route: This rule should not have failed.
+netdev/reject.t: ERROR: line 39: add rule netdev test-netdev ingress meta protocol ip reject with icmpx admin-prohibited: This rule should not have failed.
+netdev/reject.t: ERROR: line 40: add rule netdev test-netdev ingress meta protocol ip6 reject with icmpx admin-prohibited: This rule should not have failed.
+104 test files, 68 files passed, 1988 unit tests, 
+805 error, 0 warning
+
+=================================================================
+==67823==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 464608 byte(s) in 116 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f1cca in PyObject_Malloc (/usr/bin/python3.9+0x4f1cca)
+
+Direct leak of 17699 byte(s) in 20 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x50ee7b  (/usr/bin/python3.9+0x50ee7b)
+
+Direct leak of 6256 byte(s) in 9 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x50c092 in PyDict_Copy (/usr/bin/python3.9+0x50c092)
+
+Direct leak of 5892 byte(s) in 8 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f2b1d  (/usr/bin/python3.9+0x4f2b1d)
+
+Direct leak of 4628 byte(s) in 6 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4fcaef in PyMem_Malloc (/usr/bin/python3.9+0x4fcaef)
+
+Direct leak of 2656 byte(s) in 5 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f1b05  (/usr/bin/python3.9+0x4f1b05)
+
+Direct leak of 1226 byte(s) in 2 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x50ea16 in PyBytes_FromStringAndSize (/usr/bin/python3.9+0x50ea16)
+
+Direct leak of 1056 byte(s) in 2 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f1db2  (/usr/bin/python3.9+0x4f1db2)
+
+Direct leak of 936 byte(s) in 1 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4fa38d in PyType_GenericAlloc (/usr/bin/python3.9+0x4fa38d)
+
+Direct leak of 96 byte(s) in 3 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x540d66  (/usr/bin/python3.9+0x540d66)
+
+Direct leak of 32 byte(s) in 1 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f00d3 in PyThread_allocate_lock (/usr/bin/python3.9+0x4f00d3)
+
+Indirect leak of 54968 byte(s) in 57 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4fa38d in PyType_GenericAlloc (/usr/bin/python3.9+0x4fa38d)
+
+Indirect leak of 4963 byte(s) in 5 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x50ee7b  (/usr/bin/python3.9+0x50ee7b)
+
+Indirect leak of 4779 byte(s) in 5 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f2b1d  (/usr/bin/python3.9+0x4f2b1d)
+
+Indirect leak of 576 byte(s) in 1 object(s) allocated from:
+    #0 0x7f739491de8f in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+    #1 0x4f1cca in PyObject_Malloc (/usr/bin/python3.9+0x4f1cca)
+
+SUMMARY: AddressSanitizer: 570371 byte(s) leaked in 241 allocation(s).

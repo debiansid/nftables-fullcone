@@ -557,20 +557,8 @@
     }
 ]
 
-# ip6 nexthdr 6 redirect to :tcp dport map { 22 : 8000, 80 : 8080}
+# redirect to :tcp dport map { 22 : 8000, 80 : 8080}
 [
-    {
-        "match": {
-            "left": {
-                "payload": {
-                    "field": "nexthdr",
-                    "protocol": "ip6"
-                }
-            },
-	    "op": "==",
-            "right": 6
-        }
-    },
     {
         "redirect": {
             "port": {

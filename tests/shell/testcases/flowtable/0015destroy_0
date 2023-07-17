@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+$NFT add table t
+$NFT add flowtable t f { hook ingress priority 10 \; devices = { lo }\; }
+
+$NFT destroy flowtable t f

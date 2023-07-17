@@ -5,6 +5,7 @@ noinst_HEADERS = 	cli.h		\
 			cache.h		\
 			cmd.h		\
 			datatype.h	\
+			dccpopt.h	\
 			expression.h	\
 			fib.h		\
 			hash.h		\

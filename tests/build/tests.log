@@ -1,4 +1,4 @@
-Clonando en '/tmp/tmp.L4eY4ZPZJb'...
+Clonando en '/tmp/tmp.CtYg15IMO8'...
 hecho.
 configure.ac:45: installing 'build-aux/ar-lib'
 configure.ac:25: installing 'build-aux/compile'
@@ -6,14 +6,77 @@ configure.ac:46: installing 'build-aux/config.guess'
 configure.ac:46: installing 'build-aux/config.sub'
 configure.ac:6: installing 'build-aux/install-sh'
 configure.ac:6: installing 'build-aux/missing'
-src/Makefile.am: installing 'build-aux/depcomp'
+examples/Makefile.am: installing 'build-aux/depcomp'
 configure.ac: installing 'build-aux/ylwrap'
-/tmp/tmp.L4eY4ZPZJb/src/parser_bison.y:148.1-19: aviso: directiva no válida: «%name-prefix "nft_"», use «%define api.prefix {nft_}» [-Wdeprecated]
-  148 | %name-prefix "nft_"
+/tmp/tmp.CtYg15IMO8/src/parser_bison.y:186.1-19: aviso: directiva no válida: «%name-prefix "nft_"», use «%define api.prefix {nft_}» [-Wdeprecated]
+  186 | %name-prefix "nft_"
       | ^~~~~~~~~~~~~~~~~~~
       | %define api.prefix {nft_}
-/tmp/tmp.L4eY4ZPZJb/src/parser_bison.y: aviso: fix-its can be applied.  Rerun with option '--update'. [-Wother]
-libtool: warning: remember to run 'libtool --finish /tmp/tmp.L4eY4ZPZJb/nftables-0.9.8/_inst/lib'
-libtool: warning: 'libnftables.la' has not been installed in '/tmp/tmp.L4eY4ZPZJb/nftables-0.9.8/_inst/lib'
+/tmp/tmp.CtYg15IMO8/src/parser_bison.y: aviso: fix-its can be applied.  Rerun with option '--update'. [-Wother]
+TEST FAILED: /tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib/python3.9/site-packages/ does NOT support .pth files
+bad install directory or PYTHONPATH
+
+You are attempting to install a package to a directory that is not
+on PYTHONPATH and which Python does not read ".pth" files from.  The
+installation directory you specified (via --install-dir, --prefix, or
+the distutils default setting) was:
+
+    /tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib/python3.9/site-packages/
+
+and your PYTHONPATH environment variable currently contains:
+
+    ''
+
+Here are some of your options for correcting the problem:
+
+* You can choose a different installation directory, i.e., one that is
+  on PYTHONPATH or supports .pth files
+
+* You can add the installation directory to the PYTHONPATH environment
+  variable.  (It must then also be on PYTHONPATH whenever you run
+  Python and want to use the package(s) you are installing.)
+
+* You can set up the installation directory to support ".pth" files by
+  using one of the approaches described here:
+
+  https://setuptools.readthedocs.io/en/latest/easy_install.html#custom-installation-locations
+
+
+Please make the appropriate changes for your system and try again.
+zip_safe flag not set; analyzing archive contents...
+nftables.__pycache__.nftables.cpython-39: module references __file__
+libtool: warning: remember to run 'libtool --finish /tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib'
+libtool: warning: 'libnftables.la' has not been installed in '/tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib'
+TEST FAILED: /tmp/am-dc-52397//tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib/python3.9/site-packages/ does NOT support .pth files
+bad install directory or PYTHONPATH
+
+You are attempting to install a package to a directory that is not
+on PYTHONPATH and which Python does not read ".pth" files from.  The
+installation directory you specified (via --install-dir, --prefix, or
+the distutils default setting) was:
+
+    /tmp/am-dc-52397//tmp/tmp.CtYg15IMO8/nftables-1.0.8/_inst/lib/python3.9/site-packages/
+
+and your PYTHONPATH environment variable currently contains:
+
+    ''
+
+Here are some of your options for correcting the problem:
+
+* You can choose a different installation directory, i.e., one that is
+  on PYTHONPATH or supports .pth files
+
+* You can add the installation directory to the PYTHONPATH environment
+  variable.  (It must then also be on PYTHONPATH whenever you run
+  Python and want to use the package(s) you are installing.)
+
+* You can set up the installation directory to support ".pth" files by
+  using one of the approaches described here:
+
+  https://setuptools.readthedocs.io/en/latest/easy_install.html#custom-installation-locations
+
+
+Please make the appropriate changes for your system and try again.
+zip_safe flag not set; analyzing archive contents...
+nftables.__pycache__.nftables.cpython-39: module references __file__
 configure: error: No suitable version of linenoise found
-configure: error: No suitable version of libedit found

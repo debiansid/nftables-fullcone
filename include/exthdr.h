@@ -4,6 +4,7 @@
 #include <proto.h>
 #include <tcpopt.h>
 #include <ipopt.h>
+#include <dccpopt.h>
 
 enum exthdr_desc_id {
 	EXTHDR_DESC_UNKNOWN	= 0,

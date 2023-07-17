@@ -263,6 +263,9 @@ static json_t *chain_print_json(const struct chain *chain)
 			 "name", chain->handle.chain.name,
 			 "handle", chain->handle.handle.id);
 
+	if (chain->comment)
+		json_object_set_new(root, "comment", json_string(chain->comment));
+
 	if (chain->flags & CHAIN_F_BASECHAIN) {
 		mpz_export_data(&priority, chain->priority.expr->value,
 				BYTEORDER_HOST_ENDIAN, sizeof(int));
@@ -510,6 +513,9 @@ static json_t *table_print_json(const struct table *table)
 	if (tmp)
 		json_object_set_new(root, "flags", tmp);
 
+	if (table->comment)
+		json_object_set_new(root, "comment", json_string(table->comment));
+
 	return json_pack("{s:o}", "table", root);
 }
 
@@ -567,15 +573,23 @@ json_t *payload_expr_json(const struct expr *expr, struct output_ctx *octx)
 {
 	json_t *root;
 
-	if (payload_is_known(expr))
-		root = json_pack("{s:s, s:s}",
-				 "protocol", expr->payload.desc->name,
-				 "field", expr->payload.tmpl->token);
-	else
+	if (payload_is_known(expr)) {
+		if (expr->payload.inner_desc) {
+			root = json_pack("{s:s, s:s, s:s}",
+					 "tunnel", expr->payload.inner_desc->name,
+					 "protocol", expr->payload.desc->name,
+					 "field", expr->payload.tmpl->token);
+		} else {
+			root = json_pack("{s:s, s:s}",
+					 "protocol", expr->payload.desc->name,
+					 "field", expr->payload.tmpl->token);
+		}
+	} else {
 		root = json_pack("{s:s, s:i, s:i}",
 				 "base", proto_base_tokens[expr->payload.base],
 				 "offset", expr->payload.offset,
 				 "len", expr->len);
+	}
 
 	return json_pack("{s:o}", "payload", root);
 }
@@ -743,6 +757,11 @@ json_t *exthdr_expr_json(const struct expr *expr, struct output_ctx *octx)
 		}
 
 		return json_pack("{s:o}", "tcp option", root);
+	}
+
+	if (expr->exthdr.op == NFT_EXTHDR_OP_DCCP) {
+		root = json_pack("{s:i}", "type", expr->exthdr.raw_type);
+		return json_pack("{s:o}", "dccp option", root);
 	}
 
 	root = json_pack("{s:s}", "name", desc);
@@ -1471,6 +1490,14 @@ json_t *counter_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 			 "bytes", stmt->counter.bytes);
 }
 
+json_t *last_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	if (nft_output_stateless(octx) || stmt->last.set == 0)
+		return json_pack("{s:n}", "last");
+
+	return json_pack("{s:{s:I}}", "last", "used", stmt->last.used);
+}
+
 json_t *set_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 {
 	json_t *root;
@@ -1772,10 +1799,13 @@ static json_t *do_list_chains_json(struct netlink_ctx *ctx, struct cmd *cmd)
 static json_t *do_list_set_json(struct netlink_ctx *ctx,
 				struct cmd *cmd, struct table *table)
 {
-	struct set *set = set_cache_find(table, cmd->handle.set.name);
+	struct set *set = cmd->set;
 
-	if (set == NULL)
-		return json_null();
+	if (!set) {
+		set = set_cache_find(table, cmd->handle.set.name);
+		if (set == NULL)
+			return json_null();
+	}
 
 	return json_pack("[o]", set_print_json(&ctx->nft->output, set));
 }

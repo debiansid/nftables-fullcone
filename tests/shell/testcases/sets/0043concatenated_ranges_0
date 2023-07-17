@@ -147,7 +147,7 @@ for ta in ${TYPES}; do
 			eval add_b=\$ADD_${tb}
 			eval add_c=\$ADD_${tc}
 			${NFT} add element inet filter test \
-				"{ ${add_a} . ${add_b} . ${add_c} timeout 1s${mapv}}"
+				"{ ${add_a} . ${add_b} . ${add_c} timeout 2s${mapv}}"
 			[ $(${NFT} list ${setmap} inet filter test |	\
 			   grep -c "${add_a} . ${add_b} . ${add_c}") -eq 1 ]
 
@@ -180,7 +180,7 @@ for ta in ${TYPES}; do
 				continue
 			fi
 
-			sleep 1
+			sleep 2
 			[ $(${NFT} list ${setmap} inet filter test |		\
 			   grep -c "${add_a} . ${add_b} . ${add_c} ${mapv}") -eq 0 ]
 			timeout_tested=1

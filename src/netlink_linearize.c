@@ -806,7 +806,7 @@ static void netlink_gen_unary(struct netlink_linearize_ctx *ctx,
 	netlink_put_register(nle, NFTNL_EXPR_BYTEORDER_SREG, dreg);
 	netlink_put_register(nle, NFTNL_EXPR_BYTEORDER_DREG, dreg);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_BYTEORDER_LEN,
-			   expr->len / BITS_PER_BYTE);
+			   div_round_up(expr->len, BITS_PER_BYTE));
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_BYTEORDER_SIZE,
 			   byte_size);
 	nftnl_expr_set_u32(nle, NFTNL_EXPR_BYTEORDER_OP,

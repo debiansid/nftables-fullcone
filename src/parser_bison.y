@@ -80,12 +80,11 @@ static int open_scope(struct parser_state *state, struct scope *scope)
 
 static void close_scope(struct parser_state *state)
 {
-	if (state->scope_err) {
+	if (state->scope_err || state->scope == 0) {
 		state->scope_err = false;
 		return;
 	}
 
-	assert(state->scope > 0);
 	state->scope--;
 }
 
@@ -143,6 +142,33 @@ static bool already_set(const void *attr, const struct location *loc,
 	erec_queue(error(loc, "You can only specify this once. This statement is duplicated."),
 		   state->msgs);
 	return true;
+}
+
+static struct expr *ifname_expr_alloc(const struct location *location,
+				      struct list_head *queue,
+				      const char *name)
+{
+	unsigned int length = strlen(name);
+	struct expr *expr;
+
+	if (length == 0) {
+		xfree(name);
+		erec_queue(error(location, "empty interface name"), queue);
+		return NULL;
+	}
+
+	if (length > 16) {
+		xfree(name);
+		erec_queue(error(location, "interface name too long"), queue);
+		return NULL;
+	}
+
+	expr = constant_expr_alloc(location, &ifname_type, BYTEORDER_HOST_ENDIAN,
+				   length * BITS_PER_BYTE, name);
+
+	xfree(name);
+
+	return expr;
 }
 
 #define YYLLOC_DEFAULT(Current, Rhs, N)	location_update(&Current, Rhs, N)
@@ -1358,6 +1384,13 @@ delete_cmd		:	TABLE		table_or_id_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_CHAIN, &$2, &@$, NULL);
 			}
+			|	CHAIN		chain_spec	chain_block_alloc
+						'{'	chain_block	'}'
+			{
+				$5->location = @5;
+				handle_merge(&$3->handle, &$2);
+				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_CHAIN, &$2, &@$, $5);
+			}
 			|	RULE		ruleid_spec
 			{
 				$$ = cmd_alloc(CMD_DELETE, CMD_OBJ_RULE, &$2, &@$, NULL);
@@ -1653,8 +1686,13 @@ reset_cmd		:	COUNTERS	ruleset_spec
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_COUNTERS, &$2, &@$, NULL);
 			}
+			|	COUNTERS	table_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_COUNTERS, &$2, &@$, NULL);
+			}
 			|	COUNTERS	TABLE	table_spec
 			{
+				/* alias of previous rule. */
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_COUNTERS, &$3, &@$, NULL);
 			}
 			|       COUNTER         obj_spec	close_scope_counter
@@ -1669,6 +1707,11 @@ reset_cmd		:	COUNTERS	ruleset_spec
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_QUOTAS, &$3, &@$, NULL);
 			}
+			|	QUOTAS		table_spec
+			{
+				/* alias of previous rule. */
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_QUOTAS, &$2, &@$, NULL);
+			}
 			|       QUOTA           obj_spec	close_scope_quota
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_QUOTA, &$2, &@$, NULL);
@@ -1677,17 +1720,39 @@ reset_cmd		:	COUNTERS	ruleset_spec
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$2, &@$, NULL);
 			}
+			|	RULES		table_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$2, &@$, NULL);
+			}
 			|	RULES		TABLE	table_spec
 			{
+				/* alias of previous rule. */
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$3, &@$, NULL);
+			}
+			|	RULES		chain_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$2, &@$, NULL);
 			}
 			|	RULES		CHAIN	chain_spec
 			{
+				/* alias of previous rule. */
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULES, &$3, &@$, NULL);
 			}
 			|	RULE		ruleid_spec
 			{
 				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_RULE, &$2, &@$, NULL);
+			}
+			|	ELEMENT		set_spec	set_block_expr
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_ELEMENTS, &$2, &@$, $3);
+			}
+			|	SET		set_or_id_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_SET, &$2, &@$, NULL);
+			}
+			|	MAP		set_or_id_spec
+			{
+				$$ = cmd_alloc(CMD_RESET, CMD_OBJ_MAP, &$2, &@$, NULL);
 			}
 			;
 
@@ -1983,6 +2048,15 @@ chain_block		:	/* empty */	{ $$ = $<chain>-1; }
 			{
 				list_add_tail(&$2->list, &$1->rules);
 				$$ = $1;
+			}
+			|	chain_block	DEVICES		'='	flowtable_expr	stmt_separator
+			{
+				if ($$->dev_expr) {
+					list_splice_init(&$4->expressions, &$$->dev_expr->expressions);
+					expr_free($4);
+					break;
+				}
+				$$->dev_expr = $4;
 			}
 			|	chain_block	comment_spec	stmt_separator
 			{
@@ -2318,17 +2392,21 @@ flowtable_list_expr	:	flowtable_expr_member
 
 flowtable_expr_member	:	QUOTED_STRING
 			{
-				$$ = constant_expr_alloc(&@$, &string_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 strlen($1) * BITS_PER_BYTE, $1);
-				xfree($1);
+				struct expr *expr = ifname_expr_alloc(&@$, state->msgs, $1);
+
+				if (!expr)
+					YYERROR;
+
+				$$ = expr;
 			}
 			|	STRING
 			{
-				$$ = constant_expr_alloc(&@$, &string_type,
-							 BYTEORDER_HOST_ENDIAN,
-							 strlen($1) * BITS_PER_BYTE, $1);
-				xfree($1);
+				struct expr *expr = ifname_expr_alloc(&@$, state->msgs, $1);
+
+				if (!expr)
+					YYERROR;
+
+				$$ = expr;
 			}
 			|	variable_expr
 			{
@@ -2629,12 +2707,11 @@ int_num			:	NUM			{ $$ = $1; }
 
 dev_spec		:	DEVICE	string
 			{
-				struct expr *expr;
+				struct expr *expr = ifname_expr_alloc(&@$, state->msgs, $2);
 
-				expr = constant_expr_alloc(&@$, &string_type,
-							   BYTEORDER_HOST_ENDIAN,
-							   strlen($2) * BITS_PER_BYTE, $2);
-				xfree($2);
+				if (!expr)
+					YYERROR;
+
 				$$ = compound_expr_alloc(&@$, EXPR_LIST);
 				compound_expr_add($$, expr);
 
@@ -4692,7 +4769,7 @@ ct_obj_type		:	HELPER		{ $$ = NFT_OBJECT_CT_HELPER; }
 			;
 
 ct_cmd_type		:	HELPERS		{ $$ = CMD_OBJ_CT_HELPERS; }
-			|	TIMEOUT		{ $$ = CMD_OBJ_CT_TIMEOUT; }
+			|	TIMEOUT		{ $$ = CMD_OBJ_CT_TIMEOUTS; }
 			|	EXPECTATION	{ $$ = CMD_OBJ_CT_EXPECT; }
 			;
 
@@ -5931,6 +6008,15 @@ tcpopt_field_mptcp	:	SUBTYPE		{ $$ = TCPOPT_MPTCP_SUBTYPE; }
 dccp_hdr_expr		:	DCCP	dccp_hdr_field	close_scope_dccp
 			{
 				$$ = payload_expr_alloc(&@$, &proto_dccp, $2);
+			}
+			|	DCCP	OPTION		NUM	close_scope_dccp
+			{
+				if ($3 > DCCPOPT_TYPE_MAX) {
+					erec_queue(error(&@1, "value too large"),
+						   state->msgs);
+					YYERROR;
+				}
+				$$ = dccpopt_expr_alloc(&@$, $3);
 			}
 			;
 

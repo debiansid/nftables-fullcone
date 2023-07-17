@@ -753,6 +753,7 @@ The following syntaxes are valid only in a relational expression with boolean ty
 *exthdr* {*hbh* | *frag* | *rt* | *dst* | *mh*}
 *tcp option* {*eol* | *nop* | *maxseg* | *window* | *sack-perm* | *sack* | *sack0* | *sack1* | *sack2* | *sack3* | *timestamp*}
 *ip option* { lsrr | ra | rr | ssrr }
+*dccp option* 'dccp_option_type'
 
 .IPv6 extension headers
 [options="header"]
@@ -853,6 +854,11 @@ ip6 filter input frag more-fragments 1 counter
 .finding IP option
 ------------------
 filter input ip option lsrr exists counter
+---------------------------------------
+
+.finding DCCP option
+------------------
+filter input dccp option 40 exists counter
 ---------------------------------------
 
 CONNTRACK EXPRESSIONS

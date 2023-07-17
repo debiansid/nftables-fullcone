@@ -1,0 +1,5 @@
+table netdev x {
+	chain y {
+		type filter hook ingress devices = { d0, d1 } priority filter; policy accept;
+	}
+}

@@ -1,5 +1,5 @@
-AC_INIT([nftables], [1.0.7], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Old Doc Yak"], [Release name])
+AC_INIT([nftables], [1.0.8], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Old Doc Yak #2"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -55,7 +55,7 @@ AS_IF([test "x$enable_man_doc" = "xyes"], [
 ])
 
 PKG_CHECK_MODULES([LIBMNL], [libmnl >= 1.0.4])
-PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.5])
+PKG_CHECK_MODULES([LIBNFTNL], [libnftnl >= 1.2.6])
 
 AC_ARG_WITH([mini-gmp], [AS_HELP_STRING([--with-mini-gmp],
             [Use builtin mini-gmp (for embedded builds)])],

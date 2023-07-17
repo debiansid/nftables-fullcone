@@ -31,5 +31,8 @@ table ip test {
 		# ct state cannot be both established and related
 		# at the same time, but this needs extra work.
 		ct state { established, related } accept
+
+		# with stateful statement
+		meta mark { 0x0000000a counter }
 	}
 }

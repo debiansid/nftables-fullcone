@@ -69,6 +69,11 @@ if [ "$1" == "-g" ] ; then
 	shift
 fi
 
+if [ "$1" == "-V" ] ; then
+	VALGRIND=y
+	shift
+fi
+
 for arg in "$@"; do
 	SINGLE+=" $arg"
 	VERBOSE=y
@@ -105,6 +110,48 @@ find_tests() {
 	fi
 	${FIND} ${TESTDIR} -type f -executable | sort
 }
+
+printscript() { # (cmd, tmpd)
+	cat <<EOF
+#!/bin/bash
+
+CMD="$1"
+
+# note: valgrind man page warns about --log-file with --trace-children, the
+# last child executed overwrites previous reports unless %p or %q is used.
+# Since libtool wrapper calls exec but none of the iptables tools do, this is
+# perfect for us as it effectively hides bash-related errors
+
+valgrind --log-file=$2/valgrind.log --trace-children=yes \
+	 --leak-check=full --show-leak-kinds=all \$CMD "\$@"
+RC=\$?
+
+# don't keep uninteresting logs
+if grep -q 'no leaks are possible' $2/valgrind.log; then
+	rm $2/valgrind.log
+else
+	mv $2/valgrind.log $2/valgrind_\$\$.log
+fi
+
+# drop logs for failing commands for now
+[ \$RC -eq 0 ] || rm $2/valgrind_\$\$.log
+
+exit \$RC
+EOF
+}
+
+if [ "$VALGRIND" == "y" ]; then
+	tmpd=$(mktemp -d)
+	chmod 755 $tmpd
+
+	msg_info "writing valgrind logs to $tmpd"
+
+	printscript "$NFT" "$tmpd" >${tmpd}/nft
+	trap "rm ${tmpd}/nft" EXIT
+	chmod a+x ${tmpd}/nft
+
+	NFT="${tmpd}/nft"
+fi
 
 echo ""
 ok=0

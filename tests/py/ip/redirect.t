@@ -47,5 +47,5 @@ ip daddr 10.0.0.0-10.2.3.4 udp dport 53 counter redirect;ok
 iifname "eth0" ct state established,new tcp dport vmap {22 : drop, 222 : drop } redirect;ok
 
 # redirect with maps
-ip protocol 6 redirect to :tcp dport map { 22 : 8000, 80 : 8080};ok
+redirect to :tcp dport map { 22 : 8000, 80 : 8080};ok
 

@@ -25,10 +25,14 @@ table netdev filter2 {
 $NFT -f - <<< $EXPECTED
 
 EXPECTED="define if_main = { lo, dummy0 }
+define lan_interfaces = { lo }
 
 table netdev filter3 {
 	chain Main_Ingress3 {
 		type filter hook ingress devices = \$if_main priority -500; policy accept;
+	}
+	chain Main_Egress3 {
+		type filter hook egress devices = \$lan_interfaces priority -500; policy accept;
 	}
 }"
 

@@ -11,5 +11,6 @@ table ip test {
 		ip daddr . tcp dport { 192.168.0.1 . 22 } accept
 		meta mark set ip daddr map { 192.168.0.1 : 0x00000001 }
 		ct state { established, related } accept
+		meta mark { 0x0000000a counter packets 0 bytes 0 }
 	}
 }

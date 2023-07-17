@@ -17,8 +17,7 @@
 #include <string.h>
 
 static int nft_netlink(struct nft_ctx *nft,
-		       struct list_head *cmds, struct list_head *msgs,
-		       struct mnl_socket *nf_sock)
+		       struct list_head *cmds, struct list_head *msgs)
 {
 	uint32_t batch_seqnum, seqnum = 0, last_seqnum = UINT32_MAX, num_cmds = 0;
 	struct netlink_ctx ctx = {
@@ -55,6 +54,13 @@ static int nft_netlink(struct nft_ctx *nft,
 
 	ret = mnl_batch_talk(&ctx, &err_list, num_cmds);
 	if (ret < 0) {
+		if (ctx.maybe_emsgsize && errno == EMSGSIZE) {
+			netlink_io_error(&ctx, NULL,
+					 "Could not process rule: %s\n"
+					 "Please, rise /proc/sys/net/core/wmem_max on the host namespace. Hint: %d bytes",
+					 strerror(errno), round_pow_2(ctx.maybe_emsgsize));
+			goto out;
+		}
 		netlink_io_error(&ctx, NULL,
 				 "Could not process rule: %s", strerror(errno));
 		goto out;
@@ -180,11 +186,6 @@ void nft_ctx_clear_include_paths(struct nft_ctx *ctx)
 	ctx->include_paths = NULL;
 }
 
-static void nft_ctx_netlink_init(struct nft_ctx *ctx)
-{
-	ctx->nf_sock = nft_mnl_socket_open();
-}
-
 EXPORT_SYMBOL(nft_ctx_new);
 struct nft_ctx *nft_ctx_new(uint32_t flags)
 {
@@ -212,8 +213,7 @@ struct nft_ctx *nft_ctx_new(uint32_t flags)
 	ctx->output.error_fp = stderr;
 	init_list_head(&ctx->vars_ctx.indesc_list);
 
-	if (flags == NFT_CTX_DEFAULT)
-		nft_ctx_netlink_init(ctx);
+	ctx->nf_sock = nft_mnl_socket_open();
 
 	return ctx;
 }
@@ -337,8 +337,7 @@ const char *nft_ctx_get_error_buffer(struct nft_ctx *ctx)
 EXPORT_SYMBOL(nft_ctx_free);
 void nft_ctx_free(struct nft_ctx *ctx)
 {
-	if (ctx->nf_sock)
-		mnl_socket_close(ctx->nf_sock);
+	mnl_socket_close(ctx->nf_sock);
 
 	exit_cookie(&ctx->output.output_cookie);
 	exit_cookie(&ctx->output.error_cookie);
@@ -589,7 +588,7 @@ int nft_run_cmd_from_buffer(struct nft_ctx *nft, const char *buf)
 		goto err;
 	}
 
-	if (nft_netlink(nft, &cmds, &msgs, nft->nf_sock) != 0)
+	if (nft_netlink(nft, &cmds, &msgs) != 0)
 		rc = -1;
 err:
 	erec_print_list(&nft->output, &msgs, nft->debug_mask);
@@ -685,7 +684,7 @@ static int __nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename
 		goto err;
 	}
 
-	if (nft_netlink(nft, &cmds, &msgs, nft->nf_sock) != 0)
+	if (nft_netlink(nft, &cmds, &msgs) != 0)
 		rc = -1;
 err:
 	erec_print_list(&nft->output, &msgs, nft->debug_mask);

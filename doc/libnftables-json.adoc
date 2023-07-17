@@ -175,7 +175,7 @@ kind, optionally filtered by *family* and for some, also *table*.
 ____
 *{ "reset":* 'RESET_OBJECT' *}*
 
-'RESET_OBJECT' := 'COUNTER' | 'COUNTERS' | 'QUOTA' | 'QUOTAS' | 'RULE' | 'RULES'
+'RESET_OBJECT' := 'COUNTER' | 'COUNTERS' | 'QUOTA' | 'QUOTAS' | 'RULE' | 'RULES' | 'SET' | 'MAP' | 'ELEMENT'
 ____
 
 Reset state in suitable objects, i.e. zero their internal counter.
@@ -1225,6 +1225,17 @@ Create a reference to a field (*field*) of an SCTP chunk (*name*).
 If the *field* property is not given, the expression is to be used as an SCTP
 chunk existence check in a *match* statement with a boolean on the right hand
 side.
+
+=== DCCP OPTION
+[verse]
+*{ "dccp option": {
+	"type":* 'NUMBER'*
+*}}*
+
+Create a reference to a DCCP option (*type*).
+
+The expression is to be used as a DCCP option existence check in a *match*
+statement with a boolean on the right hand side.
 
 === META
 [verse]

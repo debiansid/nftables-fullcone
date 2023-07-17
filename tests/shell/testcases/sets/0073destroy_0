@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+$NFT add table x
+
+$NFT destroy set x s

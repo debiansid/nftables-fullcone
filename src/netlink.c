@@ -1024,10 +1024,15 @@ struct set *netlink_delinearize_set(struct netlink_ctx *ctx,
 	list_splice_tail(&set_parse_ctx.stmt_list, &set->stmt_list);
 
 	if (datatype) {
+		uint32_t dlen;
+
 		dtype = set_datatype_alloc(datatype, databyteorder);
 		klen = nftnl_set_get_u32(nls, NFTNL_SET_DATA_LEN) * BITS_PER_BYTE;
 
-		if (set_udata_key_valid(typeof_expr_data, klen)) {
+		dlen = data_interval ?  klen / 2 : klen;
+
+		if (set_udata_key_valid(typeof_expr_data, dlen)) {
+			typeof_expr_data->len = klen;
 			datatype_free(datatype_get(dtype));
 			set->data = typeof_expr_data;
 		} else {
@@ -1510,7 +1515,7 @@ static int list_setelements(struct nftnl_set *s, struct netlink_ctx *ctx)
 }
 
 int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
-			  struct set *set)
+			  struct set *set, bool reset)
 {
 	struct nftnl_set *nls;
 	int err;
@@ -1525,7 +1530,7 @@ int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
 	if (h->handle.id)
 		nftnl_set_set_u64(nls, NFTNL_SET_HANDLE, h->handle.id);
 
-	err = mnl_nft_setelem_get(ctx, nls);
+	err = mnl_nft_setelem_get(ctx, nls, reset);
 	if (err < 0) {
 		nftnl_set_free(nls);
 		if (errno == EINTR)
@@ -1553,7 +1558,7 @@ int netlink_list_setelems(struct netlink_ctx *ctx, const struct handle *h,
 
 int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
 			const struct location *loc, struct set *cache_set,
-			struct set *set, struct expr *init)
+			struct set *set, struct expr *init, bool reset)
 {
 	struct nftnl_set *nls, *nls_out = NULL;
 	int err = 0;
@@ -1572,7 +1577,7 @@ int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
 
 	netlink_dump_set(nls, ctx);
 
-	nls_out = mnl_nft_setelem_get_one(ctx, nls);
+	nls_out = mnl_nft_setelem_get_one(ctx, nls, reset);
 	if (!nls_out) {
 		nftnl_set_free(nls);
 		return -1;

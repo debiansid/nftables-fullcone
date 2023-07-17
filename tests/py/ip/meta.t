@@ -17,3 +17,6 @@ meta sdif "lo" accept;ok
 meta sdifname != "vrf1" accept;ok
 
 meta mark set ip dscp;ok
+
+meta mark set ip dscp << 2 | 0x10;ok
+meta mark set ip dscp << 26 | 0x10;ok

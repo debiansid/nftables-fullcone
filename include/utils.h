@@ -136,5 +136,6 @@ extern void *xzalloc(size_t size);
 extern void *xzalloc_array(size_t nmemb, size_t size);
 extern char *xstrdup(const char *s);
 extern void xstrunescape(const char *in, char *out);
+extern int round_pow_2(unsigned int value);
 
 #endif /* NFTABLES_UTILS_H */

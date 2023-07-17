@@ -18,7 +18,8 @@ Build-Depends: asciidoc-base,
                libnftnl-dev (>= 1.2.6),
                libtool,
                libxtables-dev,
-               python3-all:any
+               python3-all:any,
+               python3-setuptools
 Rules-Requires-Root: no
 Standards-Version: 4.6.2
 Homepage: https://www.netfilter.org/

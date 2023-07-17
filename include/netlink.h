@@ -84,6 +84,7 @@ struct netlink_ctx {
 	const void		*data;
 	uint32_t		seqnum;
 	struct nftnl_batch	*batch;
+	int			maybe_emsgsize;
 };
 
 extern struct nftnl_expr *alloc_nft_expr(const char *name);
@@ -164,10 +165,11 @@ extern struct stmt *netlink_parse_set_expr(const struct set *set,
 					   const struct nftnl_expr *nle);
 
 extern int netlink_list_setelems(struct netlink_ctx *ctx,
-				 const struct handle *h, struct set *set);
+				 const struct handle *h, struct set *set,
+				 bool reset);
 extern int netlink_get_setelem(struct netlink_ctx *ctx, const struct handle *h,
 			       const struct location *loc, struct set *cache_set,
-			       struct set *set, struct expr *init);
+			       struct set *set, struct expr *init, bool reset);
 extern int netlink_delinearize_setelem(struct nftnl_set_elem *nlse,
 				       struct set *set,
 				       struct nft_cache *cache);

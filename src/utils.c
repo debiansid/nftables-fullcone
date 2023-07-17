@@ -100,3 +100,8 @@ void xstrunescape(const char *in, char *out)
 	}
 	out[k++] = '\0';
 }
+
+int round_pow_2(unsigned int n)
+{
+	return 1UL << fls(n - 1);
+}

@@ -168,7 +168,7 @@ am__libnftables_la_SOURCES_DIST = rule.c statement.c cache.c cmd.c \
 	xfrm.c netlink.c netlink_linearize.c netlink_delinearize.c \
 	misspell.c monitor.c owner.c segtree.c gmputil.c utils.c \
 	erec.c mnl.c iface.c mergesort.c optimize.c osf.c nfnl_osf.c \
-	tcpopt.c socket.c print.c sctp_chunk.c libnftables.c \
+	tcpopt.c socket.c print.c sctp_chunk.c dccpopt.c libnftables.c \
 	libnftables.map xt.c json.c parser_json.c
 @BUILD_JSON_TRUE@am__objects_1 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
@@ -178,8 +178,8 @@ am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
 	netlink_delinearize.lo misspell.lo monitor.lo owner.lo \
 	segtree.lo gmputil.lo utils.lo erec.lo mnl.lo iface.lo \
 	mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
-	socket.lo print.lo sctp_chunk.lo libnftables.lo xt.lo \
-	$(am__objects_1)
+	socket.lo print.lo sctp_chunk.lo dccpopt.lo libnftables.lo \
+	xt.lo $(am__objects_1)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
 libnftables_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -214,13 +214,13 @@ depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/cache.Plo ./$(DEPDIR)/cli.Po \
 	./$(DEPDIR)/cmd.Plo ./$(DEPDIR)/ct.Plo \
-	./$(DEPDIR)/datatype.Plo ./$(DEPDIR)/erec.Plo \
-	./$(DEPDIR)/evaluate.Plo ./$(DEPDIR)/expression.Plo \
-	./$(DEPDIR)/exthdr.Plo ./$(DEPDIR)/fib.Plo \
-	./$(DEPDIR)/gmputil.Plo ./$(DEPDIR)/hash.Plo \
-	./$(DEPDIR)/iface.Plo ./$(DEPDIR)/intervals.Plo \
-	./$(DEPDIR)/ipopt.Plo ./$(DEPDIR)/json.Plo \
-	./$(DEPDIR)/libminigmp_la-mini-gmp.Plo \
+	./$(DEPDIR)/datatype.Plo ./$(DEPDIR)/dccpopt.Plo \
+	./$(DEPDIR)/erec.Plo ./$(DEPDIR)/evaluate.Plo \
+	./$(DEPDIR)/expression.Plo ./$(DEPDIR)/exthdr.Plo \
+	./$(DEPDIR)/fib.Plo ./$(DEPDIR)/gmputil.Plo \
+	./$(DEPDIR)/hash.Plo ./$(DEPDIR)/iface.Plo \
+	./$(DEPDIR)/intervals.Plo ./$(DEPDIR)/ipopt.Plo \
+	./$(DEPDIR)/json.Plo ./$(DEPDIR)/libminigmp_la-mini-gmp.Plo \
 	./$(DEPDIR)/libnftables.Plo \
 	./$(DEPDIR)/libparser_la-parser_bison.Plo \
 	./$(DEPDIR)/libparser_la-scanner.Plo ./$(DEPDIR)/main.Po \
@@ -481,8 +481,8 @@ libnftables_la_SOURCES = rule.c statement.c cache.c cmd.c datatype.c \
 	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
 	monitor.c owner.c segtree.c gmputil.c utils.c erec.c mnl.c \
 	iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
-	socket.c print.c sctp_chunk.c libnftables.c libnftables.map \
-	xt.c $(am__append_10)
+	socket.c print.c sctp_chunk.c dccpopt.c libnftables.c \
+	libnftables.map xt.c $(am__append_10)
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la $(am__append_6)
@@ -662,6 +662,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmd.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ct.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/datatype.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dccpopt.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erec.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evaluate.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/expression.Plo@am__quote@ # am--include-marker
@@ -909,6 +910,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/cmd.Plo
 	-rm -f ./$(DEPDIR)/ct.Plo
 	-rm -f ./$(DEPDIR)/datatype.Plo
+	-rm -f ./$(DEPDIR)/dccpopt.Plo
 	-rm -f ./$(DEPDIR)/erec.Plo
 	-rm -f ./$(DEPDIR)/evaluate.Plo
 	-rm -f ./$(DEPDIR)/expression.Plo
@@ -1002,6 +1004,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/cmd.Plo
 	-rm -f ./$(DEPDIR)/ct.Plo
 	-rm -f ./$(DEPDIR)/datatype.Plo
+	-rm -f ./$(DEPDIR)/dccpopt.Plo
 	-rm -f ./$(DEPDIR)/erec.Plo
 	-rm -f ./$(DEPDIR)/evaluate.Plo
 	-rm -f ./$(DEPDIR)/expression.Plo

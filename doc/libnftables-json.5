@@ -2,12 +2,12 @@
 .\"     Title: libnftables-json
 .\"    Author: Phil Sutter <phil@nwl.cc>
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/13/2023
+.\"      Date: 07/14/2023
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES\-JSON" "5" "03/13/2023" "\ \&" "\ \&"
+.TH "LIBNFTABLES\-JSON" "5" "07/14/2023" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -228,7 +228,7 @@ List ruleset elements\&. The plural forms are used to list all objects of that k
 .nf
 \fB{ "reset":\fR \fIRESET_OBJECT\fR \fB}\fR
 
-\fIRESET_OBJECT\fR := \fICOUNTER\fR | \fICOUNTERS\fR | \fIQUOTA\fR | \fIQUOTAS\fR | \fIRULE\fR | \fIRULES\fR
+\fIRESET_OBJECT\fR := \fICOUNTER\fR | \fICOUNTERS\fR | \fIQUOTA\fR | \fIQUOTAS\fR | \fIRULE\fR | \fIRULES\fR | \fISET\fR | \fIMAP\fR | \fIELEMENT\fR
 .fi
 .if n \{\
 .RE
@@ -2158,6 +2158,23 @@ If the \fBfield\fR property is not given, the expression is to be used as a TCP 
 Create a reference to a field (\fBfield\fR) of an SCTP chunk (\fBname\fR)\&.
 .sp
 If the \fBfield\fR property is not given, the expression is to be used as an SCTP chunk existence check in a \fBmatch\fR statement with a boolean on the right hand side\&.
+.SS "DCCP OPTION"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB{ "dccp option": {
+        "type":\fR \fINUMBER\fR*
+\fB}}\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a reference to a DCCP option (\fBtype\fR)\&.
+.sp
+The expression is to be used as a DCCP option existence check in a \fBmatch\fR statement with a boolean on the right hand side\&.
 .SS "META"
 .sp
 .if n \{\

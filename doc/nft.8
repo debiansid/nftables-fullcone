@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/13/2023
+.\"      Date: 07/14/2023
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "03/13/2023" "\ \&" "\ \&"
+.TH "NFT" "8" "07/14/2023" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1004,9 +1004,7 @@ Base chains also allow one to set the chain\(cqs \fBpolicy\fR, i\&.e\&. what hap
 \fBreplace rule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR \fIstatement\fR \&... [\fBcomment\fR \fIcomment\fR]
 {\fBdelete\fR | \fBreset\fR} \fBrule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR
 \fBdestroy rule\fR [\fIfamily\fR] \fItable\fR \fIchain\fR \fBhandle\fR \fIhandle\fR
-\fBreset rules\fR [\fIfamily\fR]
-\fBreset rules\fR \fBtable\fR [\fIfamily\fR] \fItable\fR
-\fBreset rules\fR \fBchain\fR [\fIfamily\fR] \fItable\fR [\fIchain\fR]
+\fBreset rules\fR [\fIfamily\fR] [\fItable\fR [\fIchain\fR]]
 .fi
 .if n \{\
 .RE
@@ -1141,7 +1139,7 @@ The sets allowed_hosts and allowed_ports need to be created first\&. The next se
 .\}
 .nf
 \fBadd set\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR \fB;\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBtimeout\fR \fItimeout\fR \fB;\fR] [\fBgc\-interval\fR \fIgc\-interval\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] [\fBauto\-merge ;\fR] \fB}\fR
-{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR} \fBset\fR [\fIfamily\fR] \fItable\fR \fIset\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR | \fBreset\fR } \fBset\fR [\fIfamily\fR] \fItable\fR \fIset\fR
 \fBlist sets\fR [\fIfamily\fR]
 \fBdelete set\fR [\fIfamily\fR] \fItable\fR \fBhandle\fR \fIhandle\fR
 {\fBadd\fR | \fBdelete\fR | \fBdestroy\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIelement\fR[\fB,\fR \&...] \fB}\fR
@@ -1153,6 +1151,7 @@ The sets allowed_hosts and allowed_ports need to be created first\&. The next se
 Sets are element containers of a user\-defined data type, they are uniquely identified by a user\-defined name and attached to tables\&. Their behaviour can be tuned with the flags that can be specified at set creation time\&.
 .TS
 tab(:);
+lt lt
 lt lt
 lt lt
 lt lt
@@ -1192,6 +1191,13 @@ T{
 T}:T{
 .sp
 Remove all elements from the specified set\&.
+T}
+T{
+.sp
+\fBreset\fR
+T}:T{
+.sp
+Reset timeout and other state in all contained elements\&.
 T}
 .TE
 .sp 1
@@ -1249,7 +1255,7 @@ T}:T{
 set flags
 T}:T{
 .sp
-string: constant, dynamic, interval, timeout
+string: constant, dynamic, interval, timeout\&. Used to describe the sets properties\&.
 T}
 T{
 .sp
@@ -1319,7 +1325,7 @@ T}
 .\}
 .nf
 \fBadd map\fR [\fIfamily\fR] \fItable\fR \fImap\fR \fB{ type\fR \fItype\fR | \fBtypeof\fR \fIexpression\fR [\fBflags\fR \fIflags\fR \fB;\fR] [\fBelements = {\fR \fIelement\fR[\fB,\fR \&...] \fB} ;\fR] [\fBsize\fR \fIsize\fR \fB;\fR] [\fBcomment\fR \fIcomment\fR \fB;\fR\fI] [\fR\fI\fBpolicy\fR\fR\fI \*(Aqpolicy\fR \fB;\fR] \fB}\fR
-{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR} \fBmap\fR [\fIfamily\fR] \fItable\fR \fImap\fR
+{\fBdelete\fR | \fBdestroy\fR | \fBlist\fR | \fBflush\fR | \fBreset\fR } \fBmap\fR [\fIfamily\fR] \fItable\fR \fImap\fR
 \fBlist maps\fR [\fIfamily\fR]
 .fi
 .if n \{\
@@ -1329,7 +1335,6 @@ T}
 Maps store data based on some specific key used as input\&. They are uniquely identified by a user\-defined name and attached to tables\&.
 .TS
 tab(:);
-lt lt
 lt lt
 lt lt
 lt lt
@@ -1373,17 +1378,10 @@ Remove all elements from the specified map\&.
 T}
 T{
 .sp
-\fBadd element\fR
+\fBreset\fR
 T}:T{
 .sp
-Comma\-separated list of elements to add into the specified map\&.
-T}
-T{
-.sp
-\fBdelete element\fR
-T}:T{
-.sp
-Comma\-separated list of element keys to delete from the specified map\&.
+Reset timeout and other state in all contained elements\&.
 T}
 .TE
 .sp 1
@@ -1438,7 +1436,7 @@ T}:T{
 map flags
 T}:T{
 .sp
-string: constant, interval
+string, same as set flags
 T}
 T{
 .sp
@@ -1472,13 +1470,64 @@ string: performance [default], memory
 T}
 .TE
 .sp 1
+.sp
+Users can specifiy the properties/features that the set/map must support\&. This allows the kernel to pick an optimal internal representation\&. If a required flag is missing, the ruleset might still work, as nftables will auto\-enable features if it can infer this from the ruleset\&. This may not work for all cases, however, so it is recommended to specify all required features in the set/map definition manually\&.
+.sp
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.B Table\ \&10.\ \&Set and Map flags
+.TS
+allbox tab(:);
+ltB ltB.
+T{
+Flag
+T}:T{
+Description
+T}
+.T&
+lt lt
+lt lt
+lt lt
+lt lt.
+T{
+.sp
+constant
+T}:T{
+.sp
+Set contents will never change after creation
+T}
+T{
+.sp
+dynamic
+T}:T{
+.sp
+Set must support updates from the packet path with the \fBadd\fR, \fBupdate\fR or \fBdelete\fR keywords\&.
+T}
+T{
+.sp
+interval
+T}:T{
+.sp
+Set must be able to store intervals (ranges)
+T}
+T{
+.sp
+timeout
+T}:T{
+.sp
+Set must support element timeouts (auto\-removal of elements once they expire)\&.
+T}
+.TE
+.sp 1
 .SH "ELEMENTS"
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-{\fBadd\fR | \fBcreate\fR | \fBdelete\fR | \fBdestroy\fR | \fBget\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIELEMENT\fR[\fB,\fR \&...] \fB}\fR
+{\fBadd\fR | \fBcreate\fR | \fBdelete\fR | \fBdestroy\fR | \fBget\fR | \fBreset\fR } \fBelement\fR [\fIfamily\fR] \fItable\fR \fIset\fR \fB{\fR \fIELEMENT\fR[\fB,\fR \&...] \fB}\fR
 
 \fIELEMENT\fR := \fIkey_expression\fR \fIOPTIONS\fR [\fB:\fR \fIvalue_expression\fR]
 \fIOPTIONS\fR := [\fBtimeout\fR \fITIMESPEC\fR] [\fBexpires\fR \fITIMESPEC\fR] [\fBcomment\fR \fIstring\fR]
@@ -1494,11 +1543,13 @@ Element\-related commands allow one to change contents of named sets and maps\&.
 .sp
 \fBget\fR command is useful to check if an element is contained in a set which may be non\-trivial in very large and/or interval sets\&. In the latter case, the containing interval is returned instead of just the element itself\&.
 .sp
+\fBreset\fR command resets timeout or other state attached to the given element(s)\&.
+.sp
 .it 1 an-trap
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&10.\ \&Element options
+.B Table\ \&11.\ \&Element options
 .TS
 allbox tab(:);
 ltB ltB.
@@ -1623,8 +1674,8 @@ Inspect configured objects\&. \fBlist hooks\fR shows the full hook pipeline, inc
 \fBlist limits\fR [\fIfamily\fR]
 \fBreset counters\fR [\fIfamily\fR]
 \fBreset quotas\fR [\fIfamily\fR]
-\fBreset counters\fR [\fIfamily\fR] \fBtable\fR \fItable\fR
-\fBreset quotas\fR [\fIfamily\fR] \fBtable\fR \fItable\fR
+\fBreset counters\fR [\fIfamily\fR] \fItable\fR
+\fBreset quotas\fR [\fIfamily\fR] \fItable\fR
 .fi
 .if n \{\
 .RE
@@ -1695,7 +1746,7 @@ Ct helper is used to define connection tracking helpers that can then be used in
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&11.\ \&conntrack helper specifications
+.B Table\ \&12.\ \&conntrack helper specifications
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -1797,7 +1848,7 @@ Ct timeout is used to update connection tracking timeout values\&.Timeout polici
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&12.\ \&conntrack timeout specifications
+.B Table\ \&13.\ \&conntrack timeout specifications
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -1938,7 +1989,7 @@ Ct expectation is used to create connection expectations\&. Expectations are ass
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&13.\ \&conntrack expectation specifications
+.B Table\ \&14.\ \&conntrack expectation specifications
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -2062,7 +2113,7 @@ table ip filter {
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&14.\ \&Counter specifications
+.B Table\ \&15.\ \&Counter specifications
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -2156,7 +2207,7 @@ BYTE_UNIT := bytes | kbytes | mbytes
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&15.\ \&Quota specifications
+.B Table\ \&16.\ \&Quota specifications
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -2600,7 +2651,7 @@ The boolean type is a syntactical helper type in userspace\&. Its use is in the 
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&16.\ \&The following keywords will automatically resolve into a boolean type with given value
+.B Table\ \&17.\ \&The following keywords will automatically resolve into a boolean type with given value
 .TS
 allbox tab(:);
 ltB ltB.
@@ -2633,7 +2684,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&17.\ \&expressions support a boolean comparison
+.B Table\ \&18.\ \&expressions support a boolean comparison
 .TS
 allbox tab(:);
 ltB ltB.
@@ -2726,7 +2777,7 @@ The ICMP Type type is used to conveniently specify the ICMP header\(cqs type fie
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&18.\ \&Keywords may be used when specifying the ICMP type
+.B Table\ \&19.\ \&Keywords may be used when specifying the ICMP type
 .TS
 allbox tab(:);
 ltB ltB.
@@ -2909,7 +2960,7 @@ The ICMP Code type is used to conveniently specify the ICMP header\(cqs code fie
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&19.\ \&Keywords may be used when specifying the ICMP code
+.B Table\ \&20.\ \&Keywords may be used when specifying the ICMP code
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3022,7 +3073,7 @@ The ICMPv6 Type type is used to conveniently specify the ICMPv6 header\(cqs type
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&20.\ \&keywords may be used when specifying the ICMPv6 type:
+.B Table\ \&21.\ \&keywords may be used when specifying the ICMPv6 type:
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3237,7 +3288,7 @@ The ICMPv6 Code type is used to conveniently specify the ICMPv6 header\(cqs code
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&21.\ \&keywords may be used when specifying the ICMPv6 code
+.B Table\ \&22.\ \&keywords may be used when specifying the ICMPv6 code
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3334,7 +3385,7 @@ The ICMPvX Code type abstraction is a set of values which overlap between ICMP a
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&22.\ \&keywords may be used when specifying the ICMPvX code
+.B Table\ \&23.\ \&keywords may be used when specifying the ICMPvX code
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3384,7 +3435,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&23.\ \&overview of types used in ct expression and statement
+.B Table\ \&24.\ \&overview of types used in ct expression and statement
 .TS
 allbox tab(:);
 ltB ltB ltB ltB.
@@ -3477,7 +3528,7 @@ For each of the types above, keywords are available for convenience:
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&24.\ \&conntrack state (ct_state)
+.B Table\ \&25.\ \&conntrack state (ct_state)
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3534,7 +3585,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&25.\ \&conntrack direction (ct_dir)
+.B Table\ \&26.\ \&conntrack direction (ct_dir)
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3567,7 +3618,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&26.\ \&conntrack status (ct_status)
+.B Table\ \&27.\ \&conntrack status (ct_status)
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3640,7 +3691,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&27.\ \&conntrack event bits (ct_event)
+.B Table\ \&28.\ \&conntrack event bits (ct_event)
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3779,7 +3830,7 @@ The DCCP packet type abstracts the different legal values of the respective four
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&28.\ \&keywords may be used when specifying the DCCP packet type
+.B Table\ \&29.\ \&keywords may be used when specifying the DCCP packet type
 .TS
 allbox tab(:);
 ltB ltB.
@@ -3917,7 +3968,7 @@ Like with iptables, wildcard matching on interface name prefixes is available fo
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&29.\ \&Meta expression types
+.B Table\ \&30.\ \&Meta expression types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -4275,7 +4326,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&30.\ \&Meta expression specific types
+.B Table\ \&31.\ \&Meta expression specific types
 .TS
 allbox tab(:);
 ltB ltB.
@@ -4423,7 +4474,7 @@ Socket expression can be used to search for an existing open TCP/UDP socket and 
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&31.\ \&Available socket attributes
+.B Table\ \&32.\ \&Available socket attributes
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -4544,7 +4595,7 @@ The osf expression does passive operating system fingerprinting\&. This expressi
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&32.\ \&Available osf attributes
+.B Table\ \&33.\ \&Available osf attributes
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -4642,7 +4693,7 @@ A fib expression queries the fib (forwarding information base) to obtain informa
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&33.\ \&fib expression specific types
+.B Table\ \&34.\ \&fib expression specific types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -4735,7 +4786,7 @@ A routing expression refers to routing data associated with a packet\&.
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&34.\ \&Routing expression types
+.B Table\ \&35.\ \&Routing expression types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -4798,7 +4849,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&35.\ \&Routing expression specific types
+.B Table\ \&36.\ \&Routing expression specific types
 .TS
 allbox tab(:);
 ltB ltB.
@@ -4862,7 +4913,7 @@ The \fIin\fR or \fIout\fR keyword needs to be used to specify if the expression 
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&36.\ \&Ipsec expression types
+.B Table\ \&37.\ \&Ipsec expression types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5010,7 +5061,7 @@ Payload expressions refer to data from the packet\(cqs payload\&.
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&37.\ \&Ethernet header expression types
+.B Table\ \&38.\ \&Ethernet header expression types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5075,7 +5126,7 @@ The vlan expression is used to match on the vlan header fields\&. This expressio
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&38.\ \&VLAN header expression
+.B Table\ \&39.\ \&VLAN header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5149,7 +5200,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&39.\ \&ARP header expression
+.B Table\ \&40.\ \&ARP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5278,7 +5329,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&40.\ \&IPv4 header expression
+.B Table\ \&41.\ \&IPv4 header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5442,7 +5493,7 @@ This expression refers to ICMP header fields\&. When using it in \fBinet\fR, \fB
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&41.\ \&ICMP header expression
+.B Table\ \&42.\ \&ICMP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5551,7 +5602,7 @@ This expression refers to IGMP header fields\&. When using it in \fBinet\fR, \fB
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&42.\ \&IGMP header expression
+.B Table\ \&43.\ \&IGMP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5627,7 +5678,7 @@ This expression refers to the ipv6 header fields\&. Caution when using \fBip6 ne
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&43.\ \&IPv6 header expression
+.B Table\ \&44.\ \&IPv6 header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5772,7 +5823,7 @@ This expression refers to ICMPv6 header fields\&. When using it in \fBinet\fR, \
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&44.\ \&ICMPv6 header expression
+.B Table\ \&45.\ \&ICMPv6 header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -5890,7 +5941,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&45.\ \&TCP header expression
+.B Table\ \&46.\ \&TCP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6030,7 +6081,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&46.\ \&UDP header expression
+.B Table\ \&47.\ \&UDP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6104,7 +6155,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&47.\ \&UDP\-Lite header expression
+.B Table\ \&48.\ \&UDP\-Lite header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6191,7 +6242,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&48.\ \&SCTP header expression
+.B Table\ \&49.\ \&SCTP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6265,7 +6316,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&49.\ \&SCTP chunk fields
+.B Table\ \&50.\ \&SCTP chunk fields
 .TS
 allbox tab(:);
 ltB ltB ltB ltB.
@@ -6549,7 +6600,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&50.\ \&DCCP header expression
+.B Table\ \&51.\ \&DCCP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6612,7 +6663,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&51.\ \&AH header expression
+.B Table\ \&52.\ \&AH header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6697,7 +6748,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&52.\ \&ESP header expression
+.B Table\ \&53.\ \&ESP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6741,7 +6792,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&53.\ \&IPComp header expression
+.B Table\ \&54.\ \&IPComp header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6808,7 +6859,7 @@ The gre expression is used to match on the gre header fields\&. This expression 
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&54.\ \&GRE header expression
+.B Table\ \&55.\ \&GRE header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6892,7 +6943,7 @@ The geneve expression is used to match on the geneve header fields\&. The geneve
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&55.\ \&GENEVE header expression
+.B Table\ \&56.\ \&GENEVE header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -6997,7 +7048,7 @@ The vxlan expression is used to match on the vxlan header fields\&. The vxlan he
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&56.\ \&VXLAN header expression
+.B Table\ \&57.\ \&VXLAN header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7062,7 +7113,7 @@ netdev filter ingress udp dport 4789 vxlan tcp dport 80 counter
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&57.\ \&ARP header expression
+.B Table\ \&58.\ \&ARP header expression
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7193,7 +7244,7 @@ The raw payload expression instructs to load \fIlength\fR bits starting at \fIof
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&58.\ \&Supported payload protocol bases
+.B Table\ \&59.\ \&Supported payload protocol bases
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7308,6 +7359,7 @@ The following syntaxes are valid only in a relational expression with boolean ty
 \fBexthdr\fR {\fBhbh\fR | \fBfrag\fR | \fBrt\fR | \fBdst\fR | \fBmh\fR}
 \fBtcp option\fR {\fBeol\fR | \fBnop\fR | \fBmaxseg\fR | \fBwindow\fR | \fBsack\-perm\fR | \fBsack\fR | \fBsack0\fR | \fBsack1\fR | \fBsack2\fR | \fBsack3\fR | \fBtimestamp\fR}
 \fBip option\fR { lsrr | ra | rr | ssrr }
+\fBdccp option\fR \fIdccp_option_type\fR
 .fi
 .if n \{\
 .RE
@@ -7317,7 +7369,7 @@ The following syntaxes are valid only in a relational expression with boolean ty
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&59.\ \&IPv6 extension headers
+.B Table\ \&60.\ \&IPv6 extension headers
 .TS
 allbox tab(:);
 ltB ltB.
@@ -7382,7 +7434,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&60.\ \&TCP Options
+.B Table\ \&61.\ \&TCP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7544,7 +7596,7 @@ TCP option matching also supports raw expression syntax to access arbitrary opti
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&61.\ \&IP Options
+.B Table\ \&62.\ \&IP Options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -7650,6 +7702,18 @@ filter input ip option lsrr exists counter
 .if n \{\
 .RE
 .\}
+.PP
+\fBfinding DCCP option\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+filter input dccp option 40 exists counter
+.fi
+.if n \{\
+.RE
+.\}
 .sp
 .SS "CONNTRACK EXPRESSIONS"
 .sp
@@ -7676,7 +7740,7 @@ The conntrack\-specific types in this table are described in the sub\-section CO
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&62.\ \&Conntrack expressions
+.B Table\ \&63.\ \&Conntrack expressions
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8119,7 +8183,7 @@ This is a non\-terminating statement, so the rule evaluation continues after the
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&63.\ \&log statement options
+.B Table\ \&64.\ \&log statement options
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8193,7 +8257,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&64.\ \&log\-flags
+.B Table\ \&65.\ \&log\-flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8296,7 +8360,7 @@ A reject statement is used to send back an error packet in response to the match
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&65.\ \&different ICMP reject variants are meant for use in different table families
+.B Table\ \&66.\ \&different ICMP reject variants are meant for use in different table families
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8383,7 +8447,7 @@ Unlike iptables, where the helper assignment happens in the raw table, the helpe
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&66.\ \&Conntrack statement types
+.B Table\ \&67.\ \&Conntrack statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8523,7 +8587,7 @@ A meta statement sets the value of a meta expression\&. The existing meta fields
 .RS 4
 .\}
 .nf
-\fBmeta\fR {\fBmark\fR | \fBpriority\fR | \fBpkttype\fR | \fBnftrace\fR} \fBset\fR \fIvalue\fR
+\fBmeta\fR {\fBmark\fR | \fBpriority\fR | \fBpkttype\fR | \fBnftrace\fR | \fBbroute\fR} \fBset\fR \fIvalue\fR
 .fi
 .if n \{\
 .RE
@@ -8535,7 +8599,7 @@ A meta statement sets meta data associated with a packet\&.
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&67.\ \&Meta statement types
+.B Table\ \&68.\ \&Meta statement types
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8547,6 +8611,7 @@ T}:T{
 Value
 T}
 .T&
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -8591,6 +8656,16 @@ T}:T{
 .sp
 0, 1
 T}
+T{
+.sp
+broute
+T}:T{
+.sp
+broute on/off\&. packets are routed instead of being bridged
+T}:T{
+.sp
+0, 1
+T}
 .TE
 .sp 1
 .SS "LIMIT STATEMENT"
@@ -8617,7 +8692,7 @@ The \fBburst\fR value influences the bucket size, i\&.e\&. jitter tolerance\&. W
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&68.\ \&limit statement values
+.B Table\ \&69.\ \&limit statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8659,8 +8734,8 @@ T}
 .RS 4
 .\}
 .nf
-\fBsnat\fR [[\fBip\fR | \fBip6\fR] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
-\fBdnat\fR [[\fBip\fR | \fBip6\fR] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
+\fBsnat\fR [[\fBip\fR | \fBip6\fR] [ \fBprefix\fR ] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
+\fBdnat\fR [[\fBip\fR | \fBip6\fR] [ \fBprefix\fR ] \fBto\fR] \fIADDR_SPEC\fR [\fB:\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
 \fBmasquerade\fR [\fBto :\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
 \fBredirect\fR [\fBto :\fR\fIPORT_SPEC\fR] [\fIFLAGS\fR]
 
@@ -8686,11 +8761,13 @@ When used in the inet family (available with kernel 5\&.2), the dnat and snat st
 .sp
 Before kernel 4\&.18 nat statements require both prerouting and postrouting base chains to be present since otherwise packets on the return path won\(cqt be seen by netfilter and therefore no reverse translation will take place\&.
 .sp
+The optional \fBprefix\fR keyword allows to map to map \fBn\fR source addresses to \fBn\fR destination addresses\&. See \fIAdvanced NAT examples\fR below\&.
+.sp
 .it 1 an-trap
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&69.\ \&NAT statement values
+.B Table\ \&70.\ \&NAT statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -8719,7 +8796,7 @@ T{
 port
 T}:T{
 .sp
-Specifies that the source/destination address of the packet should be modified\&.
+Specifies that the source/destination port of the packet should be modified\&.
 T}:T{
 .sp
 port number (16 bit)
@@ -8731,7 +8808,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&70.\ \&NAT statement flags
+.B Table\ \&71.\ \&NAT statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8803,6 +8880,57 @@ add rule inet nat postrouting meta oif ppp0 masquerade
 .if n \{\
 .RE
 .\}
+.PP
+\fBAdvanced NAT examples\fR. 
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+# map prefixes in one network to that of another, e\&.g\&. 10\&.141\&.11\&.4 is mangled to 192\&.168\&.2\&.4,
+# 10\&.141\&.11\&.5 is mangled to 192\&.168\&.2\&.5 and so on\&.
+add rule nat postrouting snat ip prefix to ip saddr map { 10\&.141\&.11\&.0/24 : 192\&.168\&.2\&.0/24 }
+
+# map a source address, source port combination to a pool of destination addresses and ports:
+add rule nat postrouting dnat to ip saddr \&. tcp dport map { 192\&.168\&.1\&.2 \&. 80 : 10\&.141\&.10\&.2\-10\&.141\&.10\&.5 \&. 8888\-8999 }
+
+# The above example generates the following NAT expression:
+#
+# [ nat dnat ip addr_min reg 1 addr_max reg 10 proto_min reg 9 proto_max reg 11 ]
+#
+# which expects to obtain the following tuple:
+# IP address (min), source port (min), IP address (max), source port (max)
+# to be obtained from the map\&. The given addresses and ports are inclusive\&.
+
+# This also works with named maps and in combination with both concatenations and ranges:
+table ip nat {
+        map ipportmap {
+                typeof ip saddr : interval ip daddr \&. tcp dport
+                flags interval
+                elements = { 192\&.168\&.1\&.2 : 10\&.141\&.10\&.1\-10\&.141\&.10\&.3 \&. 8888\-8999, 192\&.168\&.2\&.0/24 : 10\&.141\&.11\&.5\-10\&.141\&.11\&.20 \&. 8888\-8999 }
+        }
+
+        chain prerouting {
+                type nat hook prerouting priority dstnat; policy accept;
+                ip protocol tcp dnat ip to ip saddr map @ipportmap
+        }
+}
+
+@ipportmap maps network prefixes to a range of hosts and ports\&.
+The new destination is taken from the range provided by the map element\&.
+Same for the destination port\&.
+
+Note the use of the "interval" keyword in the typeof description\&.
+This is required so nftables knows that it has to ask for twice the
+amount of storage for each key\-value pair in the map\&.
+
+": ipv4_addr \&. inet_service" would allow associating one address and one port
+with each key\&.  But for this case, for each key, two addresses and two ports
+(The minimum and maximum values for both) have to be stored\&.
+.fi
+.if n \{\
+.RE
+.\}
 .sp
 .SS "TPROXY STATEMENT"
 .sp
@@ -8838,7 +8966,7 @@ This syntax can be used in \fBinet\fR tables\&. The \fBip/ip6\fR parameter defin
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&71.\ \&tproxy attributes
+.B Table\ \&72.\ \&tproxy attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8918,7 +9046,7 @@ This statement will process TCP three\-way\-handshake parallel in netfilter cont
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&72.\ \&synproxy statement attributes
+.B Table\ \&73.\ \&synproxy statement attributes
 .TS
 allbox tab(:);
 ltB ltB.
@@ -8951,7 +9079,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&73.\ \&synproxy statement flags
+.B Table\ \&74.\ \&synproxy statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -9061,7 +9189,7 @@ QUEUE_EXPRESSION can be used to compute a queue number at run\-time with the has
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&74.\ \&queue statement values
+.B Table\ \&75.\ \&queue statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.
@@ -9113,7 +9241,7 @@ T}
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&75.\ \&queue statement flags
+.B Table\ \&76.\ \&queue statement flags
 .TS
 allbox tab(:);
 ltB ltB.
@@ -9160,7 +9288,7 @@ The dup statement is used to duplicate a packet and send the copy to a different
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&76.\ \&Dup statement values
+.B Table\ \&77.\ \&Dup statement values
 .TS
 allbox tab(:);
 ltB ltB ltB.

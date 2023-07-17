@@ -490,9 +490,7 @@ RULES
 *replace rule* ['family'] 'table' 'chain' *handle* 'handle' 'statement' ... [*comment* 'comment']
 {*delete* | *reset*} *rule* ['family'] 'table' 'chain' *handle* 'handle'
 *destroy rule* ['family'] 'table' 'chain' *handle* 'handle'
-*reset rules* ['family']
-*reset rules* *table* ['family'] 'table'
-*reset rules* *chain* ['family'] 'table' ['chain']
+*reset rules* ['family'] ['table' ['chain']]
 
 Rules are added to chains in the given table. If the family is not specified, the
 ip family is used. Rules are constructed from two kinds of components according
@@ -572,7 +570,7 @@ section describes nft set syntax in more detail.
 
 [verse]
 *add set* ['family'] 'table' 'set' *{ type* 'type' | *typeof* 'expression' *;* [*flags* 'flags' *;*] [*timeout* 'timeout' *;*] [*gc-interval* 'gc-interval' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*comment* 'comment' *;*'] [*policy* 'policy' *;*] [*auto-merge ;*] *}*
-{*delete* | *destroy* | *list* | *flush*} *set* ['family'] 'table' 'set'
+{*delete* | *destroy* | *list* | *flush* | *reset* } *set* ['family'] 'table' 'set'
 *list sets* ['family']
 *delete set* ['family'] 'table' *handle* 'handle'
 {*add* | *delete* | *destroy* } *element* ['family'] 'table' 'set' *{* 'element'[*,* ...] *}*
@@ -587,6 +585,7 @@ be tuned with the flags that can be specified at set creation time.
 *destroy*:: Delete the specified set, it does not fail if it does not exist.
 *list*:: Display the elements in the specified set.
 *flush*:: Remove all elements from the specified set.
+*reset*:: Reset timeout and other state in all contained elements.
 
 .Set specifications
 [options="header"]
@@ -599,8 +598,7 @@ string: ipv4_addr, ipv6_addr, ether_addr, inet_proto, inet_service, mark
 data type of set element |
 expression to derive the data type from
 |flags |
-set flags |
-string: constant, dynamic, interval, timeout
+set flags | string: constant, dynamic, interval, timeout.  Used to describe the sets properties.
 |timeout |
 time an element stays in the set, mandatory if set is added to from the packet path (ruleset)|
 string, decimal followed by unit. Units are: d, h, m, s
@@ -626,7 +624,7 @@ MAPS
 -----
 [verse]
 *add map* ['family'] 'table' 'map' *{ type* 'type' | *typeof* 'expression' [*flags* 'flags' *;*] [*elements = {* 'element'[*,* ...] *} ;*] [*size* 'size' *;*] [*comment* 'comment' *;*'] [*policy* 'policy' *;*] *}*
-{*delete* | *destroy* | *list* | *flush*} *map* ['family'] 'table' 'map'
+{*delete* | *destroy* | *list* | *flush* | *reset* } *map* ['family'] 'table' 'map'
 *list maps* ['family']
 
 Maps store data based on some specific key used as input. They are uniquely identified by a user-defined name and attached to tables.
@@ -637,8 +635,7 @@ Maps store data based on some specific key used as input. They are uniquely iden
 *destroy*:: Delete the specified map, it does not fail if it does not exist.
 *list*:: Display the elements in the specified map.
 *flush*:: Remove all elements from the specified map.
-*add element*:: Comma-separated list of elements to add into the specified map.
-*delete element*:: Comma-separated list of element keys to delete from the specified map.
+*reset*:: Reset timeout and other state in all contained elements.
 
 .Map specifications
 [options="header"]
@@ -652,7 +649,7 @@ data type of set element |
 expression to derive the data type from
 |flags |
 map flags |
-string: constant, interval
+string, same as set flags
 |elements |
 elements contained by the map |
 map data type
@@ -664,12 +661,28 @@ map policy |
 string: performance [default], memory
 |=================
 
+Users can specifiy the properties/features that the set/map must support.
+This allows the kernel to pick an optimal internal representation.
+If a required flag is missing, the ruleset might still work, as
+nftables will auto-enable features if it can infer this from the ruleset.
+This may not work for all cases, however, so it is recommended to
+specify all required features in the set/map definition manually.
+
+.Set and Map flags
+[options="header"]
+|=================
+|Flag		| Description
+|constant	| Set contents will never change after creation
+|dynamic	| Set must support updates from the packet path with the *add*, *update* or *delete* keywords.
+|interval	| Set must be able to store intervals (ranges)
+|timeout	| Set must support element timeouts (auto-removal of elements once they expire).
+|=================
 
 ELEMENTS
 --------
 [verse]
 ____
-{*add* | *create* | *delete* | *destroy* | *get* } *element* ['family'] 'table' 'set' *{* 'ELEMENT'[*,* ...] *}*
+{*add* | *create* | *delete* | *destroy* | *get* | *reset* } *element* ['family'] 'table' 'set' *{* 'ELEMENT'[*,* ...] *}*
 
 'ELEMENT' := 'key_expression' 'OPTIONS' [*:* 'value_expression']
 'OPTIONS' := [*timeout* 'TIMESPEC'] [*expires* 'TIMESPEC'] [*comment* 'string']
@@ -688,6 +701,9 @@ listed elements may already exist.
 *get* command is useful to check if an element is contained in a set which may
 be non-trivial in very large and/or interval sets. In the latter case, the
 containing interval is returned instead of just the element itself.
+
+*reset* command resets timeout or other state attached to the given
+element(s).
 
 .Element options
 [options="header"]
@@ -762,8 +778,8 @@ STATEFUL OBJECTS
 *list limits* ['family']
 *reset counters* ['family']
 *reset quotas* ['family']
-*reset counters* ['family'] *table* 'table'
-*reset quotas* ['family'] *table* 'table'
+*reset counters* ['family'] 'table'
+*reset quotas* ['family'] 'table'
 
 Stateful objects are attached to tables and are identified by a unique name.
 They group stateful information from rules, to reference them in rules the

@@ -12,4 +12,8 @@ table netdev filter3 {
 	chain Main_Ingress3 {
 		type filter hook ingress devices = { dummy0, lo } priority -500; policy accept;
 	}
+
+	chain Main_Egress3 {
+		type filter hook egress device "lo" priority -500; policy accept;
+	}
 }

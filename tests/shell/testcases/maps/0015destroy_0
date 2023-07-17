@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+$NFT add table x
+
+$NFT destroy map x nonmap

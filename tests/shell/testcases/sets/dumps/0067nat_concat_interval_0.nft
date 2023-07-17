@@ -18,14 +18,14 @@ table ip nat {
 	}
 
 	map ipportmap4 {
-		type ifname . ipv4_addr : interval ipv4_addr
+		typeof iifname . ip saddr : interval ip daddr
 		flags interval
 		elements = { "enp2s0" . 10.1.1.136 : 1.1.2.69/32,
 			     "enp2s0" . 10.1.1.1-10.1.1.135 : 1.1.2.66-1.84.236.78 }
 	}
 
 	map ipportmap5 {
-		type ifname . ipv4_addr : interval ipv4_addr . inet_service
+		typeof iifname . ip saddr : interval ip daddr . tcp dport
 		flags interval
 		elements = { "enp2s0" . 10.1.1.136 : 1.1.2.69 . 22,
 			     "enp2s0" . 10.1.1.1-10.1.1.135 : 1.1.2.66-1.84.236.78 . 22 }

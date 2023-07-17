@@ -296,7 +296,7 @@ A meta statement sets the value of a meta expression. The existing meta fields
 are: priority, mark, pkttype, nftrace. +
 
 [verse]
-*meta* {*mark* | *priority* | *pkttype* | *nftrace*} *set* 'value'
+*meta* {*mark* | *priority* | *pkttype* | *nftrace* | *broute*} *set* 'value'
 
 A meta statement sets meta data associated with a packet. +
 
@@ -315,6 +315,9 @@ packet type |
 pkt_type
 |nftrace |
 ruleset packet tracing on/off. Use *monitor trace* command to watch traces|
+0, 1
+|broute |
+broute on/off. packets are routed instead of being bridged|
 0, 1
 |==========================
 
@@ -356,8 +359,8 @@ NAT STATEMENTS
 ~~~~~~~~~~~~~~
 [verse]
 ____
-*snat* [[*ip* | *ip6*] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
-*dnat* [[*ip* | *ip6*] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
+*snat* [[*ip* | *ip6*] [ *prefix* ] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
+*dnat* [[*ip* | *ip6*] [ *prefix* ] *to*] 'ADDR_SPEC' [*:*'PORT_SPEC'] ['FLAGS']
 *masquerade* [*to :*'PORT_SPEC'] ['FLAGS']
 *redirect* [*to :*'PORT_SPEC'] ['FLAGS']
 
@@ -395,6 +398,9 @@ Before kernel 4.18 nat statements require both prerouting and postrouting base c
 to be present since otherwise packets on the return path won't be seen by
 netfilter and therefore no reverse translation will take place.
 
+The optional *prefix* keyword allows to map to map *n* source addresses to *n*
+destination addresses.  See 'Advanced NAT examples' below.
+
 .NAT statement values
 [options="header"]
 |==================
@@ -405,7 +411,7 @@ You may specify a mapping to relate a list of tuples composed of arbitrary
 expression key with address value. |
 ipv4_addr, ipv6_addr, e.g. abcd::1234, or you can use a mapping, e.g. meta mark map { 10 : 192.168.1.2, 20 : 192.168.1.3 }
 |port|
-Specifies that the source/destination address of the packet should be modified. |
+Specifies that the source/destination port of the packet should be modified. |
 port number (16 bit)
 |===============================
 
@@ -451,6 +457,52 @@ add rule inet nat prerouting dnat ip to 10.0.2.99
 add rule inet nat prerouting dnat ip6 to fe80::dead
 # this masquerades both ipv4 and ipv6:
 add rule inet nat postrouting meta oif ppp0 masquerade
+
+------------------------
+
+.Advanced NAT examples
+----------------------
+
+# map prefixes in one network to that of another, e.g. 10.141.11.4 is mangled to 192.168.2.4,
+# 10.141.11.5 is mangled to 192.168.2.5 and so on.
+add rule nat postrouting snat ip prefix to ip saddr map { 10.141.11.0/24 : 192.168.2.0/24 }
+
+# map a source address, source port combination to a pool of destination addresses and ports:
+add rule nat postrouting dnat to ip saddr . tcp dport map { 192.168.1.2 . 80 : 10.141.10.2-10.141.10.5 . 8888-8999 }
+
+# The above example generates the following NAT expression:
+#
+# [ nat dnat ip addr_min reg 1 addr_max reg 10 proto_min reg 9 proto_max reg 11 ]
+#
+# which expects to obtain the following tuple:
+# IP address (min), source port (min), IP address (max), source port (max)
+# to be obtained from the map. The given addresses and ports are inclusive.
+
+# This also works with named maps and in combination with both concatenations and ranges:
+table ip nat {
+	map ipportmap {
+		typeof ip saddr : interval ip daddr . tcp dport
+		flags interval
+		elements = { 192.168.1.2 : 10.141.10.1-10.141.10.3 . 8888-8999, 192.168.2.0/24 : 10.141.11.5-10.141.11.20 . 8888-8999 }
+	}
+
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		ip protocol tcp dnat ip to ip saddr map @ipportmap
+	}
+}
+
+@ipportmap maps network prefixes to a range of hosts and ports.
+The new destination is taken from the range provided by the map element.
+Same for the destination port.
+
+Note the use of the "interval" keyword in the typeof description.
+This is required so nftables knows that it has to ask for twice the
+amount of storage for each key-value pair in the map.
+
+": ipv4_addr . inet_service" would allow associating one address and one port
+with each key.  But for this case, for each key, two addresses and two ports
+(The minimum and maximum values for both) have to be stored.
 
 ------------------------
 

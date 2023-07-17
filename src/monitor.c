@@ -272,10 +272,13 @@ static int netlink_events_chain_cb(const struct nlmsghdr *nlh, int type,
 			chain_print_plain(c, &monh->ctx->nft->output);
 			break;
 		case NFT_MSG_DELCHAIN:
-			nft_mon_print(monh, "chain %s %s %s",
-				      family2str(c->handle.family),
-				      c->handle.table.name,
-				      c->handle.chain.name);
+			if (c->dev_array_len > 0)
+				chain_print_plain(c, &monh->ctx->nft->output);
+			else
+				nft_mon_print(monh, "chain %s %s %s",
+					      family2str(c->handle.family),
+					      c->handle.table.name,
+					      c->handle.chain.name);
 			break;
 		}
 		nft_mon_print(monh, "\n");

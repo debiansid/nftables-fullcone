@@ -245,9 +245,10 @@ void mnl_err_list_free(struct mnl_err *err)
 	xfree(err);
 }
 
-static void mnl_set_sndbuffer(const struct mnl_socket *nl,
-			      struct nftnl_batch *batch)
+static void mnl_set_sndbuffer(struct netlink_ctx *ctx)
 {
+	struct mnl_socket *nl = ctx->nft->nf_sock;
+	struct nftnl_batch *batch = ctx->batch;
 	socklen_t len = sizeof(int);
 	int sndnlbuffsiz = 0;
 	int newbuffsiz;
@@ -260,9 +261,15 @@ static void mnl_set_sndbuffer(const struct mnl_socket *nl,
 		return;
 
 	/* Rise sender buffer length to avoid hitting -EMSGSIZE */
+	setsockopt(mnl_socket_get_fd(nl), SOL_SOCKET, SO_SNDBUF,
+		   &newbuffsiz, sizeof(socklen_t));
+
+	/* unpriviledged containers check for CAP_NET_ADMIN on the init_user_ns. */
 	if (setsockopt(mnl_socket_get_fd(nl), SOL_SOCKET, SO_SNDBUFFORCE,
-		       &newbuffsiz, sizeof(socklen_t)) < 0)
-		return;
+		       &newbuffsiz, sizeof(socklen_t)) < 0) {
+		if (errno == EPERM)
+			ctx->maybe_emsgsize = newbuffsiz;
+	}
 }
 
 static unsigned int nlsndbufsiz;
@@ -409,7 +416,7 @@ int mnl_batch_talk(struct netlink_ctx *ctx, struct list_head *err_list,
 		.nl_ctx = ctx,
 	};
 
-	mnl_set_sndbuffer(ctx->nft->nf_sock, ctx->batch);
+	mnl_set_sndbuffer(ctx);
 
 	mnl_nft_batch_to_msg(ctx, &msg, &snl, iov, iov_len);
 
@@ -711,18 +718,98 @@ err:
 /*
  * Chain
  */
+
+struct nft_dev {
+	const char		*ifname;
+	const struct location	*location;
+};
+
+static void nft_dev_add(struct nft_dev *dev_array, const struct expr *expr, int i)
+{
+	unsigned int ifname_len;
+	char ifname[IFNAMSIZ];
+
+	ifname_len = div_round_up(expr->len, BITS_PER_BYTE);
+	memset(ifname, 0, sizeof(ifname));
+	mpz_export_data(ifname, expr->value, BYTEORDER_HOST_ENDIAN, ifname_len);
+	dev_array[i].ifname = xstrdup(ifname);
+	dev_array[i].location = &expr->location;
+}
+
+static struct nft_dev *nft_dev_array(const struct expr *dev_expr, int *num_devs)
+{
+	struct nft_dev *dev_array;
+	int i = 0, len = 1;
+	struct expr *expr;
+
+	switch (dev_expr->etype) {
+	case EXPR_SET:
+	case EXPR_LIST:
+		list_for_each_entry(expr, &dev_expr->expressions, list)
+			len++;
+
+		dev_array = xmalloc(sizeof(struct nft_dev) * len);
+
+		list_for_each_entry(expr, &dev_expr->expressions, list) {
+			nft_dev_add(dev_array, expr, i);
+			i++;
+		}
+		break;
+	case EXPR_VALUE:
+		len++;
+		dev_array = xmalloc(sizeof(struct nft_dev) * len);
+		nft_dev_add(dev_array, dev_expr, i);
+		i++;
+		break;
+	default:
+		assert(0);
+	}
+
+	dev_array[i].ifname = NULL;
+	*num_devs = i;
+
+	return dev_array;
+}
+
+static void nft_dev_array_free(const struct nft_dev *dev_array)
+{
+	int i = 0;
+
+	while (dev_array[i].ifname != NULL)
+		xfree(dev_array[i++].ifname);
+
+	xfree(dev_array);
+}
+
+static void mnl_nft_chain_devs_build(struct nlmsghdr *nlh, struct cmd *cmd)
+{
+	const struct expr *dev_expr = cmd->chain->dev_expr;
+	const struct nft_dev *dev_array;
+	struct nlattr *nest_dev;
+	int i, num_devs = 0;
+
+	dev_array = nft_dev_array(dev_expr, &num_devs);
+	if (num_devs == 1) {
+		cmd_add_loc(cmd, nlh->nlmsg_len, dev_array[0].location);
+		mnl_attr_put_strz(nlh, NFTA_HOOK_DEV, dev_array[0].ifname);
+	} else {
+		nest_dev = mnl_attr_nest_start(nlh, NFTA_HOOK_DEVS);
+		for (i = 0; i < num_devs; i++) {
+			cmd_add_loc(cmd, nlh->nlmsg_len, dev_array[i].location);
+			mnl_attr_put_strz(nlh, NFTA_DEVICE_NAME, dev_array[i].ifname);
+			mnl_attr_nest_end(nlh, nest_dev);
+		}
+	}
+	nft_dev_array_free(dev_array);
+}
+
 int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		      unsigned int flags)
 {
 	struct nftnl_udata_buf *udbuf;
-	int priority, policy, i = 0;
 	struct nftnl_chain *nlc;
-	unsigned int ifname_len;
-	const char **dev_array;
-	char ifname[IFNAMSIZ];
 	struct nlmsghdr *nlh;
-	struct expr *expr;
-	int dev_array_len;
+	int priority, policy;
 
 	nlc = nftnl_chain_alloc();
 	if (nlc == NULL)
@@ -734,46 +821,6 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		if (cmd->chain->flags & CHAIN_F_HW_OFFLOAD) {
 			nftnl_chain_set_u32(nlc, NFTNL_CHAIN_FLAGS,
 					    CHAIN_F_HW_OFFLOAD);
-		}
-		if (cmd->chain->flags & CHAIN_F_BASECHAIN) {
-			nftnl_chain_set_u32(nlc, NFTNL_CHAIN_HOOKNUM,
-					    cmd->chain->hook.num);
-			mpz_export_data(&priority,
-					cmd->chain->priority.expr->value,
-					BYTEORDER_HOST_ENDIAN, sizeof(int));
-			nftnl_chain_set_s32(nlc, NFTNL_CHAIN_PRIO, priority);
-			nftnl_chain_set_str(nlc, NFTNL_CHAIN_TYPE,
-					    cmd->chain->type.str);
-		}
-		if (cmd->chain->dev_expr) {
-			dev_array = xmalloc(sizeof(char *) * 8);
-			dev_array_len = 8;
-			list_for_each_entry(expr, &cmd->chain->dev_expr->expressions, list) {
-				ifname_len = div_round_up(expr->len, BITS_PER_BYTE);
-				memset(ifname, 0, sizeof(ifname));
-				mpz_export_data(ifname, expr->value,
-						BYTEORDER_HOST_ENDIAN,
-						ifname_len);
-				dev_array[i++] = xstrdup(ifname);
-				if (i == dev_array_len) {
-					dev_array_len *= 2;
-					dev_array = xrealloc(dev_array,
-							     dev_array_len * sizeof(char *));
-				}
-			}
-
-			dev_array[i] = NULL;
-			if (i == 1)
-				nftnl_chain_set_str(nlc, NFTNL_CHAIN_DEV, dev_array[0]);
-			else if (i > 1)
-				nftnl_chain_set_data(nlc, NFTNL_CHAIN_DEVICES, dev_array,
-						     sizeof(char *) * dev_array_len);
-
-			i = 0;
-			while (dev_array[i] != NULL)
-				xfree(dev_array[i++]);
-
-			xfree(dev_array);
 		}
 		if (cmd->chain->comment) {
 			udbuf = nftnl_udata_buf_alloc(NFT_USERDATA_MAXLEN);
@@ -809,12 +856,6 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 			nftnl_chain_set_u32(nlc, NFTNL_CHAIN_FLAGS, cmd->chain->flags);
 	}
 
-	if (cmd->chain && cmd->chain->flags & CHAIN_F_BASECHAIN) {
-		nftnl_chain_unset(nlc, NFTNL_CHAIN_TYPE);
-		cmd_add_loc(cmd, nlh->nlmsg_len, &cmd->chain->type.loc);
-		mnl_attr_put_strz(nlh, NFTA_CHAIN_TYPE, cmd->chain->type.str);
-	}
-
 	if (cmd->chain && cmd->chain->policy) {
 		mpz_export_data(&policy, cmd->chain->policy->value,
 				BYTEORDER_HOST_ENDIAN, sizeof(int));
@@ -822,7 +863,33 @@ int mnl_nft_chain_add(struct netlink_ctx *ctx, struct cmd *cmd,
 		mnl_attr_put_u32(nlh, NFTA_CHAIN_POLICY, htonl(policy));
 	}
 
+	nftnl_chain_unset(nlc, NFTNL_CHAIN_TYPE);
+
 	nftnl_chain_nlmsg_build_payload(nlh, nlc);
+
+	if (cmd->chain && cmd->chain->flags & CHAIN_F_BASECHAIN) {
+		struct nlattr *nest;
+
+		if (cmd->chain->type.str) {
+			cmd_add_loc(cmd, nlh->nlmsg_len, &cmd->chain->type.loc);
+			mnl_attr_put_strz(nlh, NFTA_CHAIN_TYPE, cmd->chain->type.str);
+		}
+
+		nest = mnl_attr_nest_start(nlh, NFTA_CHAIN_HOOK);
+
+		if (cmd->chain->type.str) {
+			mnl_attr_put_u32(nlh, NFTA_HOOK_HOOKNUM, htonl(cmd->chain->hook.num));
+			mpz_export_data(&priority, cmd->chain->priority.expr->value,
+					BYTEORDER_HOST_ENDIAN, sizeof(int));
+			mnl_attr_put_u32(nlh, NFTA_HOOK_PRIORITY, htonl(priority));
+		}
+
+		if (cmd->chain && cmd->chain->dev_expr)
+			mnl_nft_chain_devs_build(nlh, cmd);
+
+		mnl_attr_nest_end(nlh, nest);
+	}
+
 	nftnl_chain_free(nlc);
 
 	mnl_nft_batch_continue(ctx->batch);
@@ -889,6 +956,15 @@ int mnl_nft_chain_del(struct netlink_ctx *ctx, struct cmd *cmd)
 		cmd_add_loc(cmd, nlh->nlmsg_len, &cmd->handle.handle.location);
 		mnl_attr_put_u64(nlh, NFTA_CHAIN_HANDLE,
 				 htobe64(cmd->handle.handle.id));
+	}
+
+	if (cmd->op == CMD_DELETE &&
+	    cmd->chain && cmd->chain->dev_expr) {
+		struct nlattr *nest;
+
+		nest = mnl_attr_nest_start(nlh, NFTA_CHAIN_HOOK);
+		mnl_nft_chain_devs_build(nlh, cmd);
+		mnl_attr_nest_end(nlh, nest);
 	}
 
 	nftnl_chain_nlmsg_build_payload(nlh, nlc);
@@ -1794,14 +1870,21 @@ int mnl_nft_setelem_del(struct netlink_ctx *ctx, struct cmd *cmd,
 }
 
 struct nftnl_set *mnl_nft_setelem_get_one(struct netlink_ctx *ctx,
-					  struct nftnl_set *nls_in)
+					  struct nftnl_set *nls_in,
+					  bool reset)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nftnl_set *nls_out;
 	struct nlmsghdr *nlh;
+	int msg_type;
 	int err;
 
-	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETSETELEM,
+	if (reset)
+		msg_type = NFT_MSG_GETSETELEM_RESET;
+	else
+		msg_type = NFT_MSG_GETSETELEM;
+
+	nlh = nftnl_nlmsg_build_hdr(buf, msg_type,
 				    nftnl_set_get_u32(nls_in, NFTNL_SET_FAMILY),
 				    NLM_F_ACK, ctx->seqnum);
 	nftnl_set_elems_nlmsg_build_payload(nlh, nls_in);
@@ -1824,12 +1907,19 @@ struct nftnl_set *mnl_nft_setelem_get_one(struct netlink_ctx *ctx,
 	return nls_out;
 }
 
-int mnl_nft_setelem_get(struct netlink_ctx *ctx, struct nftnl_set *nls)
+int mnl_nft_setelem_get(struct netlink_ctx *ctx, struct nftnl_set *nls,
+			bool reset)
 {
 	char buf[MNL_SOCKET_BUFFER_SIZE];
 	struct nlmsghdr *nlh;
+	int msg_type;
 
-	nlh = nftnl_nlmsg_build_hdr(buf, NFT_MSG_GETSETELEM,
+	if (reset)
+		msg_type = NFT_MSG_GETSETELEM_RESET;
+	else
+		msg_type = NFT_MSG_GETSETELEM;
+
+	nlh = nftnl_nlmsg_build_hdr(buf, msg_type,
 				    nftnl_set_get_u32(nls, NFTNL_SET_FAMILY),
 				    NLM_F_DUMP, ctx->seqnum);
 	nftnl_set_elems_nlmsg_build_payload(nlh, nls);
@@ -1900,48 +1990,30 @@ err:
 	return NULL;
 }
 
-static const char **nft_flowtable_dev_array(struct cmd *cmd)
+static void mnl_nft_ft_devs_build(struct nlmsghdr *nlh, struct cmd *cmd)
 {
-	unsigned int ifname_len;
-	const char **dev_array;
-	char ifname[IFNAMSIZ];
-	int i = 0, len = 1;
-	struct expr *expr;
+	const struct expr *dev_expr = cmd->flowtable->dev_expr;
+	const struct nft_dev *dev_array;
+	struct nlattr *nest_dev;
+	int i, num_devs= 0;
 
-	list_for_each_entry(expr, &cmd->flowtable->dev_expr->expressions, list)
-		len++;
-
-	dev_array = xmalloc(sizeof(char *) * len);
-
-	list_for_each_entry(expr, &cmd->flowtable->dev_expr->expressions, list) {
-		ifname_len = div_round_up(expr->len, BITS_PER_BYTE);
-		memset(ifname, 0, sizeof(ifname));
-		mpz_export_data(ifname, expr->value, BYTEORDER_HOST_ENDIAN,
-				ifname_len);
-		dev_array[i++] = xstrdup(ifname);
+	dev_array = nft_dev_array(dev_expr, &num_devs);
+	nest_dev = mnl_attr_nest_start(nlh, NFTA_FLOWTABLE_HOOK_DEVS);
+	for (i = 0; i < num_devs; i++) {
+		cmd_add_loc(cmd, nlh->nlmsg_len, dev_array[i].location);
+		mnl_attr_put_strz(nlh, NFTA_DEVICE_NAME, dev_array[i].ifname);
 	}
 
-	dev_array[i] = NULL;
-
-	return dev_array;
-}
-
-static void nft_flowtable_dev_array_free(const char **dev_array)
-{
-	int i = 0;
-
-	while (dev_array[i] != NULL)
-		xfree(dev_array[i++]);
-
-	free(dev_array);
+	mnl_attr_nest_end(nlh, nest_dev);
+	nft_dev_array_free(dev_array);
 }
 
 int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 			  unsigned int flags)
 {
 	struct nftnl_flowtable *flo;
-	const char **dev_array;
 	struct nlmsghdr *nlh;
+	struct nlattr *nest;
 	int priority;
 
 	flo = nftnl_flowtable_alloc();
@@ -1950,24 +2022,6 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FAMILY,
 				cmd->handle.family);
-
-	if (cmd->flowtable->hook.name) {
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM,
-					cmd->flowtable->hook.num);
-		mpz_export_data(&priority, cmd->flowtable->priority.expr->value,
-				BYTEORDER_HOST_ENDIAN, sizeof(int));
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, priority);
-	} else {
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM, 0);
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, 0);
-	}
-
-	if (cmd->flowtable->dev_expr) {
-		dev_array = nft_flowtable_dev_array(cmd);
-		nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
-					 dev_array, 0);
-		nft_flowtable_dev_array_free(dev_array);
-	}
 
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FLAGS,
 				cmd->flowtable->flags);
@@ -1984,6 +2038,21 @@ int mnl_nft_flowtable_add(struct netlink_ctx *ctx, struct cmd *cmd,
 	mnl_attr_put_strz(nlh, NFTA_FLOWTABLE_NAME, cmd->handle.flowtable.name);
 
 	nftnl_flowtable_nlmsg_build_payload(nlh, flo);
+
+	nest = mnl_attr_nest_start(nlh, NFTA_FLOWTABLE_HOOK);
+
+	if (cmd->flowtable && cmd->flowtable->priority.expr) {
+		mnl_attr_put_u32(nlh, NFTA_FLOWTABLE_HOOK_NUM, htonl(cmd->flowtable->hook.num));
+		mpz_export_data(&priority, cmd->flowtable->priority.expr->value,
+				BYTEORDER_HOST_ENDIAN, sizeof(int));
+		mnl_attr_put_u32(nlh, NFTA_FLOWTABLE_HOOK_PRIORITY, htonl(priority));
+	}
+
+	if (cmd->flowtable->dev_expr)
+		mnl_nft_ft_devs_build(nlh, cmd);
+
+	mnl_attr_nest_end(nlh, nest);
+
 	nftnl_flowtable_free(flo);
 
 	mnl_nft_batch_continue(ctx->batch);
@@ -1995,8 +2064,8 @@ int mnl_nft_flowtable_del(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	enum nf_tables_msg_types msg_type = NFT_MSG_DELFLOWTABLE;
 	struct nftnl_flowtable *flo;
-	const char **dev_array;
 	struct nlmsghdr *nlh;
+	struct nlattr *nest;
 
 	flo = nftnl_flowtable_alloc();
 	if (!flo)
@@ -2004,16 +2073,6 @@ int mnl_nft_flowtable_del(struct netlink_ctx *ctx, struct cmd *cmd)
 
 	nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_FAMILY,
 				cmd->handle.family);
-
-	if (cmd->flowtable && cmd->flowtable->dev_expr) {
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_HOOKNUM, 0);
-		nftnl_flowtable_set_u32(flo, NFTNL_FLOWTABLE_PRIO, 0);
-
-		dev_array = nft_flowtable_dev_array(cmd);
-		nftnl_flowtable_set_data(flo, NFTNL_FLOWTABLE_DEVICES,
-					 dev_array, 0);
-		nft_flowtable_dev_array_free(dev_array);
-	}
 
 	if (cmd->op == CMD_DESTROY)
 		msg_type = NFT_MSG_DESTROYFLOWTABLE;
@@ -2037,6 +2096,14 @@ int mnl_nft_flowtable_del(struct netlink_ctx *ctx, struct cmd *cmd)
 	}
 
 	nftnl_flowtable_nlmsg_build_payload(nlh, flo);
+
+	if (cmd->op == CMD_DELETE &&
+	    cmd->flowtable && cmd->flowtable->dev_expr) {
+		nest = mnl_attr_nest_start(nlh, NFTA_FLOWTABLE_HOOK);
+		mnl_nft_ft_devs_build(nlh, cmd);
+		mnl_attr_nest_end(nlh, nest);
+	}
+
 	nftnl_flowtable_free(flo);
 
 	mnl_nft_batch_continue(ctx->batch);
@@ -2220,6 +2287,27 @@ static int dump_nf_attr_chain_cb(const struct nlattr *attr, void *data)
 	return MNL_CB_OK;
 }
 
+static int dump_nf_attr_bpf_cb(const struct nlattr *attr, void *data)
+{
+	int type = mnl_attr_get_type(attr);
+	const struct nlattr **tb = data;
+
+	if (mnl_attr_type_valid(attr, NFNLA_HOOK_BPF_MAX) < 0)
+		return MNL_CB_OK;
+
+	switch(type) {
+	case NFNLA_HOOK_BPF_ID:
+                if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0)
+                        return MNL_CB_ERROR;
+		break;
+	default:
+		return MNL_CB_OK;
+	}
+
+	tb[type] = attr;
+	return MNL_CB_OK;
+}
+
 struct dump_nf_hook_data {
 	struct list_head *hook_list;
 	int family;
@@ -2279,6 +2367,23 @@ static int dump_nf_hooks(const struct nlmsghdr *nlh, void *_data)
 				hook->chain = xstrdup(chainname);
 			}
 			hook->chain_family = mnl_attr_get_u8(info[NFNLA_CHAIN_FAMILY]);
+		} else if (type == NFNL_HOOK_TYPE_BPF) {
+			struct nlattr *info[NFNLA_HOOK_BPF_MAX + 1] = {};
+
+			if (mnl_attr_parse_nested(nested[NFNLA_HOOK_INFO_DESC],
+						  dump_nf_attr_bpf_cb, info) < 0) {
+				basehook_free(hook);
+				return -1;
+			}
+
+			if (info[NFNLA_HOOK_BPF_ID]) {
+				char tmpbuf[16];
+
+				snprintf(tmpbuf, sizeof(tmpbuf), "id %u",
+					 ntohl(mnl_attr_get_u32(info[NFNLA_HOOK_BPF_ID])));
+
+				hook->chain = xstrdup(tmpbuf);
+			}
 		}
 	}
 	if (tb[NFNLA_HOOK_HOOKNUM])
@@ -2400,6 +2505,8 @@ static void print_hooks(struct netlink_ctx *ctx, int family, struct list_head *h
 
 		if (hook->table && hook->chain)
 			fprintf(fp, " chain %s %s %s", family2str(hook->chain_family), hook->table, hook->chain);
+		else if (hook->hookfn && hook->chain)
+			fprintf(fp, " %s %s", hook->hookfn, hook->chain);
 		else if (hook->hookfn) {
 			fprintf(fp, " %s", hook->hookfn);
 		}

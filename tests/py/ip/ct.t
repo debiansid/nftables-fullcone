@@ -28,3 +28,9 @@ meta mark set ct original saddr . meta mark map { 1.1.1.1 . 0x00000014 : 0x00000
 meta mark set ct original ip saddr . meta mark map { 1.1.1.1 . 0x00000014 : 0x0000001e };ok
 ct original saddr . meta mark { 1.1.1.1 . 0x00000014 };fail
 ct original ip saddr . meta mark { 1.1.1.1 . 0x00000014 };ok
+ct mark set ip dscp << 2 | 0x10;ok
+ct mark set ip dscp << 26 | 0x10;ok
+ct mark set ip dscp & 0x0f << 1;ok;ct mark set ip dscp & af33
+ct mark set ip dscp & 0x0f << 2;ok;ct mark set ip dscp & 0x3c
+ct mark set ip dscp | 0x04;ok
+ct mark set ip dscp | 1 << 20;ok;ct mark set ip dscp | 0x100000

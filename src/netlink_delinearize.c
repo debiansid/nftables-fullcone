@@ -489,7 +489,7 @@ static struct expr *netlink_parse_bitwise_bool(struct netlink_parse_ctx *ctx,
 		mpz_ior(m, m, o);
 	}
 
-	if (left->len > 0 && mpz_scan0(m, 0) == left->len) {
+	if (left->len > 0 && mpz_scan0(m, 0) >= left->len) {
 		/* mask encompasses the entire value */
 		expr_free(mask);
 	} else {
@@ -537,7 +537,7 @@ static struct expr *netlink_parse_bitwise_shift(struct netlink_parse_ctx *ctx,
 	right->byteorder = BYTEORDER_HOST_ENDIAN;
 
 	expr = binop_expr_alloc(loc, op, left, right);
-	expr->len = left->len;
+	expr->len = nftnl_expr_get_u32(nle, NFTNL_EXPR_BITWISE_LEN) * BITS_PER_BYTE;
 
 	return expr;
 }
@@ -920,7 +920,9 @@ static void netlink_parse_meta_stmt(struct netlink_parse_ctx *ctx,
 
 	key  = nftnl_expr_get_u32(nle, NFTNL_EXPR_META_KEY);
 	stmt = meta_stmt_alloc(loc, key, expr);
-	expr_set_type(expr, stmt->meta.tmpl->dtype, stmt->meta.tmpl->byteorder);
+
+	if (stmt->meta.tmpl)
+		expr_set_type(expr, stmt->meta.tmpl->dtype, stmt->meta.tmpl->byteorder);
 
 	ctx->stmt = stmt;
 }
@@ -2784,8 +2786,13 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 				      BYTEORDER_HOST_ENDIAN);
 			break;
 		case OP_AND:
-			expr_set_type(expr->right, expr->left->dtype,
-				      expr->left->byteorder);
+			if (expr->right->len > expr->left->len) {
+				expr_set_type(expr->right, expr->left->dtype,
+					      BYTEORDER_HOST_ENDIAN);
+			} else {
+				expr_set_type(expr->right, expr->left->dtype,
+					      expr->left->byteorder);
+			}
 
 			/* Do not process OP_AND in ordinary rule context.
 			 *
@@ -2805,19 +2812,42 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 			}
 			break;
 		default:
-			expr_set_type(expr->right, expr->left->dtype,
-				      expr->left->byteorder);
+			if (expr->right->len > expr->left->len) {
+				expr_set_type(expr->right, expr->left->dtype,
+					      BYTEORDER_HOST_ENDIAN);
+			} else {
+				expr_set_type(expr->right, expr->left->dtype,
+					      expr->left->byteorder);
+			}
 		}
 		expr_postprocess(ctx, &expr->right);
 
-		expr_set_type(expr, expr->left->dtype,
-			      expr->left->byteorder);
+		switch (expr->op) {
+		case OP_LSHIFT:
+		case OP_RSHIFT:
+			expr_set_type(expr, &xinteger_type,
+				      BYTEORDER_HOST_ENDIAN);
+			break;
+		default:
+			expr_set_type(expr, expr->left->dtype,
+				      expr->left->byteorder);
+		}
+
 		break;
 	case EXPR_RELATIONAL:
 		switch (expr->left->etype) {
 		case EXPR_PAYLOAD:
 			payload_match_postprocess(ctx, expr, expr->left);
 			return;
+		case EXPR_CONCAT:
+			if (expr->right->etype == EXPR_SET_REF) {
+				assert(expr->left->dtype == &invalid_type);
+				assert(expr->right->dtype != &invalid_type);
+
+				datatype_set(expr->left, expr->right->dtype);
+			}
+			expr_postprocess(ctx, &expr->left);
+			break;
 		default:
 			expr_postprocess(ctx, &expr->left);
 			break;
@@ -3354,10 +3384,8 @@ static void rule_parse_postprocess(struct netlink_parse_ctx *ctx, struct rule *r
 		case STMT_NAT:
 			if (stmt->nat.addr != NULL)
 				expr_postprocess(&rctx, &stmt->nat.addr);
-			if (stmt->nat.proto != NULL) {
-				payload_dependency_reset(&dl->pdctx);
+			if (stmt->nat.proto != NULL)
 				expr_postprocess(&rctx, &stmt->nat.proto);
-			}
 			break;
 		case STMT_TPROXY:
 			if (stmt->tproxy.addr)

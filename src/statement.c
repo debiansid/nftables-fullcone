@@ -268,6 +268,7 @@ static const struct stmt_ops last_stmt_ops = {
 	.type		= STMT_LAST,
 	.name		= "last",
 	.print		= last_stmt_print,
+	.json		= last_stmt_json,
 };
 
 struct stmt *last_stmt_alloc(const struct location *loc)

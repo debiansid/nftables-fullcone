@@ -1,0 +1,82 @@
+#!/bin/bash
+
+set -e
+set -x
+
+RULESET="table t {
+	set s {
+		type ipv4_addr . inet_proto . inet_service
+		flags interval, timeout
+		counter
+		timeout 30s
+		elements = {
+			1.0.0.1 . udp . 53 counter packets 5 bytes 30,
+			2.0.0.2 . tcp . 22 counter packets 10 bytes 100 timeout 15s
+		}
+	}
+	map m {
+		type ipv4_addr : ipv4_addr
+		quota 50 bytes
+		elements = {
+			1.2.3.4 quota 50 bytes used 10 bytes : 10.2.3.4,
+			5.6.7.8 quota 100 bytes used 50 bytes : 50.6.7.8
+		}
+	}
+}"
+
+$NFT -f - <<< "$RULESET"
+
+sleep 2
+
+drop_ms() {
+	sed 's/s[0-9]*ms/s/g'
+}
+expires_seconds() {
+	sed -n 's/.*expires \([0-9]*\)s.*/\1/p'
+}
+
+# 'reset element' output is supposed to match 'get element' one
+# apart from changing expires ms value
+EXP=$($NFT get element t s '{ 1.0.0.1 . udp . 53 }' | drop_ms)
+OUT=$($NFT reset element t s '{ 1.0.0.1 . udp . 53 }' | drop_ms)
+$DIFF -u <(echo "$EXP") <(echo "$OUT")
+
+EXP=$($NFT get element t m '{ 1.2.3.4 }')
+OUT=$($NFT reset element t m '{ 1.2.3.4 }')
+$DIFF -u <(echo "$EXP") <(echo "$OUT")
+
+# assert counter value is zeroed
+$NFT get element t s '{ 1.0.0.1 . udp . 53 }' | grep -q 'counter packets 0 bytes 0'
+
+# assert expiry is reset
+VAL=$($NFT get element t s '{ 1.0.0.1 . udp . 53 }' | expires_seconds)
+[[ $VAL -gt 28 ]]
+
+# assert quota value is reset
+$NFT get element t m '{ 1.2.3.4 }' | grep -q 'quota 50 bytes : 10.2.3.4'
+
+# assert other elements remain unchanged
+$NFT get element t s '{ 2.0.0.2 . tcp . 22 }'
+OUT=$($NFT get element t s '{ 2.0.0.2 . tcp . 22 }')
+grep -q 'counter packets 10 bytes 100 timeout 15s' <<< "$OUT"
+VAL=$(expires_seconds <<< "$OUT")
+[[ $val -lt 14 ]]
+$NFT get element t m '{ 5.6.7.8 }' | grep -q 'quota 100 bytes used 50 bytes'
+
+# 'reset set' output is supposed to match 'list set' one, again strip the ms values
+EXP=$($NFT list set t s | drop_ms)
+OUT=$($NFT reset set t s | drop_ms)
+$DIFF -u <(echo "$EXP") <(echo "$OUT")
+
+EXP=$($NFT list map t m | drop_ms)
+OUT=$($NFT reset map t m | drop_ms)
+$DIFF -u <(echo "$EXP") <(echo "$OUT")
+
+# assert expiry of element with custom timeout is correct
+VAL=$($NFT get element t s '{ 2.0.0.2 . tcp . 22 }' | expires_seconds)
+[[ $VAL -lt 15 ]]
+
+# assert remaining elements are now all reset
+OUT=$($NFT list ruleset)
+grep -q '2.0.0.2 . tcp . 22 counter packets 0 bytes 0' <<< "$OUT"
+grep -q '5.6.7.8 quota 100 bytes : 50.6.7.8' <<< "$OUT"

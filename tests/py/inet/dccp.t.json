@@ -230,3 +230,47 @@
     }
 ]
 
+# dccp option 0 exists
+[
+    {
+        "match": {
+            "left": {
+                "dccp option": {
+                    "type": 0
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]
+
+# dccp option 43 missing
+[
+    {
+        "match": {
+            "left": {
+                "dccp option": {
+                    "type": 43
+                }
+            },
+            "op": "==",
+            "right": false
+        }
+    }
+]
+
+# dccp option 255 exists
+[
+    {
+        "match": {
+            "left": {
+                "dccp option": {
+                    "type": 255
+                }
+            },
+            "op": "==",
+            "right": true
+        }
+    }
+]

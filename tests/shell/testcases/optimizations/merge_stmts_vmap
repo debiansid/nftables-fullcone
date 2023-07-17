@@ -12,6 +12,10 @@ RULESET="table ip x {
 		tcp dport 2-3 drop
 		tcp dport 4 accept
 	}
+	chain w {
+		ip saddr 1.1.1.1 counter accept
+		ip saddr 1.1.1.2 counter drop
+	}
 }"
 
 $NFT -o -f - <<< $RULESET

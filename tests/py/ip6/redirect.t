@@ -46,4 +46,4 @@ ip6 daddr fe00::1-fe00::200 udp dport 53 counter redirect;ok
 iifname "eth0" ct state established,new tcp dport vmap {22 : drop, 222 : drop } redirect;ok
 
 # redirect with maps
-ip6 nexthdr 6 redirect to :tcp dport map { 22 : 8000, 80 : 8080};ok
+redirect to :tcp dport map { 22 : 8000, 80 : 8080};ok

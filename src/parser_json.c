@@ -541,6 +541,27 @@ static const struct proto_desc *proto_lookup_byname(const char *name)
 		&proto_dccp,
 		&proto_sctp,
 		&proto_th,
+		&proto_vxlan,
+		&proto_gre,
+		&proto_gretap,
+		&proto_geneve,
+	};
+	unsigned int i;
+
+	for (i = 0; i < array_size(proto_tbl); i++) {
+		if (!strcmp(proto_tbl[i]->name, name))
+			return proto_tbl[i];
+	}
+	return NULL;
+}
+
+static const struct proto_desc *inner_proto_lookup_byname(const char *name)
+{
+	const struct proto_desc *proto_tbl[] = {
+		&proto_geneve,
+		&proto_gre,
+		&proto_gretap,
+		&proto_vxlan,
 	};
 	unsigned int i;
 
@@ -554,7 +575,7 @@ static const struct proto_desc *proto_lookup_byname(const char *name)
 static struct expr *json_parse_payload_expr(struct json_ctx *ctx,
 					    const char *type, json_t *root)
 {
-	const char *protocol, *field, *base;
+	const char *tunnel, *protocol, *field, *base;
 	int offset, len, val;
 	struct expr *expr;
 
@@ -576,6 +597,33 @@ static struct expr *json_parse_payload_expr(struct json_ctx *ctx,
 		payload_init_raw(expr, val, offset, len);
 		expr->byteorder		= BYTEORDER_BIG_ENDIAN;
 		expr->payload.is_raw	= true;
+		return expr;
+	} else if (!json_unpack(root, "{s:s, s:s, s:s}",
+				"tunnel", &tunnel, "protocol", &protocol, "field", &field)) {
+		const struct proto_desc *proto = proto_lookup_byname(protocol);
+		const struct proto_desc *inner_proto = inner_proto_lookup_byname(tunnel);
+
+		if (!inner_proto) {
+			json_error(ctx, "Unknown payload tunnel protocol '%s'.",
+				   tunnel);
+			return NULL;
+		}
+		if (!proto) {
+			json_error(ctx, "Unknown payload protocol '%s'.",
+				   protocol);
+			return NULL;
+		}
+		if (json_parse_payload_field(proto, field, &val)) {
+			json_error(ctx, "Unknown %s field '%s'.",
+				   protocol, field);
+			return NULL;
+		}
+		expr = payload_expr_alloc(int_loc, proto, val);
+		expr->payload.inner_desc = inner_proto;
+
+		if (proto == &proto_th)
+			expr->payload.is_raw = true;
+
 		return expr;
 	} else if (!json_unpack(root, "{s:s, s:s}",
 				"protocol", &protocol, "field", &field)) {
@@ -610,7 +658,7 @@ static struct expr *json_parse_tcp_option_expr(struct json_ctx *ctx,
 	struct expr *expr;
 
 	if (!json_unpack(root, "{s:i, s:i, s:i}",
-			"base", &kind, "offset", &offset, "len", &len)) {
+			 "base", &kind, "offset", &offset, "len", &len)) {
 		uint32_t flag = 0;
 
 		if (kind < 0 || kind > 255)
@@ -681,7 +729,7 @@ static int json_parse_ip_option_field(int type, const char *name, int *val)
 }
 
 static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
-					       const char *type, json_t *root)
+					      const char *type, json_t *root)
 {
 	const char *desc, *field;
 	int descval, fieldval;
@@ -697,7 +745,7 @@ static struct expr *json_parse_ip_option_expr(struct json_ctx *ctx,
 
 	if (json_unpack(root, "{s:s}", "field", &field)) {
 		expr = ipopt_expr_alloc(int_loc, descval,
-					 IPOPT_FIELD_TYPE);
+					IPOPT_FIELD_TYPE);
 		expr->exthdr.flags = NFT_EXTHDR_F_PRESENT;
 
 		return expr;
@@ -754,6 +802,22 @@ static struct expr *json_parse_sctp_chunk_expr(struct json_ctx *ctx,
 		return NULL;
 	}
 	return sctp_chunk_expr_alloc(int_loc, desc->type, fieldval);
+}
+
+static struct expr *json_parse_dccp_option_expr(struct json_ctx *ctx,
+						const char *type, json_t *root)
+{
+	int opt_type;
+
+	if (json_unpack_err(ctx, root, "{s:i}", "type", &opt_type))
+		return NULL;
+
+	if (opt_type < DCCPOPT_TYPE_MIN || opt_type > DCCPOPT_TYPE_MAX) {
+		json_error(ctx, "Unknown dccp option type '%d'.", opt_type);
+		return NULL;
+	}
+
+	return dccpopt_expr_alloc(int_loc, opt_type);
 }
 
 static const struct exthdr_desc *exthdr_lookup_byname(const char *name)
@@ -1084,13 +1148,13 @@ static struct expr *json_parse_fib_expr(struct json_ctx *ctx,
 	}
 
 	if ((flagval & (NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) ==
-			(NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) {
+	    (NFTA_FIB_F_SADDR|NFTA_FIB_F_DADDR)) {
 		json_error(ctx, "fib: saddr and daddr are mutually exclusive");
 		return NULL;
 	}
 
 	if ((flagval & (NFTA_FIB_F_IIF|NFTA_FIB_F_OIF)) ==
-			(NFTA_FIB_F_IIF|NFTA_FIB_F_OIF)) {
+	    (NFTA_FIB_F_IIF|NFTA_FIB_F_OIF)) {
 		json_error(ctx, "fib: iif and oif are mutually exclusive");
 		return NULL;
 	}
@@ -1462,6 +1526,7 @@ static struct expr *json_parse_expr(struct json_ctx *ctx, json_t *root)
 		{ "tcp option", json_parse_tcp_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
 		{ "ip option", json_parse_ip_option_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
 		{ "sctp chunk", json_parse_sctp_chunk_expr, CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_CONCAT },
+		{ "dccp option", json_parse_dccp_option_expr, CTX_F_PRIMARY },
 		{ "meta", json_parse_meta_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_SET_RHS | CTX_F_MANGLE | CTX_F_SES | CTX_F_MAP | CTX_F_CONCAT },
 		{ "osf", json_parse_osf_expr, CTX_F_STMT | CTX_F_PRIMARY | CTX_F_MAP | CTX_F_CONCAT },
 		{ "ipsec", json_parse_xfrm_expr, CTX_F_PRIMARY | CTX_F_MAP | CTX_F_CONCAT },
@@ -1686,7 +1751,7 @@ static struct stmt *json_parse_match_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_counter_stmt(struct json_ctx *ctx,
-					  const char *key, json_t *value)
+					    const char *key, json_t *value)
 {
 	uint64_t packets, bytes;
 	struct stmt *stmt;
@@ -1695,8 +1760,8 @@ static struct stmt *json_parse_counter_stmt(struct json_ctx *ctx,
 		return counter_stmt_alloc(int_loc);
 
 	if (!json_unpack(value, "{s:I, s:I}",
-			    "packets", &packets,
-			    "bytes", &bytes)) {
+			 "packets", &packets,
+			 "bytes", &bytes)) {
 		stmt = counter_stmt_alloc(int_loc);
 		stmt->counter.packets = packets;
 		stmt->counter.bytes = bytes;
@@ -1714,6 +1779,27 @@ static struct stmt *json_parse_counter_stmt(struct json_ctx *ctx,
 	return stmt;
 }
 
+static struct stmt *json_parse_last_stmt(struct json_ctx *ctx,
+					 const char *key, json_t *value)
+{
+	struct stmt *stmt;
+	int64_t used;
+
+	if (json_is_null(value))
+		return last_stmt_alloc(int_loc);
+
+	if (!json_unpack(value, "{s:I}", "used", &used)) {
+		stmt = last_stmt_alloc(int_loc);
+		if (used != -1) {
+			stmt->last.used = used;
+			stmt->last.set = 1;
+		}
+		return stmt;
+	}
+
+	return NULL;
+}
+
 static struct stmt *json_parse_verdict_stmt(struct json_ctx *ctx,
 					    const char *key, json_t *value)
 {
@@ -1727,14 +1813,14 @@ static struct stmt *json_parse_verdict_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_mangle_stmt(struct json_ctx *ctx,
-					const char *type, json_t *root)
+					   const char *type, json_t *root)
 {
 	json_t *jkey, *jvalue;
 	struct expr *key, *value;
 	struct stmt *stmt;
 
 	if (json_unpack_err(ctx, root, "{s:o, s:o}",
-			   "key", &jkey, "value", &jvalue))
+			    "key", &jkey, "value", &jvalue))
 		return NULL;
 
 	key = json_parse_mangle_lhs_expr(ctx, jkey);
@@ -1787,7 +1873,7 @@ static uint64_t rate_to_bytes(uint64_t val, const char *unit)
 }
 
 static struct stmt *json_parse_quota_stmt(struct json_ctx *ctx,
-					const char *key, json_t *value)
+					  const char *key, json_t *value)
 {
 	struct stmt *stmt;
 	int inv = 0;
@@ -1937,7 +2023,7 @@ static struct stmt *json_parse_flow_offload_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_notrack_stmt(struct json_ctx *ctx,
-					const char *key, json_t *value)
+					    const char *key, json_t *value)
 {
 	return notrack_stmt_alloc(int_loc);
 }
@@ -1975,7 +2061,7 @@ static struct stmt *json_parse_dup_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_secmark_stmt(struct json_ctx *ctx,
-					     const char *key, json_t *value)
+					    const char *key, json_t *value)
 {
 	struct stmt *stmt;
 
@@ -2047,7 +2133,7 @@ static int json_parse_nat_flags(struct json_ctx *ctx, json_t *root)
 }
 
 static int json_parse_nat_type_flag(struct json_ctx *ctx,
-			       json_t *root, int *flags)
+				    json_t *root, int *flags)
 {
 	const struct {
 		const char *flag;
@@ -2162,7 +2248,6 @@ static struct stmt *json_parse_nat_stmt(struct json_ctx *ctx,
 		}
 		stmt->nat.flags = flags;
 	}
-
 	if (!json_unpack(value, "{s:o}", "type_flags", &tmp)) {
 		int flags = json_parse_nat_type_flags(ctx, tmp);
 
@@ -2177,7 +2262,7 @@ static struct stmt *json_parse_nat_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_tproxy_stmt(struct json_ctx *ctx,
-					const char *key, json_t *value)
+					   const char *key, json_t *value)
 {
 	json_t *jaddr, *tmp;
 	struct stmt *stmt;
@@ -2213,7 +2298,7 @@ out_free:
 }
 
 static struct stmt *json_parse_reject_stmt(struct json_ctx *ctx,
-					  const char *key, json_t *value)
+					   const char *key, json_t *value)
 {
 	struct stmt *stmt = reject_stmt_alloc(int_loc);
 	const struct datatype *dtype = NULL;
@@ -2256,8 +2341,8 @@ static struct stmt *json_parse_reject_stmt(struct json_ctx *ctx,
 }
 
 static void json_parse_set_stmt_list(struct json_ctx *ctx,
-				      struct list_head *stmt_list,
-				      json_t *stmt_json)
+				     struct list_head *stmt_list,
+				     json_t *stmt_json)
 {
 	struct list_head *head;
 	struct stmt *tmp;
@@ -2279,7 +2364,7 @@ static void json_parse_set_stmt_list(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_set_stmt(struct json_ctx *ctx,
-					  const char *key, json_t *value)
+					const char *key, json_t *value)
 {
 	const char *opstr, *set;
 	struct expr *expr, *expr2;
@@ -2562,7 +2647,7 @@ static struct stmt *json_parse_cthelper_stmt(struct json_ctx *ctx,
 }
 
 static struct stmt *json_parse_cttimeout_stmt(struct json_ctx *ctx,
-					     const char *key, json_t *value)
+					      const char *key, json_t *value)
 {
 	struct stmt *stmt = objref_stmt_alloc(int_loc);
 
@@ -2731,6 +2816,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "counter", json_parse_counter_stmt },
 		{ "mangle", json_parse_mangle_stmt },
 		{ "quota", json_parse_quota_stmt },
+		{ "last", json_parse_last_stmt },
 		{ "limit", json_parse_limit_stmt },
 		{ "flow", json_parse_flow_offload_stmt },
 		{ "fwd", json_parse_fwd_stmt },
@@ -2789,17 +2875,21 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 static struct cmd *json_parse_cmd_add_table(struct json_ctx *ctx, json_t *root,
 					    enum cmd_ops op, enum cmd_obj obj)
 {
+	const char *family = "", *comment = NULL;
 	struct handle h = {
 		.table.location = *int_loc,
 	};
-	const char *family = "";
+	struct table *table = NULL;
 
 	if (json_unpack_err(ctx, root, "{s:s}",
 			    "family", &family))
 		return NULL;
-	if (op != CMD_DELETE &&
-	    json_unpack_err(ctx, root, "{s:s}", "name", &h.table.name)) {
-		return NULL;
+
+	if (op != CMD_DELETE) {
+		if (json_unpack_err(ctx, root, "{s:s}", "name", &h.table.name))
+			return NULL;
+
+		json_unpack(root, "{s:s}", "comment", &comment);
 	} else if (op == CMD_DELETE &&
 		   json_unpack(root, "{s:s}", "name", &h.table.name) &&
 		   json_unpack(root, "{s:I}", "handle", &h.handle.id)) {
@@ -2813,10 +2903,16 @@ static struct cmd *json_parse_cmd_add_table(struct json_ctx *ctx, json_t *root,
 	if (h.table.name)
 		h.table.name = xstrdup(h.table.name);
 
+	if (comment) {
+		table = table_alloc();
+		handle_merge(&table->handle, &h);
+		table->comment = xstrdup(comment);
+	}
+
 	if (op == CMD_ADD)
 		json_object_del(root, "handle");
 
-	return cmd_alloc(op, obj, &h, int_loc, NULL);
+	return cmd_alloc(op, obj, &h, int_loc, table);
 }
 
 static struct expr *parse_policy(const char *policy)
@@ -2841,17 +2937,19 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 	struct handle h = {
 		.table.location = *int_loc,
 	};
-	const char *family = "", *policy = "", *type, *hookstr, *name;
-	struct chain *chain;
+	const char *family = "", *policy = "", *type, *hookstr, *name, *comment = NULL;
+	struct chain *chain = NULL;
 	int prio;
 
 	if (json_unpack_err(ctx, root, "{s:s, s:s}",
 			    "family", &family,
 			    "table", &h.table.name))
 		return NULL;
-	if (op != CMD_DELETE &&
-	    json_unpack_err(ctx, root, "{s:s}", "name", &h.chain.name)) {
-		return NULL;
+	if (op != CMD_DELETE) {
+		if (json_unpack_err(ctx, root, "{s:s}", "name", &h.chain.name))
+			return NULL;
+
+		json_unpack(root, "{s:s}", "comment", &comment);
 	} else if (op == CMD_DELETE &&
 		   json_unpack(root, "{s:s}", "name", &h.chain.name) &&
 		   json_unpack(root, "{s:I}", "handle", &h.handle.id)) {
@@ -2866,14 +2964,22 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 	if (h.chain.name)
 		h.chain.name = xstrdup(h.chain.name);
 
+	if (comment) {
+		chain = chain_alloc(NULL);
+		handle_merge(&chain->handle, &h);
+		chain->comment = xstrdup(comment);
+	}
+
 	if (op == CMD_DELETE ||
 	    op == CMD_LIST ||
 	    op == CMD_FLUSH ||
 	    json_unpack(root, "{s:s, s:s, s:i}",
 			"type", &type, "hook", &hookstr, "prio", &prio))
-		return cmd_alloc(op, obj, &h, int_loc, NULL);
+		return cmd_alloc(op, obj, &h, int_loc, chain);
 
-	chain = chain_alloc(NULL);
+	if (!chain)
+		chain = chain_alloc(NULL);
+
 	chain->flags |= CHAIN_F_BASECHAIN;
 	chain->type.str = xstrdup(type);
 	chain->priority.expr = constant_expr_alloc(int_loc, &integer_type,
@@ -3063,6 +3169,7 @@ static struct cmd *json_parse_cmd_add_set(struct json_ctx *ctx, json_t *root,
 	case CMD_DESTROY:
 	case CMD_LIST:
 	case CMD_FLUSH:
+	case CMD_RESET:
 		return cmd_alloc(op, obj, &h, int_loc, NULL);
 	default:
 		break;
@@ -3812,6 +3919,9 @@ static struct cmd *json_parse_cmd_reset(struct json_ctx *ctx,
 		{ "quotas", CMD_OBJ_QUOTAS, json_parse_cmd_list_multiple },
 		{ "rule", CMD_OBJ_RULE, json_parse_cmd_reset_rule },
 		{ "rules", CMD_OBJ_RULES, json_parse_cmd_reset_rule },
+		{ "element", CMD_OBJ_ELEMENTS, json_parse_cmd_add_element },
+		{ "set", CMD_OBJ_SET, json_parse_cmd_add_set },
+		{ "map", CMD_OBJ_MAP, json_parse_cmd_add_set },
 	};
 	unsigned int i;
 	json_t *tmp;

@@ -76,7 +76,7 @@ static uint32_t udp_dflt_timeout[] = {
 	[NFTNL_CTTIMEOUT_UDP_REPLIED]		= 120,
 };
 
-struct timeout_protocol timeout_protocol[IPPROTO_MAX] = {
+struct timeout_protocol timeout_protocol[UINT8_MAX + 1] = {
 	[IPPROTO_TCP]	= {
 		.array_size	= NFTNL_CTTIMEOUT_TCP_MAX,
 		.state_to_name	= tcp_state_to_name,
@@ -1091,8 +1091,21 @@ void chain_print_plain(const struct chain *chain, struct output_ctx *octx)
 	if (chain->flags & CHAIN_F_BASECHAIN) {
 		mpz_export_data(&policy, chain->policy->value,
 				BYTEORDER_HOST_ENDIAN, sizeof(int));
-		nft_print(octx, " { type %s hook %s priority %s; policy %s; }",
-			  chain->type.str, chain->hook.name,
+		nft_print(octx, " { type %s hook %s ",
+			  chain->type.str, chain->hook.name);
+
+		if (chain->dev_array_len > 0) {
+			int i;
+
+			nft_print(octx, "devices = { ");
+			for (i = 0; i < chain->dev_array_len; i++) {
+				nft_print(octx, "%s", chain->dev_array[i]);
+				if (i + 1 != chain->dev_array_len)
+					nft_print(octx, ", ");
+			}
+			nft_print(octx, " } ");
+		}
+		nft_print(octx, "priority %s; policy %s; }",
 			  prio2str(octx, priobuf, sizeof(priobuf),
 				   chain->handle.family, chain->hook.num,
 				   chain->priority.expr),
@@ -1343,6 +1356,8 @@ void cmd_free(struct cmd *cmd)
 				set_free(cmd->elem.set);
 			break;
 		case CMD_OBJ_SET:
+		case CMD_OBJ_MAP:
+		case CMD_OBJ_METER:
 		case CMD_OBJ_SETELEMS:
 			set_free(cmd->set);
 			break;
@@ -1553,8 +1568,7 @@ static int do_command_delete(struct netlink_ctx *ctx, struct cmd *cmd)
 	}
 }
 
-static int do_list_table(struct netlink_ctx *ctx, struct cmd *cmd,
-			 struct table *table)
+static int do_list_table(struct netlink_ctx *ctx, struct table *table)
 {
 	table_print(table, &ctx->nft->output);
 	return 0;
@@ -1562,11 +1576,6 @@ static int do_list_table(struct netlink_ctx *ctx, struct cmd *cmd,
 
 static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 {
-	struct print_fmt_options opts = {
-		.tab		= "\t",
-		.nl		= "\n",
-		.stmt_separator	= "\n",
-	};
 	struct table *table;
 	struct set *set;
 
@@ -1589,8 +1598,7 @@ static int do_list_sets(struct netlink_ctx *ctx, struct cmd *cmd)
 			if (cmd->obj == CMD_OBJ_MAPS &&
 			    !map_is_literal(set->flags))
 				continue;
-			set_print_declaration(set, &opts, &ctx->nft->output);
-			nft_print(&ctx->nft->output, "%s}%s", opts.tab, opts.nl);
+			set_print(set, &ctx->nft->output);
 		}
 
 		nft_print(&ctx->nft->output, "}\n");
@@ -1900,7 +1908,7 @@ static const char * const obj_type_name_array[] = {
 	[NFT_OBJECT_CT_EXPECT]	= "ct expectation",
 };
 
-const char *obj_type_name(enum stmt_types type)
+const char *obj_type_name(unsigned int type)
 {
 	assert(type <= NFT_OBJECT_MAX && obj_type_name_array[type]);
 
@@ -1918,7 +1926,7 @@ static uint32_t obj_type_cmd_array[NFT_OBJECT_MAX + 1] = {
 	[NFT_OBJECT_CT_EXPECT]	= CMD_OBJ_CT_EXPECT,
 };
 
-uint32_t obj_type_to_cmd(uint32_t type)
+enum cmd_obj obj_type_to_cmd(uint32_t type)
 {
 	assert(type <= NFT_OBJECT_MAX && obj_type_cmd_array[type]);
 
@@ -2185,14 +2193,9 @@ static int do_list_ruleset(struct netlink_ctx *ctx, struct cmd *cmd)
 		    table->handle.family != family)
 			continue;
 
-		cmd->handle.family = table->handle.family;
-		cmd->handle.table.name = table->handle.table.name;
-
-		if (do_list_table(ctx, cmd, table) < 0)
+		if (do_list_table(ctx, table) < 0)
 			return -1;
 	}
-
-	cmd->handle.table.name = NULL;
 
 	return 0;
 }
@@ -2282,11 +2285,13 @@ static void __do_list_set(struct netlink_ctx *ctx, struct cmd *cmd,
 static int do_list_set(struct netlink_ctx *ctx, struct cmd *cmd,
 		       struct table *table)
 {
-	struct set *set;
+	struct set *set = cmd->set;
 
-	set = set_cache_find(table, cmd->handle.set.name);
-	if (set == NULL)
-		return -1;
+	if (!set) {
+		set = set_cache_find(table, cmd->handle.set.name);
+		if (set == NULL)
+			return -1;
+	}
 
 	__do_list_set(ctx, cmd, set);
 
@@ -2319,7 +2324,7 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_TABLE:
 		if (!cmd->handle.table.name)
 			return do_list_tables(ctx, cmd);
-		return do_list_table(ctx, cmd, table);
+		return do_list_table(ctx, table);
 	case CMD_OBJ_CHAIN:
 		return do_list_chain(ctx, cmd, table);
 	case CMD_OBJ_CHAINS:
@@ -2350,6 +2355,7 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_CT_HELPERS:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_HELPER);
 	case CMD_OBJ_CT_TIMEOUT:
+	case CMD_OBJ_CT_TIMEOUTS:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_TIMEOUT);
 	case CMD_OBJ_CT_EXPECT:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_EXPECT);
@@ -2375,7 +2381,7 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	return 0;
 }
 
-static int do_get_setelems(struct netlink_ctx *ctx, struct cmd *cmd)
+static int do_get_setelems(struct netlink_ctx *ctx, struct cmd *cmd, bool reset)
 {
 	struct set *set, *new_set;
 	struct expr *init;
@@ -2393,7 +2399,7 @@ static int do_get_setelems(struct netlink_ctx *ctx, struct cmd *cmd)
 
 	/* Fetch from kernel the elements that have been requested .*/
 	err = netlink_get_setelem(ctx, &cmd->handle, &cmd->location,
-				  cmd->elem.set, new_set, init);
+				  cmd->elem.set, new_set, init, reset);
 	if (err >= 0)
 		__do_list_set(ctx, cmd, new_set);
 
@@ -2409,7 +2415,7 @@ static int do_command_get(struct netlink_ctx *ctx, struct cmd *cmd)
 {
 	switch (cmd->obj) {
 	case CMD_OBJ_ELEMENTS:
-		return do_get_setelems(ctx, cmd);
+		return do_get_setelems(ctx, cmd, false);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}
@@ -2446,6 +2452,15 @@ static int do_command_reset(struct netlink_ctx *ctx, struct cmd *cmd)
 		return do_command_list(ctx, cmd);
 	case CMD_OBJ_RULE:
 		return netlink_reset_rules(ctx, cmd, false);
+	case CMD_OBJ_ELEMENTS:
+		return do_get_setelems(ctx, cmd, true);
+	case CMD_OBJ_SET:
+	case CMD_OBJ_MAP:
+		ret = netlink_list_setelems(ctx, &cmd->handle, cmd->set, true);
+		if (ret < 0)
+			return ret;
+
+		return do_command_list(ctx, cmd);
 	default:
 		BUG("invalid command object type %u\n", cmd->obj);
 	}

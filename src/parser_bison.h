@@ -785,7 +785,7 @@ extern int nft_debug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 178 "parser_bison.y"
+#line 204 "parser_bison.y"
 
 	uint64_t		val;
 	uint32_t		val32;

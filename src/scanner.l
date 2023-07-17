@@ -632,6 +632,9 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <SCANSTATE_CT,SCANSTATE_EXPR_DCCP,SCANSTATE_SCTP,SCANSTATE_TCP,SCANSTATE_EXPR_TH,SCANSTATE_EXPR_UDP,SCANSTATE_EXPR_UDPLITE>{
 	"dport"			{ return DPORT; }
 }
+<SCANSTATE_EXPR_DCCP>{
+	"option"		{ return OPTION; }
+}
 
 "vxlan"			{ return VXLAN; }
 "vni"			{ return VNI; }

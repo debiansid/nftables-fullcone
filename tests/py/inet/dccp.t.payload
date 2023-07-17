@@ -99,3 +99,17 @@ inet test-inet input
   [ bitwise reg 1 = ( reg 1 & 0x0000001e ) ^ 0x00000000 ]
   [ cmp neq reg 1 0x00000000 ]
 
+# dccp option 0 exists
+ip test-inet input
+  [ exthdr load 1b @ 0 + 0 present => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+
+# dccp option 43 missing
+ip test-inet input
+  [ exthdr load 1b @ 43 + 0 present => reg 1 ]
+  [ cmp eq reg 1 0x00000000 ]
+
+# dccp option 255 exists
+ip test-inet input
+  [ exthdr load 1b @ 255 + 0 present => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]

@@ -709,9 +709,9 @@ int set_to_intervals(const struct set *set, struct expr *init, bool add)
 			if (set->key->byteorder == BYTEORDER_HOST_ENDIAN)
 				mpz_switch_byteorder(expr->value, set->key->len / BITS_PER_BYTE);
 
-			newelem = set_elem_expr_alloc(&internal_location, expr);
+			newelem = set_elem_expr_alloc(&expr->location, expr);
 			if (i->etype == EXPR_MAPPING) {
-				newelem = mapping_expr_alloc(&internal_location,
+				newelem = mapping_expr_alloc(&expr->location,
 							     newelem,
 							     expr_get(i->right));
 			}

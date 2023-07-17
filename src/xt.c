@@ -56,9 +56,10 @@ void xt_stmt_xlate(const struct stmt *stmt, struct output_ctx *octx)
 	case NFT_XT_MATCH:
 		mt = xtables_find_match(stmt->xt.name, XTF_TRY_LOAD, NULL);
 		if (!mt) {
-			fprintf(stderr, "XT match %s not found\n",
+			fprintf(octx->error_fp,
+				"# Warning: XT match %s not found\n",
 				stmt->xt.name);
-			return;
+			break;
 		}
 		size = XT_ALIGN(sizeof(*m)) + stmt->xt.infolen;
 
@@ -83,9 +84,10 @@ void xt_stmt_xlate(const struct stmt *stmt, struct output_ctx *octx)
 	case NFT_XT_TARGET:
 		tg = xtables_find_target(stmt->xt.name, XTF_TRY_LOAD);
 		if (!tg) {
-			fprintf(stderr, "XT target %s not found\n",
+			fprintf(octx->error_fp,
+				"# Warning: XT target %s not found\n",
 				stmt->xt.name);
-			return;
+			break;
 		}
 		size = XT_ALIGN(sizeof(*t)) + stmt->xt.infolen;
 

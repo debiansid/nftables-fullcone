@@ -23,3 +23,8 @@ dccp type {request, response, data, ack, dataack, closereq, close, reset, sync, 
 dccp type != {request, response, data, ack, dataack, closereq, close, reset, sync, syncack};ok
 dccp type request;ok
 dccp type != request;ok
+
+dccp option 0 exists;ok
+dccp option 43 missing;ok
+dccp option 255 exists;ok
+dccp option 256 exists;fail

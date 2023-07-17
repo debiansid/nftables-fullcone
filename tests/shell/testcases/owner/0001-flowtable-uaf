@@ -6,6 +6,7 @@ $NFT -f - <<EOF
 table t {
  flags owner
  flowtable f {
+  hook ingress priority 0
   devices = { lo }
  }
 }
@@ -16,6 +17,7 @@ $NFT -f - <<EOF
 table t {
  flags owner
  flowtable f {
+  hook ingress priority 0
   devices = { lo }
  }
 }

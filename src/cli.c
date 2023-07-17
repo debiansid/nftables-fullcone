@@ -37,6 +37,15 @@
 #define CMDLINE_PROMPT		"nft> "
 #define CMDLINE_QUIT		"quit"
 
+static bool cli_quit;
+static int cli_rc;
+
+static void __cli_exit(int rc)
+{
+	cli_quit = true;
+	cli_rc = rc;
+}
+
 static char histfile[PATH_MAX];
 
 static void
@@ -100,8 +109,8 @@ static char *cli_append_multiline(char *line)
 		if (!s) {
 			fprintf(stderr, "%s:%u: Memory allocation failure\n",
 				__FILE__, __LINE__);
-			cli_exit();
-			exit(EXIT_FAILURE);
+			cli_exit(EXIT_FAILURE);
+			return NULL;
 		}
 		snprintf(s, len + 1, "%s%s", multiline, line);
 		free(multiline);
@@ -125,8 +134,7 @@ static void cli_complete(char *line)
 
 	if (line == NULL) {
 		printf("\n");
-		cli_exit();
-		exit(0);
+		return cli_exit(0);
 	}
 
 	line = cli_append_multiline(line);
@@ -139,10 +147,8 @@ static void cli_complete(char *line)
 	if (*c == '\0')
 		return;
 
-	if (!strcmp(line, CMDLINE_QUIT)) {
-		cli_exit();
-		exit(0);
-	}
+	if (!strcmp(line, CMDLINE_QUIT))
+		return cli_exit(0);
 
 	/* avoid duplicate history entries */
 	hist = history_get(history_length);
@@ -176,16 +182,19 @@ int cli_init(struct nft_ctx *nft)
 	read_history(histfile);
 	history_set_pos(history_length);
 
-	while (true)
+	while (!cli_quit)
 		rl_callback_read_char();
-	return 0;
+
+	return cli_rc;
 }
 
-void cli_exit(void)
+void cli_exit(int rc)
 {
 	rl_callback_handler_remove();
 	rl_deprep_terminal();
 	write_history(histfile);
+
+	__cli_exit(rc);
 }
 
 #elif defined(HAVE_LIBEDIT)
@@ -205,51 +214,63 @@ int cli_init(struct nft_ctx *nft)
 	history_set_pos(history_length);
 
 	rl_set_prompt(CMDLINE_PROMPT);
-	while ((line = readline(rl_prompt)) != NULL) {
+	while (!cli_quit) {
+		line = readline(rl_prompt);
+		if (!line) {
+			cli_exit(0);
+			break;
+		}
 		line = cli_append_multiline(line);
 		if (!line)
 			continue;
 
 		cli_complete(line);
 	}
-	cli_exit();
 
-	return 0;
+	return cli_rc;
 }
 
-void cli_exit(void)
+void cli_exit(int rc)
 {
 	rl_deprep_terminal();
 	write_history(histfile);
+
+	__cli_exit(rc);
 }
 
 #else /* HAVE_LINENOISE */
 
 int cli_init(struct nft_ctx *nft)
 {
-	int quit = 0;
 	char *line;
 
 	init_histfile();
 	linenoiseHistoryLoad(histfile);
 	linenoiseSetMultiLine(1);
 
-	while (!quit && (line = linenoise(CMDLINE_PROMPT)) != NULL) {
+	while (!cli_quit) {
+		line = linenoise(CMDLINE_PROMPT);
+		if (!line) {
+			cli_exit(0);
+			break;
+		}
 		if (strcmp(line, CMDLINE_QUIT) == 0) {
-			quit = 1;
+			cli_exit(0);
 		} else if (line[0] != '\0') {
 			linenoiseHistoryAdd(line);
 			nft_run_cmd_from_buffer(nft, line);
 		}
 		linenoiseFree(line);
 	}
-	cli_exit();
-	exit(0);
+
+	return cli_rc;
 }
 
-void cli_exit(void)
+void cli_exit(int rc)
 {
 	linenoiseHistorySave(histfile);
+
+	__cli_exit(rc);
 }
 
 #endif /* HAVE_LINENOISE */

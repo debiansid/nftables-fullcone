@@ -1,0 +1,12 @@
+#!/bin/bash
+
+dir=$(dirname $0)/nft-f/
+
+for f in $dir/*; do
+	$NFT --check -f "$f"
+
+	if [ $? -ne 1 ]; then
+		echo "Bogus input file $f did not cause expected error code" 1>&2
+		exit 111
+	fi
+done

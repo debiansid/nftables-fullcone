@@ -991,6 +991,7 @@ void payload_expr_complete(struct expr *expr, const struct proto_ctx *ctx)
 
 		expr->dtype	   = tmpl->dtype;
 		expr->payload.desc = desc;
+		expr->byteorder = tmpl->byteorder;
 		expr->payload.tmpl = tmpl;
 		return;
 	}

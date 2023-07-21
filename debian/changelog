@@ -1,3 +1,15 @@
+nftables (1.0.8-1) unstable; urgency=medium
+
+  * [d80034c] d/upstream/signing-key.asc: refresh key
+  * [1cdf229] Revert "d/watch: use `pgpmode=auto`"
+  * [d13e924] New upstream version 1.0.8
+  * [f6e0491] d/patches: drop 0001-debian-bug-1038724.patch
+  * [464cb02] d/control: bump build-dep on libnftnl
+  * [1d65f36] d/control: add python3-setuptool build-dep
+  * [6b96c7c] d/patches: add 0001-py.patch
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Fri, 21 Jul 2023 12:47:40 +0200
+
 nftables (1.0.7-2) unstable; urgency=medium
 
   * [800ca9f] d/patches: add 0001-debian-bug-1038724.patch (Closes: #1038724)

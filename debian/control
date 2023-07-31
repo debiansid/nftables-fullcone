@@ -18,6 +18,7 @@ Build-Depends: asciidoc-base,
                libnftnl-dev (>= 1.2.6),
                libtool,
                libxtables-dev,
+               pybuild-plugin-pyproject,
                python3-all:any,
                python3-setuptools
 Rules-Requires-Root: no

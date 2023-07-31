@@ -1,5 +1,6 @@
 nftables (1.0.8-1) unstable; urgency=medium
 
+  [ Arturo Borrero Gonzalez ]
   * [d80034c] d/upstream/signing-key.asc: refresh key
   * [1cdf229] Revert "d/watch: use `pgpmode=auto`"
   * [d13e924] New upstream version 1.0.8
@@ -8,7 +9,13 @@ nftables (1.0.8-1) unstable; urgency=medium
   * [1d65f36] d/control: add python3-setuptool build-dep
   * [6b96c7c] d/patches: add 0001-py.patch
 
- -- Arturo Borrero Gonzalez <arturo@debian.org>  Fri, 21 Jul 2023 12:47:40 +0200
+  [ Jeremy Sowden ]
+  * [a8248a9] d/u/signing-key.asc: minimize key
+  * [243be3f] d/*.lintian-overrides: override typo false positives
+  * [cfe1e5a] d/rules: in-line configure options
+  * [242e961] d/rules: explicitly build python3 module
+
+ -- Jeremy Sowden <jeremy@azazel.net>  Mon, 31 Jul 2023 15:36:55 +0100
 
 nftables (1.0.7-2) unstable; urgency=medium
 

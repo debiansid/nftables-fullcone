@@ -10,10 +10,9 @@ Tests: internaltest-monitor.sh
 Depends: @
 Restrictions: needs-root, allow-stderr, isolation-container, flaky
 
-# Disable test until we decide what to do with the nftables python module
-#Tests: internaltest-py.sh
-#Depends: @, python
-#Restrictions: needs-root, allow-stderr, isolation-container, build-needed
+Tests: internaltest-py.sh
+Depends: @, mawk, python3
+Restrictions: needs-root, allow-stderr, isolation-container, flaky
 
 Tests: systemd-service-test.sh
 Depends: systemd, @

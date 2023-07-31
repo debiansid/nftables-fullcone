@@ -9,4 +9,5 @@ fi
 
 set -e
 cd tests/py
-NFT=$(which nft) ./nft-test.py
+nr_errors=$(python3 ./nft-test.py -H | awk '/^[0-9]+ error, [0-9]+ warning$/ { print $1 }')
+test "$nr_errors" = 0

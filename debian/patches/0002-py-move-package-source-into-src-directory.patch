@@ -1,0 +1,54 @@
+Description: move package source into src directory
+ .
+ Separate the actual package source from the build files.  In addition
+ to being a bit tidier, this will prevent setup.py being erroneously
+ installed when we introduce PEP-517 support in a later commit.
+Author: Jeremy Sowden <jeremy@azazel.net>
+Last-Update: 2023-08-03
+Origin: upstream, http://git.netfilter.org/nftables/commit/?id=ce443afc214553b9fa6f02a640a3cd2f71a23ec9
+---
+ py/Makefile.am           | 2 +-
+ py/setup.py              | 2 +-
+ py/{ => src}/__init__.py | 0
+ py/{ => src}/nftables.py | 0
+ py/{ => src}/schema.json | 0
+ 5 files changed, 2 insertions(+), 2 deletions(-)
+ rename py/{ => src}/__init__.py (100%)
+ rename py/{ => src}/nftables.py (100%)
+ rename py/{ => src}/schema.json (100%)
+
+diff --git a/py/Makefile.am b/py/Makefile.am
+index f10ae360599f..4056aa61f820 100644
+--- a/py/Makefile.am
++++ b/py/Makefile.am
+@@ -1 +1 @@
+-EXTRA_DIST = setup.py __init__.py nftables.py schema.json
++EXTRA_DIST = setup.py src
+diff --git a/py/setup.py b/py/setup.py
+index 8ad73e7b58e5..d08b8b129a81 100755
+--- a/py/setup.py
++++ b/py/setup.py
+@@ -10,7 +10,7 @@ setup(name='nftables',
+       url='https://netfilter.org/projects/nftables/index.html',
+       packages=['nftables'],
+       provides=['nftables'],
+-      package_dir={'nftables':'.'},
++      package_dir={'nftables':'src'},
+       package_data={'nftables':['schema.json']},
+       classifiers=[
+           'Development Status :: 4 - Beta',
+diff --git a/py/__init__.py b/py/src/__init__.py
+similarity index 100%
+rename from py/__init__.py
+rename to py/src/__init__.py
+diff --git a/py/nftables.py b/py/src/nftables.py
+similarity index 100%
+rename from py/nftables.py
+rename to py/src/nftables.py
+diff --git a/py/schema.json b/py/src/schema.json
+similarity index 100%
+rename from py/schema.json
+rename to py/src/schema.json
+-- 
+2.40.1
+

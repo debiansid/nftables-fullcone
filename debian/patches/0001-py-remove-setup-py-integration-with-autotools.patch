@@ -1,14 +1,13 @@
-From: Pablo Neira Ayuso <pablo@netfilter.org>
-Subject: py: remove setup.py integration with autotools
-
-With Python distutils and setuptools going deprecated, remove
-integration with autotools. This integration is causing issues
-in modern environments.
-
-Note that setup.py is still left in place under the py/ folder.
-
-Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
-Origin: upstream, https://marc.info/?l=netfilter-devel&m=168968163015356
+Description: remove setup.py integration with autotools
+ .
+ With Python distutils and setuptools going deprecated, remove
+ integration with autotools. This integration is causing issues
+ in modern environments.
+ .
+ Note that setup.py is still left in place under the py/ folder.
+Author: Pablo Neira Ayuso <pablo@netfilter.org>
+Last-Update: 2023-08-03
+Origin: upstream, http://git.netfilter.org/nftables/commit/?id=b3def33efecb2f7be39fc9aefc9546907202056c
 ---
 
 diff --git a/Makefile.am b/Makefile.am

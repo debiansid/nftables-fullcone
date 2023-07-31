@@ -1,0 +1,95 @@
+Description: use setup.cfg to configure setuptools
+ .
+ Setuptools has had support for declarative configuration for several
+ years.  To quote their documentation:
+  .
+  Setuptools allows using configuration files (usually setup.cfg) to
+  define a package’s metadata and other options that are normally
+  supplied to the setup() function (declarative config).
+  .
+  This approach not only allows automation scenarios but also reduces
+  boilerplate code in some cases.
+  .
+ Additionally, this allows us to introduce support for PEP-517-compatible
+ build-systems.
+Last-Update: 2023-08-03
+Author: Jeremy Sowden <jeremy@azazel.net>
+Origin: upstream, http://git.netfilter.org/nftables/commit/?id=8ae4dc1f40aa04e499d941faca45fe7e914f0b4d
+---
+ py/Makefile.am |  2 +-
+ py/setup.cfg   | 24 ++++++++++++++++++++++++
+ py/setup.py    | 23 ++---------------------
+ 3 files changed, 27 insertions(+), 22 deletions(-)
+ create mode 100644 py/setup.cfg
+
+diff --git a/py/Makefile.am b/py/Makefile.am
+index 4056aa61f820..974539fd44ad 100644
+--- a/py/Makefile.am
++++ b/py/Makefile.am
+@@ -1 +1 @@
+-EXTRA_DIST = setup.py src
++EXTRA_DIST = setup.cfg setup.py src
+diff --git a/py/setup.cfg b/py/setup.cfg
+new file mode 100644
+index 000000000000..953b7f4164b4
+--- /dev/null
++++ b/py/setup.cfg
+@@ -0,0 +1,24 @@
++[metadata]
++name = nftables
++version = attr: nftables.NFTABLES_VERSION
++description = Libnftables binding
++author = Netfilter project
++author_email = coreteam@netfilter.org
++url = https://netfilter.org/projects/nftables/index.html
++provides = nftables
++classifiers =
++  Development Status :: 4 - Beta
++  Environment :: Console
++  Intended Audience :: Developers
++  License :: OSI Approved :: GNU General Public License v2 (GPLv2)
++  Operating System :: POSIX :: Linux
++  Programming Language :: Python
++  Topic :: System :: Networking :: Firewalls
++
++[options]
++packages = nftables
++package_dir =
++  nftables = src
++
++[options.package_data]
++nftables = schema.json
+diff --git a/py/setup.py b/py/setup.py
+index d08b8b129a81..beda28e82166 100755
+--- a/py/setup.py
++++ b/py/setup.py
+@@ -1,24 +1,5 @@
+ #!/usr/bin/env python
++
+ from setuptools import setup
+-from nftables import NFTABLES_VERSION
+ 
+-setup(name='nftables',
+-      version=NFTABLES_VERSION,
+-      description='Libnftables binding',
+-      author='Netfilter project',
+-      author_email='coreteam@netfilter.org',
+-      url='https://netfilter.org/projects/nftables/index.html',
+-      packages=['nftables'],
+-      provides=['nftables'],
+-      package_dir={'nftables':'src'},
+-      package_data={'nftables':['schema.json']},
+-      classifiers=[
+-          'Development Status :: 4 - Beta',
+-          'Environment :: Console',
+-          'Intended Audience :: Developers',
+-          'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+-          'Operating System :: POSIX :: Linux',
+-          'Programming Language :: Python',
+-          'Topic :: System :: Networking :: Firewalls',
+-          ],
+-      )
++setup()
+-- 
+2.40.1
+

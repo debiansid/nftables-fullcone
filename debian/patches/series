@@ -1,1 +1,4 @@
-0001-py.patch
+0001-py-remove-setup-py-integration-with-autotools.patch
+0002-py-move-package-source-into-src-directory.patch
+0003-py-use-setup.cfg-to-configure-setuptools.patch
+0004-py-add-pyproject.toml-to-support-PEP-517-compatible-.patch

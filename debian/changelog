@@ -14,8 +14,10 @@ nftables (1.0.8-1) unstable; urgency=medium
   * [243be3f] d/*.lintian-overrides: override typo false positives
   * [cfe1e5a] d/rules: in-line configure options
   * [242e961] d/rules: explicitly build python3 module
+  * [fbd4ae9] d/patches: add upstream patches to add pyproject.toml support
+  * [0b62d3e] d/control: add build-dep on pybuild-plugins-pyproject
 
- -- Jeremy Sowden <jeremy@azazel.net>  Mon, 31 Jul 2023 15:36:55 +0100
+ -- Jeremy Sowden <jeremy@azazel.net>  Thu, 03 Aug 2023 14:55:28 +0100
 
 nftables (1.0.7-2) unstable; urgency=medium
 

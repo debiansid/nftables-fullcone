@@ -1,4 +1,1 @@
-doc/*.3
-doc/*.5
-doc/*.8
 py/nftables.egg-info/

@@ -1,0 +1,25 @@
+Description: doc: move man-pages to `MAINTAINERCLEANFILES`
+ .
+ Since the man-pages are built and included in the distribution
+ tar-balls, the appropriate clean target is `maintainer-clean`.
+From: Jeremy Sowden <jeremy@azazel.net>
+Last-Update: 2023-08-10
+Origin: upstream, http://git.netfilter.org/nftables/commit/?id=520a8ba89d118c14de9376e6e21160e71d74fbe0
+---
+ doc/Makefile.am | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/Makefile.am b/doc/Makefile.am
+index 5a64e39b48cf..b43cb08d2d14 100644
+--- a/doc/Makefile.am
++++ b/doc/Makefile.am
+@@ -26,5 +26,5 @@ nft.8: ${ASCIIDOCS}
+ .adoc.5:
+ 	${AM_V_GEN}${A2X} ${A2X_OPTS_MANPAGE} $<
+ 
+-CLEANFILES += ${man_MANS}
++MAINTAINERCLEANFILES = ${man_MANS}
+ endif
+-- 
+2.40.1
+

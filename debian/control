@@ -5,10 +5,8 @@ Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.deb
 Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>,
            Jeremy Sowden <jeremy@azazel.net>
 Build-Depends: automake,
-               bison,
                debhelper-compat (= 13),
                dh-python,
-               flex,
                libeditreadline-dev,
                libgmp-dev,
                libjansson-dev,

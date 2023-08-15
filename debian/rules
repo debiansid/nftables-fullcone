@@ -9,8 +9,20 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/pkg-info.mk
 
-pybuild_pkg := python3-$(PYBUILD_NAME)
-pybuild_opts := --buildsystem=pybuild -- --dir $(CURDIR)/py
+configure_opts := --with-xtables                     \
+		  --with-json                        \
+		  --with-python-bin=/usr/bin/python3 \
+		  --with-cli=editline
+pybuild_opts   := --buildsystem=pybuild -- --dir $(CURDIR)/py
+pybuild_pkg    := python3-$(PYBUILD_NAME)
+
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
+configure_opts += --disable-silent-rules
+pybuild_opts   += --verbose
+else
+configure_opts += --enable-silent-rules
+pybuild_opts   += --quiet
+endif
 
 %:
 	dh $@ --with python3
@@ -20,12 +32,7 @@ override_dh_auto_clean:
 	dh_auto_clean -p$(pybuild_pkg) $(pybuild_opts)
 
 override_dh_auto_configure:
-	dh_auto_configure -N$(pybuild_pkg) --                                 \
-					   --with-xtables                     \
-					   --with-json                        \
-					   --with-python-bin=/usr/bin/python3 \
-					   --with-cli=editline                \
-					   --
+	dh_auto_configure -N$(pybuild_pkg) -- $(configure_opts)
 	dh_auto_configure -p$(pybuild_pkg) $(pybuild_opts)
 
 override_dh_auto_build:

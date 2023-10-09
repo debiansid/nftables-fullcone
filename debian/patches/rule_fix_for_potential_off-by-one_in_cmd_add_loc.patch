@@ -18,7 +18,7 @@ diff --git a/src/rule.c b/src/rule.c
 index dbbe744e..92daf2f3 100644
 --- a/src/rule.c
 +++ b/src/rule.c
-@@ -1275,7 +1275,7 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
+@@ -1491,7 +1491,7 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
  
  void cmd_add_loc(struct cmd *cmd, uint16_t offset, const struct location *loc)
  {

@@ -1,0 +1,188 @@
+From f37e4261130b021edf068e4d5c6ca062ce4e2ac1 Mon Sep 17 00:00:00 2001
+From: Pablo Neira Ayuso <pablo@netfilter.org>
+Date: Thu, 1 Apr 2021 22:19:30 +0200
+Subject: [PATCH nft 0.9.8] src: split chain list in table
+
+upstream a3ac2527724dd27628e12caaa55f731b109e4586 commit.
+
+This patch splits table->lists in two:
+
+- Chains that reside in the cache are stored in the new
+  tables->cache_chain and tables->cache_chain_ht. The hashtable chain
+  cache allows for fast chain lookups.
+
+- Chains that defined via command line / ruleset file reside in
+  tables->chains.
+
+Note that chains in the cache (already in the kernel) are not placed in
+the table->chains.
+
+By keeping separated lists, chains defined via command line / ruleset
+file can be added to cache.
+
+Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+---
+ include/rule.h |  2 ++
+ src/cache.c    |  6 +++---
+ src/json.c     |  6 +++---
+ src/rule.c     | 18 +++++++++++-------
+ 4 files changed, 19 insertions(+), 13 deletions(-)
+
+diff --git a/include/rule.h b/include/rule.h
+index 43872db8947a..dde32367f48f 100644
+--- a/include/rule.h
++++ b/include/rule.h
+@@ -155,6 +155,7 @@ struct table {
+ 	struct location		location;
+ 	struct scope		scope;
+ 	struct list_head	*cache_chain_ht;
++	struct list_head	cache_chain;
+ 	struct list_head	chains;
+ 	struct list_head	sets;
+ 	struct list_head	objs;
+@@ -221,6 +222,7 @@ struct hook_spec {
+ struct chain {
+ 	struct list_head	list;
+ 	struct list_head	cache_hlist;
++	struct list_head	cache_list;
+ 	struct handle		handle;
+ 	struct location		location;
+ 	unsigned int		refcnt;
+diff --git a/src/cache.c b/src/cache.c
+index 7101b74160be..32e6eea4ac5c 100644
+--- a/src/cache.c
++++ b/src/cache.c
+@@ -192,10 +192,10 @@ static int chain_cache_cb(struct nftnl_chain *nlc, void *arg)
+ 	chain = netlink_delinearize_chain(ctx->nlctx, nlc);
+ 
+ 	if (chain->flags & CHAIN_F_BINDING) {
+-		list_add_tail(&chain->list, &ctx->table->chain_bindings);
++		list_add_tail(&chain->cache_list, &ctx->table->chain_bindings);
+ 	} else {
+ 		list_add_tail(&chain->cache_hlist, &ctx->table->cache_chain_ht[hash]);
+-		list_add_tail(&chain->list, &ctx->table->chains);
++		list_add_tail(&chain->cache_list, &ctx->table->cache_chain);
+ 	}
+ 
+ 	nftnl_chain_list_del(nlc);
+@@ -239,7 +239,7 @@ void chain_cache_add(struct chain *chain, struct table *table)
+ 
+ 	hash = djb_hash(chain->handle.chain.name) % NFT_CACHE_HSIZE;
+ 	list_add_tail(&chain->cache_hlist, &table->cache_chain_ht[hash]);
+-	list_add_tail(&chain->list, &table->chains);
++	list_add_tail(&chain->cache_list, &table->cache_chain);
+ }
+ 
+ struct chain *chain_cache_find(const struct table *table,
+diff --git a/src/json.c b/src/json.c
+index 585d35326ac0..737e73b08b5a 100644
+--- a/src/json.c
++++ b/src/json.c
+@@ -1594,7 +1594,7 @@ static json_t *table_print_json_full(struct netlink_ctx *ctx,
+ 		tmp = flowtable_print_json(flowtable);
+ 		json_array_append_new(root, tmp);
+ 	}
+-	list_for_each_entry(chain, &table->chains, list) {
++	list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 		tmp = chain_print_json(chain);
+ 		json_array_append_new(root, tmp);
+ 
+@@ -1656,7 +1656,7 @@ static json_t *do_list_chain_json(struct netlink_ctx *ctx,
+ 	struct chain *chain;
+ 	struct rule *rule;
+ 
+-	list_for_each_entry(chain, &table->chains, list) {
++	list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 		if (chain->handle.family != cmd->handle.family ||
+ 		    strcmp(cmd->handle.chain.name, chain->handle.chain.name))
+ 			continue;
+@@ -1684,7 +1684,7 @@ static json_t *do_list_chains_json(struct netlink_ctx *ctx, struct cmd *cmd)
+ 		    cmd->handle.family != table->handle.family)
+ 			continue;
+ 
+-		list_for_each_entry(chain, &table->chains, list) {
++		list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 			json_t *tmp = chain_print_json(chain);
+ 
+ 			json_array_append_new(root, tmp);
+diff --git a/src/rule.c b/src/rule.c
+index 3b445851f657..f76c27c9d091 100644
+--- a/src/rule.c
++++ b/src/rule.c
+@@ -953,7 +953,7 @@ struct chain *chain_lookup(const struct table *table, const struct handle *h)
+ {
+ 	struct chain *chain;
+ 
+-	list_for_each_entry(chain, &table->chains, list) {
++	list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 		if (!strcmp(chain->handle.chain.name, h->chain.name))
+ 			return chain;
+ 	}
+@@ -965,7 +965,7 @@ struct chain *chain_binding_lookup(const struct table *table,
+ {
+ 	struct chain *chain;
+ 
+-	list_for_each_entry(chain, &table->chain_bindings, list) {
++	list_for_each_entry(chain, &table->chain_bindings, cache_list) {
+ 		if (!strcmp(chain->handle.chain.name, chain_name))
+ 			return chain;
+ 	}
+@@ -983,7 +983,7 @@ struct chain *chain_lookup_fuzzy(const struct handle *h,
+ 	string_misspell_init(&st);
+ 
+ 	list_for_each_entry(table, &cache->list, list) {
+-		list_for_each_entry(chain, &table->chains, list) {
++		list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 			if (!strcmp(chain->handle.chain.name, h->chain.name)) {
+ 				*t = table;
+ 				return chain;
+@@ -1321,6 +1321,7 @@ struct table *table_alloc(void)
+ 
+ 	table = xzalloc(sizeof(*table));
+ 	init_list_head(&table->chains);
++	init_list_head(&table->cache_chain);
+ 	init_list_head(&table->sets);
+ 	init_list_head(&table->objs);
+ 	init_list_head(&table->flowtables);
+@@ -1349,7 +1350,10 @@ void table_free(struct table *table)
+ 		xfree(table->comment);
+ 	list_for_each_entry_safe(chain, next, &table->chains, list)
+ 		chain_free(chain);
+-	list_for_each_entry_safe(chain, next, &table->chain_bindings, list)
++	list_for_each_entry_safe(chain, next, &table->chain_bindings, cache_list)
++		chain_free(chain);
++	/* this is implicitly releasing chains in the hashtable cache */
++	list_for_each_entry_safe(chain, next, &table->cache_chain, cache_list)
+ 		chain_free(chain);
+ 	list_for_each_entry_safe(set, nset, &table->sets, list)
+ 		set_free(set);
+@@ -1465,7 +1469,7 @@ static void table_print(const struct table *table, struct output_ctx *octx)
+ 		flowtable_print(flowtable, octx);
+ 		delim = "\n";
+ 	}
+-	list_for_each_entry(chain, &table->chains, list) {
++	list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 		nft_print(octx, "%s", delim);
+ 		chain_print(chain, octx);
+ 		delim = "\n";
+@@ -2555,7 +2559,7 @@ static int do_list_chain(struct netlink_ctx *ctx, struct cmd *cmd,
+ 
+ 	table_print_declaration(table, &ctx->nft->output);
+ 
+-	list_for_each_entry(chain, &table->chains, list) {
++	list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 		if (chain->handle.family != cmd->handle.family ||
+ 		    strcmp(cmd->handle.chain.name, chain->handle.chain.name) != 0)
+ 			continue;
+@@ -2580,7 +2584,7 @@ static int do_list_chains(struct netlink_ctx *ctx, struct cmd *cmd)
+ 
+ 		table_print_declaration(table, &ctx->nft->output);
+ 
+-		list_for_each_entry(chain, &table->chains, list) {
++		list_for_each_entry(chain, &table->cache_chain, cache_list) {
+ 			chain_print_declaration(chain, &ctx->nft->output);
+ 			nft_print(&ctx->nft->output, "\t}\n");
+ 		}
+-- 
+2.30.2
+

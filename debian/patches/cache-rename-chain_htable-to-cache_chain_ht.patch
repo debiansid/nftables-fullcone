@@ -1,0 +1,98 @@
+From 0a39091a75b6255422832126df4cbf73c86845cd Mon Sep 17 00:00:00 2001
+From: Pablo Neira Ayuso <pablo@netfilter.org>
+Date: Thu, 1 Apr 2021 22:18:29 +0200
+Subject: [PATCH nft 0.9.8] cache: rename chain_htable to cache_chain_ht
+
+upstream 3542e49cf539ecfcef6ef7c2d4befb7896ade2cd commit.
+
+Rename the hashtable chain that is used for fast cache lookups.
+
+Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+---
+ include/rule.h | 4 ++--
+ src/cache.c    | 6 +++---
+ src/rule.c     | 6 +++---
+ 3 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/include/rule.h b/include/rule.h
+index 330a09aa77fa..43872db8947a 100644
+--- a/include/rule.h
++++ b/include/rule.h
+@@ -154,7 +154,7 @@ struct table {
+ 	struct handle		handle;
+ 	struct location		location;
+ 	struct scope		scope;
+-	struct list_head	*chain_htable;
++	struct list_head	*cache_chain_ht;
+ 	struct list_head	chains;
+ 	struct list_head	sets;
+ 	struct list_head	objs;
+@@ -220,7 +220,7 @@ struct hook_spec {
+  */
+ struct chain {
+ 	struct list_head	list;
+-	struct list_head	hlist;
++	struct list_head	cache_hlist;
+ 	struct handle		handle;
+ 	struct location		location;
+ 	unsigned int		refcnt;
+diff --git a/src/cache.c b/src/cache.c
+index ed2609008e22..7101b74160be 100644
+--- a/src/cache.c
++++ b/src/cache.c
+@@ -194,7 +194,7 @@ static int chain_cache_cb(struct nftnl_chain *nlc, void *arg)
+ 	if (chain->flags & CHAIN_F_BINDING) {
+ 		list_add_tail(&chain->list, &ctx->table->chain_bindings);
+ 	} else {
+-		list_add_tail(&chain->hlist, &ctx->table->chain_htable[hash]);
++		list_add_tail(&chain->cache_hlist, &ctx->table->cache_chain_ht[hash]);
+ 		list_add_tail(&chain->list, &ctx->table->chains);
+ 	}
+ 
+@@ -238,7 +238,7 @@ void chain_cache_add(struct chain *chain, struct table *table)
+ 	uint32_t hash;
+ 
+ 	hash = djb_hash(chain->handle.chain.name) % NFT_CACHE_HSIZE;
+-	list_add_tail(&chain->hlist, &table->chain_htable[hash]);
++	list_add_tail(&chain->cache_hlist, &table->cache_chain_ht[hash]);
+ 	list_add_tail(&chain->list, &table->chains);
+ }
+ 
+@@ -249,7 +249,7 @@ struct chain *chain_cache_find(const struct table *table,
+ 	uint32_t hash;
+ 
+ 	hash = djb_hash(handle->chain.name) % NFT_CACHE_HSIZE;
+-	list_for_each_entry(chain, &table->chain_htable[hash], hlist) {
++	list_for_each_entry(chain, &table->cache_chain_ht[hash], cache_hlist) {
+ 		if (!strcmp(chain->handle.chain.name, handle->chain.name))
+ 			return chain;
+ 	}
+diff --git a/src/rule.c b/src/rule.c
+index e4bb6bae276a..3b445851f657 100644
+--- a/src/rule.c
++++ b/src/rule.c
+@@ -1328,10 +1328,10 @@ struct table *table_alloc(void)
+ 	init_list_head(&table->scope.symbols);
+ 	table->refcnt = 1;
+ 
+-	table->chain_htable =
++	table->cache_chain_ht =
+ 		xmalloc(sizeof(struct list_head) * NFT_CACHE_HSIZE);
+ 	for (i = 0; i < NFT_CACHE_HSIZE; i++)
+-		init_list_head(&table->chain_htable[i]);
++		init_list_head(&table->cache_chain_ht[i]);
+ 
+ 	return table;
+ }
+@@ -1359,7 +1359,7 @@ void table_free(struct table *table)
+ 		obj_free(obj);
+ 	handle_free(&table->handle);
+ 	scope_release(&table->scope);
+-	xfree(table->chain_htable);
++	xfree(table->cache_chain_ht);
+ 	xfree(table);
+ }
+ 
+-- 
+2.30.2
+

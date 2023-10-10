@@ -1,2 +1,8 @@
 payload-check-icmp-dependency-before-removing-previo.patch
 rule_fix_for_potential_off-by-one_in_cmd_add_loc.patch
+cache-rename-chain_htable-to-cache_chain_ht.patch
+src-split-chain-list-in-table.patch
+evaluate-init-cmd-pointer-for-new-on-stack-context.patch
+rule-add-helper-function-to-expand-chain-rules-into-.patch
+rule-expand-standalone-chain-that-contains-rules.patch
+src-expand-table-command-before-evaluation.patch

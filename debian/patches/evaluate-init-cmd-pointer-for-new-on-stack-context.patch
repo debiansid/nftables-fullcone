@@ -1,0 +1,48 @@
+From 5af65a30a12396281c751e635509ab1d9363f4bc Mon Sep 17 00:00:00 2001
+From: Florian Westphal <fw@strlen.de>
+Date: Fri, 4 Mar 2022 11:30:55 +0100
+Subject: [PATCH nft 0.9.8] evaluate: init cmd pointer for new on-stack
+ context
+
+upstream 4e718641397c876315a87db441afc53139863122 commit
+
+else, this will segfault when trying to print the
+"table 'x' doesn't exist" error message.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
+---
+ src/evaluate.c                                   | 1 +
+ tests/shell/testcases/chains/0041chain_binding_0 | 6 ++++++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/src/evaluate.c b/src/evaluate.c
+index c830dcdbd965..f546667131e1 100644
+--- a/src/evaluate.c
++++ b/src/evaluate.c
+@@ -3211,6 +3211,7 @@ static int stmt_evaluate_chain(struct eval_ctx *ctx, struct stmt *stmt)
+ 			struct eval_ctx rule_ctx = {
+ 				.nft	= ctx->nft,
+ 				.msgs	= ctx->msgs,
++				.cmd	= ctx->cmd,
+ 			};
+ 			struct handle h2 = {};
+ 
+diff --git a/tests/shell/testcases/chains/0041chain_binding_0 b/tests/shell/testcases/chains/0041chain_binding_0
+index 59bdbe9f0ba9..4b541bb55c30 100755
+--- a/tests/shell/testcases/chains/0041chain_binding_0
++++ b/tests/shell/testcases/chains/0041chain_binding_0
+@@ -1,5 +1,11 @@
+ #!/bin/bash
+ 
++# no table x, caused segfault in earlier nft releases
++$NFT insert rule inet x y handle 107 'goto { log prefix "MOO! "; }'
++if [ $? -ne 1 ]; then
++	exit 1
++fi
++
+ set -e
+ 
+ EXPECTED="table inet x {
+-- 
+2.30.2
+

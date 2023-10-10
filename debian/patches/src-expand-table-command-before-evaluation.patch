@@ -1,0 +1,202 @@
+From 050e0b7a85016b733e1a59285df501d1c05eec0b Mon Sep 17 00:00:00 2001
+From: Pablo Neira Ayuso <pablo@netfilter.org>
+Date: Tue, 12 Sep 2023 23:25:27 +0200
+Subject: [PATCH nft 0.9.8] src: expand table command before evaluation
+
+upstream 3975430b12d97c92cdf03753342f2269153d5624 commit.
+
+The nested syntax notation results in one single table command which
+includes all other objects. This differs from the flat notation where
+there is usually one command per object.
+
+This patch adds a previous step to the evaluation phase to expand the
+objects that are contained in the table into independent commands, so
+both notations have similar representations.
+
+Remove the code to evaluate the nested representation in the evaluation
+phase since commands are independently evaluated after the expansion.
+
+The commands are expanded after the set element collapse step, in case
+that there is a long list of singleton element commands to be added to
+the set, to shorten the command list iteration.
+
+This approach also avoids interference with the object cache that is
+populated in the evaluation, which might refer to objects coming in the
+existing command list that is being processed.
+
+There is still a post_expand phase to detach the elements from the set
+which could be consolidated by updating the evaluation step to handle
+the CMD_OBJ_SETELEMS command type.
+
+This patch fixes 27c753e4a8d4 ("rule: expand standalone chain that
+contains rules") which broke rule addition/insertion by index because
+the expansion code after the evaluation messes up the cache.
+
+Fixes: 27c753e4a8d4 ("rule: expand standalone chain that contains rules")
+Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+---
+ include/rule.h    |  1 +
+ src/evaluate.c    | 39 ---------------------------------------
+ src/libnftables.c |  9 ++++++++-
+ src/rule.c        | 21 +++++++++++++++++++--
+ 4 files changed, 28 insertions(+), 42 deletions(-)
+
+--- a/include/rule.h
++++ b/include/rule.h
+@@ -717,6 +717,7 @@
+ 			     const struct handle *h, const struct location *loc,
+ 			     void *data);
+ extern void nft_cmd_expand(struct cmd *cmd);
++extern void nft_cmd_post_expand(struct cmd *cmd);
+ extern struct cmd *cmd_alloc_obj_ct(enum cmd_ops op, int type,
+ 				    const struct handle *h,
+ 				    const struct location *loc, struct obj *obj);
+--- a/src/evaluate.c
++++ b/src/evaluate.c
+@@ -4067,7 +4067,6 @@
+ static int chain_evaluate(struct eval_ctx *ctx, struct chain *chain)
+ {
+ 	struct table *table;
+-	struct rule *rule;
+ 
+ 	table = table_lookup_global(ctx);
+ 	if (table == NULL)
+@@ -4121,11 +4120,6 @@
+ 		}
+ 	}
+ 
+-	list_for_each_entry(rule, &chain->rules, list) {
+-		handle_merge(&rule->handle, &chain->handle);
+-		if (rule_evaluate(ctx, rule, CMD_INVALID) < 0)
+-			return -1;
+-	}
+ 	return 0;
+ }
+ 
+@@ -4182,11 +4176,6 @@
+ 
+ static int table_evaluate(struct eval_ctx *ctx, struct table *table)
+ {
+-	struct flowtable *ft;
+-	struct chain *chain;
+-	struct set *set;
+-	struct obj *obj;
+-
+ 	if (table_lookup(&ctx->cmd->handle, &ctx->nft->cache) == NULL) {
+ 		if (table == NULL) {
+ 			table = table_alloc();
+@@ -4197,34 +4186,6 @@
+ 		}
+ 	}
+ 
+-	if (ctx->cmd->table == NULL)
+-		return 0;
+-
+-	ctx->table = table;
+-	list_for_each_entry(set, &table->sets, list) {
+-		expr_set_context(&ctx->ectx, NULL, 0);
+-		handle_merge(&set->handle, &table->handle);
+-		if (set_evaluate(ctx, set) < 0)
+-			return -1;
+-	}
+-	list_for_each_entry(chain, &table->chains, list) {
+-		handle_merge(&chain->handle, &table->handle);
+-		ctx->cmd->handle.chain.location = chain->location;
+-		if (chain_evaluate(ctx, chain) < 0)
+-			return -1;
+-	}
+-	list_for_each_entry(ft, &table->flowtables, list) {
+-		handle_merge(&ft->handle, &table->handle);
+-		if (flowtable_evaluate(ctx, ft) < 0)
+-			return -1;
+-	}
+-	list_for_each_entry(obj, &table->objs, list) {
+-		handle_merge(&obj->handle, &table->handle);
+-		if (obj_evaluate(ctx, obj) < 0)
+-			return -1;
+-	}
+-
+-	ctx->table = NULL;
+ 	return 0;
+ }
+ 
+--- a/src/libnftables.c
++++ b/src/libnftables.c
+@@ -421,6 +421,13 @@
+ 		return -1;
+ 
+ 	list_for_each_entry(cmd, cmds, list) {
++		if (cmd->op != CMD_ADD)
++			continue;
++
++		nft_cmd_expand(cmd);
++	}
++
++	list_for_each_entry(cmd, cmds, list) {
+ 		struct eval_ctx ectx = {
+ 			.nft	= nft,
+ 			.msgs	= msgs,
+@@ -437,7 +444,7 @@
+ 		if (cmd->op != CMD_ADD)
+ 			continue;
+ 
+-		nft_cmd_expand(cmd);
++		nft_cmd_post_expand(cmd);
+ 	}
+ 
+ 	return 0;
+--- a/src/rule.c
++++ b/src/rule.c
+@@ -1511,8 +1511,9 @@
+ 
+ 	list_for_each_entry_safe(rule, next, &chain->rules, list) {
+ 		list_del(&rule->list);
++		handle_merge(&rule->handle, &chain->handle);
+ 		memset(&h, 0, sizeof(h));
+-		handle_merge(&h, &rule->handle);
++		handle_merge(&h, &chain->handle);
+ 		if (chain->flags & CHAIN_F_BINDING) {
+ 			rule->handle.chain_id = chain->handle.chain_id;
+ 			rule->handle.chain.location = chain->location;
+@@ -1526,10 +1527,10 @@
+ void nft_cmd_expand(struct cmd *cmd)
+ {
+ 	struct list_head new_cmds;
+-	struct set *set, *newset;
+ 	struct flowtable *ft;
+ 	struct table *table;
+ 	struct chain *chain;
++	struct set *set;
+ 	struct obj *obj;
+ 	struct cmd *new;
+ 	struct handle h;
+@@ -1543,6 +1544,7 @@
+ 			return;
+ 
+ 		list_for_each_entry(chain, &table->chains, list) {
++			handle_merge(&chain->handle, &table->handle);
+ 			memset(&h, 0, sizeof(h));
+ 			handle_merge(&h, &chain->handle);
+ 			h.chain_id = chain->handle.chain_id;
+@@ -1587,6 +1589,21 @@
+ 		nft_cmd_expand_chain(chain, &new_cmds);
+ 		list_splice(&new_cmds, &cmd->list);
+ 		break;
++	default:
++		break;
++	}
++}
++
++void nft_cmd_post_expand(struct cmd *cmd)
++{
++	struct list_head new_cmds;
++	struct set *set, *newset;
++	struct cmd *new;
++	struct handle h;
++
++	init_list_head(&new_cmds);
++
++	switch (cmd->obj) {
+ 	case CMD_OBJ_SET:
+ 	case CMD_OBJ_MAP:
+ 		set = cmd->set;

@@ -1,3 +1,18 @@
+nftables (0.9.8-3.1+deb11u2) bullseye; urgency=medium
+
+  * d/p/rule_fix_for_potential_off-by-one_in_cmd_add_loc.patch: fix fuzz
+  * Fix incorrect bytecode generation hit with new kernel check that
+    rejects adding rules to bound chains
+
+    - cache: rename chain_htable to cache_chain_ht
+    - src: split chain list in table
+    - evaluate: init cmd pointer for new on-stack context
+    - rule: add helper function to expand chain rules into commands
+    - rule: expand standalone chain that contains rules
+    - src: expand table command before evaluation
+
+ -- Jeremy Sowden <jeremy@azazel.net>  Tue, 10 Oct 2023 21:28:38 +0100
+
 nftables (0.9.8-3.1+deb11u1) bullseye; urgency=medium
 
   * d/p/rule_fix_for_potential_off-by-one_in_cmd_add_loc.patch

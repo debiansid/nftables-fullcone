@@ -1,3 +1,17 @@
+nftables (1.0.9-1) unstable; urgency=medium
+
+  [ Jeremy Sowden ]
+  * [cceedbd] d/clean: add Python egg-info directory
+  * [26632e8] Use the upstream man-pages
+  * [7ace353] d/control: remove unused bison & flex build-deps
+
+  [ Arturo Borrero Gonzalez ]
+  * [83ff316] New upstream version 1.0.9
+  * [0b04e55] d/patches: drop patches integrated upstream
+  * [f6b44a9] d/libnftables1.symbols: refresh file
+
+ -- Arturo Borrero Gonzalez <arturo@debian.org>  Thu, 19 Oct 2023 16:11:15 +0200
+
 nftables (1.0.8-1) unstable; urgency=medium
 
   [ Arturo Borrero Gonzalez ]

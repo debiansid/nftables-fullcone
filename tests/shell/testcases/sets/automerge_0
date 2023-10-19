@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# NFT_TEST_SKIP(NFT_TEST_SKIP_slow)
+
 set -e
 
 RULESET="table inet x {
@@ -10,14 +12,23 @@ RULESET="table inet x {
 	}
 }"
 
+HOWMANY=65535
+if [ "$NFT_TEST_HAS_SOCKET_LIMITS" = y ] ; then
+	# The socket limit /proc/sys/net/core/wmem_max may be unsuitable for
+	# the test.
+	#
+	# Run only a subset of the test and mark as skipped at the end.
+	HOWMANY=5000
+fi
+
 $NFT -f - <<< $RULESET
 
 tmpfile=$(mktemp)
 echo -n "add element inet x y { " > $tmpfile
-for ((i=0;i<65535;i+=2))
+for ((i=0;i<$HOWMANY;i+=2))
 do
 	echo -n "$i, " >> $tmpfile
-	if [ $i -eq 65534 ]
+	if [ $i -eq $((HOWMANY-1)) ]
 	then
 		echo -n "$i" >> $tmpfile
 	fi
@@ -27,13 +38,13 @@ echo "}" >> $tmpfile
 $NFT -f $tmpfile
 
 tmpfile2=$(mktemp)
-for ((i=1;i<65535;i+=2))
+for ((i=1;i<$HOWMANY;i+=2))
 do
 	echo "$i" >> $tmpfile2
 done
 
 tmpfile3=$(mktemp)
-shuf $tmpfile2 > $tmpfile3
+shuf "$tmpfile2" --random-source=<("$NFT_TEST_BASEDIR/helpers/random-source.sh" "automerge-shuf-tmpfile2" "$NFT_TEST_RANDOM_SEED") > "$tmpfile3"
 i=0
 cat $tmpfile3 | while read line && [ $i -lt 10 ]
 do
@@ -48,7 +59,7 @@ done
 
 for ((i=0;i<10;i++))
 do
-	from=$(($RANDOM%65535))
+	from=$(($RANDOM%$HOWMANY))
 	to=$(($from+100))
 	$NFT add element inet x y { $from-$to }
 	if [ $? -ne 0 ]
@@ -111,3 +122,10 @@ done
 rm -f $tmpfile
 rm -f $tmpfile2
 rm -f $tmpfile3
+
+if [ "$HOWMANY" != 65535 ] ; then
+	echo "NFT_TEST_HAS_SOCKET_LIMITS indicates that the socket limit for"
+	echo "/proc/sys/net/core/wmem_max is too small for this test. Mark as SKIPPED"
+	echo "You may bump the limit and rerun with \`NFT_TEST_HAS_SOCKET_LIMITS=n\`."
+	exit 77
+fi

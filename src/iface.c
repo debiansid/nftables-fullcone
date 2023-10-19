@@ -6,11 +6,11 @@
  * later) as published by the Free Software Foundation.
  */
 
+#include <nft.h>
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <net/if.h>
 #include <time.h>
-#include <string.h>
 #include <errno.h>
 
 #include <libmnl/libmnl.h>

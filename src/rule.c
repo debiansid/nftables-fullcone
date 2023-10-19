@@ -8,11 +8,10 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
-#include <string.h>
 #include <inttypes.h>
 #include <errno.h>
 
@@ -27,6 +26,7 @@
 #include <cache.h>
 #include <owner.h>
 #include <intervals.h>
+#include "nftutils.h"
 
 #include <libnftnl/common.h>
 #include <libnftnl/ruleset.h>
@@ -146,11 +146,12 @@ struct set *set_alloc(const struct location *loc)
 {
 	struct set *set;
 
+	assert(loc);
+
 	set = xzalloc(sizeof(*set));
 	set->refcnt = 1;
 	set->handle.set_id = ++set_id;
-	if (loc != NULL)
-		set->location = *loc;
+	set->location = *loc;
 
 	init_list_head(&set->stmt_list);
 
@@ -161,7 +162,7 @@ struct set *set_clone(const struct set *set)
 {
 	struct set *new_set;
 
-	new_set			= set_alloc(NULL);
+	new_set			= set_alloc(&internal_location);
 	handle_merge(&new_set->handle, &set->handle);
 	new_set->flags		= set->flags;
 	new_set->gc_int		= set->gc_int;
@@ -190,8 +191,8 @@ void set_free(struct set *set)
 
 	if (--set->refcnt > 0)
 		return;
-	if (set->init != NULL)
-		expr_free(set->init);
+
+	expr_free(set->init);
 	if (set->comment)
 		xfree(set->comment);
 	handle_free(&set->handle);
@@ -453,6 +454,8 @@ struct rule *rule_alloc(const struct location *loc, const struct handle *h)
 {
 	struct rule *rule;
 
+	assert(loc);
+
 	rule = xzalloc(sizeof(*rule));
 	rule->location = *loc;
 	init_list_head(&rule->list);
@@ -695,17 +698,16 @@ const char *chain_hookname_lookup(const char *name)
 /* internal ID to uniquely identify a set in the batch */
 static uint32_t chain_id;
 
-struct chain *chain_alloc(const char *name)
+struct chain *chain_alloc(void)
 {
 	struct chain *chain;
 
 	chain = xzalloc(sizeof(*chain));
+	chain->location = internal_location;
 	chain->refcnt = 1;
 	chain->handle.chain_id = ++chain_id;
 	init_list_head(&chain->rules);
 	init_list_head(&chain->scope.symbols);
-	if (name != NULL)
-		chain->handle.chain.name = xstrdup(name);
 
 	chain->policy = NULL;
 	return chain;
@@ -864,7 +866,7 @@ struct prio_tag {
 	const char *str;
 };
 
-const static struct prio_tag std_prios[] = {
+static const struct prio_tag std_prios[] = {
 	{ NF_IP_PRI_RAW,      "raw" },
 	{ NF_IP_PRI_MANGLE,   "mangle" },
 	{ NF_IP_PRI_NAT_DST,  "dstnat" },
@@ -873,7 +875,7 @@ const static struct prio_tag std_prios[] = {
 	{ NF_IP_PRI_NAT_SRC,  "srcnat" },
 };
 
-const static struct prio_tag bridge_std_prios[] = {
+static const struct prio_tag bridge_std_prios[] = {
 	{ NF_BR_PRI_NAT_DST_BRIDGED,  "dstnat" },
 	{ NF_BR_PRI_FILTER_BRIDGED,   "filter" },
 	{ NF_BR_PRI_NAT_DST_OTHER,    "out" },
@@ -927,7 +929,8 @@ static bool std_prio_family_hook_compat(int prio, int family, int hook)
 		case NFPROTO_INET:
 		case NFPROTO_IPV4:
 		case NFPROTO_IPV6:
-			if (hook == NF_INET_PRE_ROUTING)
+			if (hook == NF_INET_PRE_ROUTING ||
+			    hook == NF_INET_LOCAL_OUT)
 				return true;
 		}
 		break;
@@ -936,7 +939,8 @@ static bool std_prio_family_hook_compat(int prio, int family, int hook)
 		case NFPROTO_INET:
 		case NFPROTO_IPV4:
 		case NFPROTO_IPV6:
-			if (hook == NF_INET_POST_ROUTING)
+			if (hook == NF_INET_LOCAL_IN ||
+			    hook == NF_INET_POST_ROUTING)
 				return true;
 		}
 	}
@@ -1120,6 +1124,7 @@ struct table *table_alloc(void)
 	struct table *table;
 
 	table = xzalloc(sizeof(*table));
+	table->location = internal_location;
 	init_list_head(&table->chains);
 	init_list_head(&table->sets);
 	init_list_head(&table->objs);
@@ -1296,6 +1301,8 @@ struct cmd *cmd_alloc(enum cmd_ops op, enum cmd_obj obj,
 {
 	struct cmd *cmd;
 
+	assert(loc);
+
 	cmd = xzalloc(sizeof(*cmd));
 	init_list_head(&cmd->list);
 	cmd->op       = op;
@@ -1450,7 +1457,13 @@ static int do_add_set(struct netlink_ctx *ctx, struct cmd *cmd,
 			return -1;
 	}
 
-	return mnl_nft_set_add(ctx, cmd, flags);
+	if (mnl_nft_set_add(ctx, cmd, flags) < 0)
+		return -1;
+
+	if (set_is_anonymous(set->flags))
+		return __do_add_elements(ctx, cmd, set, set->init, flags);
+
+	return 0;
 }
 
 static int do_command_add(struct netlink_ctx *ctx, struct cmd *cmd, bool excl)
@@ -1610,9 +1623,10 @@ struct obj *obj_alloc(const struct location *loc)
 {
 	struct obj *obj;
 
+	assert(loc);
+
 	obj = xzalloc(sizeof(*obj));
-	if (loc != NULL)
-		obj->location = *loc;
+	obj->location = *loc;
 
 	obj->refcnt = 1;
 	return obj;
@@ -1664,10 +1678,10 @@ struct obj *obj_lookup_fuzzy(const char *obj_name,
 
 static void print_proto_name_proto(uint8_t l4, struct output_ctx *octx)
 {
-	const struct protoent *p = getprotobynumber(l4);
+	char name[NFT_PROTONAME_MAXSIZE];
 
-	if (p)
-		nft_print(octx, "%s", p->p_name);
+	if (nft_getprotobynumber(l4, name, sizeof(name)))
+		nft_print(octx, "%s", name);
 	else
 		nft_print(octx, "%d", l4);
 }
@@ -1682,11 +1696,14 @@ static void print_proto_timeout_policy(uint8_t l4, const uint32_t *timeout,
 	nft_print(octx, "%s%spolicy = { ", opts->tab, opts->tab);
 	for (i = 0; i < timeout_protocol[l4].array_size; i++) {
 		if (timeout[i] != timeout_protocol[l4].dflt_timeout[i]) {
+			uint64_t timeout_ms;
+
 			if (comma)
 				nft_print(octx, ", ");
-			nft_print(octx, "%s : %u",
-				  timeout_protocol[l4].state_to_name[i],
-				  timeout[i]);
+			timeout_ms = timeout[i] * 1000u;
+			nft_print(octx, "%s : ",
+				  timeout_protocol[l4].state_to_name[i]);
+			time_print(timeout_ms, octx);
 			comma = true;
 		}
 	}
@@ -2018,9 +2035,10 @@ struct flowtable *flowtable_alloc(const struct location *loc)
 {
 	struct flowtable *flowtable;
 
+	assert(loc);
+
 	flowtable = xzalloc(sizeof(*flowtable));
-	if (loc != NULL)
-		flowtable->location = *loc;
+	flowtable->location = *loc;
 
 	flowtable->refcnt = 1;
 	return flowtable;
@@ -2358,6 +2376,7 @@ static int do_command_list(struct netlink_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_CT_TIMEOUTS:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_TIMEOUT);
 	case CMD_OBJ_CT_EXPECT:
+	case CMD_OBJ_CT_EXPECTATIONS:
 		return do_list_obj(ctx, cmd, NFT_OBJECT_CT_EXPECT);
 	case CMD_OBJ_LIMIT:
 	case CMD_OBJ_LIMITS:
@@ -2725,10 +2744,8 @@ static void stmt_reduce(const struct rule *rule)
 
 		/* Must not merge across other statements */
 		if (stmt->ops->type != STMT_EXPRESSION) {
-			if (idx < 2)
-				continue;
-
-			payload_do_merge(sa, idx);
+			if (idx >= 2)
+				payload_do_merge(sa, idx);
 			idx = 0;
 			continue;
 		}

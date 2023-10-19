@@ -1,7 +1,6 @@
 #ifndef NFTABLES_EXPRESSION_H
 #define NFTABLES_EXPRESSION_H
 
-#include <stdbool.h>
 #include <gmputil.h>
 #include <linux/netfilter/nf_tables.h>
 
@@ -121,7 +120,11 @@ enum symbol_types {
  * @maxval:	expected maximum value
  */
 struct expr_ctx {
+	/* expr_ctx does not own the reference to dtype. The caller must ensure
+	 * the valid lifetime.
+	 */
 	const struct datatype	*dtype;
+
 	enum byteorder		byteorder;
 	unsigned int		len;
 	unsigned int		maxval;
@@ -186,7 +189,7 @@ struct expr_ops {
 };
 
 const struct expr_ops *expr_ops(const struct expr *e);
-const struct expr_ops *expr_ops_by_type(enum expr_types etype);
+const struct expr_ops *expr_ops_by_type_u32(uint32_t value);
 
 /**
  * enum expr_flags

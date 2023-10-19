@@ -1,7 +1,7 @@
 #ifndef _NFT_CACHE_H_
 #define _NFT_CACHE_H_
 
-#include <string.h>
+#include <list.h>
 
 struct handle;
 
@@ -66,6 +66,7 @@ struct nft_cache_filter {
 };
 
 struct nft_cache;
+struct nft_ctx;
 enum cmd_ops;
 
 int nft_cache_evaluate(struct nft_ctx *nft, struct list_head *cmds,
@@ -97,6 +98,8 @@ void chain_cache_add(struct chain *chain, struct table *table);
 void chain_cache_del(struct chain *chain);
 struct chain *chain_cache_find(const struct table *table, const char *name);
 
+struct set;
+
 void set_cache_add(struct set *set, struct table *table);
 void set_cache_del(struct set *set);
 struct set *set_cache_find(const struct table *table, const char *name);
@@ -121,6 +124,8 @@ void table_cache_del(struct table *table);
 struct table *table_cache_find(const struct cache *cache, const char *name,
 			       uint32_t family);
 
+struct obj;
+
 void obj_cache_add(struct obj *obj, struct table *table);
 void obj_cache_del(struct obj *obj);
 struct obj *obj_cache_find(const struct table *table, const char *name,
@@ -137,6 +142,8 @@ struct nft_cache {
 	uint32_t		seqnum;
 	uint32_t		flags;
 };
+
+struct netlink_ctx;
 
 void nft_chain_cache_update(struct netlink_ctx *ctx, struct table *table,
 			    const char *chain);

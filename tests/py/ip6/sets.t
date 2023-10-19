@@ -41,4 +41,8 @@ ip6 saddr != @set33 drop;fail
 !set5 type ipv6_addr . ipv6_addr;ok
 ip6 saddr . ip6 daddr @set5 drop;ok
 add @set5 { ip6 saddr . ip6 daddr };ok
+
+!map1 type ipv6_addr . ipv6_addr : mark;ok
+add @map1 { ip6 saddr . ip6 daddr : meta mark };ok
+
 delete @set5 { ip6 saddr . ip6 daddr };ok

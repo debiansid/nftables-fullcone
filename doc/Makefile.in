@@ -152,9 +152,9 @@ am__installdirs = "$(DESTDIR)$(man3dir)" "$(DESTDIR)$(man5dir)" \
 man5dir = $(mandir)/man5
 man8dir = $(mandir)/man8
 NROFF = nroff
-MANS = $(man_MANS)
+MANS = $(dist_man_MANS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
-am__DIST_COMMON = $(srcdir)/Makefile.in
+am__DIST_COMMON = $(dist_man_MANS) $(srcdir)/Makefile.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 A2X = @A2X@
 ACLOCAL = @ACLOCAL@
@@ -225,7 +225,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON_BIN = @PYTHON_BIN@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -289,7 +288,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@BUILD_MAN_TRUE@man_MANS = nft.8 libnftables-json.5 libnftables.3
+@BUILD_MAN_TRUE@dist_man_MANS = nft.8 libnftables-json.5 libnftables.3
 @BUILD_MAN_TRUE@A2X_OPTS_MANPAGE = -L --doctype manpage --format manpage -D ${builddir}
 @BUILD_MAN_TRUE@ASCIIDOC_MAIN = nft.txt
 @BUILD_MAN_TRUE@ASCIIDOC_INCLUDES = \
@@ -300,8 +299,11 @@ top_srcdir = @top_srcdir@
 @BUILD_MAN_TRUE@       statements.txt
 
 @BUILD_MAN_TRUE@ASCIIDOCS = ${ASCIIDOC_MAIN} ${ASCIIDOC_INCLUDES}
-@BUILD_MAN_TRUE@EXTRA_DIST = ${ASCIIDOCS} ${man_MANS} libnftables-json.adoc libnftables.adoc
-@BUILD_MAN_TRUE@CLEANFILES = *~ ${man_MANS}
+@BUILD_MAN_TRUE@EXTRA_DIST = ${ASCIIDOCS} libnftables-json.adoc libnftables.adoc
+@BUILD_MAN_TRUE@CLEANFILES = \
+@BUILD_MAN_TRUE@	*~
+
+@BUILD_MAN_TRUE@MAINTAINERCLEANFILES = ${dist_man_MANS}
 all: all-am
 
 .SUFFIXES:
@@ -341,10 +343,10 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-man3: $(man_MANS)
+install-man3: $(dist_man_MANS)
 	@$(NORMAL_INSTALL)
 	@list1=''; \
-	list2='$(man_MANS)'; \
+	list2='$(dist_man_MANS)'; \
 	test -n "$(man3dir)" \
 	  && test -n "`echo $$list1$$list2`" \
 	  || exit 0; \
@@ -379,15 +381,15 @@ uninstall-man3:
 	@$(NORMAL_UNINSTALL)
 	@list=''; test -n "$(man3dir)" || exit 0; \
 	files=`{ for i in $$list; do echo "$$i"; done; \
-	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	l2='$(dist_man_MANS)'; for i in $$l2; do echo "$$i"; done | \
 	  sed -n '/\.3[a-z]*$$/p'; \
 	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^3][0-9a-z]*$$,3,;x' \
 	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
 	dir='$(DESTDIR)$(man3dir)'; $(am__uninstall_files_from_dir)
-install-man5: $(man_MANS)
+install-man5: $(dist_man_MANS)
 	@$(NORMAL_INSTALL)
 	@list1=''; \
-	list2='$(man_MANS)'; \
+	list2='$(dist_man_MANS)'; \
 	test -n "$(man5dir)" \
 	  && test -n "`echo $$list1$$list2`" \
 	  || exit 0; \
@@ -422,15 +424,15 @@ uninstall-man5:
 	@$(NORMAL_UNINSTALL)
 	@list=''; test -n "$(man5dir)" || exit 0; \
 	files=`{ for i in $$list; do echo "$$i"; done; \
-	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	l2='$(dist_man_MANS)'; for i in $$l2; do echo "$$i"; done | \
 	  sed -n '/\.5[a-z]*$$/p'; \
 	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^5][0-9a-z]*$$,5,;x' \
 	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
 	dir='$(DESTDIR)$(man5dir)'; $(am__uninstall_files_from_dir)
-install-man8: $(man_MANS)
+install-man8: $(dist_man_MANS)
 	@$(NORMAL_INSTALL)
 	@list1=''; \
-	list2='$(man_MANS)'; \
+	list2='$(dist_man_MANS)'; \
 	test -n "$(man8dir)" \
 	  && test -n "`echo $$list1$$list2`" \
 	  || exit 0; \
@@ -465,7 +467,7 @@ uninstall-man8:
 	@$(NORMAL_UNINSTALL)
 	@list=''; test -n "$(man8dir)" || exit 0; \
 	files=`{ for i in $$list; do echo "$$i"; done; \
-	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	l2='$(dist_man_MANS)'; for i in $$l2; do echo "$$i"; done | \
 	  sed -n '/\.8[a-z]*$$/p'; \
 	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^8][0-9a-z]*$$,8,;x' \
 	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
@@ -548,6 +550,7 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
 clean: clean-am
 
 clean-am: clean-generic clean-libtool mostlyclean-am

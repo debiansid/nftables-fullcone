@@ -6,9 +6,18 @@ ruleset_file=$(mktemp)
 
 trap 'rm -f "$ruleset_file"' EXIT
 
+HOWMANY=255
+if [ "$NFT_TEST_HAS_SOCKET_LIMITS" = y ] ; then
+	# The socket limit /proc/sys/net/core/wmem_max may be unsuitable for
+	# the test.
+	#
+	# Run only a subset of the test and mark as skipped at the end.
+	HOWMANY=30
+fi
+
 {
 	echo 'define big_set = {'
-	for ((i = 1; i < 255; i++)); do
+	for ((i = 1; i < $HOWMANY; i++)); do
 		for ((j = 1; j < 255; j++)); do
 			echo "10.0.$i.$j,"
 		done
@@ -27,3 +36,10 @@ table inet test68_table {
 EOF
 
 ( ulimit -s 400 && $NFT -f "$ruleset_file" )
+
+if [ "$HOWMANY" != 255 ] ; then
+	echo "NFT_TEST_HAS_SOCKET_LIMITS indicates that the socket limit for"
+	echo "/proc/sys/net/core/wmem_max is too small for this test. Mark as SKIPPED"
+	echo "You may bump the limit and rerun with \`NFT_TEST_HAS_SOCKET_LIMITS=n\`."
+	exit 77
+fi

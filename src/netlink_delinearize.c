@@ -9,9 +9,8 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
+#include <nft.h>
+
 #include <limits.h>
 #include <linux/netfilter/nf_tables.h>
 #include <arpa/inet.h>
@@ -82,8 +81,7 @@ static void netlink_set_register(struct netlink_parse_ctx *ctx,
 		return;
 	}
 
-	if (ctx->registers[reg] != NULL)
-		expr_free(ctx->registers[reg]);
+	expr_free(ctx->registers[reg]);
 
 	ctx->registers[reg] = expr;
 }
@@ -1734,6 +1732,8 @@ static void netlink_parse_dynset(struct netlink_parse_ctx *ctx,
 		expr = netlink_parse_concat_key(ctx, loc, sreg, set->key);
 		if (expr == NULL)
 			return;
+	} else if (expr->dtype == &invalid_type) {
+		expr_set_type(expr, datatype_get(set->key->dtype), set->key->byteorder);
 	}
 
 	expr = set_elem_expr_alloc(&expr->location, expr);
@@ -2767,7 +2767,7 @@ static void expr_postprocess(struct rule_pp_ctx *ctx, struct expr **exprp)
 		}
 		ctx->flags &= ~RULE_PP_IN_CONCATENATION;
 		list_splice(&tmp, &expr->expressions);
-		datatype_set(expr, concat_type_alloc(ntype));
+		__datatype_set(expr, concat_type_alloc(ntype));
 		break;
 	}
 	case EXPR_UNARY:

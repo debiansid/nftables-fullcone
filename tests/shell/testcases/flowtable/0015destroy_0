@@ -1,7 +1,12 @@
-#!/bin/bash
+#!/bin/bash -e
 
-set -e
+# NFT_TEST_REQUIRES(NFT_TEST_HAVE_destroy)
+
 $NFT add table t
-$NFT add flowtable t f { hook ingress priority 10 \; devices = { lo }\; }
 
+# pass for non-existent flowtable
+$NFT destroy flowtable t f
+
+# successfully delete existing flowtable
+$NFT add flowtable t f '{ hook ingress priority 10; devices = { lo }; }'
 $NFT destroy flowtable t f

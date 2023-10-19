@@ -6,12 +6,11 @@
  * later) as published by the Free Software Foundation.
  */
 
-#include <stdint.h>
+#include <nft.h>
+
 #include <expression.h>
 #include <gmputil.h>
 #include <list.h>
-
-static void expr_msort_value(const struct expr *expr, mpz_t value);
 
 static void concat_expr_msort_value(const struct expr *expr, mpz_t value)
 {
@@ -28,20 +27,17 @@ static void concat_expr_msort_value(const struct expr *expr, mpz_t value)
 	mpz_import_data(value, data, BYTEORDER_HOST_ENDIAN, len);
 }
 
-static void expr_msort_value(const struct expr *expr, mpz_t value)
+static mpz_srcptr expr_msort_value(const struct expr *expr, mpz_t value)
 {
 	switch (expr->etype) {
 	case EXPR_SET_ELEM:
-		expr_msort_value(expr->key, value);
-		break;
+		return expr_msort_value(expr->key, value);
 	case EXPR_BINOP:
 	case EXPR_MAPPING:
 	case EXPR_RANGE:
-		expr_msort_value(expr->left, value);
-		break;
+		return expr_msort_value(expr->left, value);
 	case EXPR_VALUE:
-		mpz_set(value, expr->value);
-		break;
+		return expr->value;
 	case EXPR_CONCAT:
 		concat_expr_msort_value(expr, value);
 		break;
@@ -52,20 +48,24 @@ static void expr_msort_value(const struct expr *expr, mpz_t value)
 	default:
 		BUG("Unknown expression %s\n", expr_name(expr));
 	}
+	return value;
 }
 
 static int expr_msort_cmp(const struct expr *e1, const struct expr *e2)
 {
-	mpz_t value1, value2;
+	mpz_srcptr value1;
+	mpz_srcptr value2;
+	mpz_t value1_tmp;
+	mpz_t value2_tmp;
 	int ret;
 
-	mpz_init(value1);
-	mpz_init(value2);
-	expr_msort_value(e1, value1);
-	expr_msort_value(e2, value2);
+	mpz_init(value1_tmp);
+	mpz_init(value2_tmp);
+	value1 = expr_msort_value(e1, value1_tmp);
+	value2 = expr_msort_value(e2, value2_tmp);
 	ret = mpz_cmp(value1, value2);
-	mpz_clear(value1);
-	mpz_clear(value2);
+	mpz_clear(value1_tmp);
+	mpz_clear(value2_tmp);
 
 	return ret;
 }

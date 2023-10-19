@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# NFT_TEST_REQUIRES(NFT_TEST_HAVE_chain_binding)
+
 set -e
 
 EXPECTED="table ip f {

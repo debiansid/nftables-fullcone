@@ -6,8 +6,8 @@
  * later) as published by the Free Software Foundation.
  */
 
-#include <stdlib.h>
-#include <string.h>
+#include <nft.h>
+
 #include <limits.h>
 #include <utils.h>
 #include <misspell.h>

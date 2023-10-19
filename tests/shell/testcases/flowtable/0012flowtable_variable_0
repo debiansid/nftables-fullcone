@@ -2,6 +2,12 @@
 
 set -e
 
+iface_cleanup() {
+	ip link del dummy1 &>/dev/null || :
+}
+trap 'iface_cleanup' EXIT
+iface_cleanup
+
 ip link add name dummy1 type dummy
 
 EXPECTED="define if_main = { lo, dummy1 }

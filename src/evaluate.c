@@ -8,11 +8,10 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
-#include <string.h>
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_arp.h>
@@ -82,7 +81,7 @@ static void key_fix_dtype_byteorder(struct expr *key)
 	if (dtype->byteorder == key->byteorder)
 		return;
 
-	datatype_set(key, set_datatype_alloc(dtype, key->byteorder));
+	__datatype_set(key, set_datatype_alloc(dtype, key->byteorder));
 }
 
 static int set_evaluate(struct eval_ctx *ctx, struct set *set);
@@ -277,7 +276,10 @@ static int flowtable_not_found(struct eval_ctx *ctx, const struct location *loc,
  */
 static int expr_evaluate_symbol(struct eval_ctx *ctx, struct expr **expr)
 {
-	struct parse_ctx parse_ctx = { .tbl = &ctx->nft->output.tbl, };
+	struct parse_ctx parse_ctx = {
+		.tbl	= &ctx->nft->output.tbl,
+		.input	= &ctx->nft->input,
+	};
 	struct error_record *erec;
 	struct table *table;
 	struct set *set;
@@ -1139,7 +1141,6 @@ static int expr_evaluate_prefix(struct eval_ctx *ctx, struct expr **expr)
 		mpz_prefixmask(mask->value, base->len, prefix->prefix_len);
 		break;
 	case TYPE_STRING:
-		mpz_init2(mask->value, base->len);
 		mpz_bitmask(mask->value, prefix->prefix_len);
 		break;
 	}
@@ -1338,8 +1339,8 @@ static int expr_evaluate_bitwise(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *op = *expr, *left = op->left;
 	const struct datatype *dtype;
+	enum byteorder byteorder;
 	unsigned int max_len;
-	int byteorder;
 
 	if (ctx->stmt_len > left->len) {
 		max_len = ctx->stmt_len;
@@ -1515,11 +1516,10 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 		if (!key && i->dtype->type == TYPE_INTEGER) {
 			struct datatype *clone;
 
-			clone = dtype_clone(i->dtype);
+			clone = datatype_clone(i->dtype);
 			clone->size = i->len;
 			clone->byteorder = i->byteorder;
-			clone->refcnt = 1;
-			i->dtype = clone;
+			__datatype_set(i, clone);
 		}
 
 		if (dtype == NULL && i->dtype->size == 0)
@@ -1547,7 +1547,7 @@ static int expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 	}
 
 	(*expr)->flags |= flags;
-	datatype_set(*expr, concat_type_alloc(ntype));
+	__datatype_set(*expr, concat_type_alloc(ntype));
 	(*expr)->len   = size;
 
 	if (off > 0)
@@ -1811,21 +1811,6 @@ static int expr_evaluate_set(struct eval_ctx *ctx, struct expr **expr)
 	if (ctx->set) {
 		if (ctx->set->flags & NFT_SET_CONCAT)
 			set->set_flags |= NFT_SET_CONCAT;
-	} else if (set->size == 1) {
-		i = list_first_entry(&set->expressions, struct expr, list);
-		if (i->etype == EXPR_SET_ELEM && list_empty(&i->stmt_list)) {
-			switch (i->key->etype) {
-			case EXPR_PREFIX:
-			case EXPR_RANGE:
-			case EXPR_VALUE:
-				*expr = i->key;
-				i->key = NULL;
-				expr_free(set);
-				return 0;
-			default:
-				break;
-			}
-		}
 	}
 
 	set->set_flags |= NFT_SET_CONSTANT;
@@ -1896,11 +1881,17 @@ static int mapping_expr_expand(struct eval_ctx *ctx)
 	return 0;
 }
 
+static bool datatype_compatible(const struct datatype *a, const struct datatype *b)
+{
+	return (a->type == TYPE_MARK &&
+		datatype_equal(datatype_basetype(a), datatype_basetype(b))) ||
+		datatype_equal(a, b);
+}
+
 static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *map = *expr, *mappings;
 	struct expr_ctx ectx = ctx->ectx;
-	const struct datatype *dtype;
 	struct expr *key, *data;
 
 	if (map->map->etype == EXPR_CT &&
@@ -1942,12 +1933,16 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 						  ctx->ectx.len, NULL);
 		}
 
-		dtype = set_datatype_alloc(ectx.dtype, ectx.byteorder);
-		if (dtype->type == TYPE_VERDICT)
+		if (ectx.dtype->type == TYPE_VERDICT) {
 			data = verdict_expr_alloc(&netlink_location, 0, NULL);
-		else
+		} else {
+			const struct datatype *dtype;
+
+			dtype = set_datatype_alloc(ectx.dtype, ectx.byteorder);
 			data = constant_expr_alloc(&netlink_location, dtype,
 						   dtype->byteorder, ectx.len, NULL);
+			datatype_free(dtype);
+		}
 
 		mappings = implicit_set_declaration(ctx, "__map%d",
 						    key, data,
@@ -2000,7 +1995,7 @@ static int expr_evaluate_map(struct eval_ctx *ctx, struct expr **expr)
 		    expr_name(map->mappings));
 	}
 
-	if (!datatype_equal(map->map->dtype, map->mappings->set->key->dtype))
+	if (!datatype_compatible(map->mappings->set->key->dtype, map->map->dtype))
 		return expr_binary_error(ctx->msgs, map->mappings, map->map,
 					 "datatype mismatch, map expects %s, "
 					 "mapping expression has type %s",
@@ -2058,17 +2053,14 @@ static int expr_evaluate_mapping(struct eval_ctx *ctx, struct expr **expr)
 				  "Key must be a constant");
 	mapping->flags |= mapping->left->flags & EXPR_F_SINGLETON;
 
-	if (set->data) {
-		if (!set_is_anonymous(set->flags) &&
-		    set->data->flags & EXPR_F_INTERVAL)
-			datalen = set->data->len / 2;
-		else
-			datalen = set->data->len;
-
-		__expr_set_context(&ctx->ectx, set->data->dtype, set->data->byteorder, datalen, 0);
-	} else {
-		assert((set->flags & NFT_SET_MAP) == 0);
-	}
+	assert(set->data != NULL);
+	if (!set_is_anonymous(set->flags) &&
+	    set->data->flags & EXPR_F_INTERVAL)
+		datalen = set->data->len / 2;
+	else
+		datalen = set->data->len;
+	__expr_set_context(&ctx->ectx, set->data->dtype,
+			   set->data->byteorder, datalen, 0);
 
 	if (expr_evaluate(ctx, &mapping->right) < 0)
 		return -1;
@@ -2349,6 +2341,35 @@ static bool range_needs_swap(const struct expr *range)
 	return mpz_cmp(left->value, right->value) > 0;
 }
 
+static void optimize_singleton_set(struct expr *rel, struct expr **expr)
+{
+	struct expr *set = rel->right, *i;
+
+	i = list_first_entry(&set->expressions, struct expr, list);
+	if (i->etype == EXPR_SET_ELEM &&
+	    list_empty(&i->stmt_list)) {
+
+		switch (i->key->etype) {
+		case EXPR_PREFIX:
+		case EXPR_RANGE:
+		case EXPR_VALUE:
+			rel->right = *expr = i->key;
+			i->key = NULL;
+			expr_free(set);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (rel->op == OP_IMPLICIT &&
+	    rel->right->dtype->basetype &&
+	    rel->right->dtype->basetype->type == TYPE_BITMASK &&
+	    rel->right->dtype->type != TYPE_CT_STATE) {
+		rel->op = OP_EQ;
+	}
+}
+
 static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 {
 	struct expr *rel = *expr, *left, *right;
@@ -2431,6 +2452,17 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 	switch (rel->op) {
 	case OP_EQ:
 	case OP_IMPLICIT:
+	case OP_NEQ:
+		if (right->etype == EXPR_SET && right->size == 1)
+			optimize_singleton_set(rel, &right);
+		break;
+	default:
+		break;
+	}
+
+	switch (rel->op) {
+	case OP_EQ:
+	case OP_IMPLICIT:
 		/*
 		 * Update protocol context for payload and meta iiftype
 		 * equality expressions.
@@ -2448,7 +2480,7 @@ static int expr_evaluate_relational(struct eval_ctx *ctx, struct expr **expr)
 			    right->dtype->basetype == NULL ||
 			    right->dtype->basetype->type != TYPE_BITMASK)
 				return expr_binary_error(ctx->msgs, left, right,
-							 "negation can only be used with singleton bitmask values");
+							 "negation can only be used with singleton bitmask values.  Did you mean \"!=\"?");
 		}
 
 		switch (right->etype) {
@@ -2797,11 +2829,7 @@ static int __stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 					 dtype->desc, (*expr)->dtype->desc,
 					 (*expr)->len);
 
-	if ((dtype->type == TYPE_MARK &&
-	     !datatype_equal(datatype_basetype(dtype), datatype_basetype((*expr)->dtype))) ||
-	    (dtype->type != TYPE_MARK &&
-	     (*expr)->dtype->type != TYPE_INTEGER &&
-	     !datatype_equal((*expr)->dtype, dtype)))
+	if (!datatype_compatible(dtype, (*expr)->dtype))
 		return stmt_binary_error(ctx, *expr, stmt,		/* verdict vs invalid? */
 					 "datatype mismatch: expected %s, "
 					 "expression has type %s",
@@ -2826,6 +2854,10 @@ static int __stmt_evaluate_arg(struct eval_ctx *ctx, struct stmt *stmt,
 		return byteorder_conversion(ctx, expr, byteorder);
 	case EXPR_PREFIX:
 		return stmt_prefix_conversion(ctx, expr, byteorder);
+	case EXPR_NUMGEN:
+		if (dtype->type == TYPE_IPADDR)
+			return byteorder_conversion(ctx, expr, byteorder);
+		break;
 	default:
 		break;
 	}
@@ -3037,6 +3069,24 @@ static int stmt_evaluate_payload(struct eval_ctx *ctx, struct stmt *stmt)
 static int stmt_evaluate_meter(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	struct expr *key, *set, *setref;
+	struct set *existing_set;
+	struct table *table;
+
+	table = table_cache_find(&ctx->nft->cache.table_cache,
+				 ctx->cmd->handle.table.name,
+				 ctx->cmd->handle.family);
+	if (table == NULL)
+		return table_not_found(ctx);
+
+	existing_set = set_cache_find(table, stmt->meter.name);
+	if (existing_set)
+		return cmd_error(ctx, &stmt->location,
+				 "%s; meter ‘%s’ overlaps an existing %s ‘%s’ in family %s",
+				 strerror(EEXIST),
+				 stmt->meter.name,
+				 set_is_map(existing_set->flags) ? "map" : "set",
+				 existing_set->handle.set.name,
+				 family2str(existing_set->handle.family));
 
 	expr_set_context(&ctx->ectx, NULL, 0);
 	if (expr_evaluate(ctx, &stmt->meter.key) < 0)
@@ -3432,7 +3482,10 @@ static int stmt_evaluate_reject_default(struct eval_ctx *ctx,
 
 static int stmt_evaluate_reject_icmp(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	struct parse_ctx parse_ctx = { .tbl = &ctx->nft->output.tbl, };
+	struct parse_ctx parse_ctx = {
+		.tbl	= &ctx->nft->output.tbl,
+		.input	= &ctx->nft->input,
+	};
 	struct error_record *erec;
 	struct expr *code;
 
@@ -3715,8 +3768,10 @@ static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
 {
 	struct proto_ctx *pctx = eval_proto_ctx(ctx);
 	struct expr *one, *two, *data, *tmp;
-	const struct datatype *dtype;
-	int addr_type, err;
+	const struct datatype *dtype = NULL;
+	const struct datatype *dtype2;
+	int addr_type;
+	int err;
 
 	if (stmt->nat.family == NFPROTO_INET)
 		expr_family_infer(pctx, stmt->nat.addr, &stmt->nat.family);
@@ -3736,18 +3791,23 @@ static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
 	dtype = concat_type_alloc((addr_type << TYPE_BITS) | TYPE_INET_SERVICE);
 
 	expr_set_context(&ctx->ectx, dtype, dtype->size);
-	if (expr_evaluate(ctx, &stmt->nat.addr))
-		return -1;
+	if (expr_evaluate(ctx, &stmt->nat.addr)) {
+		err = -1;
+		goto out;
+	}
 
 	if (pctx->protocol[PROTO_BASE_TRANSPORT_HDR].desc == NULL &&
 	    !nat_evaluate_addr_has_th_expr(stmt->nat.addr)) {
-		return stmt_binary_error(ctx, stmt->nat.addr, stmt,
+		err = stmt_binary_error(ctx, stmt->nat.addr, stmt,
 					 "transport protocol mapping is only "
 					 "valid after transport protocol match");
+		goto out;
 	}
 
-	if (stmt->nat.addr->etype != EXPR_MAP)
-		return 0;
+	if (stmt->nat.addr->etype != EXPR_MAP) {
+		err = 0;
+		goto out;
+	}
 
 	data = stmt->nat.addr->mappings->set->data;
 	if (data->flags & EXPR_F_INTERVAL)
@@ -3755,36 +3815,42 @@ static int stmt_evaluate_nat_map(struct eval_ctx *ctx, struct stmt *stmt)
 
 	datatype_set(data, dtype);
 
-	if (expr_ops(data)->type != EXPR_CONCAT)
-		return __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+	if (expr_ops(data)->type != EXPR_CONCAT) {
+		err = __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
 					   BYTEORDER_BIG_ENDIAN,
 					   &stmt->nat.addr);
+		goto out;
+	}
 
 	one = list_first_entry(&data->expressions, struct expr, list);
 	two = list_entry(one->list.next, struct expr, list);
 
-	if (one == two || !list_is_last(&two->list, &data->expressions))
-		return __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+	if (one == two || !list_is_last(&two->list, &data->expressions)) {
+		err = __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
 					   BYTEORDER_BIG_ENDIAN,
 					   &stmt->nat.addr);
+		goto out;
+	}
 
-	dtype = get_addr_dtype(stmt->nat.family);
+	dtype2 = get_addr_dtype(stmt->nat.family);
 	tmp = one;
-	err = __stmt_evaluate_arg(ctx, stmt, dtype, dtype->size,
+	err = __stmt_evaluate_arg(ctx, stmt, dtype2, dtype2->size,
 				  BYTEORDER_BIG_ENDIAN,
 				  &tmp);
 	if (err < 0)
-		return err;
+		goto out;
 	if (tmp != one)
 		BUG("Internal error: Unexpected alteration of l3 expression");
 
 	tmp = two;
 	err = nat_evaluate_transport(ctx, stmt, &tmp);
 	if (err < 0)
-		return err;
+		goto out;
 	if (tmp != two)
 		BUG("Internal error: Unexpected alteration of l4 expression");
 
+out:
+	datatype_free(dtype);
 	return err;
 }
 
@@ -4103,15 +4169,25 @@ static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
 
 static int stmt_evaluate_log_prefix(struct eval_ctx *ctx, struct stmt *stmt)
 {
-	char prefix[NF_LOG_PREFIXLEN] = {}, tmp[NF_LOG_PREFIXLEN] = {};
-	int len = sizeof(prefix), offset = 0, ret;
+	char tmp[NF_LOG_PREFIXLEN] = {};
+	char prefix[NF_LOG_PREFIXLEN];
+	size_t len = sizeof(prefix);
+	size_t offset = 0;
 	struct expr *expr;
-	size_t size = 0;
 
-	if (stmt->log.prefix->etype != EXPR_LIST)
+	if (stmt->log.prefix->etype != EXPR_LIST) {
+		if (stmt->log.prefix &&
+		    div_round_up(stmt->log.prefix->len, BITS_PER_BYTE) >= NF_LOG_PREFIXLEN)
+			return expr_error(ctx->msgs, stmt->log.prefix, "log prefix is too long");
+
 		return 0;
+	}
+
+	prefix[0] = '\0';
 
 	list_for_each_entry(expr, &stmt->log.prefix->expressions, list) {
+		int ret;
+
 		switch (expr->etype) {
 		case EXPR_VALUE:
 			expr_to_string(expr, tmp);
@@ -4125,10 +4201,10 @@ static int stmt_evaluate_log_prefix(struct eval_ctx *ctx, struct stmt *stmt)
 			BUG("unknown expression type %s\n", expr_name(expr));
 			break;
 		}
-		SNPRINTF_BUFFER_SIZE(ret, size, len, offset);
+		SNPRINTF_BUFFER_SIZE(ret, &len, &offset);
 	}
 
-	if (len == NF_LOG_PREFIXLEN)
+	if (len == 0)
 		return stmt_error(ctx, stmt, "log prefix is too long");
 
 	expr = constant_expr_alloc(&stmt->log.prefix->location, &string_type,
@@ -4316,7 +4392,7 @@ static int stmt_evaluate_objref_map(struct eval_ctx *ctx, struct stmt *stmt)
 		    expr_name(map->mappings));
 	}
 
-	if (!datatype_equal(map->map->dtype, map->mappings->set->key->dtype))
+	if (!datatype_compatible(map->mappings->set->key->dtype, map->map->dtype))
 		return expr_binary_error(ctx->msgs, map->mappings, map->map,
 					 "datatype mismatch, map expects %s, "
 					 "mapping expression has type %s",
@@ -4444,11 +4520,14 @@ static int setelem_evaluate(struct eval_ctx *ctx, struct cmd *cmd)
 		return -1;
 
 	cmd->elem.set = set_get(set);
+	if (set_is_interval(ctx->set->flags)) {
+		if (!(set->flags & NFT_SET_CONCAT) &&
+		    interval_set_eval(ctx, ctx->set, cmd->expr) < 0)
+			return -1;
 
-	if (set_is_interval(ctx->set->flags) &&
-	    !(set->flags & NFT_SET_CONCAT) &&
-	    interval_set_eval(ctx, ctx->set, cmd->expr) < 0)
-		return -1;
+		assert(cmd->expr->etype == EXPR_SET);
+		cmd->expr->set_flags |= NFT_SET_INTERVAL;
+	}
 
 	ctx->set = NULL;
 
@@ -4488,11 +4567,10 @@ static int set_expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 		    i->dtype->type == TYPE_INTEGER) {
 			struct datatype *dtype;
 
-			dtype = dtype_clone(i->dtype);
+			dtype = datatype_clone(i->dtype);
 			dtype->size = i->len;
 			dtype->byteorder = i->byteorder;
-			dtype->refcnt = 1;
-			i->dtype = dtype;
+			__datatype_set(i, dtype);
 		}
 
 		if (i->dtype->size == 0 && i->len == 0)
@@ -4515,11 +4593,34 @@ static int set_expr_evaluate_concat(struct eval_ctx *ctx, struct expr **expr)
 	}
 
 	(*expr)->flags |= flags;
-	datatype_set(*expr, concat_type_alloc(ntype));
+	__datatype_set(*expr, concat_type_alloc(ntype));
 	(*expr)->len   = size;
 
 	expr_set_context(&ctx->ectx, (*expr)->dtype, (*expr)->len);
 	ctx->ectx.key = *expr;
+
+	return 0;
+}
+
+static int elems_evaluate(struct eval_ctx *ctx, struct set *set)
+{
+	ctx->set = set;
+	if (set->init != NULL) {
+		__expr_set_context(&ctx->ectx, set->key->dtype,
+				   set->key->byteorder, set->key->len, 0);
+		if (expr_evaluate(ctx, &set->init) < 0)
+			return -1;
+		if (set->init->etype != EXPR_SET)
+			return expr_error(ctx->msgs, set->init, "Set %s: Unexpected initial type %s, missing { }?",
+					  set->handle.set.name, expr_name(set->init));
+	}
+
+	if (set_is_interval(ctx->set->flags) &&
+	    !(ctx->set->flags & NFT_SET_CONCAT) &&
+	    interval_set_eval(ctx, ctx->set, set->init) < 0)
+		return -1;
+
+	ctx->set = NULL;
 
 	return 0;
 }
@@ -4622,23 +4723,6 @@ static int set_evaluate(struct eval_ctx *ctx, struct set *set)
 	}
 
 	set->existing_set = existing_set;
-	ctx->set = set;
-	if (set->init != NULL) {
-		__expr_set_context(&ctx->ectx, set->key->dtype,
-				   set->key->byteorder, set->key->len, 0);
-		if (expr_evaluate(ctx, &set->init) < 0)
-			return -1;
-		if (set->init->etype != EXPR_SET)
-			return expr_error(ctx->msgs, set->init, "Set %s: Unexpected initial type %s, missing { }?",
-					  set->handle.set.name, expr_name(set->init));
-	}
-
-	if (set_is_interval(ctx->set->flags) &&
-	    !(ctx->set->flags & NFT_SET_CONCAT) &&
-	    interval_set_eval(ctx, ctx->set, set->init) < 0)
-		return -1;
-
-	ctx->set = NULL;
 
 	return 0;
 }
@@ -4973,7 +5057,7 @@ static int chain_evaluate(struct eval_ctx *ctx, struct chain *chain)
 
 	if (chain == NULL) {
 		if (!chain_cache_find(table, ctx->cmd->handle.chain.name)) {
-			chain = chain_alloc(NULL);
+			chain = chain_alloc();
 			handle_merge(&chain->handle, &ctx->cmd->handle);
 			chain_cache_add(chain, table);
 		}
@@ -5111,6 +5195,8 @@ static int cmd_evaluate_add(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SET:
 		handle_merge(&cmd->set->handle, &cmd->handle);
 		return set_evaluate(ctx, cmd->set);
+	case CMD_OBJ_SETELEMS:
+		return elems_evaluate(ctx, cmd->set);
 	case CMD_OBJ_RULE:
 		handle_merge(&cmd->rule->handle, &cmd->handle);
 		return rule_evaluate(ctx, cmd->rule, cmd->op);
@@ -5425,6 +5511,7 @@ static int cmd_evaluate_list(struct eval_ctx *ctx, struct cmd *cmd)
 	case CMD_OBJ_SECMARKS:
 	case CMD_OBJ_SYNPROXYS:
 	case CMD_OBJ_CT_TIMEOUTS:
+	case CMD_OBJ_CT_EXPECTATIONS:
 		if (cmd->handle.table.name == NULL)
 			return 0;
 		if (!table_cache_find(&ctx->nft->cache.table_cache,

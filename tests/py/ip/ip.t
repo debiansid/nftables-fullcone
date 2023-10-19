@@ -48,12 +48,15 @@ ip id != 33-45;ok
 ip id { 33, 55, 67, 88};ok
 ip id != { 33, 55, 67, 88};ok
 
-ip frag-off 222 accept;ok
-ip frag-off != 233;ok
-ip frag-off 33-45;ok
-ip frag-off != 33-45;ok
-ip frag-off { 33, 55, 67, 88};ok
-ip frag-off != { 33, 55, 67, 88};ok
+ip frag-off 0xde accept;ok
+ip frag-off != 0xe9;ok
+ip frag-off 0x21-0x2d;ok
+ip frag-off != 0x21-0x2d;ok
+ip frag-off { 0x21, 0x37, 0x43, 0x58};ok
+ip frag-off != { 0x21, 0x37, 0x43, 0x58};ok
+ip frag-off & 0x1fff != 0x0;ok
+ip frag-off & 0x2000 != 0x0;ok
+ip frag-off & 0x4000 != 0x0;ok
 
 ip ttl 0 drop;ok
 ip ttl 233;ok
@@ -127,3 +130,6 @@ iif "lo" ip dscp set cs0;ok
 
 ip saddr . ip daddr { 192.0.2.1 . 10.0.0.1-10.0.0.2 };ok
 ip saddr . ip daddr vmap { 192.168.5.1-192.168.5.128 . 192.168.6.1-192.168.6.128 : accept };ok
+
+ip saddr 1.2.3.4 ip daddr 3.4.5.6;ok
+ip saddr 1.2.3.4 counter ip daddr 3.4.5.6;ok

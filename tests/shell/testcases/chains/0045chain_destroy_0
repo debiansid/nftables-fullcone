@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e
-
-$NFT add table t
-$NFT add chain t c
-
-$NFT destroy chain t c

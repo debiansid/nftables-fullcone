@@ -1,0 +1,62 @@
+# ip frag-off & 0x1fff != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    8191
+                ]
+            },
+            "op": "!=",
+            "right": 0
+        }
+    }
+]
+
+# ip frag-off & 0x2000 != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    8192
+                ]
+            },
+            "op": "!=",
+            "right": 0
+        }
+    }
+]
+
+# ip frag-off & 0x4000 != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    16384
+                ]
+            },
+            "op": "!=",
+            "right": 0
+        }
+    }
+]

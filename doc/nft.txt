@@ -434,6 +434,11 @@ further quirks worth noticing:
   *prerouting*, *input*, *forward*, *output*, *postrouting* and this *ingress*
   hook.
 
+The *device* parameter accepts a network interface name as a string, and is
+required when adding a base chain that filters traffic on the ingress or
+egress hooks. Any ingress or egress chains will only filter traffic from the
+interface specified in the *device* parameter.
+
 The *priority* parameter accepts a signed integer value or a standard priority
 name which specifies the order in which chains with the same *hook* value are
 traversed. The ordering is ascending, i.e. lower priority values have precedence
@@ -519,7 +524,7 @@ beginning of the chain or before the specified rule.
 *replace*:: Similar to *add*, but the rule replaces the specified rule.
 *delete*:: Delete the specified rule.
 *destroy*:: Delete the specified rule, it does not fail if it does not exist.
-*reset*:: Reset rule-contained state, i.e. counter and quota statement values.
+*reset*:: Reset rule-contained state, e.g. counter and quota statement values.
 
 .*add a rule to ip table output chain*
 -------------
@@ -585,7 +590,7 @@ be tuned with the flags that can be specified at set creation time.
 *destroy*:: Delete the specified set, it does not fail if it does not exist.
 *list*:: Display the elements in the specified set.
 *flush*:: Remove all elements from the specified set.
-*reset*:: Reset timeout and other state in all contained elements.
+*reset*:: Reset state in all contained elements, e.g. counter and quota statement values.
 
 .Set specifications
 [options="header"]
@@ -635,7 +640,7 @@ Maps store data based on some specific key used as input. They are uniquely iden
 *destroy*:: Delete the specified map, it does not fail if it does not exist.
 *list*:: Display the elements in the specified map.
 *flush*:: Remove all elements from the specified map.
-*reset*:: Reset timeout and other state in all contained elements.
+*reset*:: Reset state in all contained elements, e.g. counter and quota statement values.
 
 .Map specifications
 [options="header"]
@@ -702,8 +707,8 @@ listed elements may already exist.
 be non-trivial in very large and/or interval sets. In the latter case, the
 containing interval is returned instead of just the element itself.
 
-*reset* command resets timeout or other state attached to the given
-element(s).
+*reset* command resets state attached to the given element(s), e.g. counter and
+quota statement values.
 
 .Element options
 [options="header"]

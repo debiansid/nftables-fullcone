@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# NFT_TEST_SKIP(NFT_TEST_SKIP_slow)
+
 set -e
 
 RULESET="table ip t {

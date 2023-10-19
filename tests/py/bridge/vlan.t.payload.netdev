@@ -356,3 +356,13 @@ netdev test-netdev ingress
   [ payload load 2b @ link header + 14 => reg 10 ]
   [ bitwise reg 10 = ( reg 10 & 0x0000ff0f ) ^ 0x00000000 ]
   [ lookup reg 1 set __set%d ]
+
+# ether saddr 00:11:22:33:44:55 counter ether type 8021q
+bridge test-bridge input
+  [ meta load iiftype => reg 1 ]
+  [ cmp eq reg 1 0x00000001 ]
+  [ payload load 6b @ link header + 6 => reg 1 ]
+  [ cmp eq reg 1 0x33221100 0x00005544 ]
+  [ counter pkts 0 bytes 0 ]
+  [ payload load 2b @ link header + 12 => reg 1 ]
+  [ cmp eq reg 1 0x00000081 ]

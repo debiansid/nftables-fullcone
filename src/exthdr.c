@@ -10,11 +10,10 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
-#include <string.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 
@@ -405,7 +404,7 @@ bool exthdr_find_template(struct expr *expr, const struct expr *mask, unsigned i
 		found = tcpopt_find_template(expr, off, mask_len - mask_offset);
 		break;
 	case NFT_EXTHDR_OP_IPV6:
-		exthdr_init_raw(expr, expr->exthdr.desc->type,
+		exthdr_init_raw(expr, expr->exthdr.raw_type,
 				off, mask_len - mask_offset, expr->exthdr.op, 0);
 
 		/* still failed to find a template... Bug. */

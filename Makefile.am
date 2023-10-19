@@ -4,10 +4,8 @@ SUBDIRS = 	src	\
 		include	\
 		files	\
 		doc	\
-		examples
-if HAVE_PYTHON
-SUBDIRS += py
-endif
+		examples\
+		py
 
 EXTRA_DIST =	tests	\
 		files

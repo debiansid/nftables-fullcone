@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# NFT_TEST_REQUIRES(NFT_TEST_HAVE_cttimeout)
+
 EXPECTED='table ip filter {
 	ct timeout cttime{
 		protocol tcp

@@ -10,11 +10,11 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
-#include <string.h>
 
 #include <netinet/ip.h>
 #include <linux/netfilter.h>
@@ -131,7 +131,7 @@ static const struct symbol_table ct_events_tbl = {
 	},
 };
 
-static const struct datatype ct_event_type = {
+const struct datatype ct_event_type = {
 	.type		= TYPE_CT_EVENTBIT,
 	.name		= "ct_event",
 	.desc		= "conntrack event bits",
@@ -216,7 +216,7 @@ static struct error_record *ct_label_type_parse(struct parse_ctx *ctx,
 	return NULL;
 }
 
-static const struct datatype ct_label_type = {
+const struct datatype ct_label_type = {
 	.type		= TYPE_CT_LABEL,
 	.name		= "ct_label",
 	.desc		= "conntrack label",

@@ -1,5 +1,5 @@
 if BUILD_MAN
-man_MANS = nft.8 libnftables-json.5 libnftables.3
+dist_man_MANS = nft.8 libnftables-json.5 libnftables.3
 
 A2X_OPTS_MANPAGE = -L --doctype manpage --format manpage -D ${builddir}
 
@@ -12,7 +12,7 @@ ASCIIDOC_INCLUDES = \
        statements.txt
 ASCIIDOCS = ${ASCIIDOC_MAIN} ${ASCIIDOC_INCLUDES}
 
-EXTRA_DIST = ${ASCIIDOCS} ${man_MANS} libnftables-json.adoc libnftables.adoc
+EXTRA_DIST = ${ASCIIDOCS} libnftables-json.adoc libnftables.adoc
 
 CLEANFILES = \
 	*~
@@ -26,5 +26,5 @@ nft.8: ${ASCIIDOCS}
 .adoc.5:
 	${AM_V_GEN}${A2X} ${A2X_OPTS_MANPAGE} $<
 
-CLEANFILES += ${man_MANS}
+MAINTAINERCLEANFILES = ${dist_man_MANS}
 endif

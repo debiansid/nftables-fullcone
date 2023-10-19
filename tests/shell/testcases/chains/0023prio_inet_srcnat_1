@@ -2,7 +2,7 @@
 
 for family in ip ip6 inet
 do
-	for hook in prerouting input forward output
+	for hook in prerouting forward output
 	do
 		$NFT add table $family x
 		$NFT add chain $family x y "{ type filter hook $hook priority srcnat; }" &> /dev/null

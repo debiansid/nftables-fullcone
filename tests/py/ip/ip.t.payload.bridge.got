@@ -1,0 +1,24 @@
+# ip frag-off & 0x1fff != 0x0
+bridge test-bridge input
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000ff1f ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
+
+# ip frag-off & 0x2000 != 0x0
+bridge test-bridge input
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x00000020 ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
+
+# ip frag-off & 0x4000 != 0x0
+bridge test-bridge input
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x00000008 ]
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x00000040 ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
+

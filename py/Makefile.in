@@ -191,7 +191,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON_BIN = @PYTHON_BIN@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -255,7 +254,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = setup.py __init__.py nftables.py schema.json
+EXTRA_DIST = pyproject.toml setup.cfg setup.py src
 all: all-am
 
 .SUFFIXES:
@@ -336,7 +335,7 @@ distdir-am: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile all-local
+all-am: Makefile
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -370,11 +369,11 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-local mostlyclean-am
+clean-am: clean-generic clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
-distclean-am: clean-am distclean-generic distclean-local
+distclean-am: clean-am distclean-generic
 
 dvi: dvi-am
 
@@ -394,7 +393,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-exec-local
+install-exec-am:
 
 install-html: install-html-am
 
@@ -432,52 +431,24 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-local
+uninstall-am:
 
 .MAKE: install-am install-strip
 
-.PHONY: all all-am all-local check check-am clean clean-generic \
-	clean-libtool clean-local cscopelist-am ctags-am distclean \
-	distclean-generic distclean-libtool distclean-local distdir \
-	dvi dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-exec-local install-html \
+.PHONY: all all-am check check-am clean clean-generic clean-libtool \
+	cscopelist-am ctags-am distclean distclean-generic \
+	distclean-libtool distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
 	install-pdf install-pdf-am install-ps install-ps-am \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags-am uninstall uninstall-am uninstall-local
+	tags-am uninstall uninstall-am
 
 .PRECIOUS: Makefile
 
-
-all-local:
-	cd $(srcdir) && \
-		$(PYTHON_BIN) setup.py build --build-base $(abs_builddir)
-
-install-exec-local:
-	cd $(srcdir) && \
-		$(PYTHON_BIN) setup.py build --build-base $(abs_builddir) \
-		install --prefix $(DESTDIR)$(prefix)
-
-uninstall-local:
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/site-packages/nftables
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/dist-packages/nftables
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/site-packages/nftables-[0-9]*.egg-info
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/dist-packages/nftables-[0-9]*.egg-info
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/site-packages/nftables-[0-9]*.egg
-	rm -rf $(DESTDIR)$(prefix)/lib*/python*/dist-packages/nftables-[0-9]*.egg
-
-clean-local:
-	cd $(srcdir) && \
-		$(PYTHON_BIN) setup.py clean \
-		--build-base $(abs_builddir)
-	rm -rf scripts-* lib* build dist bdist.* nftables.egg-info
-	find . -name \*.pyc -delete
-
-distclean-local:
-	rm -f version
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

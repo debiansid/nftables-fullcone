@@ -124,29 +124,29 @@ ip test-ip4 input
   [ payload load 2b @ network header + 4 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
 
-# ip frag-off 222 accept
+# ip frag-off 0xde accept
 ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ cmp eq reg 1 0x0000de00 ]
   [ immediate reg 0 accept ]
 
-# ip frag-off != 233
+# ip frag-off != 0xe9
 ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ cmp neq reg 1 0x0000e900 ]
 
-# ip frag-off 33-45
+# ip frag-off 0x21-0x2d
 ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ cmp gte reg 1 0x00002100 ]
   [ cmp lte reg 1 0x00002d00 ]
 
-# ip frag-off != 33-45
+# ip frag-off != 0x21-0x2d
 ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ range neq reg 1 0x00002100 0x00002d00 ]
 
-# ip frag-off { 33, 55, 67, 88}
+# ip frag-off { 0x21, 0x37, 0x43, 0x58}
 __set%d test-ip4 3
 __set%d test-ip4 0
 	element 00002100  : 0 [end]	element 00003700  : 0 [end]	element 00004300  : 0 [end]	element 00005800  : 0 [end]
@@ -154,13 +154,31 @@ ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ lookup reg 1 set __set%d ]
 
-# ip frag-off != { 33, 55, 67, 88}
+# ip frag-off != { 0x21, 0x37, 0x43, 0x58}
 __set%d test-ip4 3
 __set%d test-ip4 0
 	element 00002100  : 0 [end]	element 00003700  : 0 [end]	element 00004300  : 0 [end]	element 00005800  : 0 [end]
 ip test-ip4 input
   [ payload load 2b @ network header + 6 => reg 1 ]
   [ lookup reg 1 set __set%d 0x1 ]
+
+# ip frag-off & 0x1fff != 0x0
+ip test-ip4 input
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000ff1f ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
+
+# ip frag-off & 0x2000 != 0x0
+ip test-ip4 input
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x00000020 ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
+
+# ip frag-off & 0x4000 != 0x0
+ip test-ip4 input
+  [ payload load 2b @ network header + 6 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x00000040 ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00000000 ]
 
 # ip ttl 0 drop
 ip test-ip4 input
@@ -523,3 +541,18 @@ ip
   [ payload load 4b @ network header + 12 => reg 1 ]
   [ payload load 4b @ network header + 16 => reg 9 ]
   [ lookup reg 1 set __map%d dreg 0 ]
+
+# ip saddr 1.2.3.4 ip daddr 3.4.5.6
+ip test-ip4 input
+  [ payload load 4b @ network header + 12 => reg 1 ]
+  [ cmp eq reg 1 0x04030201 ]
+  [ payload load 4b @ network header + 16 => reg 1 ]
+  [ cmp eq reg 1 0x06050403 ]
+
+# ip saddr 1.2.3.4 counter ip daddr 3.4.5.6
+ip test-ip4 input
+  [ payload load 4b @ network header + 12 => reg 1 ]
+  [ cmp eq reg 1 0x04030201 ]
+  [ counter pkts 0 bytes 0 ]
+  [ payload load 4b @ network header + 16 => reg 1 ]
+  [ cmp eq reg 1 0x06050403 ]

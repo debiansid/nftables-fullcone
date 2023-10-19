@@ -7,7 +7,7 @@ table ip x {
 	}
 
 	chain y {
-		ip saddr . @ih,32,32 vmap @y
-		ip saddr . @ih,32,32 vmap { 4.4.4.4 . 0x34 : accept, 5.5.5.5 . 0x45 : drop }
+		ip saddr . @nh,32,32 vmap @y
+		ip saddr . @nh,32,32 vmap { 4.4.4.4 . 0x34 : accept, 5.5.5.5 . 0x45 : drop }
 	}
 }

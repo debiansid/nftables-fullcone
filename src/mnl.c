@@ -8,6 +8,8 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <libmnl/libmnl.h>
 #include <libnftnl/common.h>
 #include <libnftnl/ruleset.h>
@@ -27,13 +29,11 @@
 
 #include <mnl.h>
 #include <cmd.h>
-#include <string.h>
 #include <net/if.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <utils.h>
 #include <nftables.h>
 #include <linux/netfilter.h>

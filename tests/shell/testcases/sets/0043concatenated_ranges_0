@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/bash -e
+#
+# NFT_TEST_SKIP(NFT_TEST_SKIP_slow)
 #
 # 0043concatenated_ranges_0 - Add, get, list, timeout for concatenated ranges
 #
@@ -14,12 +16,7 @@
 # - delete them
 # - make sure they can't be deleted again
 
-if [ "$(ps -o comm= $PPID)" = "run-tests.sh" ]; then
-	# Skip some permutations on a full test suite run to keep it quick
-	TYPES="ipv4_addr ipv6_addr ether_addr inet_service"
-else
-	TYPES="ipv4_addr ipv6_addr ether_addr inet_proto inet_service mark"
-fi
+TYPES="ipv4_addr ipv6_addr ether_addr inet_proto inet_service mark"
 
 RULESPEC_ipv4_addr="ip saddr"
 ELEMS_ipv4_addr="192.0.2.1 198.51.100.0/25 203.0.113.0-203.0.113.129"
@@ -147,7 +144,7 @@ for ta in ${TYPES}; do
 			eval add_b=\$ADD_${tb}
 			eval add_c=\$ADD_${tc}
 			${NFT} add element inet filter test \
-				"{ ${add_a} . ${add_b} . ${add_c} timeout 2s${mapv}}"
+				"{ ${add_a} . ${add_b} . ${add_c} timeout 2m${mapv}}"
 			[ $(${NFT} list ${setmap} inet filter test |	\
 			   grep -c "${add_a} . ${add_b} . ${add_c}") -eq 1 ]
 
@@ -180,7 +177,11 @@ for ta in ${TYPES}; do
 				continue
 			fi
 
-			sleep 2
+			${NFT} delete element inet filter test \
+				"{ ${add_a} . ${add_b} . ${add_c} ${mapv}}"
+			${NFT} add element inet filter test \
+				"{ ${add_a} . ${add_b} . ${add_c} timeout 1s${mapv}}"
+			sleep 1
 			[ $(${NFT} list ${setmap} inet filter test |		\
 			   grep -c "${add_a} . ${add_b} . ${add_c} ${mapv}") -eq 0 ]
 			timeout_tested=1

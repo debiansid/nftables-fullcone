@@ -2,12 +2,12 @@
 .\"     Title: libnftables
 .\"    Author: Phil Sutter <phil@nwl.cc>
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 06/28/2023
+.\"      Date: 10/11/2023
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "LIBNFTABLES" "3" "06/28/2023" "\ \&" "\ \&"
+.TH "LIBNFTABLES" "3" "10/11/2023" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -39,6 +39,9 @@ void nft_ctx_free(struct nft_ctx\fR \fI*ctx\fR\fB);
 
 bool nft_ctx_get_dry_run(struct nft_ctx\fR \fI*ctx\fR\fB);
 void nft_ctx_set_dry_run(struct nft_ctx\fR \fI*ctx\fR\fB, bool\fR \fIdry\fR\fB);
+
+unsigned int nft_ctx_input_get_flags(struct nft_ctx\fR \fI*ctx\fR\fB);
+unsigned int nft_ctx_input_set_flags(struct nft_ctx\fR \fI*ctx\fR\fB, unsigned int\fR \fIflags\fR\fB);
 
 unsigned int nft_ctx_output_get_flags(struct nft_ctx\fR \fI*ctx\fR\fB);
 void nft_ctx_output_set_flags(struct nft_ctx\fR \fI*ctx\fR\fB, unsigned int\fR \fIflags\fR\fB);
@@ -87,6 +90,33 @@ Dry\-run setting controls whether ruleset changes are actually committed on kern
 The \fBnft_ctx_get_dry_run\fR() function returns the dry\-run setting\(cqs value contained in \fIctx\fR\&.
 .sp
 The \fBnft_ctx_set_dry_run\fR() function sets the dry\-run setting in \fIctx\fR to the value of \fIdry\fR\&.
+.SS "nft_ctx_input_get_flags() and nft_ctx_input_set_flags()"
+.sp
+The flags setting controls the input format\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+enum {
+        NFT_CTX_INPUT_NO_DNS = (1 << 0),
+        NFT_CTX_INPUT_JSON   = (1 << 1),
+};
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+NFT_CTX_INPUT_NO_DNS
+.RS 4
+Avoid resolving IP addresses with blocking getaddrinfo()\&. In that case, only plain IP addresses are accepted\&.
+.RE
+.sp
+NFT_CTX_INPUT_JSON: When parsing the input, first try to interpret the input as JSON before falling back to the nftables format\&. This behavior is implied when setting the NFT_CTX_OUTPUT_JSON flag\&.
+.sp
+The \fBnft_ctx_input_get_flags\fR() function returns the input flags setting\(cqs value in \fIctx\fR\&.
+.sp
+The \fBnft_ctx_input_set_flags\fR() function sets the input flags setting in \fIctx\fR to the value of \fIval\fR and returns the previous flags\&.
 .SS "nft_ctx_output_get_flags() and nft_ctx_output_set_flags()"
 .sp
 The flags setting controls the output format\&.
@@ -145,7 +175,7 @@ Upon insertion into the ruleset, some elements are assigned a unique handle for 
 NFT_CTX_OUTPUT_JSON
 .RS 4
 If enabled at compile\-time, libnftables accepts input in JSON format and is able to print output in JSON format as well\&. See
-\fBlibnftables\-json\fR(5) for a description of the supported schema\&. This flag controls JSON output format, input is auto\-detected\&.
+\fBlibnftables\-json\fR(5) for a description of the supported schema\&. This flag enables JSON output format\&. If the flag is set, the input will first be tried as JSON format, before falling back to nftables format\&. This flag implies NFT_CTX_INPUT_JSON\&.
 .RE
 .PP
 NFT_CTX_OUTPUT_ECHO

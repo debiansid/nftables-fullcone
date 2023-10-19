@@ -1,0 +1,11 @@
+table ip t {
+	set s {
+		type ipv4_addr
+		size 256
+		flags dynamic,timeout
+	}
+
+	chain c {
+		tcp dport 80 meter m size 128 { ip saddr limit rate 10/second burst 5 packets }
+	}
+}

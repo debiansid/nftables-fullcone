@@ -1,17 +1,20 @@
 #!/bin/bash
 
+# NFT_TEST_REQUIRES(NFT_TEST_HAVE_reset_set)
+
 set -e
-set -x
+
+trap '[[ $? -eq 0 ]] || echo FAIL' EXIT
 
 RULESET="table t {
 	set s {
 		type ipv4_addr . inet_proto . inet_service
 		flags interval, timeout
 		counter
-		timeout 30s
+		timeout 30m
 		elements = {
-			1.0.0.1 . udp . 53 counter packets 5 bytes 30,
-			2.0.0.2 . tcp . 22 counter packets 10 bytes 100 timeout 15s
+			1.0.0.1 . udp . 53 counter packets 5 bytes 30 expires 20m,
+			2.0.0.2 . tcp . 22 counter packets 10 bytes 100 timeout 15m expires 10m
 		}
 	}
 	map m {
@@ -24,59 +27,67 @@ RULESET="table t {
 	}
 }"
 
+echo -n "applying test ruleset: "
 $NFT -f - <<< "$RULESET"
+echo OK
 
-sleep 2
-
-drop_ms() {
-	sed 's/s[0-9]*ms/s/g'
+drop_seconds() {
+	sed 's/[0-9]\+m\?s//g'
 }
-expires_seconds() {
-	sed -n 's/.*expires \([0-9]*\)s.*/\1/p'
+expires_minutes() {
+	sed -n 's/.*expires \([0-9]*\)m.*/\1/p'
 }
 
-# 'reset element' output is supposed to match 'get element' one
-# apart from changing expires ms value
-EXP=$($NFT get element t s '{ 1.0.0.1 . udp . 53 }' | drop_ms)
-OUT=$($NFT reset element t s '{ 1.0.0.1 . udp . 53 }' | drop_ms)
-$DIFF -u <(echo "$EXP") <(echo "$OUT")
+echo -n "get set elem matches reset set elem: "
+elem='element t s { 1.0.0.1 . udp . 53 }'
+[[ $($NFT "get $elem ; reset $elem" | \
+	grep 'elements = ' | drop_seconds | uniq | wc -l) == 1 ]]
+echo OK
 
-EXP=$($NFT get element t m '{ 1.2.3.4 }')
-OUT=$($NFT reset element t m '{ 1.2.3.4 }')
-$DIFF -u <(echo "$EXP") <(echo "$OUT")
+echo -n "counters and expiry are reset: "
+NEW=$($NFT "get $elem")
+grep -q 'counter packets 0 bytes 0' <<< "$NEW"
+[[ $(expires_minutes <<< "$NEW") -gt 20 ]]
+echo OK
 
-# assert counter value is zeroed
-$NFT get element t s '{ 1.0.0.1 . udp . 53 }' | grep -q 'counter packets 0 bytes 0'
+echo -n "get map elem matches reset map elem: "
+elem='element t m { 1.2.3.4 }'
+[[ $($NFT "get $elem ; reset $elem" | \
+	grep 'elements = ' | uniq | wc -l) == 1 ]]
+echo OK
 
-# assert expiry is reset
-VAL=$($NFT get element t s '{ 1.0.0.1 . udp . 53 }' | expires_seconds)
-[[ $VAL -gt 28 ]]
-
-# assert quota value is reset
+echo -n "quota value is reset: "
 $NFT get element t m '{ 1.2.3.4 }' | grep -q 'quota 50 bytes : 10.2.3.4'
+echo OK
 
-# assert other elements remain unchanged
-$NFT get element t s '{ 2.0.0.2 . tcp . 22 }'
+echo -n "other elements remain the same: "
 OUT=$($NFT get element t s '{ 2.0.0.2 . tcp . 22 }')
-grep -q 'counter packets 10 bytes 100 timeout 15s' <<< "$OUT"
-VAL=$(expires_seconds <<< "$OUT")
-[[ $val -lt 14 ]]
+grep -q 'counter packets 10 bytes 100 timeout 15m' <<< "$OUT"
+VAL=$(expires_minutes <<< "$OUT")
+[[ $val -lt 10 ]]
 $NFT get element t m '{ 5.6.7.8 }' | grep -q 'quota 100 bytes used 50 bytes'
+echo OK
 
-# 'reset set' output is supposed to match 'list set' one, again strip the ms values
-EXP=$($NFT list set t s | drop_ms)
-OUT=$($NFT reset set t s | drop_ms)
+echo -n "list set matches reset set: "
+EXP=$($NFT list set t s | drop_seconds)
+OUT=$($NFT reset set t s | drop_seconds)
 $DIFF -u <(echo "$EXP") <(echo "$OUT")
+echo OK
 
-EXP=$($NFT list map t m | drop_ms)
-OUT=$($NFT reset map t m | drop_ms)
+echo -n "list map matches reset map: "
+EXP=$($NFT list map t m)
+OUT=$($NFT reset map t m)
 $DIFF -u <(echo "$EXP") <(echo "$OUT")
+echo OK
 
-# assert expiry of element with custom timeout is correct
-VAL=$($NFT get element t s '{ 2.0.0.2 . tcp . 22 }' | expires_seconds)
-[[ $VAL -lt 15 ]]
+echo -n "reset command respects per-element timeout: "
+VAL=$($NFT get element t s '{ 2.0.0.2 . tcp . 22 }' | expires_minutes)
+[[ $VAL -lt 15 ]]	# custom timeout applies
+[[ $VAL -gt 10 ]]	# expires was reset
+echo OK
 
-# assert remaining elements are now all reset
+echo -n "remaining elements are reset: "
 OUT=$($NFT list ruleset)
 grep -q '2.0.0.2 . tcp . 22 counter packets 0 bytes 0' <<< "$OUT"
 grep -q '5.6.7.8 quota 100 bytes : 50.6.7.8' <<< "$OUT"
+echo OK

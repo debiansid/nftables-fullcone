@@ -12,13 +12,12 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
-#include <config.h>
-#include <stdlib.h>
+#include <nft.h>
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
 #include <ctype.h>
 #include <limits.h>
 #ifdef HAVE_LIBREADLINE

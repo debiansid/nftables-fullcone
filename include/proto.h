@@ -35,6 +35,8 @@ enum icmp_hdr_field_type {
 	PROTO_ICMP6_PPTR,
 	PROTO_ICMP6_ECHO,
 	PROTO_ICMP6_MGMQ,
+	PROTO_ICMP6_ADDRESS,	/* neighbor solicit/advert, redirect and MLD */
+	PROTO_ICMP6_REDIRECT,
 };
 
 /**
@@ -305,6 +307,8 @@ enum icmp6_hdr_fields {
 	ICMP6HDR_ID,
 	ICMP6HDR_SEQ,
 	ICMP6HDR_MAXDELAY,
+	ICMP6HDR_TADDR,
+	ICMP6HDR_DADDR,
 };
 
 enum ip6_hdr_fields {

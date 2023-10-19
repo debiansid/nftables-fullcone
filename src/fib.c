@@ -8,13 +8,14 @@
  * later) as published by the Free Software Foundation.
  */
 
+#include <nft.h>
+
 #include <nftables.h>
 #include <erec.h>
 #include <expression.h>
 #include <datatype.h>
 #include <gmputil.h>
 #include <utils.h>
-#include <string.h>
 #include <fib.h>
 
 #include <linux/rtnetlink.h>

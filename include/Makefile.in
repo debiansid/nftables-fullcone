@@ -254,7 +254,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON_BIN = @PYTHON_BIN@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -326,6 +325,7 @@ noinst_HEADERS = cli.h		\
 			cmd.h		\
 			datatype.h	\
 			dccpopt.h	\
+			nft.h	\
 			expression.h	\
 			fib.h		\
 			hash.h		\

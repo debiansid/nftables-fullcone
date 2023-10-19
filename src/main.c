@@ -8,12 +8,12 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
-#include <stdlib.h>
+#include <nft.h>
+
 #include <stddef.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
-#include <string.h>
 #include <getopt.h>
 #include <fcntl.h>
 #include <sys/types.h>

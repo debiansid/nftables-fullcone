@@ -1,6 +1,0 @@
-#!/bin/bash
-
-set -e
-$NFT add table t
-
-$NFT destroy flowtable t f

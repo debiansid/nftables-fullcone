@@ -8,8 +8,8 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
-#include <stdlib.h>
-#include <string.h>
+#include <nft.h>
+
 #include <inttypes.h>
 #include <arpa/inet.h>
 
@@ -126,9 +126,8 @@ static struct expr *get_set_interval_find(const struct set *cache_set,
 		case EXPR_VALUE:
 			if (expr_basetype(i->key)->type != TYPE_STRING)
 				break;
-			/* string type, check if its a range (wildcard), so
-			 * fall through.
-			 */
+			/* string type, check if its a range (wildcard). */
+			/* fall-through */
 		case EXPR_PREFIX:
 		case EXPR_RANGE:
 			range_expr_value_low(val, i);

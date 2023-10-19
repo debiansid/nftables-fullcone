@@ -1,5 +1,5 @@
-AC_INIT([nftables], [1.0.8], [netfilter-devel@vger.kernel.org])
-AC_DEFINE([RELEASE_NAME], ["Old Doc Yak #2"], [Release name])
+AC_INIT([nftables], [1.0.9], [netfilter-devel@vger.kernel.org])
+AC_DEFINE([RELEASE_NAME], ["Old Doc Yak #3"], [Release name])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
@@ -23,6 +23,9 @@ AM_CONDITIONAL([BUILD_MAN], [test "x$enable_man_doc" = "xyes" ])
 
 # Checks for programs.
 AC_PROG_CC
+
+AC_USE_SYSTEM_EXTENSIONS
+
 AC_PROG_MKDIR_P
 AC_PROG_INSTALL
 AC_PROG_SED
@@ -44,7 +47,6 @@ fi
 
 AM_PROG_AR
 LT_INIT([disable-static])
-AM_PROG_CC_C_O
 AC_EXEEXT
 CHECK_GCC_FVISIBILITY
 
@@ -108,24 +110,9 @@ AC_DEFINE([HAVE_LIBJANSSON], [1], [Define if you have libjansson])
 ])
 AM_CONDITIONAL([BUILD_JSON], [test "x$with_json" != xno])
 
-AC_ARG_ENABLE(python,
-       AS_HELP_STRING([--enable-python], [Enable python]),,[enable_python=check]
-       )
-
-AC_ARG_WITH([python_bin],
-            [AS_HELP_STRING([--with-python-bin], [Specify Python binary to use])],
-	    [PYTHON_BIN="$withval"], [AC_PATH_PROGS(PYTHON_BIN, python python2 python2.7 python3)]
-	   )
-
-AS_IF([test "x$PYTHON_BIN" = "x"], [
-	AS_IF([test "x$enable_python" = "xyes"], [AC_MSG_ERROR([Python asked but not found])],
-	[test "x$enable_python" = "xcheck"], [
-		AC_MSG_WARN([Python not found, continuing anyway])
-		enable_python=no
-	])
-])
-
-AM_CONDITIONAL([HAVE_PYTHON], [test "$enable_python" != "no"])
+AC_CHECK_DECLS([getprotobyname_r, getprotobynumber_r, getservbyport_r], [], [], [[
+#include <netdb.h>
+]])
 
 AC_CONFIG_FILES([					\
 		Makefile				\
@@ -157,10 +144,3 @@ nft configuration:
   enable man page:              ${enable_man_doc}
   libxtables support:		${with_xtables}
   json output support:          ${with_json}"
-
-AS_IF([test "$enable_python" != "no"], [
-	echo "  enable Python:		yes (with $PYTHON_BIN)"
-	], [
-	echo "  enable Python:		no"
-	]
-	)

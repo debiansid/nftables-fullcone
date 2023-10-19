@@ -2,6 +2,8 @@
 
 # list only the flowtable asked for with table
 
+set -e
+
 FLOWTABLES="flowtable f {
 	hook ingress priority filter
 	devices = { lo }
@@ -41,13 +43,13 @@ EXPECTED3="table ip filter {
 	}
 }"
 
-ip link add d0 type dummy || {
-	echo "Skipping, no dummy interface available"
-	exit 0
+iface_cleanup() {
+	ip link del d0 &>/dev/null || :
 }
-trap "ip link del d0" EXIT
+trap 'iface_cleanup' EXIT
+iface_cleanup
 
-set -e
+ip link add d0 type dummy
 
 $NFT -f - <<< "$RULESET"
 

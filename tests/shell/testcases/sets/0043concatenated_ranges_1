@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 #
 # 0043concatenated_ranges_1 - Insert and list subnets of different sizes
 

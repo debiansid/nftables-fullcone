@@ -85,3 +85,15 @@ icmpv6 max-delay {33, 55, 67, 88};ok
 icmpv6 max-delay != {33, 55, 67, 88};ok
 
 icmpv6 type parameter-problem icmpv6 code no-route;ok
+
+icmpv6 type mld-listener-query icmpv6 taddr 2001:db8::133;ok
+icmpv6 type nd-neighbor-solicit icmpv6 taddr 2001:db8::133;ok
+icmpv6 type nd-neighbor-advert icmpv6 taddr 2001:db8::133;ok
+icmpv6 taddr 2001:db8::133;ok;icmpv6 type { mld-listener-query, mld-listener-report, mld-listener-done, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect} icmpv6 taddr 2001:db8::133
+
+icmpv6 taddr 2001:db8::133;ok;icmpv6 type { mld-listener-query, mld-listener-report, mld-listener-done, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect} icmpv6 taddr 2001:db8::133
+
+icmpv6 type { mld-listener-query, mld-listener-report, mld-listener-done, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect} icmpv6 taddr 2001:db8::133;ok
+icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert } icmpv6 taddr 2001:db8::133;ok
+icmpv6 daddr 2001:db8::133;ok
+icmpv6 type nd-redirect icmpv6 daddr 2001:db8::133;ok;icmpv6 daddr 2001:db8::133

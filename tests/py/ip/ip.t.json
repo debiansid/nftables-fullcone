@@ -384,7 +384,7 @@
     }
 ]
 
-# ip frag-off 222 accept
+# ip frag-off 0xde accept
 [
     {
         "match": {
@@ -403,7 +403,7 @@
     }
 ]
 
-# ip frag-off != 233
+# ip frag-off != 0xe9
 [
     {
         "match": {
@@ -419,7 +419,7 @@
     }
 ]
 
-# ip frag-off 33-45
+# ip frag-off 0x21-0x2d
 [
     {
         "match": {
@@ -437,7 +437,7 @@
     }
 ]
 
-# ip frag-off != 33-45
+# ip frag-off != 0x21-0x2d
 [
     {
         "match": {
@@ -455,7 +455,7 @@
     }
 ]
 
-# ip frag-off { 33, 55, 67, 88}
+# ip frag-off { 0x21, 0x37, 0x43, 0x58}
 [
     {
         "match": {
@@ -478,7 +478,7 @@
     }
 ]
 
-# ip frag-off != { 33, 55, 67, 88}
+# ip frag-off != { 0x21, 0x37, 0x43, 0x58}
 [
     {
         "match": {
@@ -497,6 +497,69 @@
                     88
                 ]
             }
+        }
+    }
+]
+
+# ip frag-off & 0x1fff != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    8191
+                ]
+            },
+            "op": "!=",
+            "right": 0
+        }
+    }
+]
+
+# ip frag-off & 0x2000 != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    8192
+                ]
+            },
+            "op": "!=",
+            "right": 0
+        }
+    }
+]
+
+# ip frag-off & 0x4000 != 0x0
+[
+    {
+        "match": {
+            "left": {
+                "&": [
+                    {
+                        "payload": {
+                            "field": "frag-off",
+                            "protocol": "ip"
+                        }
+                    },
+                    16384
+                ]
+            },
+            "op": "!=",
+            "right": 0
         }
     }
 ]
@@ -1685,3 +1748,64 @@
     }
 ]
 
+# ip saddr 1.2.3.4 ip daddr 3.4.5.6
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "1.2.3.4"
+        }
+    },
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "daddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "3.4.5.6"
+        }
+    }
+]
+
+# ip saddr 1.2.3.4 counter ip daddr 3.4.5.6
+[
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "saddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "1.2.3.4"
+        }
+    },
+    {
+        "counter": {
+            "bytes": 0,
+            "packets": 0
+        }
+    },
+    {
+        "match": {
+            "left": {
+                "payload": {
+                    "field": "daddr",
+                    "protocol": "ip"
+                }
+            },
+            "op": "==",
+            "right": "3.4.5.6"
+        }
+    }
+]

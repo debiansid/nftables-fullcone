@@ -9,11 +9,11 @@
 *bridge;test-bridge;output
 *netdev;test-netdev;ingress,egress
 
-limit rate 400/minute;ok
-limit rate 20/second;ok
-limit rate 400/hour;ok
-limit rate 40/day;ok
-limit rate 400/week;ok
+limit rate 400/minute;ok;limit rate 400/minute burst 5 packets
+limit rate 20/second;ok;limit rate 20/second burst 5 packets
+limit rate 400/hour;ok;limit rate 400/hour burst 5 packets
+limit rate 40/day;ok;limit rate 40/day burst 5 packets
+limit rate 400/week;ok;limit rate 400/week burst 5 packets
 limit rate 1023/second burst 10 packets;ok
 limit rate 1023/second burst 10 bytes;fail
 
@@ -35,11 +35,11 @@ limit rate 1025 kbytes/second burst 1023 kbytes;ok
 limit rate 1025 mbytes/second burst 1025 kbytes;ok
 limit rate 1025000 mbytes/second burst 1023 mbytes;ok
 
-limit rate over 400/minute;ok
-limit rate over 20/second;ok
-limit rate over 400/hour;ok
-limit rate over 40/day;ok
-limit rate over 400/week;ok
+limit rate over 400/minute;ok;limit rate over 400/minute burst 5 packets
+limit rate over 20/second;ok;limit rate over 20/second burst 5 packets
+limit rate over 400/hour;ok;limit rate over 400/hour burst 5 packets
+limit rate over 40/day;ok;limit rate over 40/day burst 5 packets
+limit rate over 400/week;ok;limit rate over 400/week burst 5 packets
 limit rate over 1023/second burst 10 packets;ok
 
 limit rate over 1 kbytes/second;ok

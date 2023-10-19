@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# NFT_TEST_REQUIRES(NFT_TEST_HAVE_catchall_element)
+
 set -e
 
 RULESET="table ip x {

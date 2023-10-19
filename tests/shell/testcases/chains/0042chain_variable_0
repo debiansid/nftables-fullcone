@@ -24,6 +24,11 @@ table netdev filter2 {
 
 $NFT -f - <<< $EXPECTED
 
+if [ "$NFT_TEST_HAVE_netdev_egress" = n ] ; then
+	echo "Skip parts of the test due to NFT_TEST_HAVE_netdev_egress=n"
+	exit 77
+fi
+
 EXPECTED="define if_main = { lo, dummy0 }
 define lan_interfaces = { lo }
 

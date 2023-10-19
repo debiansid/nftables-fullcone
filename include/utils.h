@@ -2,8 +2,6 @@
 #define NFTABLES_UTILS_H
 
 #include <asm/byteorder.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -11,7 +9,6 @@
 #include <list.h>
 #include <gmputil.h>
 
-#include "config.h"
 #ifdef HAVE_VISIBILITY_HIDDEN
 #       define __visible        __attribute__((visibility("default")))
 #       define EXPORT_SYMBOL(x) typeof(x) (x) __visible;
@@ -39,7 +36,7 @@
 #define __must_check		__attribute__((warn_unused_result))
 #define __noreturn		__attribute__((__noreturn__))
 
-#define BUG(fmt, arg...)	({ fprintf(stderr, "BUG: " fmt, ##arg); assert(0); })
+#define BUG(fmt, arg...)	({ fprintf(stderr, "BUG: " fmt, ##arg); assert(0); abort(); })
 
 #define BUILD_BUG_ON(condition)	((void)sizeof(char[1 - 2*!!(condition)]))
 #define BUILD_BUG_ON_ZERO(e)	(sizeof(char[1 - 2 * !!(e)]) - 1)
@@ -75,15 +72,32 @@
 #define max(_x, _y) ({				\
 	_x > _y ? _x : _y; })
 
-#define SNPRINTF_BUFFER_SIZE(ret, size, len, offset)	\
-	if (ret < 0)					\
-		abort();				\
-	offset += ret;					\
-	assert(ret < len);				\
-	if (ret > len)					\
-		ret = len;				\
-	size += ret;					\
-	len -= ret;
+#define SNPRINTF_BUFFER_SIZE(ret, len, offset)			\
+	({ \
+		const int _ret = (ret);				\
+		size_t *const _len = (len);			\
+		size_t *const _offset = (offset);		\
+		bool _not_truncated = true;			\
+		size_t _ret2;					\
+								\
+		assert(_ret >= 0);				\
+								\
+		if ((size_t) _ret >= *_len) {			\
+			/* Truncated.
+			 *
+			 * We will leave "len" at zero and increment
+			 * "offset" to point one byte after the buffer
+			 * (after the terminating NUL byte). */	\
+			_ret2 = *_len;				\
+			_not_truncated = false;			\
+		} else						\
+			_ret2 = (size_t) _ret;			\
+								\
+		*_offset += _ret2;				\
+		*_len -= _ret2;					\
+								\
+		_not_truncated;					\
+	})
 
 #define MSEC_PER_SEC	1000L
 

@@ -1,0 +1,16 @@
+table ip x {
+	set est-connlimit {
+		type ipv4_addr
+		size 65535
+		flags dynamic
+		elements = { 84.245.120.167 ct count over 20 }
+	}
+
+	set new-connlimit {
+		type ipv4_addr
+		size 65535
+		flags dynamic
+		ct count over 20
+		elements = { 84.245.120.167 ct count over 20 }
+	}
+}

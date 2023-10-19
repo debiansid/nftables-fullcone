@@ -9,10 +9,9 @@
  *
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <linux/netfilter.h>
@@ -305,6 +304,8 @@ const struct proto_desc *proto_ctx_find_conflict(struct proto_ctx *ctx,
 
 #define HDR_FIELD(__name, __struct, __member)				\
 	HDR_TEMPLATE(__name, &integer_type, __struct, __member)
+#define HDR_HEX_FIELD(__name, __struct, __member)				\
+	HDR_TEMPLATE(__name, &xinteger_type, __struct, __member)
 #define HDR_BITFIELD(__name, __dtype,  __offset, __len)			\
 	PROTO_HDR_TEMPLATE(__name, __dtype, BYTEORDER_BIG_ENDIAN,	\
 			   __offset, __len)
@@ -437,10 +438,10 @@ const struct datatype icmp_type_type = {
 	.sym_tbl	= &icmp_type_tbl,
 };
 
-#define ICMP46HDR_FIELD(__token, __struct, __member, __dep)			\
+#define ICMP46HDR_FIELD(__token, __dtype, __struct, __member, __dep)		\
 	{									\
 		.token		= (__token),					\
-		.dtype		= &integer_type,				\
+		.dtype		= &__dtype,					\
 		.byteorder	= BYTEORDER_BIG_ENDIAN,				\
 		.offset		= offsetof(__struct, __member) * 8,		\
 		.len		= field_sizeof(__struct, __member) * 8,		\
@@ -448,7 +449,7 @@ const struct datatype icmp_type_type = {
 	}
 
 #define ICMPHDR_FIELD(__token, __member, __dep) \
-	ICMP46HDR_FIELD(__token, struct icmphdr, __member, __dep)
+	ICMP46HDR_FIELD(__token, integer_type, struct icmphdr, __member, __dep)
 
 #define ICMPHDR_TYPE(__name, __type, __member) \
 	HDR_TYPE(__name,  __type, struct icmphdr, __member)
@@ -845,7 +846,7 @@ const struct proto_desc proto_ip = {
 		[IPHDR_ECN]		= HDR_BITFIELD("ecn", &ecn_type, 14, 2),
 		[IPHDR_LENGTH]		= IPHDR_FIELD("length",		tot_len),
 		[IPHDR_ID]		= IPHDR_FIELD("id",		id),
-		[IPHDR_FRAG_OFF]	= IPHDR_FIELD("frag-off",	frag_off),
+		[IPHDR_FRAG_OFF]	= HDR_HEX_FIELD("frag-off", struct iphdr, frag_off),
 		[IPHDR_TTL]		= IPHDR_FIELD("ttl",		ttl),
 		[IPHDR_PROTOCOL]	= INET_PROTOCOL("protocol", struct iphdr, protocol),
 		[IPHDR_CHECKSUM]	= IPHDR_FIELD("checksum",	check),
@@ -912,7 +913,7 @@ const struct datatype icmp6_type_type = {
 };
 
 #define ICMP6HDR_FIELD(__token, __member, __dep) \
-	ICMP46HDR_FIELD(__token, struct icmp6_hdr, __member, __dep)
+	ICMP46HDR_FIELD(__token, integer_type, struct icmp6_hdr, __member, __dep)
 #define ICMP6HDR_TYPE(__name, __type, __member) \
 	HDR_TYPE(__name, __type, struct icmp6_hdr, __member)
 
@@ -932,6 +933,12 @@ const struct proto_desc proto_icmp6 = {
 		[ICMP6HDR_ID]		= ICMP6HDR_FIELD("id", icmp6_id, PROTO_ICMP6_ECHO),
 		[ICMP6HDR_SEQ]		= ICMP6HDR_FIELD("sequence", icmp6_seq, PROTO_ICMP6_ECHO),
 		[ICMP6HDR_MAXDELAY]	= ICMP6HDR_FIELD("max-delay", icmp6_maxdelay, PROTO_ICMP6_MGMQ),
+		[ICMP6HDR_TADDR]	= ICMP46HDR_FIELD("taddr", ip6addr_type,
+							  struct nd_neighbor_solicit, nd_ns_target,
+							  PROTO_ICMP6_ADDRESS),
+		[ICMP6HDR_DADDR]	= ICMP46HDR_FIELD("daddr", ip6addr_type,
+							  struct nd_redirect, nd_rd_dst,
+							  PROTO_ICMP6_REDIRECT),
 	},
 };
 
@@ -1279,7 +1286,7 @@ const struct proto_desc proto_netdev = {
 	},
 };
 
-static const struct proto_desc *proto_definitions[PROTO_DESC_MAX + 1] = {
+static const struct proto_desc *const proto_definitions[PROTO_DESC_MAX + 1] = {
 	[PROTO_DESC_AH]		= &proto_ah,
 	[PROTO_DESC_ESP]	= &proto_esp,
 	[PROTO_DESC_COMP]	= &proto_comp,
@@ -1298,6 +1305,7 @@ static const struct proto_desc *proto_definitions[PROTO_DESC_MAX + 1] = {
 	[PROTO_DESC_VLAN]	= &proto_vlan,
 	[PROTO_DESC_ETHER]	= &proto_eth,
 	[PROTO_DESC_VXLAN]	= &proto_vxlan,
+	[PROTO_DESC_GENEVE]	= &proto_geneve,
 	[PROTO_DESC_GRE]	= &proto_gre,
 	[PROTO_DESC_GRETAP]	= &proto_gretap,
 };

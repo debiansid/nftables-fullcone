@@ -6,15 +6,16 @@
  * later) as published by the Free Software Foundation.
  */
 
-#define _GNU_SOURCE
+#include <nft.h>
+
 #include <stdio.h>
-#include <string.h>
 
 #include <expression.h>
 #include <list.h>
 #include <netlink.h>
 #include <rule.h>
 #include <rt.h>
+#include "nftutils.h"
 
 #include <netdb.h>
 #include <netinet/icmp6.h>
@@ -69,8 +70,9 @@ static json_t *set_dtype_json(const struct expr *key)
 {
 	char *namedup = xstrdup(key->dtype->name), *tok;
 	json_t *root = NULL;
+	char *tok_safe;
 
-	tok = strtok(namedup, " .");
+	tok = strtok_r(namedup, " .", &tok_safe);
 	while (tok) {
 		json_t *jtok = json_string(tok);
 		if (!root)
@@ -79,7 +81,7 @@ static json_t *set_dtype_json(const struct expr *key)
 			root = json_pack("[o, o]", root, jtok);
 		else
 			json_array_append_new(root, jtok);
-		tok = strtok(NULL, " .");
+		tok = strtok_r(NULL, " .", &tok_safe);
 	}
 	xfree(namedup);
 	return root;
@@ -173,6 +175,8 @@ static json_t *set_print_json(struct output_ctx *octx, const struct set *set)
 		json_array_append_new(tmp, json_pack("s", "interval"));
 	if (set->flags & NFT_SET_TIMEOUT)
 		json_array_append_new(tmp, json_pack("s", "timeout"));
+	if (set->flags & NFT_SET_EVAL)
+		json_array_append_new(tmp, json_pack("s", "dynamic"));
 
 	if (json_array_size(tmp) > 0) {
 		json_object_set_new(root, "flags", tmp);
@@ -297,10 +301,10 @@ static json_t *chain_print_json(const struct chain *chain)
 
 static json_t *proto_name_json(uint8_t proto)
 {
-	const struct protoent *p = getprotobynumber(proto);
+	char name[NFT_PROTONAME_MAXSIZE];
 
-	if (p)
-		return json_string(p->p_name);
+	if (nft_getprotobynumber(proto, name, sizeof(name)))
+		return json_string(name);
 	return json_integer(proto);
 }
 
@@ -1093,12 +1097,11 @@ json_t *boolean_type_json(const struct expr *expr, struct output_ctx *octx)
 json_t *inet_protocol_type_json(const struct expr *expr,
 				struct output_ctx *octx)
 {
-	struct protoent *p;
-
 	if (!nft_output_numeric_proto(octx)) {
-		p = getprotobynumber(mpz_get_uint8(expr->value));
-		if (p != NULL)
-			return json_string(p->p_name);
+		char name[NFT_PROTONAME_MAXSIZE];
+
+		if (nft_getprotobynumber(mpz_get_uint8(expr->value), name, sizeof(name)))
+			return json_string(name);
 	}
 	return integer_type_json(expr, octx);
 }
@@ -1106,13 +1109,13 @@ json_t *inet_protocol_type_json(const struct expr *expr,
 json_t *inet_service_type_json(const struct expr *expr, struct output_ctx *octx)
 {
 	uint16_t port = mpz_get_be16(expr->value);
-	const struct servent *s = NULL;
+	char name[NFT_SERVNAME_MAXSIZE];
 
 	if (!nft_output_service(octx) ||
-	    (s = getservbyport(port, NULL)) == NULL)
+	    !nft_getservbyport(port, NULL, name, sizeof(name)))
 		return json_integer(ntohs(port));
 
-	return json_string(s->s_name);
+	return json_string(name);
 }
 
 json_t *mark_type_json(const struct expr *expr, struct output_ctx *octx)
@@ -1514,6 +1517,25 @@ json_t *set_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
 	}
 
 	return json_pack("{s:o}", "set", root);
+}
+
+json_t *map_stmt_json(const struct stmt *stmt, struct output_ctx *octx)
+{
+	json_t *root;
+
+	root = json_pack("{s:s, s:o, s:o, s:s+}",
+			 "op", set_stmt_op_names[stmt->map.op],
+			 "elem", expr_print_json(stmt->map.key, octx),
+			 "data", expr_print_json(stmt->map.data, octx),
+			 "map", "@", stmt->map.set->set->handle.set.name);
+
+	if (!list_empty(&stmt->map.stmt_list)) {
+		json_object_set_new(root, "stmt",
+				    set_stmt_list_json(&stmt->map.stmt_list,
+						       octx));
+	}
+
+	return json_pack("{s:o}", "map", root);
 }
 
 json_t *objref_stmt_json(const struct stmt *stmt, struct output_ctx *octx)

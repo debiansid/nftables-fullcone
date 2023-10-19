@@ -39,3 +39,12 @@ netdev test-netdev ingress
   [ payload load 16b @ network header + 24 => reg 2 ]
   [ dynset delete reg_key 1 set set5 ]
 
+# add @map1 { ip6 saddr . ip6 daddr : meta mark }
+netdev test-netdev ingress
+  [ meta load protocol => reg 1 ]
+  [ cmp eq reg 1 0x0000dd86 ]
+  [ payload load 16b @ network header + 8 => reg 1 ]
+  [ payload load 16b @ network header + 24 => reg 2 ]
+  [ meta load mark => reg 3 ]
+  [ dynset add reg_key 1 set map1 sreg_data 3 ]
+

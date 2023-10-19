@@ -41,12 +41,12 @@ see https://www.gnu.org/licenses/.  */
    mpn/generic/sbpi1_div_qr.c, mpn/generic/sub_n.c,
    mpn/generic/submul_1.c. */
 
+#include <nft.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "mini-gmp.h"
 

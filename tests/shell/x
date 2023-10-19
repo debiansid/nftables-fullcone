@@ -1,1 +1,5 @@
-testcases/transactions/0050rule_1
+testcases/json/dumps/0001set_statements_0.nft
+testcases/nft-f/0025empty_dynset_0
+testcases/sets/dumps/0022type_selective_flush_0.nft
+testcases/sets/dumps/0038meter_list_0.nft
+testcases/sets/dumps/0060set_multistmt_0.nft

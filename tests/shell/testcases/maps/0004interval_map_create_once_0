@@ -5,6 +5,10 @@
 
 HOWMANY=63
 
+if [ "$NFT_TEST_SKIP_slow" = y ] ; then
+	HOWMANY=5
+fi
+
 tmpfile=$(mktemp)
 if [ ! -w $tmpfile ] ; then
 	echo "Failed to create tmp file" >&2
@@ -64,3 +68,7 @@ if [ "$EXPECTED" != "$GET" ] ; then
 	exit 1
 fi
 
+if [ "$HOWMANY" != 63 ] ; then
+	echo "Run a partial test due to NFT_TEST_SKIP_slow=y. Skip"
+	exit 77
+fi

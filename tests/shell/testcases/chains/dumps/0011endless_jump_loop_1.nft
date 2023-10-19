@@ -1,0 +1,13 @@
+table ip t {
+	map m {
+		type inet_service : verdict
+		elements = { 2 : jump c2 }
+	}
+
+	chain c1 {
+		tcp dport vmap @m
+	}
+
+	chain c2 {
+	}
+}

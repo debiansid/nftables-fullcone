@@ -1,8 +1,6 @@
 #ifndef NFTABLES_GMPUTIL_H
 #define NFTABLES_GMPUTIL_H
 
-#include <config.h>
-
 #ifdef HAVE_LIBGMP
 #include <gmp.h>
 #else

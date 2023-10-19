@@ -7,8 +7,8 @@ EXPECTED="table inet t {
 	}
 
 	chain y {
-		ip saddr . @ih,32,32 { 1.1.1.1 . 0x14, 2.2.2.2 . 0x1e }
-		ip daddr . @ih,32,32 @y
+		ip saddr . @nh,32,32 { 1.1.1.1 . 0x14, 2.2.2.2 . 0x1e }
+		ip daddr . @nh,32,32 @y
 	}
 }"
 

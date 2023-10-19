@@ -1,0 +1,430 @@
+testcases/transactions/0050rule_1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KError: Could not process rule: File exists
+add element t s {  0 -  2 }
+                   ^^^^^^
+Failed to insert  0 -  2 given:
+table ip t {
+	set s {
+		type inet_service
+		flags interval,timeout
+		timeout 1m22s
+		gc-interval 1m22s
+	}
+
+	set c {
+		type inet_service . inet_service
+		flags interval,timeout
+		timeout 1m22s
+		gc-interval 1m22s
+	}
+}
+
+I: results: [OK] 0 [FAILED] 1 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KError: Could not process rule: File exists
+add element t s {  0 -  2 }
+                   ^^^^^^
+Failed to insert  0 -  2 given:
+table ip t {
+	set s {
+		type inet_service
+		flags interval,timeout
+		timeout 1m22s
+		gc-interval 1m22s
+	}
+
+	set c {
+		type inet_service . inet_service
+		flags interval,timeout
+		timeout 1m22s
+		gc-interval 1m22s
+	}
+}
+
+I: results: [OK] 0 [FAILED] 1 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0
+[1A[KI: [OK]		testcases/sets/0044interval_overlap_0
+
+I: results: [OK] 1 [FAILED] 0 [TOTAL] 1
+I: using nft command: ./../../src/nft
+
+I: [EXECUTING]	testcases/sets/0044interval_overlap_0

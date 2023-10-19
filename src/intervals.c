@@ -6,6 +6,8 @@
  * later) as published by the Free Software Foundation.
  */
 
+#include <nft.h>
+
 #include <nftables.h>
 #include <expression.h>
 #include <intervals.h>

@@ -2,7 +2,6 @@
 #define NFTABLES_DCCPOPT_H
 
 #include <nftables.h>
-#include <stdint.h>
 
 #define DCCPOPT_TYPE_MIN 0
 #define DCCPOPT_TYPE_MAX UINT8_MAX

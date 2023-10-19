@@ -4,7 +4,7 @@ Installation instructions for nftables
  Prerequisites
  =============
 
-  - standard glibc headers, gcc etc.
+  - build tooling: glibc headers, gcc, autotools, automake, libtool, pkg-config.
 
   - libmnl: git://git.netfilter.org/libmnl.git
 
@@ -14,17 +14,15 @@ Installation instructions for nftables
 
   - bison
 
-  - libgmp
+  - libgmp: alternatively, see mini-gmp support below.
 
-  - libreadline
-
-  - pkg-config
-
-  - libtool
+  - libreadline or libedit or linenoise: required by interactive command line
 
   - optional: libxtables: required to interact with iptables-compat
 
-  - optional: docbook2x: required for building man-page
+  - optional: libjansson: required to build JSON support
+
+  - optional: asciidoc: required for building man-page
 
  Configuring and compiling
  =========================
@@ -60,17 +58,50 @@ Installation instructions for nftables
 	For libxtables support to interact with the iptables-compat
 	utility.
 
- Suggested configuration options: --prefix=/ --datarootdir=/usr/share
+ --without-cli
+
+	To disable interactive command line support, ie. -i/--interactive.
+
+ --with-cli=readline
+
+	To enable interactive command line support with libreadline.
+
+ --with-cli=linenoise
+
+	To enable interactive command line support with linenoise.
+
+ --with-cli=editline
+
+	To enable interactive command line support with libedit.
+
+ --with-json
+
+	To enable JSON support, this requires libjansson.
 
  Run "make" to compile nftables, "make install" to install it in the
  configured paths.
 
- Other notes
+ Python support
+ ==============
+
+ CPython bindings are available for nftables under the py/ folder.  They can be
+ installed using pip:
+
+	python -m pip install py/
+
+ A legacy setup.py script can also be used:
+
+	( cd py && python setup.py install )
+
+ However, this method is deprecated.
+
+ Source code
  ===========
 
- The nftables kernel tree can be found at:
+ Netfilter's Linux kernel tree can be found at:
 
- git://git.kernel.org/pub/scm/linux/kernel/git/pablo/nftables.git
+ git://git.kernel.org/pub/scm/linux/kernel/git/netfilter/nf.git/
+ https://git.kernel.org/pub/scm/linux/kernel/git/netfilter/nf.git
 
  The latest version of this code can be found at:
 

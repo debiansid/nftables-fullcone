@@ -134,6 +134,14 @@ Destination address |
 ipv4_addr
 |======================
 
+Careful with matching on *ip length*: If GRO/GSO is enabled, then the Linux
+kernel might aggregate several packets into one big packet that is larger than
+MTU. Moreover, if GRO/GSO maximum size is larger than 65535 (see man ip-link(8),
+specifically gro_ipv6_max_size and gso_ipv6_max_size), then *ip length* might
+be 0 for such jumbo packets. *meta length* allows you to match on the packet
+length including the IP header size.  If you want to perform heuristics on the
+*ip length* field, then disable GRO/GSO.
+
 ICMP HEADER EXPRESSION
 ~~~~~~~~~~~~~~~~~~~~~~
 [verse]
@@ -244,6 +252,14 @@ Destination address |
 ipv6_addr
 |=======================
 
+Careful with matching on *ip6 length*: If GRO/GSO is enabled, then the Linux
+kernel might aggregate several packets into one big packet that is larger than
+MTU. Moreover, if GRO/GSO maximum size is larger than 65535 (see man ip-link(8),
+specifically gro_ipv6_max_size and gso_ipv6_max_size), then *ip6 length* might
+be 0 for such jumbo packets. *meta length* allows you to match on the packet
+length including the IP header size.  If you want to perform heuristics on the
+*ip6 length* field, then disable GRO/GSO.
+
 .Using ip6 header expressions
 -----------------------------
 # matching if first extension header indicates a fragment
@@ -253,7 +269,7 @@ ip6 nexthdr ipv6-frag
 ICMPV6 HEADER EXPRESSION
 ~~~~~~~~~~~~~~~~~~~~~~~~
 [verse]
-*icmpv6* {*type* | *code* | *checksum* | *parameter-problem* | *packet-too-big* | *id* | *sequence* | *max-delay*}
+*icmpv6* {*type* | *code* | *checksum* | *parameter-problem* | *packet-too-big* | *id* | *sequence* | *max-delay* | *taddr* | *daddr*}
 
 This expression refers to ICMPv6 header fields. When using it in *inet*,
 *bridge* or *netdev* families, it will cause an implicit dependency on IPv6 to
@@ -288,6 +304,12 @@ integer (16 bit)
 |max-delay|
 maximum response delay of MLD queries|
 integer (16 bit)
+|taddr|
+target address of neighbor solicit/advert, redirect or MLD|
+ipv6_addr
+|daddr|
+destination address of redirect|
+ipv6_addr
 |==============================
 
 TCP HEADER EXPRESSION

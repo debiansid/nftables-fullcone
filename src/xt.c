@@ -7,9 +7,9 @@
  * later) as published by the Free Software Foundation.
  */
 
-#include <stdlib.h>
+#include <nft.h>
+
 #include <time.h>
-#include <string.h>
 #include <net/if.h>
 #include <getopt.h>
 #include <ctype.h>	/* for isspace */
@@ -348,7 +348,7 @@ err:
 }
 
 static struct option original_opts[] = {
-	{ NULL },
+	{ },
 };
 
 static struct xtables_globals xt_nft_globals = {
@@ -360,7 +360,18 @@ static struct xtables_globals xt_nft_globals = {
 
 void xt_init(void)
 {
-	/* Default to IPv4, but this changes in runtime */
-	xtables_init_all(&xt_nft_globals, NFPROTO_IPV4);
+	static bool init_once;
+
+	if (!init_once) {
+		/* libxtables is full of global variables and cannot be used
+		 * concurrently by multiple threads. Hence, it's fine that the
+		 * "init_once" guard is not thread-safe either.
+		 * Don't link against xtables if you want thread safety.
+		 */
+		init_once = true;
+
+		/* Default to IPv4, but this changes in runtime */
+		xtables_init_all(&xt_nft_globals, NFPROTO_IPV4);
+	}
 }
 #endif

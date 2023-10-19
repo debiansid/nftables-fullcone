@@ -9,10 +9,11 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <linux/netfilter/nf_tables.h>
 #include <linux/netfilter/nf_log.h>
 
-#include <string.h>
 #include <rule.h>
 #include <statement.h>
 #include <expression.h>
@@ -1583,13 +1584,13 @@ static void netlink_gen_map_stmt(struct netlink_linearize_ctx *ctx,
 	int num_stmts = 0;
 	struct stmt *this;
 
-	sreg_key = get_register(ctx, stmt->map.key);
-	netlink_gen_expr(ctx, stmt->map.key, sreg_key);
+	sreg_key = get_register(ctx, stmt->map.key->key);
+	netlink_gen_expr(ctx, stmt->map.key->key, sreg_key);
 
 	sreg_data = get_register(ctx, stmt->map.data);
 	netlink_gen_expr(ctx, stmt->map.data, sreg_data);
 
-	release_register(ctx, stmt->map.key);
+	release_register(ctx, stmt->map.key->key);
 	release_register(ctx, stmt->map.data);
 
 	nle = alloc_nft_expr("dynset");

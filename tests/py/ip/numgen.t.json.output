@@ -80,3 +80,33 @@
     }
 ]
 
+# dnat to numgen inc mod 7 offset 167772161
+[
+    {
+        "dnat": {
+            "addr": {
+                "numgen": {
+                    "mod": 7,
+                    "mode": "inc",
+                    "offset": 167772161
+                }
+            }
+        }
+    }
+]
+
+# dnat to numgen inc mod 255 offset 167772161
+[
+    {
+        "dnat": {
+            "addr": {
+                "numgen": {
+                    "mod": 255,
+                    "mode": "inc",
+                    "offset": 167772161
+                }
+            }
+        }
+    }
+]
+

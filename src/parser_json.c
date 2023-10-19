@@ -6,10 +6,9 @@
  * later) as published by the Free Software Foundation.
  */
 
-#define _GNU_SOURCE
+#include <nft.h>
+
 #include <errno.h>
-#include <stdint.h> /* needed by gmputil.h */
-#include <string.h>
 #include <syslog.h>
 
 #include <erec.h>
@@ -1725,13 +1724,18 @@ static struct stmt *json_parse_match_stmt(struct json_ctx *ctx,
 		    !strcmp(opstr, expr_op_symbols[op]))
 			break;
 	}
-	if (op == __OP_MAX) {
+	switch (op) {
+	case OP_EQ ... OP_NEG:
+		break;
+	case __OP_MAX:
 		if (!strcmp(opstr, "in")) {
 			op = OP_IMPLICIT;
-		} else {
-			json_error(ctx, "Unknown relational op '%s'.", opstr);
-			return NULL;
+			break;
 		}
+		/* fall through */
+	default:
+		json_error(ctx, "Invalid relational op '%s'.", opstr);
+		return NULL;
 	}
 
 	left = json_parse_expr(ctx, jleft);
@@ -2411,6 +2415,63 @@ static struct stmt *json_parse_set_stmt(struct json_ctx *ctx,
 	return stmt;
 }
 
+static struct stmt *json_parse_map_stmt(struct json_ctx *ctx,
+					const char *key, json_t *value)
+{
+	struct expr *expr, *expr2, *expr_data;
+	json_t *elem, *data, *stmt_json;
+	const char *opstr, *set;
+	struct stmt *stmt;
+	int op;
+
+	if (json_unpack_err(ctx, value, "{s:s, s:o, s:o, s:s}",
+			    "op", &opstr, "elem", &elem, "data", &data, "map", &set))
+		return NULL;
+
+	if (!strcmp(opstr, "add")) {
+		op = NFT_DYNSET_OP_ADD;
+	} else if (!strcmp(opstr, "update")) {
+		op = NFT_DYNSET_OP_UPDATE;
+	} else if (!strcmp(opstr, "delete")) {
+		op = NFT_DYNSET_OP_DELETE;
+	} else {
+		json_error(ctx, "Unknown map statement op '%s'.", opstr);
+		return NULL;
+	}
+
+	expr = json_parse_set_elem_expr_stmt(ctx, elem);
+	if (!expr) {
+		json_error(ctx, "Illegal map statement element.");
+		return NULL;
+	}
+
+	expr_data = json_parse_set_elem_expr_stmt(ctx, data);
+	if (!expr_data) {
+		json_error(ctx, "Illegal map expression data.");
+		expr_free(expr);
+		return NULL;
+	}
+
+	if (set[0] != '@') {
+		json_error(ctx, "Illegal map reference in map statement.");
+		expr_free(expr);
+		expr_free(expr_data);
+		return NULL;
+	}
+	expr2 = symbol_expr_alloc(int_loc, SYMBOL_SET, NULL, set + 1);
+
+	stmt = map_stmt_alloc(int_loc);
+	stmt->map.op = op;
+	stmt->map.key = expr;
+	stmt->map.data = expr_data;
+	stmt->map.set = expr2;
+
+	if (!json_unpack(value, "{s:o}", "stmt", &stmt_json))
+		json_parse_set_stmt_list(ctx, &stmt->set.stmt_list, stmt_json);
+
+	return stmt;
+}
+
 static int json_parse_log_flag(struct json_ctx *ctx,
 			       json_t *root, int *flags)
 {
@@ -2682,7 +2743,7 @@ static struct stmt *json_parse_meter_stmt(struct json_ctx *ctx,
 	json_t *jkey, *jstmt;
 	struct stmt *stmt;
 	const char *name;
-	uint32_t size = 0xffff;
+	uint32_t size = 0;
 
 	if (json_unpack_err(ctx, value, "{s:s, s:o, s:o}",
 			    "name", &name, "key", &jkey, "stmt", &jstmt))
@@ -2797,7 +2858,14 @@ static struct stmt *json_parse_optstrip_stmt(struct json_ctx *ctx,
 {
 	struct expr *expr = json_parse_expr(ctx, value);
 
-	return expr ? optstrip_stmt_alloc(int_loc, expr) : NULL;
+	if (!expr ||
+	    expr->etype != EXPR_EXTHDR ||
+	    expr->exthdr.op != NFT_EXTHDR_OP_TCPOPT) {
+		json_error(ctx, "Illegal TCP optstrip argument");
+		return NULL;
+	}
+
+	return optstrip_stmt_alloc(int_loc, expr);
 }
 
 static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
@@ -2828,6 +2896,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "redirect", json_parse_nat_stmt },
 		{ "reject", json_parse_reject_stmt },
 		{ "set", json_parse_set_stmt },
+		{ "map", json_parse_map_stmt },
 		{ "log", json_parse_log_stmt },
 		{ "ct helper", json_parse_cthelper_stmt },
 		{ "ct timeout", json_parse_cttimeout_stmt },
@@ -2965,7 +3034,7 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 		h.chain.name = xstrdup(h.chain.name);
 
 	if (comment) {
-		chain = chain_alloc(NULL);
+		chain = chain_alloc();
 		handle_merge(&chain->handle, &h);
 		chain->comment = xstrdup(comment);
 	}
@@ -2978,7 +3047,7 @@ static struct cmd *json_parse_cmd_add_chain(struct json_ctx *ctx, json_t *root,
 		return cmd_alloc(op, obj, &h, int_loc, chain);
 
 	if (!chain)
-		chain = chain_alloc(NULL);
+		chain = chain_alloc();
 
 	chain->flags |= CHAIN_F_BASECHAIN;
 	chain->type.str = xstrdup(type);
@@ -3124,6 +3193,7 @@ static int string_to_set_flag(const char *str)
 		{ NFT_SET_CONSTANT, "constant" },
 		{ NFT_SET_INTERVAL, "interval" },
 		{ NFT_SET_TIMEOUT, "timeout" },
+		{ NFT_SET_EVAL,	"dynamic" },
 	};
 	unsigned int i;
 
@@ -3175,7 +3245,7 @@ static struct cmd *json_parse_cmd_add_set(struct json_ctx *ctx, json_t *root,
 		break;
 	}
 
-	set = set_alloc(NULL);
+	set = set_alloc(&internal_location);
 
 	if (json_unpack(root, "{s:o}", "type", &tmp)) {
 		json_error(ctx, "Invalid set type.");
@@ -3367,7 +3437,7 @@ static struct cmd *json_parse_cmd_add_flowtable(struct json_ctx *ctx,
 	if (op == CMD_DELETE || op == CMD_LIST || op == CMD_DESTROY)
 		return cmd_alloc(op, cmd_obj, &h, int_loc, NULL);
 
-	if (json_unpack_err(ctx, root, "{s:s, s:I}",
+	if (json_unpack_err(ctx, root, "{s:s, s:i}",
 			    "hook", &hook,
 			    "prio", &prio)) {
 		handle_free(&h);
@@ -3408,7 +3478,7 @@ static int json_parse_ct_timeout_policy(struct json_ctx *ctx,
 	json_t *tmp, *val;
 	const char *key;
 
-	if (!json_unpack(root, "{s:o}", "policy", &tmp))
+	if (json_unpack(root, "{s:o}", "policy", &tmp))
 		return 0;
 
 	if (!json_is_object(tmp)) {
@@ -3440,8 +3510,8 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 {
 	const char *family, *tmp, *rate_unit = "packets", *burst_unit = "bytes";
 	uint32_t l3proto = NFPROTO_UNSPEC;
+	int inv = 0, flags = 0, i, j;
 	struct handle h = { 0 };
-	int inv = 0, flags = 0;
 	struct obj *obj;
 	json_t *jflags;
 
@@ -3563,7 +3633,7 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 			obj_free(obj);
 			return NULL;
 		}
-		obj->ct_helper.l3proto = l3proto;
+		obj->ct_timeout.l3proto = l3proto;
 
 		init_list_head(&obj->ct_timeout.timeout_list);
 		if (json_parse_ct_timeout_policy(ctx, root, obj)) {
@@ -3592,11 +3662,12 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 				return NULL;
 			}
 		}
-		if (!json_unpack(root, "{s:o}", "dport", &tmp))
-			obj->ct_expect.dport = atoi(tmp);
-		json_unpack(root, "{s:I}", "timeout", &obj->ct_expect.timeout);
-		if (!json_unpack(root, "{s:o}", "size", &tmp))
-			obj->ct_expect.size = atoi(tmp);
+		if (!json_unpack(root, "{s:i}", "dport", &i))
+			obj->ct_expect.dport = i;
+		if (!json_unpack(root, "{s:i}", "timeout", &i))
+			obj->ct_expect.timeout = i;
+		if (!json_unpack(root, "{s:i}", "size", &i))
+			obj->ct_expect.size = i;
 		break;
 	case CMD_OBJ_LIMIT:
 		obj->type = NFT_OBJECT_LIMIT;
@@ -3608,7 +3679,7 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 		}
 		json_unpack(root, "{s:s}", "rate_unit", &rate_unit);
 		json_unpack(root, "{s:b}", "inv", &inv);
-		json_unpack(root, "{s:I}", "burst", &obj->limit.burst);
+		json_unpack(root, "{s:i}", "burst", &obj->limit.burst);
 		json_unpack(root, "{s:s}", "burst_unit", &burst_unit);
 
 		if (!strcmp(rate_unit, "packets")) {
@@ -3626,11 +3697,12 @@ static struct cmd *json_parse_cmd_add_object(struct json_ctx *ctx,
 	case CMD_OBJ_SYNPROXY:
 		obj->type = NFT_OBJECT_SYNPROXY;
 		if (json_unpack_err(ctx, root, "{s:i, s:i}",
-				    "mss", &obj->synproxy.mss,
-				    "wscale", &obj->synproxy.wscale)) {
+				    "mss", &i, "wscale", &j)) {
 			obj_free(obj);
 			return NULL;
 		}
+		obj->synproxy.mss = i;
+		obj->synproxy.wscale = j;
 		obj->synproxy.flags |= NF_SYNPROXY_OPT_MSS;
 		obj->synproxy.flags |= NF_SYNPROXY_OPT_WSCALE;
 		if (!json_unpack(root, "{s:o}", "flags", &jflags)) {

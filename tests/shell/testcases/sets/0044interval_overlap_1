@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/bash -e
+#
+# NFT_TEST_SKIP(NFT_TEST_SKIP_slow)
 #
 # 0044interval_overlap_1 - Single-sized intervals can never overlap partially
 #

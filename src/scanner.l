@@ -10,12 +10,15 @@
 
 %{
 
+#include <nft.h>
+
 #include <limits.h>
 #include <glob.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>
+#include <sys/stat.h>
 
 #include <nftables.h>
 #include <erec.h>
@@ -586,6 +589,8 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 	"param-problem"		{ return PPTR; }
 	"max-delay"		{ return MAXDELAY; }
 	"mtu"			{ return MTU; }
+	"taddr"			{ return TADDR; }
+	"daddr"			{ return DADDR; }
 }
 <SCANSTATE_EXPR_AH,SCANSTATE_EXPR_ESP,SCANSTATE_ICMP,SCANSTATE_TCP>{
 	"sequence"		{ return SEQUENCE; }
@@ -970,9 +975,59 @@ static void scanner_push_file(struct nft_ctx *nft, void *scanner,
 	scanner_push_indesc(state, indesc);
 }
 
+enum nft_include_type {
+	NFT_INCLUDE,
+	NFT_CMDLINE,
+};
+
+static bool __is_useable(unsigned int type, enum nft_include_type t)
+{
+	type &= S_IFMT;
+	switch (type) {
+	case S_IFREG: return true;
+	case S_IFIFO:
+		 return t == NFT_CMDLINE; /* disallow include /path/to/fifo */
+	default:
+		break;
+	}
+
+	return false;
+}
+
+/* need to use stat() to, fopen() will block for named fifos */
+static bool filename_is_useable(const char *name)
+{
+	struct stat sb;
+	int err;
+
+	err = stat(name, &sb);
+	if (err)
+		return false;
+
+	return __is_useable(sb.st_mode, NFT_INCLUDE);
+}
+
+static bool fp_is_useable(FILE *fp, enum nft_include_type t)
+{
+	int fd = fileno(fp);
+	struct stat sb;
+	int err;
+
+	if (fd < 0)
+		return false;
+
+	err = fstat(fd, &sb);
+	if (err < 0)
+		return false;
+
+	return __is_useable(sb.st_mode, t);
+}
+
 static int include_file(struct nft_ctx *nft, void *scanner,
 			const char *filename, const struct location *loc,
-			const struct input_descriptor *parent_indesc)
+			const struct input_descriptor *parent_indesc,
+			enum nft_include_type includetype)
+
 {
 	struct parser_state *state = yyget_extra(scanner);
 	struct error_record *erec;
@@ -984,12 +1039,24 @@ static int include_file(struct nft_ctx *nft, void *scanner,
 		goto err;
 	}
 
+	if (includetype == NFT_INCLUDE && !filename_is_useable(filename)) {
+		erec = error(loc, "Not a regular file: \"%s\"\n", filename);
+		goto err;
+	}
+
 	f = fopen(filename, "r");
 	if (f == NULL) {
 		erec = error(loc, "Could not open file \"%s\": %s\n",
 			     filename, strerror(errno));
 		goto err;
 	}
+
+	if (!fp_is_useable(f, includetype)) {
+		fclose(f);
+		erec = error(loc, "Not a regular file: \"%s\"\n", filename);
+		goto err;
+	}
+
 	scanner_push_file(nft, scanner, f, filename, loc, parent_indesc);
 	return 0;
 err:
@@ -1062,7 +1129,7 @@ static int include_glob(struct nft_ctx *nft, void *scanner, const char *pattern,
 			if (len == 0 || path[len - 1] == '/')
 				continue;
 
-			ret = include_file(nft, scanner, path, loc, indesc);
+			ret = include_file(nft, scanner, path, loc, indesc, NFT_INCLUDE);
 			if (ret != 0)
 				goto err;
 		}
@@ -1099,7 +1166,7 @@ err:
 int scanner_read_file(struct nft_ctx *nft, const char *filename,
 		      const struct location *loc)
 {
-	return include_file(nft, nft->scanner, filename, loc, NULL);
+	return include_file(nft, nft->scanner, filename, loc, NULL, NFT_CMDLINE);
 }
 
 static bool search_in_include_path(const char *filename)

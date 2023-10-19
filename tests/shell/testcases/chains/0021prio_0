@@ -69,7 +69,7 @@ done
 family=netdev
 echo "add table $family x"
 gen_chains $family ingress filter lo
-gen_chains $family egress filter lo
+[ "$NFT_TEST_HAVE_netdev_egress" != n ] && gen_chains $family egress filter lo
 
 family=bridge
 echo "add table $family x"
@@ -83,3 +83,8 @@ gen_chains $family postrouting srcnat
 
 ) >$tmpfile
 $NFT -f $tmpfile
+
+if [ "$NFT_TEST_HAVE_netdev_egress" = n ]; then
+	echo "Ran a modified version of the test due to NFT_TEST_HAVE_netdev_egress=n"
+	exit 77
+fi

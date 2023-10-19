@@ -161,7 +161,10 @@ for variant in $variants; do
 	output_append=${variant}_output_append
 
 	for testcase in ${testcases:-testcases/*.t}; do
-		echo "$variant: running tests from file $(basename $testcase)"
+		filename=$(basename $testcase)
+		echo "$variant: running tests from file $filename"
+		rc_start=$rc
+
 		# files are like this:
 		#
 		# I add table ip t
@@ -199,6 +202,10 @@ for variant in $variants; do
 			$run_test
 			let "rc += $?"
 		}
+
+		let "rc_diff = rc - rc_start"
+		[[ $rc_diff -ne 0 ]] && \
+			echo "$variant: $rc_diff tests from file $filename failed"
 	done
 done
 exit $rc

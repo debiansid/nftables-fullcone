@@ -2,12 +2,12 @@
 .\"     Title: nft
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 07/14/2023
+.\"      Date: 10/11/2023
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "NFT" "8" "07/14/2023" "\ \&" "\ \&"
+.TH "NFT" "8" "10/11/2023" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -811,6 +811,8 @@ and this
 hook\&.
 .RE
 .sp
+The \fBdevice\fR parameter accepts a network interface name as a string, and is required when adding a base chain that filters traffic on the ingress or egress hooks\&. Any ingress or egress chains will only filter traffic from the interface specified in the \fBdevice\fR parameter\&.
+.sp
 The \fBpriority\fR parameter accepts a signed integer value or a standard priority name which specifies the order in which chains with the same \fBhook\fR value are traversed\&. The ordering is ascending, i\&.e\&. lower priority values have precedence over higher ones\&.
 .sp
 With \fBnat\fR type chains, there\(cqs a lower excluding limit of \-200 for \fBpriority\fR values, because conntrack hooks at this priority and NAT requires it\&.
@@ -1063,7 +1065,7 @@ T{
 \fBreset\fR
 T}:T{
 .sp
-Reset rule\-contained state, i\&.e\&. counter and quota statement values\&.
+Reset rule\-contained state, e\&.g\&. counter and quota statement values\&.
 T}
 .TE
 .sp 1
@@ -1197,7 +1199,7 @@ T{
 \fBreset\fR
 T}:T{
 .sp
-Reset timeout and other state in all contained elements\&.
+Reset state in all contained elements, e\&.g\&. counter and quota statement values\&.
 T}
 .TE
 .sp 1
@@ -1381,7 +1383,7 @@ T{
 \fBreset\fR
 T}:T{
 .sp
-Reset timeout and other state in all contained elements\&.
+Reset state in all contained elements, e\&.g\&. counter and quota statement values\&.
 T}
 .TE
 .sp 1
@@ -1543,7 +1545,7 @@ Element\-related commands allow one to change contents of named sets and maps\&.
 .sp
 \fBget\fR command is useful to check if an element is contained in a set which may be non\-trivial in very large and/or interval sets\&. In the latter case, the containing interval is returned instead of just the element itself\&.
 .sp
-\fBreset\fR command resets timeout or other state attached to the given element(s)\&.
+\fBreset\fR command resets state attached to the given element(s), e\&.g\&. counter and quota statement values\&.
 .sp
 .it 1 an-trap
 .nr an-no-space-flag 1
@@ -1938,7 +1940,7 @@ table ip filter {
         ct timeout customtimeout {
                 protocol tcp;
                 l3proto ip
-                policy = { established: 120, close: 20 }
+                policy = { established: 2m, close: 20s }
         }
 
         chain output {
@@ -5475,6 +5477,8 @@ ipv4_addr
 T}
 .TE
 .sp 1
+.sp
+Careful with matching on \fBip length\fR: If GRO/GSO is enabled, then the Linux kernel might aggregate several packets into one big packet that is larger than MTU\&. Moreover, if GRO/GSO maximum size is larger than 65535 (see man ip\-link(8), specifically gro_ipv6_max_size and gso_ipv6_max_size), then \fBip length\fR might be 0 for such jumbo packets\&. \fBmeta length\fR allows you to match on the packet length including the IP header size\&. If you want to perform heuristics on the \fBip length\fR field, then disable GRO/GSO\&.
 .SS "ICMP HEADER EXPRESSION"
 .sp
 .if n \{\
@@ -5791,6 +5795,8 @@ ipv6_addr
 T}
 .TE
 .sp 1
+.sp
+Careful with matching on \fBip6 length\fR: If GRO/GSO is enabled, then the Linux kernel might aggregate several packets into one big packet that is larger than MTU\&. Moreover, if GRO/GSO maximum size is larger than 65535 (see man ip\-link(8), specifically gro_ipv6_max_size and gso_ipv6_max_size), then \fBip6 length\fR might be 0 for such jumbo packets\&. \fBmeta length\fR allows you to match on the packet length including the IP header size\&. If you want to perform heuristics on the \fBip6 length\fR field, then disable GRO/GSO\&.
 .PP
 \fBUsing ip6 header expressions\fR. 
 .sp
@@ -5811,7 +5817,7 @@ ip6 nexthdr ipv6\-frag
 .RS 4
 .\}
 .nf
-\fBicmpv6\fR {\fBtype\fR | \fBcode\fR | \fBchecksum\fR | \fBparameter\-problem\fR | \fBpacket\-too\-big\fR | \fBid\fR | \fBsequence\fR | \fBmax\-delay\fR}
+\fBicmpv6\fR {\fBtype\fR | \fBcode\fR | \fBchecksum\fR | \fBparameter\-problem\fR | \fBpacket\-too\-big\fR | \fBid\fR | \fBsequence\fR | \fBmax\-delay\fR | \fBtaddr\fR | \fBdaddr\fR}
 .fi
 .if n \{\
 .RE
@@ -5835,6 +5841,8 @@ T}:T{
 Type
 T}
 .T&
+lt lt lt
+lt lt lt
 lt lt lt
 lt lt lt
 lt lt lt
@@ -5922,6 +5930,26 @@ maximum response delay of MLD queries
 T}:T{
 .sp
 integer (16 bit)
+T}
+T{
+.sp
+taddr
+T}:T{
+.sp
+target address of neighbor solicit/advert, redirect or MLD
+T}:T{
+.sp
+ipv6_addr
+T}
+T{
+.sp
+daddr
+T}:T{
+.sp
+destination address of redirect
+T}:T{
+.sp
+ipv6_addr
 T}
 .TE
 .sp 1

@@ -8,6 +8,6 @@ table ip x {
 
 	chain z {
 		type filter hook output priority filter; policy accept;
-		update @y { ip daddr limit rate 1/second counter }
+		update @y { ip daddr limit rate 1/second burst 5 packets counter }
 	}
 }

@@ -9,6 +9,7 @@
  */
 
 %{
+#include <nft.h>
 
 #include <ctype.h>
 #include <stddef.h>
@@ -421,6 +422,7 @@ int nft_lex(void *, void *, void *);
 %token ICMP6			"icmpv6"
 %token PPTR			"param-problem"
 %token MAXDELAY			"max-delay"
+%token TADDR			"taddr"
 
 %token AH			"ah"
 %token RESERVED			"reserved"
@@ -673,7 +675,7 @@ int nft_lex(void *, void *, void *);
 %type <string>			identifier type_identifier string comment_spec
 %destructor { xfree($$); }	identifier type_identifier string comment_spec
 
-%type <val>			time_spec quota_used
+%type <val>			time_spec time_spec_or_num_s quota_used
 
 %type <expr>			data_type_expr data_type_atom_expr
 %destructor { expr_free($$); }  data_type_expr data_type_atom_expr
@@ -727,7 +729,7 @@ int nft_lex(void *, void *, void *);
 
 %type <set>			map_block_alloc map_block
 %destructor { set_free($$); }	map_block_alloc
-%type <val>			map_block_obj_type
+%type <val>			map_block_obj_type map_block_data_interval
 
 %type <flowtable>		flowtable_block_alloc flowtable_block
 %destructor { flowtable_free($$); }	flowtable_block_alloc
@@ -2029,7 +2031,7 @@ table_block		:	/* empty */	{ $$ = $<table>-1; }
 
 chain_block_alloc	:	/* empty */
 			{
-				$$ = chain_alloc(NULL);
+				$$ = chain_alloc();
 				if (open_scope(state, &$$->scope) < 0) {
 					erec_queue(error(&@$, "too many levels of nesting"),
 						   state->msgs);
@@ -2134,7 +2136,7 @@ typeof_expr		:	primary_expr
 
 set_block_alloc		:	/* empty */
 			{
-				$$ = set_alloc(NULL);
+				$$ = set_alloc(&internal_location);
 			}
 			;
 
@@ -2214,7 +2216,7 @@ set_flag		:	CONSTANT	{ $$ = NFT_SET_CONSTANT; }
 
 map_block_alloc		:	/* empty */
 			{
-				$$ = set_alloc(NULL);
+				$$ = set_alloc(&internal_location);
 			}
 			;
 
@@ -2225,6 +2227,10 @@ map_block_obj_type	:	COUNTER	close_scope_counter { $$ = NFT_OBJECT_COUNTER; }
 			|	SYNPROXY close_scope_synproxy { $$ = NFT_OBJECT_SYNPROXY; }
 			;
 
+map_block_data_interval :	INTERVAL { $$ = EXPR_F_INTERVAL; }
+			|	{ $$ = 0; }
+			;
+
 map_block		:	/* empty */	{ $$ = $<set>-1; }
 			|	map_block	common_block
 			|	map_block	stmt_separator
@@ -2233,23 +2239,18 @@ map_block		:	/* empty */	{ $$ = $<set>-1; }
 				$1->timeout = $3;
 				$$ = $1;
 			}
-			|	map_block	TYPE
-						data_type_expr	COLON	data_type_expr
-						stmt_separator	close_scope_type
+			|	map_block	GC_INTERVAL	time_spec	stmt_separator
 			{
-				$1->key = $3;
-				$1->data = $5;
-
-				$1->flags |= NFT_SET_MAP;
+				$1->gc_int = $3;
 				$$ = $1;
 			}
 			|	map_block	TYPE
-						data_type_expr	COLON	INTERVAL	data_type_expr
+						data_type_expr	COLON	map_block_data_interval data_type_expr
 						stmt_separator	close_scope_type
 			{
 				$1->key = $3;
 				$1->data = $6;
-				$1->data->flags |= EXPR_F_INTERVAL;
+				$1->data->flags |= $5;
 
 				$1->flags |= NFT_SET_MAP;
 				$$ = $1;
@@ -2330,7 +2331,7 @@ set_policy_spec		:	PERFORMANCE	{ $$ = NFT_SET_POL_PERFORMANCE; }
 
 flowtable_block_alloc	:	/* empty */
 			{
-				$$ = flowtable_alloc(NULL);
+				$$ = flowtable_alloc(&internal_location);
 			}
 			;
 
@@ -2449,7 +2450,7 @@ data_type_expr		:	data_type_atom_expr
 
 obj_block_alloc		:       /* empty */
 			{
-				$$ = obj_alloc(NULL);
+				$$ = obj_alloc(&internal_location);
 			}
 			;
 
@@ -2788,6 +2789,11 @@ time_spec		:	STRING
 				}
 				$$ = res;
 			}
+			;
+
+/* compatibility kludge to allow either 60, 60s, 1m, ... */
+time_spec_or_num_s	:	NUM
+			|	time_spec { $$ = $1 / 1000u; }
 			;
 
 family_spec		:	/* empty */		{ $$ = NFPROTO_IPV4; }
@@ -3656,8 +3662,8 @@ reject_opts		:       /* empty */
 nat_stmt		:	nat_stmt_alloc	nat_stmt_args
 			;
 
-nat_stmt_alloc		:	SNAT	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_SNAT); }
-			|	DNAT	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_DNAT); }
+nat_stmt_alloc		:	SNAT	{ $$ = nat_stmt_alloc(&@$, __NFT_NAT_SNAT); }
+			|	DNAT	{ $$ = nat_stmt_alloc(&@$, __NFT_NAT_DNAT); }
 			;
 
 tproxy_stmt		:	TPROXY TO stmt_expr
@@ -4770,7 +4776,7 @@ ct_obj_type		:	HELPER		{ $$ = NFT_OBJECT_CT_HELPER; }
 
 ct_cmd_type		:	HELPERS		{ $$ = CMD_OBJ_CT_HELPERS; }
 			|	TIMEOUT		{ $$ = CMD_OBJ_CT_TIMEOUTS; }
-			|	EXPECTATION	{ $$ = CMD_OBJ_CT_EXPECT; }
+			|	EXPECTATION	{ $$ = CMD_OBJ_CT_EXPECTATIONS; }
 			;
 
 ct_l4protoname		:	TCP	close_scope_tcp	{ $$ = IPPROTO_TCP; }
@@ -4812,8 +4818,7 @@ timeout_states		:	timeout_state
 			}
 			;
 
-timeout_state		:	STRING	COLON	NUM
-
+timeout_state		:	STRING	COLON	time_spec_or_num_s
 			{
 				struct timeout_state *ts;
 
@@ -5742,6 +5747,8 @@ icmp6_hdr_field		:	TYPE		close_scope_type	{ $$ = ICMP6HDR_TYPE; }
 			|	ID		{ $$ = ICMP6HDR_ID; }
 			|	SEQUENCE	{ $$ = ICMP6HDR_SEQ; }
 			|	MAXDELAY	{ $$ = ICMP6HDR_MAXDELAY; }
+			|	TADDR		{ $$ = ICMP6HDR_TADDR; }
+			|	DADDR		{ $$ = ICMP6HDR_DADDR; }
 			;
 
 auth_hdr_expr		:	AH	auth_hdr_field	close_scope_ah

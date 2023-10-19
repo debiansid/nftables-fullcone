@@ -116,3 +116,35 @@
         }
     }
 ]
+
+# add @map1 { ip6 saddr . ip6 daddr : meta mark }
+[
+    {
+        "map": {
+            "data": {
+                "meta": {
+                    "key": "mark"
+                }
+            },
+            "elem": {
+                "concat": [
+                    {
+                        "payload": {
+                            "field": "saddr",
+                            "protocol": "ip6"
+                        }
+                    },
+                    {
+                        "payload": {
+                            "field": "daddr",
+                            "protocol": "ip6"
+                        }
+                    }
+                ]
+            },
+            "map": "@map1",
+            "op": "add"
+        }
+    }
+]
+

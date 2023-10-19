@@ -19,12 +19,12 @@
  * Based on iptables/utils/nfnl_osf.c.
  */
 
+#include <nft.h>
+
 #include <sys/time.h>
 
 #include <ctype.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 #include <netinet/ip.h>

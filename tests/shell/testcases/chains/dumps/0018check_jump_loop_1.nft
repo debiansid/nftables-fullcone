@@ -1,0 +1,8 @@
+table ip filter {
+	chain ap1 {
+		jump ap2
+	}
+
+	chain ap2 {
+	}
+}

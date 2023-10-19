@@ -8,12 +8,11 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <inttypes.h>
-#include <string.h>
 #include <syslog.h>
 #include <rule.h>
 
@@ -486,9 +485,7 @@ static void limit_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 		nft_print(octx, "limit rate %s%" PRIu64 "/%s",
 			  inv ? "over " : "", stmt->limit.rate,
 			  get_unit(stmt->limit.unit));
-		if (stmt->limit.burst && stmt->limit.burst != 5)
-			nft_print(octx, " burst %u packets",
-				  stmt->limit.burst);
+		nft_print(octx, " burst %u packets", stmt->limit.burst);
 		break;
 	case NFT_LIMIT_PKT_BYTES:
 		data_unit = get_rate(stmt->limit.rate, &rate);
@@ -850,6 +847,7 @@ static const struct stmt_ops map_stmt_ops = {
 	.name		= "map",
 	.print		= map_stmt_print,
 	.destroy	= map_stmt_destroy,
+	.json		= map_stmt_json,
 };
 
 struct stmt *map_stmt_alloc(const struct location *loc)

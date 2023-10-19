@@ -6,6 +6,8 @@
  * later) as published by the Free Software Foundation.
  */
 
+#include <nft.h>
+
 #include <expression.h>
 #include <statement.h>
 #include <rule.h>
@@ -212,6 +214,10 @@ static unsigned int evaluate_cache_list(struct nft_ctx *nft, struct cmd *cmd,
 			filter->list.family = cmd->handle.family;
 			filter->list.table = cmd->handle.table.name;
 			filter->list.chain = cmd->handle.chain.name;
+			/* implicit terse listing to fetch content of anonymous
+			 * sets only when chain name is specified.
+			 */
+			flags |= NFT_CACHE_TERSE;
 		}
 		flags |= NFT_CACHE_FULL;
 		break;
@@ -377,6 +383,7 @@ static int nft_handle_validate(const struct cmd *cmd, struct list_head *msgs)
 	case CMD_OBJ_CT_TIMEOUT:
 	case CMD_OBJ_CT_TIMEOUTS:
 	case CMD_OBJ_CT_EXPECT:
+	case CMD_OBJ_CT_EXPECTATIONS:
 		if (h->table.name &&
 		    strlen(h->table.name) > NFT_NAME_MAXLEN) {
 			loc = &h->table.location;
@@ -1020,8 +1027,10 @@ static int implicit_chain_cache(struct netlink_ctx *ctx, struct table *table,
 	int ret = 0;
 
 	list_for_each_entry(chain, &table->chain_bindings, cache.list) {
-		filter.list.table = table->handle.table.name;
-		filter.list.chain = chain->handle.chain.name;
+		filter.list = (typeof(filter.list)) {
+			.table = table->handle.table.name,
+			.chain = chain->handle.chain.name,
+		};
 		ret = rule_init_cache(ctx, table, &filter);
 	}
 

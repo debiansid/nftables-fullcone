@@ -1,5 +1,6 @@
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdint.h>
 
 #include <datatype.h>
 #include <dccpopt.h>

@@ -5,6 +5,9 @@
  * it under the terms of the GNU General Public License version 2 (or any
  * later) as published by the Free Software Foundation.
  */
+
+#include <nft.h>
+
 #include <nftables/libnftables.h>
 #include <erec.h>
 #include <mnl.h>
@@ -13,8 +16,7 @@
 #include <iface.h>
 #include <cmd.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
+#include <sys/stat.h>
 
 static int nft_netlink(struct nft_ctx *nft,
 		       struct list_head *cmds, struct list_head *msgs)
@@ -189,16 +191,11 @@ void nft_ctx_clear_include_paths(struct nft_ctx *ctx)
 EXPORT_SYMBOL(nft_ctx_new);
 struct nft_ctx *nft_ctx_new(uint32_t flags)
 {
-	static bool init_once;
 	struct nft_ctx *ctx;
 
-	if (!init_once) {
-		init_once = true;
-		gmp_init();
 #ifdef HAVE_LIBXTABLES
-		xt_init();
+	xt_init();
 #endif
-	}
 
 	ctx = xzalloc(sizeof(struct nft_ctx));
 	nft_init(ctx);
@@ -401,6 +398,22 @@ void nft_ctx_set_optimize(struct nft_ctx *ctx, uint32_t flags)
 	ctx->optimize_flags = flags;
 }
 
+EXPORT_SYMBOL(nft_ctx_input_get_flags);
+unsigned int nft_ctx_input_get_flags(struct nft_ctx *ctx)
+{
+	return ctx->input.flags;
+}
+
+EXPORT_SYMBOL(nft_ctx_input_set_flags);
+unsigned int nft_ctx_input_set_flags(struct nft_ctx *ctx, unsigned int flags)
+{
+	unsigned int old_flags;
+
+	old_flags = ctx->input.flags;
+	ctx->input.flags = flags;
+	return old_flags;
+}
+
 EXPORT_SYMBOL(nft_ctx_output_get_flags);
 unsigned int nft_ctx_output_get_flags(struct nft_ctx *ctx)
 {
@@ -544,13 +557,6 @@ static int nft_evaluate(struct nft_ctx *nft, struct list_head *msgs,
 	if (err < 0 || nft->state->nerrs)
 		return -1;
 
-	list_for_each_entry(cmd, cmds, list) {
-		if (cmd->op != CMD_ADD)
-			continue;
-
-		nft_cmd_post_expand(cmd);
-	}
-
 	return 0;
 }
 
@@ -566,7 +572,7 @@ int nft_run_cmd_from_buffer(struct nft_ctx *nft, const char *buf)
 	nlbuf = xzalloc(strlen(buf) + 2);
 	sprintf(nlbuf, "%s\n", buf);
 
-	if (nft_output_json(&nft->output))
+	if (nft_output_json(&nft->output) || nft_input_json(&nft->input))
 		rc = nft_parse_json_buffer(nft, nlbuf, &msgs, &cmds);
 	if (rc == -EINVAL)
 		rc = nft_parse_bison_buffer(nft, nlbuf, &msgs, &cmds,
@@ -607,8 +613,10 @@ err:
 	    nft_output_json(&nft->output) &&
 	    nft_output_echo(&nft->output))
 		json_print_echo(nft);
-	if (rc)
+
+	if (rc || nft->check)
 		nft_cache_release(&nft->cache);
+
 	return rc;
 }
 
@@ -653,19 +661,52 @@ retry:
 	return rc;
 }
 
+/* need to use stat() to, fopen() will block for named fifos and
+ * libjansson makes no checks before or after open either.
+ */
+static struct error_record *filename_is_useable(struct nft_ctx *nft, const char *name)
+{
+	unsigned int type;
+	struct stat sb;
+	int err;
+
+	err = stat(name, &sb);
+	if (err)
+		return error(&internal_location, "Could not open file \"%s\": %s\n",
+			     name, strerror(errno));
+
+	type = sb.st_mode & S_IFMT;
+
+	if (type == S_IFREG || type == S_IFIFO)
+		return NULL;
+
+	if (type == S_IFCHR && 0 == strcmp(name, "/dev/stdin"))
+		return NULL;
+
+	return error(&internal_location, "Not a regular file: \"%s\"\n", name);
+}
+
 static int __nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename)
 {
+	struct error_record *erec;
 	struct cmd *cmd, *next;
 	int rc, parser_rc;
 	LIST_HEAD(msgs);
 	LIST_HEAD(cmds);
+
+	erec = filename_is_useable(nft, filename);
+	if (erec) {
+		erec_print(&nft->output, erec, nft->debug_mask);
+		erec_destroy(erec);
+		return -1;
+	}
 
 	rc = load_cmdline_vars(nft, &msgs);
 	if (rc < 0)
 		goto err;
 
 	rc = -EINVAL;
-	if (nft_output_json(&nft->output))
+	if (nft_output_json(&nft->output) || nft_input_json(&nft->input))
 		rc = nft_parse_json_filename(nft, filename, &msgs, &cmds);
 	if (rc == -EINVAL)
 		rc = nft_parse_bison_filename(nft, filename, &msgs, &cmds);
@@ -713,7 +754,8 @@ err:
 	    nft_output_json(&nft->output) &&
 	    nft_output_echo(&nft->output))
 		json_print_echo(nft);
-	if (rc)
+
+	if (rc || nft->check)
 		nft_cache_release(&nft->cache);
 
 	scope_release(nft->state->scopes[0]);

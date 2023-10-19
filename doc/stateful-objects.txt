@@ -94,7 +94,7 @@ table ip filter {
 	ct timeout customtimeout {
 		protocol tcp;
 		l3proto ip
-		policy = { established: 120, close: 20 }
+		policy = { established: 2m, close: 20s }
 	}
 
 	chain output {

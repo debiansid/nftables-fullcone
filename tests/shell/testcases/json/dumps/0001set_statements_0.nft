@@ -7,6 +7,6 @@ table ip testt {
 
 	chain testc {
 		type filter hook input priority filter; policy accept;
-		tcp dport 22 ct state new add @ssh_meter { ip saddr limit rate 10/second } accept
+		tcp dport 22 ct state new add @ssh_meter { ip saddr limit rate 10/second burst 5 packets } accept
 	}
 }

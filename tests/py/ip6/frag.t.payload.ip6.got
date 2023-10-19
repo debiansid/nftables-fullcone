@@ -1,0 +1,43 @@
+# frag frag-off 0x16
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ cmp eq reg 1 0x0000b000 ]
+
+# frag frag-off != 0xe9
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ cmp neq reg 1 0x00004807 ]
+
+# frag frag-off 0x21-0x2d
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ cmp gte reg 1 0x00000801 ]
+  [ cmp lte reg 1 0x00006801 ]
+
+# frag frag-off != 0x21-0x2d
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ range neq reg 1 0x00000801 0x00006801 ]
+
+# frag frag-off { 0x21, 0x37, 0x43, 0x58}
+__set%d test-ip6 3 size 4
+__set%d test-ip6 0
+	element 00000801  : 0 [end]	element 0000b801  : 0 [end]	element 00001802  : 0 [end]	element 0000c002  : 0 [end]
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ lookup reg 1 set __set%d ]
+
+# frag frag-off != { 0x21, 0x37, 0x43, 0x58}
+__set%d test-ip6 3 size 4
+__set%d test-ip6 0
+	element 00000801  : 0 [end]	element 0000b801  : 0 [end]	element 00001802  : 0 [end]	element 0000c002  : 0 [end]
+ip6 test-ip6 output
+  [ exthdr load ipv6 2b @ 44 + 2 => reg 1 ]
+  [ bitwise reg 1 = ( reg 1 & 0x0000f8ff ) ^ 0x00000000 ]
+  [ lookup reg 1 set __set%d 0x1 ]
+

@@ -86,11 +86,12 @@ class Table:
 class Set:
     """Class that represents a set"""
 
-    def __init__(self, family, table, name, type, timeout, flags):
+    def __init__(self, family, table, name, type, data, timeout, flags):
         self.family = family
         self.table = table
         self.name = name
         self.type = type
+        self.data = data
         self.timeout = timeout
         self.flags = flags
 
@@ -366,7 +367,11 @@ def set_add(s, test_result, filename, lineno):
         if flags != "":
             flags = "flags %s; " % flags
 
-        cmd = "add set %s %s { type %s;%s %s}" % (table, s.name, s.type, s.timeout, flags)
+        if s.data == "":
+                cmd = "add set %s %s { type %s;%s %s}" % (table, s.name, s.type, s.timeout, flags)
+        else:
+                cmd = "add map %s %s { type %s : %s;%s %s}" % (table, s.name, s.type, s.data, s.timeout, flags)
+
         ret = execute_cmd(cmd, filename, lineno)
 
         if (ret == 0 and test_result == "fail") or \
@@ -382,6 +387,44 @@ def set_add(s, test_result, filename, lineno):
             return -1
 
     return 0
+
+
+def map_add(s, test_result, filename, lineno):
+    '''
+    Adds a map
+    '''
+    if not table_list:
+        reason = "Missing table to add rule"
+        print_error(reason, filename, lineno)
+        return -1
+
+    for table in table_list:
+        s.table = table.name
+        s.family = table.family
+        if _map_exist(s, filename, lineno):
+            reason = "Map %s already exists in %s" % (s.name, table)
+            print_error(reason, filename, lineno)
+            return -1
+
+        flags = s.flags
+        if flags != "":
+            flags = "flags %s; " % flags
+
+        cmd = "add map %s %s { type %s : %s;%s %s}" % (table, s.name, s.type, s.data, s.timeout, flags)
+
+        ret = execute_cmd(cmd, filename, lineno)
+
+        if (ret == 0 and test_result == "fail") or \
+                (ret != 0 and test_result == "ok"):
+            reason = "%s: I cannot add the set %s" % (cmd, s.name)
+            print_error(reason, filename, lineno)
+            return -1
+
+        if not _map_exist(s, filename, lineno):
+            reason = "I have just added the set %s to " \
+                     "the table %s but it does not exist" % (s.name, table)
+            print_error(reason, filename, lineno)
+            return -1
 
 
 def set_add_elements(set_element, set_name, state, filename, lineno):
@@ -485,6 +528,16 @@ def _set_exist(s, filename, lineno):
     Check if the set exists.
     '''
     cmd = "list set %s %s %s" % (s.family, s.table, s.name)
+    ret = execute_cmd(cmd, filename, lineno)
+
+    return True if (ret == 0) else False
+
+
+def _map_exist(s, filename, lineno):
+    '''
+    Check if the map exists.
+    '''
+    cmd = "list map %s %s %s" % (s.family, s.table, s.name)
     ret = execute_cmd(cmd, filename, lineno)
 
     return True if (ret == 0) else False
@@ -1092,11 +1145,16 @@ def set_process(set_line, filename, lineno):
     tokens = set_line[0].split(" ")
     set_name = tokens[0]
     set_type = tokens[2]
+    set_data = ""
     set_flags = ""
 
     i = 3
     while len(tokens) > i and tokens[i] == ".":
         set_type += " . " + tokens[i+1]
+        i += 2
+
+    while len(tokens) > i and tokens[i] == ":":
+        set_data = tokens[i+1]
         i += 2
 
     if len(tokens) == i+2 and tokens[i] == "timeout":
@@ -1108,9 +1166,13 @@ def set_process(set_line, filename, lineno):
     elif len(tokens) != i:
         print_error(set_name + " bad flag: " + tokens[i], filename, lineno)
 
-    s = Set("", "", set_name, set_type, timeout, set_flags)
+    s = Set("", "", set_name, set_type, set_data, timeout, set_flags)
 
-    ret = set_add(s, test_result, filename, lineno)
+    if set_data == "":
+        ret = set_add(s, test_result, filename, lineno)
+    else:
+        ret = map_add(s, test_result, filename, lineno)
+
     if ret == 0:
         all_set[set_name] = set()
 

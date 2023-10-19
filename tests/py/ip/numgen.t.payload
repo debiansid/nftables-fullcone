@@ -27,3 +27,14 @@ ip test-ip4 pre
   [ numgen reg 1 = inc mod 2 offset 100 ]
   [ ct set mark with reg 1 ]
 
+# dnat to numgen inc mod 7 offset 167772161
+ip test-ip4 pre
+  [ numgen reg 1 = inc mod 7 offset 167772161 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ nat dnat ip addr_min reg 1 ]
+
+# dnat to numgen inc mod 255 offset 167772161
+ip test-ip4 pre
+  [ numgen reg 1 = inc mod 255 offset 167772161 ]
+  [ byteorder reg 1 = hton(reg 1, 4, 4) ]
+  [ nat dnat ip addr_min reg 1 ]

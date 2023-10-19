@@ -22,4 +22,12 @@ EXPECTED="table inet filter {
 }"
 
 $NFT -f - <<< "$EXPECTED"
-$NFT 'add element inet filter portmap { 22 : jump ssh_input, * : drop }'
+
+if [ "$NFT_TEST_HAVE_catchall_element" != n ]; then
+	$NFT 'add element inet filter portmap { 22 : jump ssh_input, * : drop }'
+fi
+
+if [ "$NFT_TEST_HAVE_catchall_element" = n ]; then
+	echo "Ran partial tests due to NFT_TEST_HAVE_catchall_element=n (skipped)"
+	exit 77
+fi

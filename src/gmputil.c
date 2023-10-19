@@ -8,12 +8,12 @@
  * Development of this code funded by Astaro AG (http://www.astaro.com/)
  */
 
+#include <nft.h>
+
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <string.h>
 
 #include <nftables.h>
 #include <datatype.h>
@@ -196,13 +196,3 @@ int mpz_vfprintf(FILE *fp, const char *f, va_list args)
 	return n;
 }
 #endif
-
-static void *gmp_xrealloc(void *ptr, size_t old_size, size_t new_size)
-{
-	return xrealloc(ptr, new_size);
-}
-
-void gmp_init(void)
-{
-	mp_set_memory_functions(xmalloc, gmp_xrealloc, NULL);
-}

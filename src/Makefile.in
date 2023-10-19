@@ -167,17 +167,18 @@ am__libnftables_la_SOURCES_DIST = rule.c statement.c cache.c cmd.c \
 	fib.c hash.c intervals.c ipopt.c meta.c rt.c numgen.c ct.c \
 	xfrm.c netlink.c netlink_linearize.c netlink_delinearize.c \
 	misspell.c monitor.c owner.c segtree.c gmputil.c utils.c \
-	erec.c mnl.c iface.c mergesort.c optimize.c osf.c nfnl_osf.c \
-	tcpopt.c socket.c print.c sctp_chunk.c dccpopt.c libnftables.c \
-	libnftables.map xt.c json.c parser_json.c
+	nftutils.c nftutils.h erec.c mnl.c iface.c mergesort.c \
+	optimize.c osf.c nfnl_osf.c tcpopt.c socket.c print.c \
+	sctp_chunk.c dccpopt.c libnftables.c libnftables.map xt.c \
+	json.c parser_json.c
 @BUILD_JSON_TRUE@am__objects_1 = json.lo parser_json.lo
 am_libnftables_la_OBJECTS = rule.lo statement.lo cache.lo cmd.lo \
 	datatype.lo expression.lo evaluate.lo proto.lo payload.lo \
 	exthdr.lo fib.lo hash.lo intervals.lo ipopt.lo meta.lo rt.lo \
 	numgen.lo ct.lo xfrm.lo netlink.lo netlink_linearize.lo \
 	netlink_delinearize.lo misspell.lo monitor.lo owner.lo \
-	segtree.lo gmputil.lo utils.lo erec.lo mnl.lo iface.lo \
-	mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
+	segtree.lo gmputil.lo utils.lo nftutils.lo erec.lo mnl.lo \
+	iface.lo mergesort.lo optimize.lo osf.lo nfnl_osf.lo tcpopt.lo \
 	socket.lo print.lo sctp_chunk.lo dccpopt.lo libnftables.lo \
 	xt.lo $(am__objects_1)
 libnftables_la_OBJECTS = $(am_libnftables_la_OBJECTS)
@@ -229,14 +230,15 @@ am__depfiles_remade = ./$(DEPDIR)/cache.Plo ./$(DEPDIR)/cli.Po \
 	./$(DEPDIR)/monitor.Plo ./$(DEPDIR)/netlink.Plo \
 	./$(DEPDIR)/netlink_delinearize.Plo \
 	./$(DEPDIR)/netlink_linearize.Plo ./$(DEPDIR)/nfnl_osf.Plo \
-	./$(DEPDIR)/numgen.Plo ./$(DEPDIR)/optimize.Plo \
-	./$(DEPDIR)/osf.Plo ./$(DEPDIR)/owner.Plo \
-	./$(DEPDIR)/parser_json.Plo ./$(DEPDIR)/payload.Plo \
-	./$(DEPDIR)/print.Plo ./$(DEPDIR)/proto.Plo ./$(DEPDIR)/rt.Plo \
-	./$(DEPDIR)/rule.Plo ./$(DEPDIR)/sctp_chunk.Plo \
-	./$(DEPDIR)/segtree.Plo ./$(DEPDIR)/socket.Plo \
-	./$(DEPDIR)/statement.Plo ./$(DEPDIR)/tcpopt.Plo \
-	./$(DEPDIR)/utils.Plo ./$(DEPDIR)/xfrm.Plo ./$(DEPDIR)/xt.Plo
+	./$(DEPDIR)/nftutils.Plo ./$(DEPDIR)/numgen.Plo \
+	./$(DEPDIR)/optimize.Plo ./$(DEPDIR)/osf.Plo \
+	./$(DEPDIR)/owner.Plo ./$(DEPDIR)/parser_json.Plo \
+	./$(DEPDIR)/payload.Plo ./$(DEPDIR)/print.Plo \
+	./$(DEPDIR)/proto.Plo ./$(DEPDIR)/rt.Plo ./$(DEPDIR)/rule.Plo \
+	./$(DEPDIR)/sctp_chunk.Plo ./$(DEPDIR)/segtree.Plo \
+	./$(DEPDIR)/socket.Plo ./$(DEPDIR)/statement.Plo \
+	./$(DEPDIR)/tcpopt.Plo ./$(DEPDIR)/utils.Plo \
+	./$(DEPDIR)/xfrm.Plo ./$(DEPDIR)/xt.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -375,7 +377,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON_BIN = @PYTHON_BIN@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -479,10 +480,10 @@ libnftables_la_SOURCES = rule.c statement.c cache.c cmd.c datatype.c \
 	expression.c evaluate.c proto.c payload.c exthdr.c fib.c \
 	hash.c intervals.c ipopt.c meta.c rt.c numgen.c ct.c xfrm.c \
 	netlink.c netlink_linearize.c netlink_delinearize.c misspell.c \
-	monitor.c owner.c segtree.c gmputil.c utils.c erec.c mnl.c \
-	iface.c mergesort.c optimize.c osf.c nfnl_osf.c tcpopt.c \
-	socket.c print.c sctp_chunk.c dccpopt.c libnftables.c \
-	libnftables.map xt.c $(am__append_10)
+	monitor.c owner.c segtree.c gmputil.c utils.c nftutils.c \
+	nftutils.h erec.c mnl.c iface.c mergesort.c optimize.c osf.c \
+	nfnl_osf.c tcpopt.c socket.c print.c sctp_chunk.c dccpopt.c \
+	libnftables.c libnftables.map xt.c $(am__append_10)
 
 # yacc and lex generate dirty code
 noinst_LTLIBRARIES = libparser.la $(am__append_6)
@@ -491,6 +492,7 @@ libparser_la_CFLAGS = ${AM_CFLAGS} \
 		      -Wno-missing-prototypes \
 		      -Wno-missing-declarations \
 		      -Wno-implicit-function-declaration \
+		      -Wno-unused-but-set-variable \
 		      -Wno-nested-externs \
 		      -Wno-undef \
 		      -Wno-redundant-decls
@@ -688,6 +690,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_delinearize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netlink_linearize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nfnl_osf.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nftutils.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/numgen.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/optimize.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/osf.Plo@am__quote@ # am--include-marker
@@ -936,6 +939,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/netlink_delinearize.Plo
 	-rm -f ./$(DEPDIR)/netlink_linearize.Plo
 	-rm -f ./$(DEPDIR)/nfnl_osf.Plo
+	-rm -f ./$(DEPDIR)/nftutils.Plo
 	-rm -f ./$(DEPDIR)/numgen.Plo
 	-rm -f ./$(DEPDIR)/optimize.Plo
 	-rm -f ./$(DEPDIR)/osf.Plo
@@ -1030,6 +1034,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/netlink_delinearize.Plo
 	-rm -f ./$(DEPDIR)/netlink_linearize.Plo
 	-rm -f ./$(DEPDIR)/nfnl_osf.Plo
+	-rm -f ./$(DEPDIR)/nftutils.Plo
 	-rm -f ./$(DEPDIR)/numgen.Plo
 	-rm -f ./$(DEPDIR)/optimize.Plo
 	-rm -f ./$(DEPDIR)/osf.Plo

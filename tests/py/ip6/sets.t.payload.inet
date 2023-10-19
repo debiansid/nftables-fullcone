@@ -31,6 +31,15 @@ inet test-inet input
   [ payload load 16b @ network header + 24 => reg 2 ]
   [ dynset add reg_key 1 set set5 ]
 
+# add @map1 { ip6 saddr . ip6 daddr : meta mark }
+inet test-inet input
+  [ meta load nfproto => reg 1 ]
+  [ cmp eq reg 1 0x0000000a ]
+  [ payload load 16b @ network header + 8 => reg 1 ]
+  [ payload load 16b @ network header + 24 => reg 2 ]
+  [ meta load mark => reg 3 ]
+  [ dynset add reg_key 1 set map1 sreg_data 3 ]
+
 # delete @set5 { ip6 saddr . ip6 daddr }
 inet test-inet input
   [ meta load nfproto => reg 1 ]

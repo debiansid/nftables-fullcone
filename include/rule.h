@@ -1,13 +1,11 @@
 #ifndef NFTABLES_RULE_H
 #define NFTABLES_RULE_H
 
-#include <stdint.h>
 #include <nftables.h>
 #include <list.h>
 #include <netinet/in.h>
 #include <libnftnl/object.h>	/* For NFTNL_CTTIMEOUT_ARRAY_MAX. */
 #include <linux/netfilter/nf_tables.h>
-#include <string.h>
 #include <cache.h>
 
 /**
@@ -261,7 +259,7 @@ struct chain {
 extern int std_prio_lookup(const char *std_prio_name, int family, int hook);
 extern const char *chain_type_name_lookup(const char *name);
 extern const char *chain_hookname_lookup(const char *name);
-extern struct chain *chain_alloc(const char *name);
+extern struct chain *chain_alloc(void);
 extern struct chain *chain_get(struct chain *chain);
 extern void chain_free(struct chain *chain);
 extern struct chain *chain_lookup_fuzzy(const struct handle *h,
@@ -649,6 +647,7 @@ enum cmd_obj {
 	CMD_OBJ_SECMARK,
 	CMD_OBJ_SECMARKS,
 	CMD_OBJ_CT_EXPECT,
+	CMD_OBJ_CT_EXPECTATIONS,
 	CMD_OBJ_SYNPROXY,
 	CMD_OBJ_SYNPROXYS,
 	CMD_OBJ_HOOKS,

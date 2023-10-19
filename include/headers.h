@@ -1,6 +1,8 @@
 #ifndef NFTABLES_HEADERS_H
 #define NFTABLES_HEADERS_H
 
+#include <netinet/in.h>
+
 #ifndef IPPROTO_UDPLITE
 # define IPPROTO_UDPLITE	136
 #endif

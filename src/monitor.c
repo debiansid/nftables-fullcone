@@ -6,13 +6,13 @@
  * later) as published by the Free Software Foundation.
  */
 
-#include <string.h>
+#include <nft.h>
+
 #include <fcntl.h>
 #include <errno.h>
 #include <libmnl/libmnl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdlib.h>
 #include <inttypes.h>
 
 #include <libnftnl/table.h>

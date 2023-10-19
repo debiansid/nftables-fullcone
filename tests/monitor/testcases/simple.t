@@ -15,13 +15,13 @@ J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "ex
 
 I insert rule ip t c counter accept
 O insert rule ip t c counter packets 0 bytes 0 accept
-J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "expr": [{"counter": {"packets": 0, "bytes": 0}}, {"accept": null}]}}}
+J {"insert": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "expr": [{"counter": {"packets": 0, "bytes": 0}}, {"accept": null}]}}}
 
 I replace rule ip t c handle 2 accept comment "foo bar"
 O delete rule ip t c handle 2
 O add rule ip t c handle 5 accept comment "foo bar"
-J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "comment": "foo bar", "expr": [{"accept": null}]}}}
 J {"delete": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "expr": [{"accept": null}]}}}
+J {"add": {"rule": {"family": "ip", "table": "t", "chain": "c", "handle": 0, "comment": "foo bar", "expr": [{"accept": null}]}}}
 
 I add counter ip t cnt
 O add counter ip t cnt { packets 0 bytes 0 }

@@ -52,6 +52,9 @@ ip saddr != @set33 drop;fail
 ip saddr . ip daddr @set5 drop;ok
 add @set5 { ip saddr . ip daddr };ok
 
+!map1 type ipv4_addr . ipv4_addr : mark;ok
+add @map1 { ip saddr . ip daddr : meta mark };ok
+
 # test nested anonymous sets
 ip saddr { { 1.1.1.0, 3.3.3.0 }, 2.2.2.0 };ok;ip saddr { 1.1.1.0, 2.2.2.0, 3.3.3.0 }
 ip saddr { { 1.1.1.0/24, 3.3.3.0/24 }, 2.2.2.0/24 };ok;ip saddr { 1.1.1.0/24, 2.2.2.0/24, 3.3.3.0/24 }

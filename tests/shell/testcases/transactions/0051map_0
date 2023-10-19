@@ -119,3 +119,4 @@ RULESET="table inet filter {
 
 $NFT -c -f - <<< "$RULESET" >/dev/null || exit 0
 $NFT -f - <<< "$RULESET" >/dev/null || exit 0
+$NFT flush table inet filter || exit 0

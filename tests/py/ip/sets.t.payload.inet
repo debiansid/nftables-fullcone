@@ -75,6 +75,15 @@ inet
   [ lookup reg 1 set set6 ]
   [ immediate reg 0 drop ]
 
+# add @map1 { ip saddr . ip daddr : meta mark }
+inet test-inet input
+  [ meta load nfproto => reg 1 ]
+  [ cmp eq reg 1 0x00000002 ]
+  [ payload load 4b @ network header + 12 => reg 1 ]
+  [ payload load 4b @ network header + 16 => reg 9 ]
+  [ meta load mark => reg 10 ]
+  [ dynset add reg_key 1 set map1 sreg_data 10 ]
+
 # ip saddr vmap { 1.1.1.1 : drop, * : accept }
 __map%d test-inet b
 __map%d test-inet 0

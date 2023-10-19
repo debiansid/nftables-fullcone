@@ -1,4 +1,5 @@
-#include <stdint.h>
+#include <nft.h>
+
 
 #include <netinet/in.h>
 #include <netinet/ip.h>

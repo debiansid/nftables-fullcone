@@ -9,4 +9,4 @@ fi
 
 set -e
 cd tests/py
-NFT=$(which nft) ./nft-test.py
+NFT=$(which nft) python3 ./nft-test.py

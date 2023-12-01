@@ -14,10 +14,6 @@ Files: src/nfnl_osf.c
 Copyright:  2005 Evgeniy Polyakov <johnpol@2ka.mxt.ru>
 License: GPL-2+
 
-Files: py/nftables.py
-Copyright: 2018 Phil Sutter <phil@nwl.cc>
-License: GPL-2
-
 Files: src/libnftables.c include/nftables/libnftables.h
 Copyright: 2017 Eric Leblond <eric@regit.org>
 License: GPL-2

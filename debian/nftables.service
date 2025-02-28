@@ -5,6 +5,7 @@ Wants=network-pre.target
 Before=network-pre.target shutdown.target
 Conflicts=shutdown.target
 DefaultDependencies=no
+ConditionFileNotEmpty=/etc/nftables.conf
 
 [Service]
 Type=oneshot

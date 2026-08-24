@@ -369,29 +369,6 @@ static int range_mask_len(const mpz_t start, const mpz_t end, unsigned int len)
 	return ret;
 }
 
-static int concat_expr_cmp(const struct expr *r1, const struct expr *r2)
-{
-	int ret;
-
-	assert(r1->etype == r2->etype);
-
-	switch (r1->etype) {
-	case EXPR_BINOP:
-		assert(r1->op == r2->op);
-		ret = 0;
-		ret = mpz_cmp(r1->left->value, r2->left->value);
-		ret |= mpz_cmp(r1->right->value, r2->right->value);
-		break;
-	case EXPR_VALUE:
-		ret = mpz_cmp(r1->value, r2->value);
-		break;
-	default:
-		BUG("unexpected expression %s", expr_name(r1->key));
-	}
-
-	return ret;
-}
-
 /* Given a set with two elements (start and end), transform them into a
  * concatenation of ranges. That is, from a list of start expressions and a list
  * of end expressions, form a list of start - end expressions.
@@ -431,12 +408,12 @@ void concat_range_aggregate(struct expr *set)
 			r2_next = r2->list.next;
 			free_r1 = 0;
 
-			if (!concat_expr_cmp(r1, r2)) {
+			assert(r1->etype == EXPR_VALUE && r1->etype == EXPR_VALUE);
+
+			if (!mpz_cmp(r1->value, r2->value)) {
 				free_r1 = 1;
 				goto next;
 			}
-
-			assert(r1->etype == EXPR_VALUE && r1->etype == EXPR_VALUE);
 
 			if (expr_basetype(r1)->type == TYPE_STRING &&
 			    expr_basetype(r2)->type == TYPE_STRING) {

@@ -253,6 +253,9 @@ int get_set_decompose(struct set *cache_set, struct set *set)
 		if (i->key->flags & EXPR_F_INTERVAL_END && left) {
 			list_del(&left->list);
 			list_del(&i->list);
+
+			assert(i->key->etype == EXPR_VALUE);
+
 			mpz_sub_ui(i->key->value, i->key->value, 1);
 			range = get_set_interval_find(cache_set, left, i);
 			if (!range) {
@@ -325,6 +328,10 @@ static int expr_value_cmp(const void *p1, const void *p2)
 		return -1;
 
 	key_e2 = expr_value(e2);
+
+	assert(key_e1->etype == EXPR_VALUE);
+	assert(key_e2->etype == EXPR_VALUE);
+
 	ret = mpz_cmp(key_e1->value, key_e2->value);
 	if (ret == 0) {
 		if (e1->key->flags & EXPR_F_INTERVAL_END)
@@ -592,6 +599,10 @@ add_interval(struct expr *set, struct expr *low, struct expr *i, bool closed)
 	mpz_init(p);
 
 	key = expr_value(low);
+
+	assert(expr_value(i)->etype == EXPR_VALUE);
+	assert(key->etype == EXPR_VALUE);
+
 	mpz_sub(range, expr_value(i)->value, key->value);
 	if (closed)
 		mpz_sub_ui(range, range, 1);

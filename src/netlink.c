@@ -1440,7 +1440,8 @@ static struct expr *concat_elem_expr(const struct set *set, struct expr *key,
 	     expr->byteorder == BYTEORDER_HOST_ENDIAN))
 		mpz_switch_byteorder(expr->value, expr->len / BITS_PER_BYTE);
 
-	if (expr->dtype->basetype != NULL &&
+	if (!(set->flags & NFT_SET_INTERVAL) &&
+	    expr->dtype->basetype != NULL &&
 	    expr->dtype->basetype->type == TYPE_BITMASK)
 		expr = bitmask_expr_to_binops(expr);
 
@@ -1591,7 +1592,8 @@ key_end:
 		    key->byteorder == BYTEORDER_HOST_ENDIAN)
 			mpz_switch_byteorder(key->value, key->len / BITS_PER_BYTE);
 
-		if (key->dtype->basetype != NULL &&
+		if (!(set->flags & NFT_SET_INTERVAL) &&
+		    key->dtype->basetype != NULL &&
 		    key->dtype->basetype->type == TYPE_BITMASK)
 			key = bitmask_expr_to_binops(key);
 	} else if (flags & NFT_SET_ELEM_CATCHALL) {

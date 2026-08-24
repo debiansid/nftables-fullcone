@@ -98,6 +98,65 @@
       }
     },
     {
+      "set": {
+        "family": "ip",
+        "name": "s",
+        "table": "x",
+        "type": {
+          "typeof": {
+            "concat": [
+              {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "flags"
+                }
+              },
+              {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              }
+            ]
+          }
+        },
+        "handle": 0,
+        "flags": [
+          "interval"
+        ],
+        "elem": [
+          {
+            "concat": [
+              {
+                "|": [
+                  "syn",
+                  "ack"
+                ]
+              },
+              80
+            ]
+          },
+          {
+            "concat": [
+              "ack",
+              90
+            ]
+          },
+          {
+            "concat": [
+              "rst",
+              {
+                "range": [
+                  100,
+                  110
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "rule": {
         "family": "ip",
         "table": "x",
@@ -198,6 +257,101 @@
                       "drop": null
                     }
                   ]
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "ip",
+        "table": "x",
+        "chain": "z",
+        "handle": 0,
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "concat": [
+                  {
+                    "payload": {
+                      "protocol": "tcp",
+                      "field": "flags"
+                    }
+                  },
+                  {
+                    "payload": {
+                      "protocol": "tcp",
+                      "field": "dport"
+                    }
+                  }
+                ]
+              },
+              "right": "@s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "ip",
+        "table": "x",
+        "chain": "z",
+        "handle": 0,
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "concat": [
+                  {
+                    "payload": {
+                      "protocol": "tcp",
+                      "field": "flags"
+                    }
+                  },
+                  {
+                    "payload": {
+                      "protocol": "tcp",
+                      "field": "dport"
+                    }
+                  }
+                ]
+              },
+              "right": {
+                "set": [
+                  {
+                    "concat": [
+                      {
+                        "|": [
+                          "syn",
+                          "ack"
+                        ]
+                      },
+                      80
+                    ]
+                  },
+                  {
+                    "concat": [
+                      "ack",
+                      90
+                    ]
+                  },
+                  {
+                    "concat": [
+                      "rst",
+                      {
+                        "range": [
+                          100,
+                          110
+                        ]
+                      }
+                    ]
+                  }
                 ]
               }
             }

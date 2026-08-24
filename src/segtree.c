@@ -411,6 +411,13 @@ void concat_range_aggregate(struct expr *set)
 			assert(r1->etype == EXPR_VALUE && r1->etype == EXPR_VALUE);
 
 			if (!mpz_cmp(r1->value, r2->value)) {
+				if (r2->dtype->basetype != NULL &&
+				    r2->dtype->basetype->type == TYPE_BITMASK) {
+					expr_get(r2);
+					tmp = bitmask_expr_to_binops(r2);
+					list_replace(&r2->list, &tmp->list);
+					expr_free(r2);
+				}
 				free_r1 = 1;
 				goto next;
 			}
@@ -590,6 +597,14 @@ add_interval(struct expr *set, struct expr *low, struct expr *i, bool closed)
 		if (expr_basetype(low)->type == TYPE_STRING)
 			mpz_switch_byteorder(key->value,
 					     key->len / BITS_PER_BYTE);
+
+		if (key->dtype->basetype != NULL &&
+		    key->dtype->basetype->type == TYPE_BITMASK) {
+			if (low->key->etype == EXPR_MAPPING)
+				low->key->left = bitmask_expr_to_binops(low->key->left);
+			else
+				low->key = bitmask_expr_to_binops(low->key);
+		}
 		low->key->flags |= EXPR_F_KERNEL;
 		expr = expr_get(low);
 	} else if (range_is_prefix(range) && !mpz_cmp_ui(p, 0)) {

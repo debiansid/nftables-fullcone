@@ -2,22 +2,24 @@ Source: nftables
 Section: net
 Priority: important
 Maintainer: Debian Netfilter Packaging Team <team+pkg-netfilter-team@tracker.debian.org>
-Uploaders: Arturo Borrero Gonzalez <arturo@debian.org>,
-           Jeremy Sowden <azazel@debian.org>
-Build-Depends: automake,
-               debhelper-compat (= 13),
-               dh-python,
-               libeditreadline-dev,
-               libgmp-dev,
-               libjansson-dev,
-               libmnl-dev,
-               libnftnl-dev (>= 1.3.1),
-               libpython3-all-dev,
-               libtool,
-               libxtables-dev,
-               pybuild-plugin-pyproject,
-               python3-all:any,
-               python3-setuptools
+Uploaders:
+ Arturo Borrero Gonzalez <arturo@debian.org>,
+ Jeremy Sowden <azazel@debian.org>,
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python,
+ automake,
+ libeditreadline-dev,
+ libgmp-dev,
+ libjansson-dev,
+ libmnl-dev,
+ libnftnl-dev (>= 1.3.1),
+ libpython3-all-dev,
+ libtool,
+ libxtables-dev,
+ pybuild-plugin-pyproject,
+ python3-all:any,
+ python3-setuptools,
 Rules-Requires-Root: no
 Standards-Version: 4.7.2
 Homepage: https://www.netfilter.org/
@@ -26,9 +28,14 @@ Vcs-Browser: https://salsa.debian.org/pkg-netfilter-team/pkg-nftables
 
 Package: nftables
 Architecture: linux-any
-Depends: libnftables1 (=${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
-Recommends: netbase
-Suggests: firewalld
+Depends:
+ libnftables1 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ netbase,
+Suggests:
+ firewalld,
 Description: Program to control packet filtering rules by Netfilter project
  This software provides an in-kernel packet classification framework that is
  based on a network-specific Virtual Machine (VM) and the nft userspace
@@ -49,7 +56,9 @@ Section: libdevel
 Priority: optional
 Architecture: linux-any
 Multi-Arch: same
-Depends: libnftables1 (=${binary:Version}), ${misc:Depends}
+Depends:
+ libnftables1 (= ${binary:Version}),
+ ${misc:Depends},
 Description: Development files for libnftables
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
@@ -69,7 +78,9 @@ Section: libs
 Priority: optional
 Architecture: linux-any
 Multi-Arch: same
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
 Description: Netfilter nftables high level userspace API library
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
@@ -88,10 +99,11 @@ Package: python3-nftables
 Priority: optional
 Section: python
 Architecture: linux-any
-Depends: libnftables1 (=${binary:Version}),
-         python3-jsonschema,
-         ${misc:Depends},
-         ${python3:Depends}
+Depends:
+ libnftables1 (= ${binary:Version}),
+ python3-jsonschema,
+ ${misc:Depends},
+ ${python3:Depends},
 Description: nftables/libnftables python3 module
  The libnftables library provides high level semantics to interact with the
  nftables framework by the Netfilter project.

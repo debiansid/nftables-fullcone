@@ -1,23 +1,60 @@
 Test-Command: nft -h
-Depends: @
-Restrictions: needs-root, superficial
+Depends:
+ @,
+Restrictions:
+ needs-root,
+ superficial,
 
-Tests: internaltest-shell.sh
-Depends: gawk, kmod, @
-Restrictions: needs-root, allow-stderr, isolation-container, flaky
+Tests:
+ internaltest-shell.sh,
+Depends:
+ gawk,
+ kmod,
+ @,
+Restrictions:
+ allow-stderr,
+ flaky,
+ isolation-container,
+ needs-root,
 
-Tests: internaltest-monitor.sh
-Depends: @
-Restrictions: needs-root, allow-stderr, isolation-container, flaky
+Tests:
+ internaltest-monitor.sh,
+Depends:
+ @,
+Restrictions:
+ allow-stderr,
+ flaky,
+ isolation-container,
+ needs-root,
 
-Tests: internaltest-py.sh
-Depends: @, python3
-Restrictions: needs-root, allow-stderr, isolation-container, flaky
+Tests:
+ internaltest-py.sh,
+Depends:
+ python3,
+ @,
+Restrictions:
+ allow-stderr,
+ flaky,
+ isolation-container,
+ needs-root,
 
-Tests: internaltest-json-echo.sh
-Depends: @, python3
-Restrictions: needs-root, allow-stderr, isolation-container, flaky
+Tests:
+ internaltest-json-echo.sh,
+Depends:
+ python3,
+ @,
+Restrictions:
+ allow-stderr,
+ flaky,
+ isolation-container,
+ needs-root,
 
-Tests: systemd-service-test.sh
-Depends: systemd, @
-Restrictions: needs-root, allow-stderr, isolation-container
+Tests:
+ systemd-service-test.sh,
+Depends:
+ systemd,
+ @,
+Restrictions:
+ allow-stderr,
+ isolation-container,
+ needs-root,

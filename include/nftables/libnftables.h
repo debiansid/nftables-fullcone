@@ -99,8 +99,6 @@ void nft_ctx_clear_vars(struct nft_ctx *ctx);
 int nft_run_cmd_from_buffer(struct nft_ctx *nft, const char *buf);
 int nft_run_cmd_from_filename(struct nft_ctx *nft, const char *filename);
 
-extern bool nft_bison_have_extended_errors;
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

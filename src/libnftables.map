@@ -38,7 +38,3 @@ LIBNFTABLES_4 {
   nft_ctx_input_get_flags;
   nft_ctx_input_set_flags;
 } LIBNFTABLES_3;
-
-LIBNFTABLES_5 {
-  nft_bison_have_extended_errors;
-} LIBNFTABLES_4;

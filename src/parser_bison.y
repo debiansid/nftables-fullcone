@@ -6679,8 +6679,4 @@ yyreport_syntax_error(const yypcontext_t *yyctx, struct nft_ctx *nft,
 	return 0;
 }
 
-bool nft_bison_have_extended_errors = true;
-#else /* ! YY_LAC_ESTABLISH */
-bool nft_bison_have_extended_errors = false;
 #endif /* YY_LAC_ESTABLISH */
-EXPORT_SYMBOL(nft_bison_have_extended_errors);

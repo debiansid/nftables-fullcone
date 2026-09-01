@@ -1,8 +1,6 @@
 :osfchain;type filter hook input priority 0
 
 *ip;osfip;osfchain
-*ip6;osfip6;osfchain
-*inet;osfinet;osfchain
 
 osf name "Linux";ok
 osf ttl loose name "Linux";ok

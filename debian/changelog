@@ -1,3 +1,43 @@
+nftables (1.1.7-1) UNRELEASED; urgency=medium
+
+  [ Luca Boccassi ]
+  * [b5cb949] nftables.service: add ConditionFileNotEmpty=/etc/nftables.conf
+
+  [ Jeremy Sowden ]
+  * [5985c60] d/gbp.conf: import-orig: set `upstream-vcs-tag`
+  * [7509113] New upstream version 1.1.7 (Closes: #1138454)
+    - Fix spurious EEXIST error when using the create element command with
+      large batches.
+    - Improve error reporting for syntax errors by printing expected
+      tokens.
+    - add/insert commands use 'handle' for positioning in JSON. The handle
+      specifies from what rule to add (after the specified rule) or insert
+      (before the specified rule). Multiple rules added at the same handle
+      are positioned relative to the original rule, not to previously
+      inserted rules.
+    - Sort strings datatype when listing sets.
+    - Sort concatenation components in big endian, so the listing is
+      independent of the architecture byteorder.
+    - Update --debug=netlink to display data in its byteorder and size,
+      this applies to immediate data in expressions and set elements.
+    - Set element support for multi-statements, eg. counter + quota.
+      One can also combine with ct count, last and limit rate.
+    - Connlimit support with maps.
+    - Include "count" field when listing set in JSON
+    - Support for using bitmask datatypes as set key, eg. tcp flags.
+    - Fix element deletion by numeric cgroupsv2 id.
+    - Fix get element with intervals including maximum datatype value,
+    - Use poll() not select(), otherwise libnftables breaks with
+      third party applications with >= 1024 open file descriptors.
+    - Do not reset counter if -c/--check is specified with the reset
+      command.
+    - Replace strings by tokens in the parser, leverage Flex start
+      conditions for this purpose.
+    - Many tests coverage enhacements.
+    - man nft(8) documentation updates and assorted fixes.
+
+ -- Jeremy Sowden <azazel@debian.org>  Tue, 01 Sep 2026 21:47:30 +0100
+
 nftables (1.1.6-1) unstable; urgency=medium
 
   * [76930dd] d/watch: add `Matching-Pattern`, use `@PACKAGE@` in `Source:`

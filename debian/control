@@ -6,7 +6,7 @@ Uploaders:
  Arturo Borrero Gonzalez <arturo@debian.org>,
  Jeremy Sowden <azazel@debian.org>,
 Build-Depends:
- debhelper-compat (= 13),
+ debhelper-compat (= 14),
  dh-python,
  automake,
  libeditreadline-dev,

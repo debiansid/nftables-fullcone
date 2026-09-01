@@ -30,8 +30,6 @@ Package: nftables
 Architecture: linux-any
 Depends:
  libnftables1 (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
 Recommends:
  netbase,
 Suggests:
@@ -58,7 +56,6 @@ Architecture: linux-any
 Multi-Arch: same
 Depends:
  libnftables1 (= ${binary:Version}),
- ${misc:Depends},
 Description: Development files for libnftables
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
@@ -78,9 +75,6 @@ Section: libs
 Priority: optional
 Architecture: linux-any
 Multi-Arch: same
-Depends:
- ${misc:Depends},
- ${shlibs:Depends},
 Description: Netfilter nftables high level userspace API library
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
@@ -102,7 +96,6 @@ Architecture: linux-any
 Depends:
  libnftables1 (= ${binary:Version}),
  python3-jsonschema,
- ${misc:Depends},
  ${python3:Depends},
 Description: nftables/libnftables python3 module
  The libnftables library provides high level semantics to interact with the

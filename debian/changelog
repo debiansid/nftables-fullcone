@@ -1,4 +1,4 @@
-nftables (1.1.7-1) UNRELEASED; urgency=medium
+nftables (1.1.7-1) unstable; urgency=medium
 
   [ Luca Boccassi ]
   * [b5cb949] nftables.service: add ConditionFileNotEmpty=/etc/nftables.conf
@@ -31,12 +31,16 @@ nftables (1.1.7-1) UNRELEASED; urgency=medium
       third party applications with >= 1024 open file descriptors.
     - Do not reset counter if -c/--check is specified with the reset
       command.
-    - Replace strings by tokens in the parser, leverage Flex start
-      conditions for this purpose.
-    - Many tests coverage enhacements.
     - man nft(8) documentation updates and assorted fixes.
+  * [48a753f] d/patches: remove upstreamed patch
+  * [d445013] d/control, d/t/control: run `wrap-and-sort -ast`
+  * [fe6c5f8] d/control: bump Standards-Version to 4.7.4
+  * [2a73d41] d/control: bump debhelper-compat to 14
+  * [6b64720] d/control: remove substvars handled by debhelper at compat 14
+  * [058e778] d/control: remove default `Rules-Requires-Root` field
+  * [121b033] d/control: bump min. version for libnftnl-dev build-dep to 1.3.2
 
- -- Jeremy Sowden <azazel@debian.org>  Tue, 01 Sep 2026 21:47:30 +0100
+ -- Jeremy Sowden <azazel@debian.org>  Wed, 02 Sep 2026 09:08:26 +0100
 
 nftables (1.1.6-1) unstable; urgency=medium
 

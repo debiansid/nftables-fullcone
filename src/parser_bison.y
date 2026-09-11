@@ -690,6 +690,7 @@ int nft_lex(void *, void *, void *);
 %token DNAT			"dnat"
 %token MASQUERADE		"masquerade"
 %token FULLCONE			"fullcone"
+%token BRCMFULLCONE		"brcmfullcone"
 %token REDIRECT			"redirect"
 %token RANDOM			"random"
 %token FULLY_RANDOM		"fully-random"
@@ -4175,6 +4176,12 @@ masq_stmt_args		:	TO 	COLON	stmt_expr
 			|	nf_nat_flags
 			{
 				$<stmt>0->nat.flags = $1;
+			}
+			|	BRCMFULLCONE
+			{
+				/* A non-zero address register enables Broadcom fullcone. */
+				$<stmt>0->nat.addr = symbol_expr_alloc(&@$, SYMBOL_VALUE,
+								       current_scope(state), "1253");
 			}
 			;
 

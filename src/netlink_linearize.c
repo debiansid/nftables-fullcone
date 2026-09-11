@@ -1255,6 +1255,8 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 	int registers = 0;
 	int nftnl_flag_attr;
 	int nftnl_reg_pmin, nftnl_reg_pmax;
+	int nftnl_reg_amin = NFTNL_EXPR_NAT_REG_ADDR_MIN;
+	int nftnl_reg_amax = NFTNL_EXPR_NAT_REG_ADDR_MAX;
 
 	switch (stmt->nat.type) {
 	case NFT_NAT_SNAT:
@@ -1275,6 +1277,8 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 		nftnl_flag_attr = NFTNL_EXPR_MASQ_FLAGS;
 		nftnl_reg_pmin = NFTNL_EXPR_MASQ_REG_PROTO_MIN;
 		nftnl_reg_pmax = NFTNL_EXPR_MASQ_REG_PROTO_MAX;
+		nftnl_reg_amin = NFTNL_EXPR_MASQ_REG_ADDR_MIN;
+		nftnl_reg_amax = NFTNL_EXPR_MASQ_REG_ADDR_MAX;
 		break;
 	case NFT_NAT_FULLCONE:
 		nle = alloc_nft_expr("fullcone");
@@ -1307,13 +1311,13 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 
 			netlink_gen_expr(ctx, stmt->nat.addr->left, amin_reg);
 			netlink_gen_expr(ctx, stmt->nat.addr->right, amax_reg);
-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN,
+			netlink_put_register(nle, nftnl_reg_amin,
 					     amin_reg);
-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
+			netlink_put_register(nle, nftnl_reg_amax,
 					     amax_reg);
 		} else {
 			netlink_gen_expr(ctx, stmt->nat.addr, amin_reg);
-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN,
+			netlink_put_register(nle, nftnl_reg_amin,
 					     amin_reg);
 			if (stmt->nat.addr->etype == EXPR_MAP &&
 			    stmt->nat.addr->mappings->set->data->flags & EXPR_F_INTERVAL) {
@@ -1322,7 +1326,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 					netlink_put_register(nle, nftnl_reg_pmin,
 							     amin_reg);
 				} else {
-					netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
+					netlink_put_register(nle, nftnl_reg_amax,
 							     amin_reg);
 				}
 			}
@@ -1338,7 +1342,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
 
 			if (stmt->nat.type_flags & STMT_NAT_F_INTERVAL) {
 				pmin_reg += netlink_register_space(nat_addrlen(family));
-				netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
+				netlink_put_register(nle, nftnl_reg_amax,
 						     pmin_reg);
 			}
 

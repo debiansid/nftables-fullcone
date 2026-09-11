@@ -1,5 +1,5 @@
 From: debiansid <wong.syrone@gmail.com>
-Subject: [PATCH] nftables: add fullcone expression support
+Subject: [PATCH 1/2] nftables: add fullcone expression support
 
 Signed-off-by: debiansid <wong.syrone@gmail.com>
 ---

@@ -487,6 +487,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
 <*>"dnat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return DNAT; }
 <*>"masquerade"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return MASQUERADE; }
 <*>"fullcone"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return FULLCONE; }
+"brcmfullcone"		{ return BRCMFULLCONE; }
 <*>"redirect"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return REDIRECT; }
 "random"		{ return RANDOM; }
 <SCANSTATE_STMT_NAT>{

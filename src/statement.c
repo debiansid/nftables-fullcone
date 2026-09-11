@@ -691,24 +691,30 @@ const char *nat_etype2str(enum nft_nat_etypes type)
 
 static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
 {
+	bool brcmfullcone = stmt->nat.type == NFT_NAT_MASQ && stmt->nat.addr;
+
 	nft_print(octx, "%s", nat_etype2str(stmt->nat.type));
 	if (stmt->nat.addr || stmt->nat.proto) {
-		switch (stmt->nat.family) {
-		case NFPROTO_IPV4:
-			nft_print(octx, " ip");
-			break;
-		case NFPROTO_IPV6:
-			nft_print(octx, " ip6");
-			break;
+		if (brcmfullcone) {
+			nft_print(octx, " brcmfullcone");
+		} else {
+			switch (stmt->nat.family) {
+			case NFPROTO_IPV4:
+				nft_print(octx, " ip");
+				break;
+			case NFPROTO_IPV6:
+				nft_print(octx, " ip6");
+				break;
+			}
+
+			if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
+				nft_print(octx, " prefix");
+
+			nft_print(octx, " to");
 		}
-
-		if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
-			nft_print(octx, " prefix");
-
-		nft_print(octx, " to");
 	}
 
-	if (stmt->nat.addr) {
+	if (stmt->nat.addr && !brcmfullcone) {
 		nft_print(octx, " ");
 		if (stmt->nat.proto) {
 			if (stmt->nat.addr->etype == EXPR_VALUE &&

@@ -34,7 +34,7 @@ stmts+=("queue to 1")
 # ct_stmt
 stmts+=("ct mark set 1")
 # masq_stmt
-stmts+=(masquerade)
+stmts+=(masquerade fullcone)
 # redir_stmt
 stmts+=(redirect)
 # dup_stmt

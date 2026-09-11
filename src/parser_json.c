@@ -2296,6 +2296,7 @@ static int nat_type_parse(const char *type)
 		[NFT_NAT_SNAT]	= "snat",
 		[NFT_NAT_DNAT]	= "dnat",
 		[NFT_NAT_MASQ]	= "masquerade",
+		[NFT_NAT_FULLCONE] = "fullcone",
 		[NFT_NAT_REDIR]	= "redirect",
 	};
 	size_t i;
@@ -2913,6 +2914,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
 		{ "snat", json_parse_nat_stmt },
 		{ "dnat", json_parse_nat_stmt },
 		{ "masquerade", json_parse_nat_stmt },
+		{ "fullcone", json_parse_nat_stmt },
 		{ "redirect", json_parse_nat_stmt },
 		{ "reject", json_parse_reject_stmt },
 		{ "set", json_parse_set_stmt },

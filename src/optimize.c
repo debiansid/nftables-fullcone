@@ -299,6 +299,7 @@ static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b,
 				return false;
 			break;
 		case NFT_NAT_MASQ:
+		case NFT_NAT_FULLCONE:
 			break;
 		case NFT_NAT_REDIR:
 			if ((stmt_a->nat.proto &&
@@ -1216,7 +1217,8 @@ static uint32_t merge_stmt_type(const struct optimize_ctx *ctx,
 			if (stmt->type == STMT_NAT) {
 				if ((stmt->nat.type == NFT_NAT_REDIR &&
 				     !stmt->nat.proto) ||
-				    stmt->nat.type == NFT_NAT_MASQ)
+				    (stmt->nat.type == NFT_NAT_MASQ ||
+				     stmt->nat.type == NFT_NAT_FULLCONE))
 					return MERGE_BY_NAT;
 
 				return MERGE_BY_NAT_MAP;

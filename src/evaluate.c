@@ -87,6 +87,8 @@ const char *stmt_name(const struct stmt *stmt)
 			return "redirect";
 		case NFT_NAT_MASQ:
 			return "masquerade";
+		case NFT_NAT_FULLCONE:
+			return "fullcone";
 		}
 		break;
 	default:

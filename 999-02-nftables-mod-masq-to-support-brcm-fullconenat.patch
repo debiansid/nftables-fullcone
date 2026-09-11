@@ -1,7 +1,7 @@
-From: debiansid <wong.syrone@gmail.com>
+From: debiansid <9624961+debiansid@users.noreply.github.com>
 Subject: [PATCH 2/2] nftables: support Broadcom fullcone via masquerade
 
-Signed-off-by: debiansid <wong.syrone@gmail.com>
+Signed-off-by: debiansid <9624961+debiansid@users.noreply.github.com>
 ---
 diff --git a/include/linux/netfilter/nf_tables.h b/include/linux/netfilter/nf_tables.h
 index ae8cd209..55221989 100644

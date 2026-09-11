@@ -1,7 +1,7 @@
-From: debiansid <wong.syrone@gmail.com>
+From: debiansid <9624961+debiansid@users.noreply.github.com>
 Subject: [PATCH 1/2] nftables: add fullcone expression support
 
-Signed-off-by: debiansid <wong.syrone@gmail.com>
+Signed-off-by: debiansid <9624961+debiansid@users.noreply.github.com>
 ---
 diff --git a/include/linux/netfilter/nf_tables.h b/include/linux/netfilter/nf_tables.h
 index 45d0b92b..ae8cd209 100644

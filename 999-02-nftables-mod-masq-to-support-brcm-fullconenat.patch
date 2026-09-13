@@ -1,0 +1,215 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: debiansid <9624961+debiansid@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 10:44:38 +0800
+Subject: [PATCH 2/2] nftables: support Broadcom fullcone via masquerade
+
+Signed-off-by: debiansid <9624961+debiansid@users.noreply.github.com>
+
+diff --git a/include/linux/netfilter/nf_tables.h b/include/linux/netfilter/nf_tables.h
+index ae8cd209..55221989 100644
+--- a/include/linux/netfilter/nf_tables.h
++++ b/include/linux/netfilter/nf_tables.h
+@@ -1489,12 +1489,16 @@ enum nft_tproxy_attributes {
+  * @NFTA_MASQ_FLAGS: NAT flags (see NF_NAT_RANGE_* in linux/netfilter/nf_nat.h) (NLA_U32)
+  * @NFTA_MASQ_REG_PROTO_MIN: source register of proto range start (NLA_U32: nft_registers)
+  * @NFTA_MASQ_REG_PROTO_MAX: source register of proto range end (NLA_U32: nft_registers)
++ * @NFTA_MASQ_REG_ADDR_MIN: source register of address range start (NLA_U32: nft_registers), non-zero enables Broadcom fullcone
++ * @NFTA_MASQ_REG_ADDR_MAX: source register of address range end (NLA_U32: nft_registers)
+  */
+ enum nft_masq_attributes {
+ 	NFTA_MASQ_UNSPEC,
+ 	NFTA_MASQ_FLAGS,
+ 	NFTA_MASQ_REG_PROTO_MIN,
+ 	NFTA_MASQ_REG_PROTO_MAX,
++	NFTA_MASQ_REG_ADDR_MIN,
++	NFTA_MASQ_REG_ADDR_MAX,
+ 	__NFTA_MASQ_MAX
+ };
+ #define NFTA_MASQ_MAX		(__NFTA_MASQ_MAX - 1)
+diff --git a/src/netlink_delinearize.c b/src/netlink_delinearize.c
+index 9c555455..bbff1969 100644
+--- a/src/netlink_delinearize.c
++++ b/src/netlink_delinearize.c
+@@ -1479,7 +1479,7 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
+ 			       const struct nftnl_expr *nle)
+ {
+ 	enum nft_registers reg1, reg2;
+-	struct expr *proto;
++	struct expr *addr, *proto;
+ 	struct stmt *stmt;
+ 	uint32_t flags = 0;
+ 
+@@ -1515,6 +1515,32 @@ static void netlink_parse_masq(struct netlink_parse_ctx *ctx,
+ 		stmt->nat.proto = proto;
+ 	}
+ 
++	reg1 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_ADDR_MIN);
++	if (reg1) {
++		addr = netlink_get_register(ctx, loc, reg1);
++		if (addr == NULL) {
++			netlink_error(ctx, loc,
++				      "MASQUERADE statement has no address expression");
++			goto out_err;
++		}
++		expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
++		stmt->nat.addr = addr;
++	}
++
++	reg2 = netlink_parse_register(nle, NFTNL_EXPR_MASQ_REG_ADDR_MAX);
++	if (reg2 && reg2 != reg1) {
++		addr = netlink_get_register(ctx, loc, reg2);
++		if (addr == NULL) {
++			netlink_error(ctx, loc,
++				      "MASQUERADE statement has no address expression");
++			goto out_err;
++		}
++		expr_set_type(addr, &ipaddr_type, BYTEORDER_BIG_ENDIAN);
++		if (stmt->nat.addr != NULL)
++			addr = range_expr_alloc(loc, stmt->nat.addr, addr);
++		stmt->nat.addr = addr;
++	}
++
+ 	ctx->stmt = stmt;
+ 	return;
+ out_err:
+diff --git a/src/netlink_linearize.c b/src/netlink_linearize.c
+index ef4f46b5..596b3cdb 100644
+--- a/src/netlink_linearize.c
++++ b/src/netlink_linearize.c
+@@ -1255,6 +1255,8 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 	int registers = 0;
+ 	int nftnl_flag_attr;
+ 	int nftnl_reg_pmin, nftnl_reg_pmax;
++	int nftnl_reg_amin = NFTNL_EXPR_NAT_REG_ADDR_MIN;
++	int nftnl_reg_amax = NFTNL_EXPR_NAT_REG_ADDR_MAX;
+ 
+ 	switch (stmt->nat.type) {
+ 	case NFT_NAT_SNAT:
+@@ -1275,6 +1277,8 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 		nftnl_flag_attr = NFTNL_EXPR_MASQ_FLAGS;
+ 		nftnl_reg_pmin = NFTNL_EXPR_MASQ_REG_PROTO_MIN;
+ 		nftnl_reg_pmax = NFTNL_EXPR_MASQ_REG_PROTO_MAX;
++		nftnl_reg_amin = NFTNL_EXPR_MASQ_REG_ADDR_MIN;
++		nftnl_reg_amax = NFTNL_EXPR_MASQ_REG_ADDR_MAX;
+ 		break;
+ 	case NFT_NAT_FULLCONE:
+ 		nle = alloc_nft_expr("fullcone");
+@@ -1307,13 +1311,13 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 
+ 			netlink_gen_expr(ctx, stmt->nat.addr->left, amin_reg);
+ 			netlink_gen_expr(ctx, stmt->nat.addr->right, amax_reg);
+-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN,
++			netlink_put_register(nle, nftnl_reg_amin,
+ 					     amin_reg);
+-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
++			netlink_put_register(nle, nftnl_reg_amax,
+ 					     amax_reg);
+ 		} else {
+ 			netlink_gen_expr(ctx, stmt->nat.addr, amin_reg);
+-			netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MIN,
++			netlink_put_register(nle, nftnl_reg_amin,
+ 					     amin_reg);
+ 			if (stmt->nat.addr->etype == EXPR_MAP &&
+ 			    stmt->nat.addr->mappings->set->data->flags & EXPR_F_INTERVAL) {
+@@ -1322,7 +1326,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 					netlink_put_register(nle, nftnl_reg_pmin,
+ 							     amin_reg);
+ 				} else {
+-					netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
++					netlink_put_register(nle, nftnl_reg_amax,
+ 							     amin_reg);
+ 				}
+ 			}
+@@ -1338,7 +1342,7 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 
+ 			if (stmt->nat.type_flags & STMT_NAT_F_INTERVAL) {
+ 				pmin_reg += netlink_register_space(nat_addrlen(family));
+-				netlink_put_register(nle, NFTNL_EXPR_NAT_REG_ADDR_MAX,
++				netlink_put_register(nle, nftnl_reg_amax,
+ 						     pmin_reg);
+ 			}
+ 
+diff --git a/src/parser_bison.y b/src/parser_bison.y
+index e38e5029..36f3b226 100644
+--- a/src/parser_bison.y
++++ b/src/parser_bison.y
+@@ -690,6 +690,7 @@ int nft_lex(void *, void *, void *);
+ %token DNAT			"dnat"
+ %token MASQUERADE		"masquerade"
+ %token FULLCONE			"fullcone"
++%token BRCMFULLCONE		"brcmfullcone"
+ %token REDIRECT			"redirect"
+ %token RANDOM			"random"
+ %token FULLY_RANDOM		"fully-random"
+@@ -4176,6 +4177,12 @@ masq_stmt_args		:	TO 	COLON	stmt_expr
+ 			{
+ 				$<stmt>0->nat.flags = $1;
+ 			}
++			|	BRCMFULLCONE
++			{
++				/* A non-zero address register enables Broadcom fullcone. */
++				$<stmt>0->nat.addr = symbol_expr_alloc(&@$, SYMBOL_VALUE,
++								       current_scope(state), "1253");
++			}
+ 			;
+ 
+ redir_stmt		:	redir_stmt_alloc	redir_stmt_arg
+diff --git a/src/scanner.l b/src/scanner.l
+index 628b4304..3b659629 100644
+--- a/src/scanner.l
++++ b/src/scanner.l
+@@ -487,6 +487,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
+ <*>"dnat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return DNAT; }
+ <*>"masquerade"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return MASQUERADE; }
+ <*>"fullcone"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return FULLCONE; }
++"brcmfullcone"		{ return BRCMFULLCONE; }
+ <*>"redirect"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return REDIRECT; }
+ "random"		{ return RANDOM; }
+ <SCANSTATE_STMT_NAT>{
+diff --git a/src/statement.c b/src/statement.c
+index 07e83ba7..a38da077 100644
+--- a/src/statement.c
++++ b/src/statement.c
+@@ -691,24 +691,30 @@ const char *nat_etype2str(enum nft_nat_etypes type)
+ 
+ static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+ {
++	bool brcmfullcone = stmt->nat.type == NFT_NAT_MASQ && stmt->nat.addr;
++
+ 	nft_print(octx, "%s", nat_etype2str(stmt->nat.type));
+ 	if (stmt->nat.addr || stmt->nat.proto) {
+-		switch (stmt->nat.family) {
+-		case NFPROTO_IPV4:
+-			nft_print(octx, " ip");
+-			break;
+-		case NFPROTO_IPV6:
+-			nft_print(octx, " ip6");
+-			break;
+-		}
++		if (brcmfullcone) {
++			nft_print(octx, " brcmfullcone");
++		} else {
++			switch (stmt->nat.family) {
++			case NFPROTO_IPV4:
++				nft_print(octx, " ip");
++				break;
++			case NFPROTO_IPV6:
++				nft_print(octx, " ip6");
++				break;
++			}
+ 
+-		if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
+-			nft_print(octx, " prefix");
++			if (stmt->nat.type_flags & STMT_NAT_F_PREFIX)
++				nft_print(octx, " prefix");
+ 
+-		nft_print(octx, " to");
++			nft_print(octx, " to");
++		}
+ 	}
+ 
+-	if (stmt->nat.addr) {
++	if (stmt->nat.addr && !brcmfullcone) {
+ 		nft_print(octx, " ");
+ 		if (stmt->nat.proto) {
+ 			if (stmt->nat.addr->etype == EXPR_VALUE &&

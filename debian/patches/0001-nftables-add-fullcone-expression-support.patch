@@ -1,0 +1,242 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: debiansid <9624961+debiansid@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 10:44:07 +0800
+Subject: [PATCH 1/2] nftables: add fullcone expression support
+
+Signed-off-by: debiansid <9624961+debiansid@users.noreply.github.com>
+
+diff --git a/include/linux/netfilter/nf_tables.h b/include/linux/netfilter/nf_tables.h
+index 45d0b92b..ae8cd209 100644
+--- a/include/linux/netfilter/nf_tables.h
++++ b/include/linux/netfilter/nf_tables.h
+@@ -1499,6 +1499,22 @@ enum nft_masq_attributes {
+ };
+ #define NFTA_MASQ_MAX		(__NFTA_MASQ_MAX - 1)
+ 
++/**
++ * enum nft_fullcone_attributes - nf_tables fullcone expression attributes
++ *
++ * @NFTA_FULLCONE_FLAGS: NAT flags (see NF_NAT_RANGE_* in linux/netfilter/nf_nat.h) (NLA_U32)
++ * @NFTA_FULLCONE_REG_PROTO_MIN: source register of proto range start (NLA_U32: nft_registers)
++ * @NFTA_FULLCONE_REG_PROTO_MAX: source register of proto range end (NLA_U32: nft_registers)
++ */
++enum nft_fullcone_attributes {
++	NFTA_FULLCONE_UNSPEC,
++	NFTA_FULLCONE_FLAGS,
++	NFTA_FULLCONE_REG_PROTO_MIN,
++	NFTA_FULLCONE_REG_PROTO_MAX,
++	__NFTA_FULLCONE_MAX
++};
++#define NFTA_FULLCONE_MAX	(__NFTA_FULLCONE_MAX - 1)
++
+ /**
+  * enum nft_redir_attributes - nf_tables redirect expression netlink attributes
+  *
+diff --git a/include/statement.h b/include/statement.h
+index e8724dde..d4149351 100644
+--- a/include/statement.h
++++ b/include/statement.h
+@@ -129,6 +129,7 @@ enum nft_nat_etypes {
+ 	__NFT_NAT_SNAT = NFT_NAT_SNAT,
+ 	__NFT_NAT_DNAT = NFT_NAT_DNAT,
+ 	NFT_NAT_MASQ,
++	NFT_NAT_FULLCONE,
+ 	NFT_NAT_REDIR,
+ };
+ 
+diff --git a/src/evaluate.c b/src/evaluate.c
+index 8115867f..c001c2cd 100644
+--- a/src/evaluate.c
++++ b/src/evaluate.c
+@@ -87,6 +87,8 @@ const char *stmt_name(const struct stmt *stmt)
+ 			return "redirect";
+ 		case NFT_NAT_MASQ:
+ 			return "masquerade";
++		case NFT_NAT_FULLCONE:
++			return "fullcone";
+ 		}
+ 		break;
+ 	default:
+diff --git a/src/netlink_delinearize.c b/src/netlink_delinearize.c
+index 81763206..9c555455 100644
+--- a/src/netlink_delinearize.c
++++ b/src/netlink_delinearize.c
+@@ -1521,6 +1521,53 @@ out_err:
+ 	stmt_free(stmt);
+ }
+ 
++static void netlink_parse_fullcone(struct netlink_parse_ctx *ctx,
++				   const struct location *loc,
++				   const struct nftnl_expr *nle)
++{
++	enum nft_registers reg1, reg2;
++	struct expr *proto;
++	struct stmt *stmt;
++	uint32_t flags = 0;
++
++	if (nftnl_expr_is_set(nle, NFTNL_EXPR_FULLCONE_FLAGS))
++		flags = nftnl_expr_get_u32(nle, NFTNL_EXPR_FULLCONE_FLAGS);
++
++	stmt = nat_stmt_alloc(loc, NFT_NAT_FULLCONE);
++	stmt->nat.flags = flags;
++
++	reg1 = netlink_parse_register(nle, NFTNL_EXPR_FULLCONE_REG_PROTO_MIN);
++	if (reg1) {
++		proto = netlink_get_register(ctx, loc, reg1);
++		if (proto == NULL) {
++			netlink_error(ctx, loc,
++				      "fullcone statement has no proto expression");
++			goto out_err;
++		}
++		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
++		stmt->nat.proto = proto;
++	}
++
++	reg2 = netlink_parse_register(nle, NFTNL_EXPR_FULLCONE_REG_PROTO_MAX);
++	if (reg2 && reg2 != reg1) {
++		proto = netlink_get_register(ctx, loc, reg2);
++		if (proto == NULL) {
++			netlink_error(ctx, loc,
++				      "fullcone statement has no proto expression");
++			goto out_err;
++		}
++		expr_set_type(proto, &inet_service_type, BYTEORDER_BIG_ENDIAN);
++		if (stmt->nat.proto != NULL)
++			proto = range_expr_alloc(loc, stmt->nat.proto, proto);
++		stmt->nat.proto = proto;
++	}
++
++	ctx->stmt = stmt;
++	return;
++out_err:
++	stmt_free(stmt);
++}
++
+ static void netlink_parse_redir(struct netlink_parse_ctx *ctx,
+ 				const struct location *loc,
+ 				const struct nftnl_expr *nle)
+@@ -1952,6 +1999,7 @@ static const struct expr_handler netlink_parsers[] = {
+ 	{ .name = "tproxy",	.parse = netlink_parse_tproxy },
+ 	{ .name = "notrack",	.parse = netlink_parse_notrack },
+ 	{ .name = "masq",	.parse = netlink_parse_masq },
++	{ .name = "fullcone",	.parse = netlink_parse_fullcone },
+ 	{ .name = "redir",	.parse = netlink_parse_redir },
+ 	{ .name = "dup",	.parse = netlink_parse_dup },
+ 	{ .name = "queue",	.parse = netlink_parse_queue },
+diff --git a/src/netlink_linearize.c b/src/netlink_linearize.c
+index dfa841c6..ef4f46b5 100644
+--- a/src/netlink_linearize.c
++++ b/src/netlink_linearize.c
+@@ -1276,6 +1276,13 @@ static void netlink_gen_nat_stmt(struct netlink_linearize_ctx *ctx,
+ 		nftnl_reg_pmin = NFTNL_EXPR_MASQ_REG_PROTO_MIN;
+ 		nftnl_reg_pmax = NFTNL_EXPR_MASQ_REG_PROTO_MAX;
+ 		break;
++	case NFT_NAT_FULLCONE:
++		nle = alloc_nft_expr("fullcone");
++
++		nftnl_flag_attr = NFTNL_EXPR_FULLCONE_FLAGS;
++		nftnl_reg_pmin = NFTNL_EXPR_FULLCONE_REG_PROTO_MIN;
++		nftnl_reg_pmax = NFTNL_EXPR_FULLCONE_REG_PROTO_MAX;
++		break;
+ 	case NFT_NAT_REDIR:
+ 		nle = alloc_nft_expr("redir");
+ 
+diff --git a/src/optimize.c b/src/optimize.c
+index a2bd3aab..652258d4 100644
+--- a/src/optimize.c
++++ b/src/optimize.c
+@@ -299,6 +299,7 @@ static bool __stmt_type_eq(const struct stmt *stmt_a, const struct stmt *stmt_b,
+ 				return false;
+ 			break;
+ 		case NFT_NAT_MASQ:
++		case NFT_NAT_FULLCONE:
+ 			break;
+ 		case NFT_NAT_REDIR:
+ 			if ((stmt_a->nat.proto &&
+@@ -1216,7 +1217,8 @@ static uint32_t merge_stmt_type(const struct optimize_ctx *ctx,
+ 			if (stmt->type == STMT_NAT) {
+ 				if ((stmt->nat.type == NFT_NAT_REDIR &&
+ 				     !stmt->nat.proto) ||
+-				    stmt->nat.type == NFT_NAT_MASQ)
++				    (stmt->nat.type == NFT_NAT_MASQ ||
++				     stmt->nat.type == NFT_NAT_FULLCONE))
+ 					return MERGE_BY_NAT;
+ 
+ 				return MERGE_BY_NAT_MAP;
+diff --git a/src/parser_bison.y b/src/parser_bison.y
+index 9060c8c3..e38e5029 100644
+--- a/src/parser_bison.y
++++ b/src/parser_bison.y
+@@ -689,6 +689,7 @@ int nft_lex(void *, void *, void *);
+ %token SNAT			"snat"
+ %token DNAT			"dnat"
+ %token MASQUERADE		"masquerade"
++%token FULLCONE			"fullcone"
+ %token REDIRECT			"redirect"
+ %token RANDOM			"random"
+ %token FULLY_RANDOM		"fully-random"
+@@ -4159,6 +4160,7 @@ masq_stmt		:	masq_stmt_alloc		masq_stmt_args
+ 			;
+ 
+ masq_stmt_alloc		:	MASQUERADE	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_MASQ); }
++			|	FULLCONE	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_FULLCONE); }
+ 			;
+ 
+ masq_stmt_args		:	TO 	COLON	stmt_expr
+diff --git a/src/parser_json.c b/src/parser_json.c
+index 0522b2cd..4b947fe5 100644
+--- a/src/parser_json.c
++++ b/src/parser_json.c
+@@ -2296,6 +2296,7 @@ static int nat_type_parse(const char *type)
+ 		[NFT_NAT_SNAT]	= "snat",
+ 		[NFT_NAT_DNAT]	= "dnat",
+ 		[NFT_NAT_MASQ]	= "masquerade",
++		[NFT_NAT_FULLCONE] = "fullcone",
+ 		[NFT_NAT_REDIR]	= "redirect",
+ 	};
+ 	size_t i;
+@@ -2913,6 +2914,7 @@ static struct stmt *json_parse_stmt(struct json_ctx *ctx, json_t *root)
+ 		{ "snat", json_parse_nat_stmt },
+ 		{ "dnat", json_parse_nat_stmt },
+ 		{ "masquerade", json_parse_nat_stmt },
++		{ "fullcone", json_parse_nat_stmt },
+ 		{ "redirect", json_parse_nat_stmt },
+ 		{ "reject", json_parse_reject_stmt },
+ 		{ "set", json_parse_set_stmt },
+diff --git a/src/scanner.l b/src/scanner.l
+index 61fcc4fa..628b4304 100644
+--- a/src/scanner.l
++++ b/src/scanner.l
+@@ -486,6 +486,7 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr})
+ <*>"snat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return SNAT; }
+ <*>"dnat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return DNAT; }
+ <*>"masquerade"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return MASQUERADE; }
++<*>"fullcone"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return FULLCONE; }
+ <*>"redirect"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return REDIRECT; }
+ "random"		{ return RANDOM; }
+ <SCANSTATE_STMT_NAT>{
+diff --git a/src/statement.c b/src/statement.c
+index 9cfbe9b3..07e83ba7 100644
+--- a/src/statement.c
++++ b/src/statement.c
+@@ -682,6 +682,7 @@ const char *nat_etype2str(enum nft_nat_etypes type)
+ 		[NFT_NAT_SNAT]	= "snat",
+ 		[NFT_NAT_DNAT]	= "dnat",
+ 		[NFT_NAT_MASQ]	= "masquerade",
++		[NFT_NAT_FULLCONE] = "fullcone",
+ 		[NFT_NAT_REDIR]	= "redirect",
+ 	};
+ 
+diff --git a/tests/shell/testcases/parsing/exclusive_start_cond b/tests/shell/testcases/parsing/exclusive_start_cond
+index f769e7dd..d791c416 100755
+--- a/tests/shell/testcases/parsing/exclusive_start_cond
++++ b/tests/shell/testcases/parsing/exclusive_start_cond
+@@ -34,7 +34,7 @@ stmts+=("queue to 1")
+ # ct_stmt
+ stmts+=("ct mark set 1")
+ # masq_stmt
+-stmts+=(masquerade)
++stmts+=(masquerade fullcone)
+ # redir_stmt
+ stmts+=(redirect)
+ # dup_stmt

@@ -1,5 +1,9 @@
 nftables (1.1.7-1) unstable; urgency=medium
 
+  [ debiansid ]
+  * Add Fullcone NAT statement support.
+  * Support Broadcom Fullcone NAT through the masquerade statement.
+
   [ Luca Boccassi ]
   * [b5cb949] nftables.service: add ConditionFileNotEmpty=/etc/nftables.conf
 

@@ -77,6 +77,9 @@ Section: libs
 Priority: optional
 Architecture: linux-any
 Multi-Arch: same
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
 Description: Netfilter nftables high level userspace API library
  This library provides high level semantics to interact with the nftables
  framework by Netfilter project.
